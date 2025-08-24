@@ -1,0 +1,1779 @@
+"use client";
+
+import type React from "react";
+
+import { useState, useRef, useEffect } from "react";
+import { useChat } from "ai/react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Download,
+  Upload,
+  FileText,
+  Sparkles,
+  Key,
+  AlertTriangle,
+  Youtube,
+  MessageSquare,
+  Mail,
+  HandHeart,
+  TableIcon as TableOfContents,
+  RotateCw,
+} from "lucide-react";
+import PDFViewer from "@/components/pdf-viewer";
+import ResumeEditor from "@/components/resume-editor";
+import { defaultResumeData } from "@/lib/default-resume-data";
+import type {
+  ResumeData,
+  Template,
+  AIModel,
+  Experience,
+  Education,
+  Project,
+  Achievement,
+} from "@/lib/types";
+import { generatePDF } from "@/lib/pdf-generator";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { resumeTemplates } from "@/components/pdf-templates";
+import Link from "next/link";
+import EnhancedChat from "@/components/enhanced-chat";
+import LoadingScreen from "@/components/loading-screen";
+
+// Import the correct components
+import InfiniteMarquee from "@/components/ui/infinite-marquee";
+import { galleryItems } from "@/lib/gallery-data";
+
+export default function ResumePage() {
+  const { toast } = useToast();
+  const [resumeData, setResumeData] = useState<ResumeData>(() => {
+    // Load from localStorage if available
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("resumeData");
+      return saved ? JSON.parse(saved) : defaultResumeData;
+    }
+    return defaultResumeData;
+  });
+  const [template, setTemplate] = useState<Template>(() => {
+    // Load from localStorage if available
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("resumeTemplate");
+      return saved ? (saved as Template) : "modern";
+    }
+    return "modern";
+  });
+  const [aiMode, setAiMode] = useState(true);
+  const [jobDescription, setJobDescription] = useState("");
+  const [selectedModel, setSelectedModel] = useState<AIModel>("lingo-ai");
+  const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [showQuotaWarning, setShowQuotaWarning] = useState(false);
+  const [contextText, setContextText] = useState(() => {
+    // Load from localStorage if available
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("aiContextText") || "";
+    }
+    return "";
+  });
+  const [showContextInput, setShowContextInput] = useState(false);
+  
+  // Custom model configuration
+  const [customEndpoint, setCustomEndpoint] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("customEndpoint") || "";
+    }
+    return "";
+  });
+  const [customModel, setCustomModel] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("customModel") || "";
+    }
+    return "";
+  });
+  const [customHeaders, setCustomHeaders] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("customHeaders") || "";
+    }
+    return "";
+  });
+  const [customAuth, setCustomAuth] = useState<"bearer" | "api-key" | "custom" | "none">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("customAuth");
+      return (saved as "bearer" | "api-key" | "custom" | "none") || "bearer";
+    }
+    return "bearer";
+  });
+  const [showCustomConfig, setShowCustomConfig] = useState(false);
+  const [showTutorials, setShowTutorials] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachmentRef = useRef<HTMLInputElement>(null);
+
+  const {
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    setMessages,
+    isLoading,
+    error,
+    stop,
+  } = useChat({
+    api: "/api/chat",
+    body: {
+      resumeData,
+      aiMode,
+      jobDescription,
+      model: selectedModel,
+      apiKey: apiKey || undefined,
+      contextText: (selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") ? (contextText || undefined) : undefined,
+      customEndpoint: customEndpoint || undefined,
+      customModel: customModel || undefined,
+      customHeaders: customHeaders || undefined,
+      customAuth: customAuth || undefined,
+      attachedFiles: undefined, // We'll handle files in the submit handler instead
+    },
+    onError: (error) => {
+      console.error("Chat error:", error);
+      if (
+        error.message &&
+        error.message.includes("429") &&
+        error.message.includes("quota")
+      ) {
+        setShowQuotaWarning(true);
+      }
+    },
+  });
+
+  // Save to localStorage whenever resumeData changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("resumeData", JSON.stringify(resumeData));
+    }
+  }, [resumeData]);
+
+  // Save template to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("resumeTemplate", template);
+    }
+  }, [template]);
+
+  // Save context text to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("aiContextText", contextText);
+    }
+  }, [contextText]);
+
+  // Save custom configuration to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("customEndpoint", customEndpoint);
+    }
+  }, [customEndpoint]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("customModel", customModel);
+    }
+  }, [customModel]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("customHeaders", customHeaders);
+    }
+  }, [customHeaders]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("customAuth", customAuth);
+    }
+  }, [customAuth]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        setResumeData(json);
+        toast({
+          title: "Resume data loaded",
+          description: "Your resume data has been successfully imported.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error loading file",
+          description: "The file is not a valid JSON resume data file.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const downloadResumeData = () => {
+    const dataStr = JSON.stringify(resumeData, null, 2);
+    const dataUri =
+      "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+    const exportFileDefaultName = "resume-data.json";
+
+    const linkElement = document.createElement("a");
+    linkElement.setAttribute("href", dataUri);
+    linkElement.setAttribute("download", exportFileDefaultName);
+    linkElement.click();
+
+    toast({
+      title: "Resume data saved",
+      description: "Your resume data has been downloaded as JSON.",
+    });
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      await generatePDF(resumeData, template);
+      toast({
+        title: "PDF Downloaded",
+        description: "Your resume has been downloaded as a PDF.",
+      });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        title: "Error generating PDF",
+        description:
+          "There was an error generating your PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Fix the applyAiChanges function to properly extract and apply JSON changes from AI chat
+  const applyAiChanges = () => {
+    // Find the last assistant message
+    const lastAssistantMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    if (!lastAssistantMessage) return;
+
+    try {
+      // Improved regex to better match JSON in the message, handling multiline JSON blocks
+      const regex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/;
+      const match = lastAssistantMessage.content.match(regex);
+
+      if (match && match[1]) {
+        try {
+          const suggestedChanges = JSON.parse(match[1].trim());
+          console.log("Parsed AI suggestions:", suggestedChanges);
+
+          // Deep merge changes instead of replacing entire objects
+          setResumeData((current) => {
+            const newResumeData = { ...current };
+
+            // Handle basic info properly to preserve profile picture and other fields
+            if (suggestedChanges.basicInfo) {
+              newResumeData.basicInfo = {
+                ...current.basicInfo,
+                ...suggestedChanges.basicInfo,
+              };
+            }
+
+            // Handle skills array properly
+            if (suggestedChanges.skills) {
+              newResumeData.skills = suggestedChanges.skills;
+            }
+
+            // Handle experience array properly
+            if (suggestedChanges.experience) {
+              // If specific experience items are updated, merge them
+              if (Array.isArray(suggestedChanges.experience)) {
+                newResumeData.experience = suggestedChanges.experience.map(
+                  (newExp: Partial<Experience>, index: number) => {
+                    // If there's an existing experience item, merge with it
+                    if (current.experience[index]) {
+                      return { ...current.experience[index], ...newExp };
+                    }
+                    return newExp as Experience;
+                  }
+                );
+              }
+            }
+
+            // Handle education array properly
+            if (suggestedChanges.education) {
+              if (Array.isArray(suggestedChanges.education)) {
+                newResumeData.education = suggestedChanges.education.map(
+                  (newEdu: Partial<Education>, index: number) => {
+                    if (current.education[index]) {
+                      return { ...current.education[index], ...newEdu };
+                    }
+                    return newEdu as Education;
+                  }
+                );
+              }
+            }
+
+            // Handle projects array properly
+            if (suggestedChanges.projects) {
+              if (Array.isArray(suggestedChanges.projects)) {
+                newResumeData.projects = suggestedChanges.projects.map(
+                  (newProj: Partial<Project>, index: number) => {
+                    if (current.projects && current.projects[index]) {
+                      return { ...current.projects[index], ...newProj };
+                    }
+                    return newProj as Project;
+                  }
+                );
+              }
+            }
+
+            // Handle achievements array properly
+            if (suggestedChanges.achievements) {
+              if (Array.isArray(suggestedChanges.achievements)) {
+                newResumeData.achievements = suggestedChanges.achievements.map(
+                  (newAch: Partial<Achievement>, index: number) => {
+                    if (current.achievements && current.achievements[index]) {
+                      return { ...current.achievements[index], ...newAch };
+                    }
+                    return newAch as Achievement;
+                  }
+                );
+              }
+            }
+
+            console.log("Updated resume data:", newResumeData);
+            return newResumeData;
+          });
+
+          toast({
+            title: "AI changes applied",
+            description:
+              "The suggested changes have been applied to your resume.",
+          });
+        } catch (jsonError) {
+          console.error(
+            "JSON parsing error:",
+            jsonError,
+            "Raw JSON:",
+            match[1]
+          );
+          toast({
+            title: "Error parsing JSON",
+            description:
+              "The AI suggestion contains invalid JSON. Please try again.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        // Try to find JSON without code blocks
+        const jsonRegex = /\{[\s\S]*?\}/g;
+        const jsonMatches = lastAssistantMessage.content.match(jsonRegex);
+
+        if (jsonMatches) {
+          // Try each potential JSON match
+          for (const potentialJson of jsonMatches) {
+            try {
+              const suggestedChanges = JSON.parse(potentialJson);
+
+              // Check if this is a valid resume change (has at least one expected key)
+              const validKeys = [
+                "basicInfo",
+                "experience",
+                "education",
+                "skills",
+                "projects",
+                "achievements",
+              ];
+              if (validKeys.some((key) => key in suggestedChanges)) {
+                // Apply the changes using the same logic as above
+                setResumeData((current) => {
+                  const newResumeData = { ...current };
+
+                  if (suggestedChanges.basicInfo) {
+                    newResumeData.basicInfo = {
+                      ...current.basicInfo,
+                      ...suggestedChanges.basicInfo,
+                    };
+                  }
+
+                  if (suggestedChanges.skills) {
+                    newResumeData.skills = suggestedChanges.skills;
+                  }
+
+                  // Handle other sections similarly...
+
+                  return newResumeData;
+                });
+
+                toast({
+                  title: "AI changes applied",
+                  description:
+                    "The suggested changes have been applied to your resume.",
+                });
+
+                return; // Exit after successfully applying changes
+              }
+            } catch (e) {
+              // This wasn't valid JSON or wasn't a resume change, continue to next match
+              continue;
+            }
+          }
+        }
+
+        toast({
+          title: "No changes found",
+          description: "No applicable changes were found in the AI response.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Failed to parse AI suggestions", error);
+      toast({
+        title: "Error applying changes",
+        description: "There was an error applying the AI suggestions.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Add a function to ensure data consistency between editor and PDF viewer
+  useEffect(() => {
+    // This effect ensures that any changes to resumeData (whether from editor or AI)
+    // are properly synchronized and saved
+
+    // Save to localStorage whenever resumeData changes
+    if (typeof window !== "undefined") {
+      localStorage.setItem("resumeData", JSON.stringify(resumeData));
+      console.log("Resume data saved to localStorage:", resumeData);
+    }
+  }, [resumeData]);
+
+  // Custom chat submission handler that supports file uploads
+  const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setShowQuotaWarning(false);
+
+    // Check if there are attached files
+    if (attachedFiles.length > 0) {
+      // Process attached files and send to AI model
+      const fileData = await processAttachedFiles(attachedFiles);
+      
+      // Create a comprehensive message that includes file content
+      let enhancedInput = input;
+      if (input.trim()) {
+        enhancedInput += '\n\n';
+      }
+      
+      enhancedInput += 'Attached Files:\n';
+      for (const file of fileData) {
+        if (file.contentType === 'pdf') {
+          enhancedInput += `\nPDF: ${file.name} (${file.pages} pages)\nContent:\n${file.content}\n`;
+        } else if (file.contentType === 'document') {
+          enhancedInput += `\nDocument: ${file.name}\nContent:\n${file.content}\n`;
+        } else if (file.contentType === 'image') {
+          enhancedInput += `\nImage: ${file.name}\nDescription: ${file.content}\n`;
+        } else if (file.contentType === 'json') {
+          enhancedInput += `\nJSON: ${file.name}\nData: ${JSON.stringify(file.content, null, 2)}\n`;
+        } else if (file.contentType === 'text' || file.contentType === 'csv') {
+          enhancedInput += `\nText/CSV: ${file.name}\nContent:\n${file.content}\n`;
+        } else if (file.contentType === 'excel') {
+          enhancedInput += `\nExcel: ${file.name}\nInfo: ${file.content}\n`;
+        } else {
+          enhancedInput += `\nFile: ${file.name}\nContent: ${file.content}\n`;
+        }
+      }
+      
+      // Update the input with file content and submit
+      const originalInput = input;
+      handleInputChange({ target: { value: enhancedInput } } as any);
+      
+      // Submit the enhanced message
+      setTimeout(() => {
+        handleSubmit(e);
+        
+        // Restore original input after submission
+        setTimeout(() => {
+          handleInputChange({ target: { value: originalInput } } as any);
+        }, 100);
+      }, 100);
+      
+      // Clear attached files after processing
+      setAttachedFiles([]);
+      
+      toast({
+        title: "Files processed",
+        description: `${attachedFiles.length} file(s) have been processed and sent to the AI model.`,
+      });
+      
+      return;
+    }
+
+    // Normal submit without attachment using the useChat hook
+    handleSubmit(e);
+  };
+
+  // Process attached files and convert them to text/data that can be sent to AI
+  const processAttachedFiles = async (files: File[]): Promise<any[]> => {
+    const processedFiles = [];
+    
+    for (const file of files) {
+      try {
+        if (file.type === "application/json") {
+          // For JSON files, parse and send as structured data
+          const text = await file.text();
+          const data = JSON.parse(text);
+          processedFiles.push({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            content: data,
+            contentType: 'json'
+          });
+        } else if (file.type === "text/plain" || file.type === "text/csv") {
+          // For text and CSV files, read and send as text
+          const text = await file.text();
+          processedFiles.push({
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            content: text,
+            contentType: file.type === "text/csv" ? 'csv' : 'text'
+          });
+        } else if (file.type === "application/pdf") {
+          // For PDF files, extract text content using pdfjs-dist
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdfjsLib = await import('pdfjs-dist');
+            
+            // Set worker source for PDF.js
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+            
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            let pageCount = pdf.numPages;
+            
+            // Extract text from each page
+            for (let i = 1; i <= pageCount; i++) {
+              const page = await pdf.getPage(i);
+              const textContent = await page.getTextContent();
+              const pageText = textContent.items.map((item: any) => item.str).join(' ');
+              fullText += `Page ${i}: ${pageText}\n\n`;
+            }
+            
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: fullText.trim(),
+              contentType: 'pdf',
+              pages: pageCount,
+              info: { title: file.name }
+            });
+          } catch (pdfError) {
+            console.error(`PDF parsing error for ${file.name}:`, pdfError);
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: `Error extracting text from PDF "${file.name}". Please ensure it's a valid PDF file.`,
+              contentType: 'pdf-error'
+            });
+          }
+        } else if (file.type.includes("word") || file.type.includes("document") || 
+                   file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+          // For Word documents, extract text content using mammoth
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const mammoth = (await import('mammoth')).default;
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: result.value,
+              contentType: 'document',
+              messages: result.messages
+            });
+          } catch (docError) {
+            console.error(`Document parsing error for ${file.name}:`, docError);
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: `Error extracting text from document "${file.name}". Please ensure it's a valid Word document.`,
+              contentType: 'document-error'
+            });
+          }
+        } else if (file.type.startsWith("image/")) {
+          // For images, convert to base64 and send for analysis
+          try {
+            const arrayBuffer = await file.arrayBuffer();
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            const dataUrl = `data:${file.type};base64,${base64}`;
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: `Image file "${file.name}" attached. Image data available for AI analysis.`,
+              contentType: 'image',
+              base64: dataUrl,
+              dimensions: await getImageDimensions(file)
+            });
+          } catch (imgError) {
+            console.error(`Image processing error for ${file.name}:`, imgError);
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: `Error processing image "${file.name}".`,
+              contentType: 'image-error'
+            });
+          }
+        } else if (file.type.includes("excel") || file.type.includes("spreadsheet") || 
+                   file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+                   file.type === "application/vnd.ms-excel") {
+          // For Excel files, provide information about processing
+          try {
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: `Excel file "${file.name}" attached. Spreadsheet analysis coming soon. For now, please export as CSV or copy-paste the relevant data.`,
+              contentType: 'excel',
+              info: 'Spreadsheet data extraction coming soon'
+            });
+          } catch (excelError) {
+            console.error(`Excel processing error for ${file.name}:`, excelError);
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: `Error processing Excel file "${file.name}".`,
+              contentType: 'excel-error'
+            });
+          }
+        } else {
+          // For other file types, try to read as text
+          try {
+            const text = await file.text();
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: text,
+              contentType: 'text-fallback'
+            });
+          } catch (textError) {
+            processedFiles.push({
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              content: `File "${file.name}" attached. Content extraction not supported for this file type.`,
+              contentType: 'unsupported'
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Error processing file ${file.name}:`, error);
+        processedFiles.push({
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          content: `Error processing file "${file.name}".`,
+          contentType: 'error'
+        });
+      }
+    }
+    
+    return processedFiles;
+  };
+
+  // Helper function to get image dimensions
+  const getImageDimensions = (file: File): Promise<{width: number, height: number} | null> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        resolve({ width: img.width, height: img.height });
+      };
+      img.onerror = () => {
+        resolve(null);
+      };
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Add a debug button to help troubleshoot data synchronization issues
+  const debugResumeData = () => {
+    console.log("Current resume data:", resumeData);
+    toast({
+      title: "Resume data logged",
+      description:
+        "Current resume data has been logged to the console for debugging.",
+    });
+  };
+
+  // Save custom configuration and show toast
+  const saveCustomConfig = () => {
+    toast({
+      title: "Configuration saved",
+      description: "Custom model configuration has been saved successfully.",
+    });
+  };
+
+  // Clear attached files
+  const clearAttachedFiles = () => {
+    setAttachedFiles([]);
+    if (attachmentRef.current) {
+      attachmentRef.current.value = "";
+    }
+  };
+
+  return (
+    <LoadingScreen minLoadingTime={5000}>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+        <div className="container mx-auto py-8 px-4">
+          <header className="mb-8 text-center">
+            <h1 className="text-4xl font-bold mb-2 text-primary">
+              AI-Powered Resume Generator
+            </h1>
+            <p className="text-muted-foreground">
+              Create, customize, and optimize your resume with AI assistance
+            </p>
+          </header>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left Column - Editor & Chat */}
+            <div className="space-y-6">
+              <Card className="border shadow-md">
+                <Tabs defaultValue="editor" className="w-full">
+                  <TabsList className="w-full rounded-t-lg rounded-b-none bg-muted/50">
+                    <TabsTrigger
+                      value="editor"
+                      className="flex-1 data-[state=active]:bg-background"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Editor
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="chat"
+                      className="flex-1 data-[state=active]:bg-background"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      AI Assistant
+                      {contextText && contextText.trim() && (
+                        <div className="ml-2 w-2 h-2 bg-blue-500 rounded-full"></div>
+                      )}
+                      {attachedFiles.length > 0 && (
+                        <div className="ml-2 w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      )}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="editor" className="p-6 space-y-4 m-0">
+                    <div>
+                      <ResumeEditor
+                        resumeData={resumeData}
+                        setResumeData={setResumeData}
+                      />
+                    </div>
+                  </TabsContent>
+
+                  {/* Enhanced chat UI */}
+                  <TabsContent value="chat" className="p-6 space-y-4 m-0">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="ai-mode"
+                          checked={aiMode}
+                          onCheckedChange={setAiMode}
+                        />
+                        <Label
+                          htmlFor="ai-mode"
+                          className="flex items-center gap-2"
+                        >
+                          <Sparkles size={16} className="text-yellow-500" />
+                          Tailor Resume Mode
+                        </Label>
+                      </div>
+                      
+                      {attachedFiles.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {attachedFiles.length} file(s) attached
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={clearAttachedFiles}
+                            className="h-7 px-2"
+                          >
+                            Clear Files
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Context Text Input - Only for Google Gemini and Lingo AI */}
+                    {(selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") && (
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label htmlFor="context-text" className="flex items-center gap-2">
+                            <MessageSquare size={16} className="text-blue-500" />
+                            AI Context of your profile (Optional)
+                          </Label>
+                          <Button
+                          
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowContextInput(!showContextInput)}
+                            className="h-6 px-2"
+                          >
+                            {showContextInput ? "Hide" : "Show"}
+                          </Button>
+                        </div>
+                        {showContextInput && (
+                          <div className="space-y-2 p-3 bg-muted/30 rounded-lg border border-border/50">
+                            <Textarea
+                              id="context-text"
+                              placeholder="Add context that will be used for every AI interaction (e.g., industry preferences, career goals, specific requirements)..."
+                              value={contextText}
+                              onChange={(e) => setContextText(e.target.value)}
+                              className="min-h-[100px] resize-none"
+                            />
+                            <div className="flex items-center justify-between">
+                              <p className="text-xs text-muted-foreground">
+                                This context will be included in every AI chat to provide better, more consistent responses.
+                              </p>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setContextText("")}
+                                  className="h-6 px-2"
+                                >
+                                  Clear
+                                </Button>
+                                {contextText && contextText.trim() && (
+                                  <div className="flex items-center gap-1 text-xs text-green-600">
+                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                    Saved
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* {aiMode && (
+                      <div className="bg-primary/5 rounded-lg p-4 mb-4 border border-primary/20">
+                        <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+                          <Sparkles size={18} className="text-yellow-500" />
+                          Tailor with AI
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Paste a job description below to tailor your resume
+                          for specific positions. Our AI will suggest
+                          improvements to match the requirements.
+                        </p>
+                        <div className="mb-2">
+                          <Label htmlFor="job-description">
+                            Job Description
+                          </Label>
+                          <Textarea
+                            id="job-description"
+                            placeholder="Paste the job description here to tailor your resume..."
+                            value={jobDescription}
+                            onChange={(e) => setJobDescription(e.target.value)}
+                            className="h-32"
+                          />
+                        </div>
+                      </div>
+                    )} */}
+
+                    {showQuotaWarning && (
+                      <Alert variant="destructive" className="mb-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>API Quota Exceeded</AlertTitle>
+                        <AlertDescription>
+                          The Google AI API quota has been exceeded. The
+                          assistant will provide generic advice instead of
+                          personalized responses. Consider adding your own API
+                          key below or try again later.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* AI Model Selection */}
+                    <div className="mb-4">
+                      <Label htmlFor="ai-model">AI Model</Label>
+                      <Select
+                        value={selectedModel}
+                        onValueChange={(value: AIModel) =>
+                          setSelectedModel(value)
+                        }
+                      >
+                        <SelectTrigger id="ai-model">
+                          <SelectValue placeholder="Select AI model" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-96">
+                          {/* Specialized Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Specialized Models
+                          </div>
+                          <SelectItem value="lingo-ai">Lingo AI</SelectItem>
+
+                          {/* Google Gemini Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Google Gemini
+                          </div>
+
+                          {/* Gemini 2.0 Models */}
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
+                            Gemini 2.0
+                          </div>
+                          <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</SelectItem>
+                          <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                          <SelectItem value="gemini-2.0-pro">Gemini 2.0 Pro</SelectItem>
+                          <SelectItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</SelectItem>
+                          
+                          {/* Gemini 2.5 Models */}
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
+                            Gemini 2.5
+                          </div>
+                          <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
+                          <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
+                          <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
+                          
+                          {/* OpenAI Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            OpenAI
+                          </div>
+                          <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                          <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                          <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                          <SelectItem value="gpt-4">GPT-4</SelectItem>
+                          <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+
+                          {/* Anthropic Claude Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Anthropic Claude
+                          </div>
+                          <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet</SelectItem>
+                          <SelectItem value="claude-3-5-haiku">Claude 3.5 Haiku</SelectItem>
+                          <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
+                          <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
+                          <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
+                          <SelectItem value="claude-2.1">Claude 2.1</SelectItem>
+                          <SelectItem value="claude-2.0">Claude 2.0</SelectItem>
+                          <SelectItem value="claude-instant-1.2">Claude Instant 1.2</SelectItem>
+
+                          {/* DeepSeek Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            DeepSeek
+                          </div>
+                          <SelectItem value="deepseek-chat">DeepSeek Chat</SelectItem>
+                          <SelectItem value="deepseek-reasoner">DeepSeek Reasoner</SelectItem>
+                          <SelectItem value="deepseek-coder">DeepSeek Coder</SelectItem>
+
+                          {/* Groq Models (Fast Inference) */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Groq (Fast)
+                          </div>
+                          <SelectItem value="llama-3.1-8b-instant">Llama 3.1 8B Instant</SelectItem>
+                          <SelectItem value="llama-3.1-70b-versatile">Llama 3.1 70B Versatile</SelectItem>
+                          <SelectItem value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</SelectItem>
+                          <SelectItem value="mixtral-8x7b-32768">Mixtral 8x7B 32K</SelectItem>
+                          <SelectItem value="gemma2-9b-it">Gemma2 9B IT</SelectItem>
+
+                          {/* Mistral Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Mistral
+                          </div>
+                          <SelectItem value="mistral-large-latest">Mistral Large</SelectItem>
+                          <SelectItem value="mistral-medium-latest">Mistral Medium</SelectItem>
+                          <SelectItem value="mistral-small-latest">Mistral Small</SelectItem>
+                          <SelectItem value="mistral-7b-instruct">Mistral 7B Instruct</SelectItem>
+
+                          {/* Together.ai Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Together.ai
+                          </div>
+                          <SelectItem value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B Instruct</SelectItem>
+                          <SelectItem value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B Instruct</SelectItem>
+                          <SelectItem value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B Instruct</SelectItem>
+
+                          {/* Cohere Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Cohere
+                          </div>
+                          <SelectItem value="command-r-plus">Command R+</SelectItem>
+                          <SelectItem value="command-r">Command R</SelectItem>
+                          <SelectItem value="command-light">Command Light</SelectItem>
+
+                          {/* Perplexity Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Perplexity
+                          </div>
+                          <SelectItem value="llama-3.1-8b-instruct">Llama 3.1 8B Instruct</SelectItem>
+                          <SelectItem value="llama-3.1-70b-instruct">Llama 3.1 70B Instruct</SelectItem>
+                          <SelectItem value="mixtral-8x7b-instruct">Mixtral 8x7B Instruct</SelectItem>
+
+                          {/* Fireworks Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Fireworks
+                          </div>
+                          <SelectItem value="fireworks-llama-3.1-8b-instruct">Llama 3.1 8B Instruct</SelectItem>
+                          <SelectItem value="fireworks-llama-3.1-70b-instruct">Llama 3.1 70B Instruct</SelectItem>
+                          <SelectItem value="fireworks-mixtral-8x7b-instruct">Mixtral 8x7B Instruct</SelectItem>
+
+                          {/* Custom Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Custom Models
+                          </div>
+                          <SelectItem value="huggingface-custom">Hugging Face Custom</SelectItem>
+                          <SelectItem value="local-custom">Local/Custom API</SelectItem>
+                          
+                          {/* Local Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Local Models
+                          </div>
+                          <SelectItem value="ollama-local">Ollama Local</SelectItem>
+                          <SelectItem value="lmstudio-local">LM Studio Local</SelectItem>
+                          <SelectItem value="openai-like-local">OpenAI-like Local</SelectItem>
+                          
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* API Key Input */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <Label htmlFor="api-key">
+                          {selectedModel.startsWith("gemini") ? "Google" : 
+                           selectedModel.startsWith("gpt") ? "OpenAI" :
+                           selectedModel.startsWith("claude") ? "Anthropic" :
+                           selectedModel.startsWith("deepseek") ? "DeepSeek" :
+                           selectedModel.startsWith("llama") || selectedModel.startsWith("mixtral") || selectedModel.startsWith("gemma") ? "Groq" :
+                           selectedModel.startsWith("mistral") ? "Mistral" :
+                           selectedModel.startsWith("meta-llama") ? "Together.ai" :
+                           selectedModel.startsWith("command") ? "Cohere" :
+                           selectedModel.startsWith("fireworks") ? "Fireworks" :
+                           selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"} API Key
+                        </Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="h-6 px-2"
+                        >
+                          {showApiKey ? "Hide" : "Show"}
+                        </Button>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          id="api-key"
+                          type={showApiKey ? "text" : "password"}
+                          placeholder={`Enter your ${
+                            selectedModel.startsWith("gemini") ? "Google" : 
+                            selectedModel.startsWith("gpt") ? "OpenAI" :
+                            selectedModel.startsWith("claude") ? "Anthropic" :
+                            selectedModel.startsWith("deepseek") ? "DeepSeek" :
+                            selectedModel.startsWith("llama") || selectedModel.startsWith("mixtral") || selectedModel.startsWith("gemma") ? "Groq" :
+                            selectedModel.startsWith("mistral") ? "Mistral" :
+                            selectedModel.startsWith("meta-llama") ? "Together.ai" :
+                            selectedModel.startsWith("command") ? "Cohere" :
+                            selectedModel.startsWith("fireworks") ? "Fireworks" :
+                            selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"
+                          } API key`}
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setApiKey("");
+                            toast({
+                              title: "API key cleared",
+                              description: "API key cleared. You'll need to provide a new one for the selected model.",
+                            });
+                          }}
+                        >
+                          <RotateCw size={16} />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {selectedModel.startsWith("gemini") ? "Get your API key from Google Ai Studio Platform." :
+                         selectedModel === "lingo-ai" ? "Get your Lingo AI API key from cedzlabs.com/resume-builder" :
+                         "API key required for this model. Get one from the provider's website." + "https://"+ selectedModel.split("-")[0] +".com/api-keys"}
+                      </p>
+                    </div>
+
+                    {/* Custom Model Configuration */}
+                    {(selectedModel === "huggingface-custom" || selectedModel === "local-custom" || 
+                      selectedModel === "ollama-local" || selectedModel === "lmstudio-local" || 
+                      selectedModel === "openai-like-local") && (
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="flex items-center gap-2">
+                            <Key size={16} className="text-purple-500" />
+                            {selectedModel === "huggingface-custom" && "Hugging Face Configuration"}
+                            {selectedModel === "local-custom" && "Custom API Configuration"}
+                            {selectedModel === "ollama-local" && "Ollama Configuration"}
+                            {selectedModel === "lmstudio-local" && "LM Studio Configuration"}
+                            {selectedModel === "openai-like-local" && "OpenAI-like Configuration"}
+                          </Label>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowCustomConfig(!showCustomConfig)}
+                            className="h-6 px-2"
+                          >
+                            {showCustomConfig ? "Hide" : "Show"}
+                          </Button>
+                        </div>
+                        
+                        {showCustomConfig && (
+                          <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+                            {/* Hugging Face - Only Model Name */}
+                            {selectedModel === "huggingface-custom" && (
+                              <div>
+                                <Label htmlFor="custom-model">Model Name</Label>
+                                <Input
+                                  id="custom-model"
+                                  placeholder="google/gemma-3-270m"
+                                  value={customModel}
+                                  onChange={(e) => setCustomModel(e.target.value)}
+                                  className="mt-1"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Hugging Face model identifier (e.g., google/gemma-3-270m, nvidia/NVIDIA-Nemotron-Nano-9B-v2)
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Local Models - Only Base URL/Endpoint */}
+                            {(selectedModel === "ollama-local" || selectedModel === "lmstudio-local" || selectedModel === "openai-like-local") && (
+                              <div>
+                                <Label htmlFor="custom-endpoint">Base URL</Label>
+                                <Input
+                                  id="custom-endpoint"
+                                  placeholder={
+                                    selectedModel === "ollama-local"
+                                      ? "http://127.0.0.1:11434"
+                                      : selectedModel === "lmstudio-local"
+                                      ? "http://localhost:1234"
+                                      : "http://localhost:8000"
+                                  }
+                                  value={customEndpoint}
+                                  onChange={(e) => setCustomEndpoint(e.target.value)}
+                                  className="mt-1"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {selectedModel === "ollama-local"
+                                    ? "Ollama local endpoint (default: 127.0.0.1:11434)"
+                                    : selectedModel === "lmstudio-local"
+                                    ? "LM Studio local endpoint (default: localhost:1234)"
+                                    : "OpenAI-compatible API endpoint"
+                                  }
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Custom API - Full Configuration */}
+                            {selectedModel === "local-custom" && (
+                              <>
+                                <div>
+                                  <Label htmlFor="custom-endpoint">API Endpoint</Label>
+                                  <Input
+                                    id="custom-endpoint"
+                                    placeholder="http://localhost:8000/v1/chat/completions"
+                                    value={customEndpoint}
+                                    onChange={(e) => setCustomEndpoint(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Your local or custom API endpoint
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <Label htmlFor="custom-model">Model Name</Label>
+                                  <Input
+                                    id="custom-model"
+                                    placeholder="local-model"
+                                    value={customModel}
+                                    onChange={(e) => setCustomModel(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Model name for your local API
+                                  </p>
+                                </div>
+
+                                <div>
+                                  <Label htmlFor="custom-auth">Authentication Method</Label>
+                                  <Select value={customAuth} onValueChange={(value: "bearer" | "api-key" | "custom" | "none") => setCustomAuth(value)}>
+                                    <SelectTrigger id="custom-auth" className="mt-1">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="bearer">Bearer Token</SelectItem>
+                                      <SelectItem value="api-key">API Key Header</SelectItem>
+                                      <SelectItem value="custom">Custom Headers</SelectItem>
+                                      <SelectItem value="none">No Authentication</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                {/* Custom Headers */}
+                                {(customAuth === "custom" || customAuth === "api-key") && (
+                                  <div>
+                                    <Label htmlFor="custom-headers">Custom Headers (JSON)</Label>
+                                    <Textarea
+                                      id="custom-headers"
+                                      placeholder={customAuth === "api-key" 
+                                        ? '{"X-API-Key": "your-api-key"}'
+                                        : '{"Authorization": "Bearer token", "X-Custom": "value"}'
+                                      }
+                                      value={customHeaders}
+                                      onChange={(e) => setCustomHeaders(e.target.value)}
+                                      className="mt-1 min-h-[80px] resize-none"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {customAuth === "api-key" 
+                                        ? "JSON format for custom API key headers"
+                                        : "JSON format for custom authentication headers"
+                                      }
+                                    </p>
+                                  </div>
+                                )}
+                              </>
+                            )}
+
+                            {/* Curl Example */}
+                            <div className="mt-4 p-3 bg-background rounded-lg border">
+                              <Label className="text-sm font-medium mb-2 block">cURL Example</Label>
+                              <div className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto">
+                                <pre className="whitespace-pre-wrap break-words">
+{`curl ${customEndpoint || (
+  selectedModel === "huggingface-custom" 
+    ? "https://router.huggingface.co/v1/chat/completions"
+    : selectedModel === "ollama-local"
+    ? "http://127.0.0.1:11434/v1/chat/completions"
+    : selectedModel === "lmstudio-local"
+    ? "http://localhost:1234/v1/chat/completions"
+    : selectedModel === "openai-like-local"
+    ? "http://localhost:8000/v1/chat/completions"
+    : "http://localhost:8000/v1/chat/completions"
+)} \\
+    -H "Content-Type: application/json" \\
+${selectedModel === "huggingface-custom" && apiKey ? `    -H "Authorization: Bearer ${apiKey}" \\` : ""}
+${selectedModel === "local-custom" && customAuth === "bearer" && apiKey ? `    -H "Authorization: Bearer ${apiKey}" \\` : ""}
+${selectedModel === "local-custom" && customAuth === "api-key" && apiKey ? `    -H "X-API-Key: ${apiKey}" \\` : ""}
+${selectedModel === "local-custom" && customAuth === "custom" && customHeaders ? `    -H '${customHeaders.replace(/"/g, '\\"')}' \\` : ""}
+    -d '{
+        "messages": [
+            {
+                "role": "user",
+                "content": "What is the capital of France?"
+            }
+        ],
+        "model": "${customModel || (
+          selectedModel === "huggingface-custom" 
+            ? "google/gemma-3-270m"
+            : selectedModel === "ollama-local"
+            ? "llama3.1:8b"
+            : selectedModel === "lmstudio-local"
+            ? "local-model"
+            : selectedModel === "openai-like-local"
+            ? "local-model"
+            : "local-model"
+        )}",
+        "stream": true
+    }'`}
+                                </pre>
+                              </div>
+                            </div>
+
+                            {/* Save Button */}
+                            <div className="flex justify-end">
+                              <Button onClick={saveCustomConfig} size="sm">
+                                Save Configuration
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Lingo AI Advertisement Box */}
+                    {selectedModel === "lingo-ai" && (
+                      <div className="mb-4">
+                        <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0">
+                              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                                <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                                Lingo AI - Specialized Resume & Job AI
+                              </h3>
+                              <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                                For our custom AI model for job recommendations, mock interviews, and job tracking, use Lingo AI. 
+                                Get your API key from <a href="https://cedzlabs.com/resume-builder" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-300">cedzlabs.com/resume-builder</a>
+                              </p>
+                              
+                              {/* Video Player Accordion */}
+                              <div className="mt-4">
+                                {/* <div className="flex items-center justify-between mb-2">
+                                  <Label className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                                    Watch Demo Video
+                                  </Label>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setShowCustomConfig(!showCustomConfig)}
+                                    className="h-6 px-2 text-blue-600 dark:text-blue-400"
+                                  >
+                                    {showCustomConfig ? "Hide" : "Show"}
+                                  </Button>
+                                </div>
+                                
+                                {showCustomConfig && (
+                                  <div className="mt-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-blue-200 dark:border-blue-700">
+                                    <div className="aspect-video bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
+                                      <iframe
+                                        src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                                        title="Lingo AI Demo Video"
+                                        className="w-full h-full"
+                                        frameBorder="0"
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                        allowFullScreen
+                                      />
+                                    </div>
+                                    <p className="text-xs text-gray-600 dark:text-gray-300 mt-2 text-center">
+                                      Learn how to use Lingo AI for resume optimization and job recommendations
+                                    </p>
+                                  </div>
+                                )} */}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tutorial Videos Accordion */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="flex items-center gap-2">
+                          <Youtube size={16} className="text-red-500" />
+                          Tutorial Videos
+                        </Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowTutorials(!showTutorials)}
+                          className="h-6 px-2"
+                        >
+                          {showTutorials ? "Hide" : "Show"}
+                        </Button>
+                      </div>
+                      
+                      {showTutorials && (
+                        <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+                          {/* Model-specific tutorials */}
+                          <div className="grid gap-3">
+                            {/* Google Gemini Tutorials */}
+                            {selectedModel.startsWith("gemini") && (
+                              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                                <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Google Gemini Tutorials</h4>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Getting Started with Gemini AI
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Advanced Gemini Prompting Techniques
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Lingo AI Tutorials */}
+                            {selectedModel === "lingo-ai" && (
+                              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                                <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Lingo AI Tutorials</h4>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Resume Optimization with Lingo AI
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Job Recommendations & Mock Interviews
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Career Tracking & Analytics
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* OpenAI Tutorials */}
+                            {selectedModel.startsWith("gpt") && (
+                              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                                <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">OpenAI GPT Tutorials</h4>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      GPT-4 Best Practices
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Prompt Engineering with GPT
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Claude Tutorials */}
+                            {selectedModel.startsWith("claude") && (
+                              <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border">
+                                <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Anthropic Claude Tutorials</h4>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Claude 3.5 Sonnet Deep Dive
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Claude for Creative Writing
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Local Models Tutorials */}
+                            {(selectedModel === "ollama-local" || selectedModel === "lmstudio-local" || selectedModel === "openai-like-local") && (
+                              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                                <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Local Models Tutorials</h4>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Setting up Ollama Locally
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      LM Studio Configuration Guide
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      OpenAI-compatible API Setup
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Hugging Face Tutorials */}
+                            {selectedModel === "huggingface-custom" && (
+                              <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
+                                <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Hugging Face Tutorials</h4>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Hugging Face Models Overview
+                                    </a>
+                                  </div>
+                                  <div className="flex items-center gap-2 text-sm">
+                                    <Youtube size={14} className="text-red-500" />
+                                    <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
+                                      Custom Model Integration
+                                    </a>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* General AI Tutorials */}
+                            <div className="p-3 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 rounded-lg border border-purple-200 dark:border-purple-700">
+                              <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">General AI & Resume Tips</h4>
+                              <div className="space-y-2">
+                                <div className=
+                                "flex items-center gap-2 text-sm">
+                                  <Youtube size={14} className="text-red-500" />
+                                  <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">
+                                    AI Resume Writing Best Practices
+                                  </a>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Youtube size={14} className="text-red-500" />
+                                  <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">
+                                    Prompt Engineering Fundamentals
+                                  </a>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Youtube size={14} className="text-red-500" />
+                                  <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">
+                                    Career Development with AI
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Enhanced Chat Component */}
+                    <EnhancedChat
+                      messages={messages}
+                      input={input}
+                      handleInputChange={handleInputChange}
+                      handleSubmit={handleChatSubmit}
+                      isLoading={isLoading}
+                      onStop={stop}
+                      applyAiChanges={applyAiChanges}
+                      aiMode={aiMode}
+                      attachmentRef={attachmentRef}
+                      contextText={contextText}
+                      onFilesAttached={setAttachedFiles}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </Card>
+
+              {/* Template Gallery Marquee */}
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-lg font-semibold">Template Gallery</h3>
+                  <span className="text-sm text-muted-foreground">
+                    Hover to pause
+                  </span>
+                </div>
+                <InfiniteMarquee items={galleryItems} />
+              </div>
+            </div>
+
+            {/* Right Column - Preview & Controls */}
+            <div className="space-y-6">
+
+            <div className="h-[800px]">
+                <PDFViewer resumeData={resumeData} template={template} />
+              </div>
+
+              <Card className="p-2 border shadow-md">
+                <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      accept=".json"
+                      className="hidden"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2"
+                    >
+                      <Upload size={16} />
+                      Load Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={downloadResumeData}
+                      className="flex items-center gap-2"
+                    >
+                      <Download size={16} />
+                      Save Details
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={debugResumeData}
+                      className="flex items-center gap-2"
+                    >
+                      <FileText size={16} />
+                      Debug Data
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleDownloadPDF}
+                      className="flex items-center gap-2"
+                    >
+                      <FileText size={16} />
+                      Download PDF
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={template}
+                      onValueChange={(value: Template) => setTemplate(value)}
+                    >
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select template" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(resumeTemplates).map((templateKey) => (
+                          <SelectItem key={templateKey} value={templateKey}>
+                            {templateKey.charAt(0).toUpperCase() +
+                              templateKey.slice(1).replace(/-/g, " ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Link href={"/cover-letter"}>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <FileText size={16} />
+                        Cover Letter
+                      </Button>
+                    </Link>
+                    <Link href={"/donate"}>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <HandHeart size={16} />
+                        Donate
+                      </Button>
+                    </Link>
+                    <Link href={"/feedback"}>
+                      <Button
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <TableOfContents size={16} />
+                        Feedback
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </Card>
+
+              {/* New Quick Links Card */}
+              <Card className="border shadow-md">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Quick Links</CardTitle>
+                  <CardDescription>
+                    Access helpful resources and tools
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 h-auto py-3"
+                    asChild
+                  >
+                    <Link
+                      href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                      target="_blank"
+                    >
+                      <Youtube size={18} className="text-red-500" />
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Tutorial</span>
+                        <span className="text-xs text-muted-foreground">
+                          Watch how-to videos
+                        </span>
+                      </div>
+                    </Link>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 h-auto py-3"
+                    asChild
+                  >
+                    <Link href="/feedback">
+                      <MessageSquare size={18} className="text-blue-500" />
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Feedback</span>
+                        <span className="text-xs text-muted-foreground">
+                          Share your thoughts
+                        </span>
+                      </div>
+                    </Link>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="flex items-center gap-2 h-auto py-3"
+                    asChild
+                  >
+                    <Link href="/cover-letter">
+                      <Mail size={18} className="text-green-500" />
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">Cover Letter</span>
+                        <span className="text-xs text-muted-foreground">
+                          Create matching letters
+                        </span>
+                      </div>
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </LoadingScreen>
+  );
+}

@@ -1,0 +1,255 @@
+import { GoogleGenerativeAI } from "@google/generative-ai"
+
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 30
+
+// Define available models
+const AVAILABLE_MODELS = {
+  "gemini-1.5-pro": {
+    provider: "google",
+    modelId: "gemini-1.5-pro",
+  },
+  "gemini-1.5-flash": {
+    provider: "google",
+    modelId: "gemini-1.5-flash",
+  },
+  "gemini-2.0-flash-001": {
+    provider: "google",
+    modelId: "gemini-2.0-flash-001",
+  },
+  "gemini-2.0-flash-thinking-exp-01-21": {
+    provider: "google",
+    modelId: "gemini-2.0-flash-thinking-exp-01-21",
+  },
+  "gemini-2.0-flash-exp-image-generation": {
+    provider: "google",
+    modelId: "gemini-2.0-flash-exp-image-generation",
+  },
+  "gemini-2.0-flash-lite": {
+    provider: "google",
+    modelId: "gemini-2.0-flash-lite",
+  },
+  "gemini-2.0-pro-exp-02-05": {
+    provider: "google",
+    modelId: "gemini-2.0-pro-exp-02-05",
+  },
+  
+  // GPT Models
+  "gpt-4": {
+    provider: "openai",
+    modelId: "gpt-4",
+  },
+  "gpt-3.5-turbo": {
+    provider: "openai",
+    modelId: "gpt-3.5-turbo",
+  },
+
+  // Claude Models
+  "claude-1": {
+    provider: "anthropic",
+    modelId: "claude-1",
+  },
+  "claude-2": {
+    provider: "anthropic",
+    modelId: "claude-2",
+  },
+  "claude-3": {
+    provider: "anthropic",
+    modelId: "claude-3",
+  },
+
+  // Deep Seek Models
+  "deep-seek-v1": {
+    provider: "deepseek",
+    modelId: "deep-seek-v1",
+  },
+  "deep-seek-v2": {
+    provider: "deepseek",
+    modelId: "deep-seek-v2",
+  },
+};
+
+// Default model if none specified
+const DEFAULT_MODEL = "gemini-1.5-pro"
+
+// Mock response for when API quota is exceeded
+const MOCK_RESPONSES = [
+  "I'm sorry, but I can't process your request right now due to API quota limitations. Here are some general cover letter tips:\n\n1. Tailor your cover letter to each job application\n2. Use a professional tone and format\n3. Highlight relevant skills and experiences\n4. Show enthusiasm for the role and company\n5. Keep it concise and focused",
+  "Due to high demand, I can't access the AI service right now. Consider these cover letter improvements:\n\n- Make your opening paragraph more engaging by mentioning specific details about the company\n- In the body, focus on how your skills and experiences align with the job requirements\n- End with a strong call to action that expresses your interest in an interview",
+  "API quota exceeded. While I can't analyze your specific cover letter right now, here are universal cover letter tips:\n\n- Address the letter to a specific person whenever possible\n- Avoid generic language and clichés\n- Quantify your achievements with numbers when possible\n- Proofread carefully for errors\n- Keep it to one page",
+]
+
+export async function POST(req: Request) {
+  const { messages, coverLetterData, jobDescription, model, apiKey, attachedData } = await req.json()
+
+  // Create a system message
+  let systemMessage = `You are an AI cover letter assistant that helps users create and improve their cover letters.
+
+The user has provided their cover letter data and possibly a job description. Your task is to suggest improvements to their cover letter to better match the job requirements and make it more effective.
+
+When suggesting changes, provide specific recommendations for each section (head, body, footer) and explain why these changes would be beneficial.
+
+IMPORTANT: When suggesting specific text changes, you MUST format them as JSON within triple backticks like this:
+\`\`\`json
+{
+  "head": "Updated header text here...",
+  "body": "Updated body text here...",
+  "footer": "Updated footer text here..."
+}
+\`\`\`
+
+Only include the fields that you're suggesting changes for. The user can apply these changes with a button.
+Make sure your JSON is valid and properly formatted with double quotes around property names.
+
+Current cover letter data: ${JSON.stringify(coverLetterData)}
+
+Job description: ${jobDescription || "Not provided"}`
+
+  // If there's attached data, add it to the system message
+  if (attachedData) {
+    try {
+      // If attachedData is a string that contains JSON, parse it
+      const parsedData = typeof attachedData === "string" ? JSON.parse(attachedData) : attachedData
+      systemMessage += `\n\nThe user has also attached additional data: ${JSON.stringify(parsedData)}`
+    } catch (error) {
+      // If it's not valid JSON, just use it as is
+      systemMessage += `\n\nThe user has also attached additional data: ${attachedData}`
+    }
+  }
+
+  // Format the conversation for the AI
+  const formattedMessages = [{ role: "system", content: systemMessage }, ...messages]
+
+  // Get the model configuration or use default
+  const modelConfig = AVAILABLE_MODELS[model as keyof typeof AVAILABLE_MODELS] || AVAILABLE_MODELS[DEFAULT_MODEL]
+
+  try {
+    // Currently we only support Google models
+    if (modelConfig.provider === "google") {
+      try {
+        return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey)
+      } catch (error: any) {
+        console.error("Error with Gemini model:", error)
+
+        // Check if it's a quota exceeded error (429)
+        if (error.message && error.message.includes("429") && error.message.includes("quota")) {
+          return handleQuotaExceeded()
+        }
+
+        // For other errors, return a generic error message
+        return new Response(
+          JSON.stringify({
+            error: "Failed to generate response",
+            message: "There was an error processing your request. Please try again later.",
+          }),
+          {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          },
+        )
+      }
+    } else {
+      throw new Error(`Unsupported model provider: ${modelConfig.provider}`)
+    }
+  } catch (error) {
+    console.error("Error generating response:", error)
+    return new Response(
+      JSON.stringify({
+        error: "Failed to generate response",
+        message: "There was an error processing your request. Please try again later.",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    )
+  }
+}
+
+async function handleWithGemini(messages: any[], modelId: string, apiKey?: string) {
+  try {
+    // Initialize the Gemini API
+    const genAI = new GoogleGenerativeAI(apiKey || process.env.GOOGLE_API_KEY || "")
+
+    // Create a Gemini model instance
+    const gemini = genAI.getGenerativeModel({ model: modelId })
+
+    // Convert messages to Gemini format
+    const geminiMessages = messages.map((msg) => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }],
+    }))
+
+    // Start a chat session
+    const chat = gemini.startChat({
+      history: geminiMessages.slice(0, -1),
+      generationConfig: {
+        maxOutputTokens: 8192,
+      },
+    })
+
+    // Get the last message to send
+    const lastMessage = geminiMessages[geminiMessages.length - 1]
+    const result = await chat.sendMessageStream(lastMessage.parts[0].text)
+
+    // Create a readable stream from the Gemini response
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+
+        try {
+          for await (const chunk of result.stream) {
+            const text = chunk.text()
+            controller.enqueue(encoder.encode(text))
+          }
+          controller.close()
+        } catch (error) {
+          console.error("Error streaming from Gemini:", error)
+          controller.error(error)
+        }
+      },
+    })
+
+    // Return the stream as the response
+    return new Response(stream)
+  } catch (error) {
+    console.error("Error with Gemini model:", error)
+    throw error
+  }
+}
+
+function handleQuotaExceeded() {
+  // Select a random mock response
+  const mockResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
+
+  // Create a readable stream from the mock response
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder()
+
+      // Split the mock response into chunks to simulate streaming
+      const chunks = mockResponse.split(". ")
+
+      let i = 0
+      const interval = setInterval(() => {
+        if (i >= chunks.length) {
+          clearInterval(interval)
+          controller.close()
+          return
+        }
+
+        // Add the period back except for the last chunk
+        const chunk = chunks[i] + (i < chunks.length - 1 ? "." : "")
+        controller.enqueue(encoder.encode(chunk + " "))
+        i++
+      }, 100) // Stream a chunk every 100ms
+    },
+  })
+
+  // Return the stream as the response with a 200 status
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+    },
+  })
+}
