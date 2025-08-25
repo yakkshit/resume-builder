@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import type { CoverLetterData, CoverLetterTemplate } from "@/lib/types"
 import { Card } from "@/components/ui/card"
-import { GradientCoverLetterTemplate } from "./pdf-templates/coverletter/gradient-cover-letter-template"
-import { ProfessionalCoverLetterTemplate } from "./pdf-templates/coverletter/professional-cover-letter-template"
-import { ElegantCoverLetterTemplate } from "./pdf-templates/coverletter/elegant-cover-letter-template"
-import { DarkCoverLetterTemplate } from "./pdf-templates/coverletter/dark-cover-letter-template"
+import { GradientCoverLetterTemplate } from "../pdf-templates/coverletter/gradient-cover-letter-template"
+import { ProfessionalCoverLetterTemplate } from "../pdf-templates/coverletter/professional-cover-letter-template"
+import { ElegantCoverLetterTemplate } from "../pdf-templates/coverletter/elegant-cover-letter-template"
+import { DarkCoverLetterTemplate } from "../pdf-templates/coverletter/dark-cover-letter-template"
 
 interface CoverLetterPreviewProps {
   coverLetterData: CoverLetterData

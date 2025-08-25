@@ -1,13 +1,13 @@
 // Resume PDF Templates
-import { ModernPDFTemplate } from "./modern-pdf-template"
-import { ClassicPDFTemplate } from "./classic-pdf-template"
-import { MinimalPDFTemplate } from "./minimal-pdf-template"
-import { ProfessionalPDFTemplate } from "./professional-pdf-template"
-import { ElegantPDFTemplate } from "./elegant-pdf-template"
-import { DarkPDFTemplate } from "./dark-pdf-template"
-import { GradientPDFTemplate } from "./gradient-pdf-template"
-import { TwoColumnPDFTemplate } from "./two-column-pdf-template"
-import { GradientGrayPDFTemplate } from "./gradient-gray-pdf-template"
+import { ModernPDFTemplate } from "./cv/general-resumes/modern-pdf-template"
+import { ClassicPDFTemplate } from "./cv/general-resumes/classic-pdf-template"
+import { MinimalPDFTemplate } from "./cv/general-resumes/minimal-pdf-template"
+import { ProfessionalPDFTemplate } from "./cv/general-resumes/professional-pdf-template"
+import { ElegantPDFTemplate } from "./cv/general-resumes/elegant-pdf-template"
+import { DarkPDFTemplate } from "./cv/general-resumes/dark-pdf-template"
+import { GradientPDFTemplate } from "./cv/general-resumes/gradient-pdf-template"
+import { TwoColumnPDFTemplate } from "./cv/general-resumes/two-column-pdf-template"
+import { GradientGrayPDFTemplate } from "./cv/general-resumes/gradient-gray-pdf-template"
 import { StandardCoverLetterPDFTemplate } from "./coverletter/standard-cover-letter-template"
 import { ModernCoverLetterPDFTemplate } from "./coverletter/modern-cover-letter-template"
 import { CreativeCoverLetterPDFTemplate } from "./coverletter/creative-cover-letter-template"
@@ -16,6 +16,7 @@ import { ElegantCoverLetterTemplate } from "./coverletter/elegant-cover-letter-t
 import { DarkCoverLetterTemplate } from "./coverletter/dark-cover-letter-template"
 import { GradientCoverLetterTemplate } from "./coverletter/gradient-cover-letter-template"
 import { GermanLebenslaufTemplate } from "./cv/german-templates/GermanLebenslaufTemplate"
+import { MultiColorfulGradientPDFTemplate } from "./cv/other-resume/RandomColourTemplate"
 
 // Cover Letter PDF Templates
 
@@ -40,6 +41,7 @@ export {
   ElegantCoverLetterTemplate,
   DarkCoverLetterTemplate,
   GradientCoverLetterTemplate,
+  MultiColorfulGradientPDFTemplate
 }
 
 // Template Mappings - Resume
@@ -55,6 +57,7 @@ export const resumeTemplates = {
   "two-column": TwoColumnPDFTemplate,
   "gradient-gray": GradientGrayPDFTemplate,
   "german-cv": GermanLebenslaufTemplate,
+  "multi-colour" : MultiColorfulGradientPDFTemplate
 } as const
 
 // Template Mappings - Cover Letter

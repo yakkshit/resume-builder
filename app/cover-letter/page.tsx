@@ -14,14 +14,14 @@ import { Download, Upload, FileText, Key, AlertTriangle, HandHeart, TableIcon as
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/hooks/use-toast"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
-import CoverLetterEditor from "@/components/cover-letter-editor"
+import CoverLetterEditor from "@/components/resume-coverletter/cover-letter-editor"
 import { defaultCoverLetterData } from "@/lib/default-cover-letter"
 import type { CoverLetterData, CoverLetterTemplate, AIModel } from "@/lib/types"
 import { generateCoverLetterPDF } from "@/lib/cover-letter-pdf-generator"
-import CoverLetterPDFViewer from "@/components/cover-letter-pdf-viewer"
+import CoverLetterPDFViewer from "@/components/resume-coverletter/cover-letter-pdf-viewer"
 import { coverLetterTemplates } from "@/components/pdf-templates"
-import CoverLetterChat from "@/components/cover-letter-chat"
-import LoadingScreen from "@/components/loading-screen"
+import CoverLetterChat from "@/components/resume-coverletter/cover-letter-chat"
+import LoadingScreen from "@/components/resume-coverletter/loading-screen"
 import Link from "next/link"
 
 export default function CoverLetterPage() {

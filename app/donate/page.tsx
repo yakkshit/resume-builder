@@ -28,7 +28,7 @@ export default function DonationPage() {
       {/* Hero Section */}
       <section className="relative h-[500px] w-full overflow-hidden">
         <Image
-          src="/logo.png?height=1080&width=1920"
+          src="/deepmind-picture-2.jpg?height=1080&width=1920"
           alt="People helping others"
           fill
           className="object-cover brightness-[0.7]"

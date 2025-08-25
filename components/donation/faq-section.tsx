@@ -14,7 +14,7 @@ export function FaqSection() {
     {
       question: "Is my donation tax-deductible?",
       answer:
-        "Depending on your location, your donation may be tax-deductible. We recommend consulting with a tax professional for advice specific to your situation. We can provide donation receipts upon request.",
+        "We recommend consulting with a tax professional for advice specific to your situation. We can provide donation receipts upon request. But for now its NO",
     },
     {
       question: "Can I make a recurring donation?",
@@ -29,7 +29,7 @@ export function FaqSection() {
     {
       question: "How secure is my payment information?",
       answer:
-        "We take security very seriously. All payments are processed through secure, encrypted connections. We do not store your payment information on our servers.",
+        "We take security very seriously. All payments are processed through secure, encrypted connections. We do not store your payment information on our servers. our payments services is hadled by wix for more details visit wix.com",
     },
   ]
 

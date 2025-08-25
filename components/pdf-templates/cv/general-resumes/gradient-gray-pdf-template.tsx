@@ -1,6 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Image, Link } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
-import { lightIconUrls } from "../logos/logos"
+import { lightIconUrls } from "../../../logos/logos"
 
 // Optimized two-column template with better space utilization
 const styles = StyleSheet.create({
