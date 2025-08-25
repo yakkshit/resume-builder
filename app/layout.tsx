@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
+import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
   title: 'AI-Powered Resume Generator',
@@ -35,6 +36,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
+        <Toaster />
         <Analytics />
       </body>
     </html>

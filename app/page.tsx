@@ -126,6 +126,7 @@ export default function ResumePage() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentRef = useRef<HTMLInputElement>(null);
+  const [modelErrorBanner, setModelErrorBanner] = useState<string>("");
 
   const {
     messages,
@@ -159,6 +160,27 @@ export default function ResumePage() {
         error.message.includes("quota")
       ) {
         setShowQuotaWarning(true);
+        return;
+      }
+
+      // Show helpful toast/banner for model/provider errors
+      const message = String(error?.message || "");
+      const isHuggingFaceProviderIssue = /No Inference Provider available/i.test(message);
+      const isKnownModelLoadIssue =
+        isHuggingFaceProviderIssue ||
+        /Error with Hugging Face model/i.test(message) ||
+        /Failed to generate response/i.test(message);
+
+      if (isKnownModelLoadIssue) {
+        const suggestion = selectedModel.startsWith("huggingface")
+          ? "Try a different provider in Hugging Face or switch to another model."
+          : "Please select a different model or provide a valid API key.";
+        toast({
+          title: "Model unavailable",
+          description: `${suggestion}`,
+          variant: "destructive",
+        });
+        setModelErrorBanner(suggestion);
       }
     },
   });
@@ -183,6 +205,13 @@ export default function ResumePage() {
       localStorage.setItem("aiContextText", contextText);
     }
   }, [contextText]);
+
+  // Clear model error banner when switching model
+  useEffect(() => {
+    if (modelErrorBanner) {
+      setModelErrorBanner("");
+    }
+  }, [selectedModel]);
 
   // Save custom configuration to localStorage
   useEffect(() => {
@@ -927,6 +956,15 @@ export default function ResumePage() {
 
                     {/* AI Model Selection */}
                     <div className="mb-4">
+                      {modelErrorBanner && (
+                        <Alert variant="destructive" className="mb-3">
+                          <AlertTriangle className="h-4 w-4" />
+                          <AlertTitle>Model issue</AlertTitle>
+                          <AlertDescription>
+                            {modelErrorBanner}
+                          </AlertDescription>
+                        </Alert>
+                      )}
                       <Label htmlFor="ai-model">AI Model</Label>
                       <Select
                         value={selectedModel}
@@ -1048,11 +1086,19 @@ export default function ResumePage() {
                           <SelectItem value="fireworks-llama-3.1-70b-instruct">Llama 3.1 70B Instruct</SelectItem>
                           <SelectItem value="fireworks-mixtral-8x7b-instruct">Mixtral 8x7B Instruct</SelectItem>
 
+                          {/* Hugging Face Models */}
+                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                            Hugging Face
+                          </div>
+                          <SelectItem value="huggingface-endpoint">Endpoint</SelectItem>
+                          <SelectItem value="huggingface-model">Model</SelectItem>
+                          <SelectItem value="huggingface-streaming">Model with Streaming</SelectItem>
+                          <SelectItem value="huggingface-provider">Third-party Provider</SelectItem>
+
                           {/* Custom Models */}
                           <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
                             Custom Models
                           </div>
-                          <SelectItem value="huggingface-custom">Hugging Face Custom</SelectItem>
                           <SelectItem value="local-custom">Local/Custom API</SelectItem>
                           
                           {/* Local Models */}
@@ -1080,6 +1126,7 @@ export default function ResumePage() {
                            selectedModel.startsWith("meta-llama") ? "Together.ai" :
                            selectedModel.startsWith("command") ? "Cohere" :
                            selectedModel.startsWith("fireworks") ? "Fireworks" :
+                           selectedModel.startsWith("huggingface") ? "Hugging Face" :
                            selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"} API Key
                         </Label>
                         <Button
@@ -1105,6 +1152,7 @@ export default function ResumePage() {
                             selectedModel.startsWith("meta-llama") ? "Together.ai" :
                             selectedModel.startsWith("command") ? "Cohere" :
                             selectedModel.startsWith("fireworks") ? "Fireworks" :
+                            selectedModel.startsWith("huggingface") ? "Hugging Face" :
                             selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"
                           } API key`}
                           value={apiKey}
@@ -1127,20 +1175,24 @@ export default function ResumePage() {
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {selectedModel.startsWith("gemini") ? "Get your API key from Google Ai Studio Platform." :
+                         selectedModel.startsWith("huggingface") ? "Get your API key from Hugging Face (huggingface.co/settings/tokens)" :
                          selectedModel === "lingo-ai" ? "Get your Lingo AI API key from cedzlabs.com/resume-builder" :
                          "API key required for this model. Get one from the provider's website." + "https://"+ selectedModel.split("-")[0] +".com/api-keys"}
                       </p>
                     </div>
 
                     {/* Custom Model Configuration */}
-                    {(selectedModel === "huggingface-custom" || selectedModel === "local-custom" || 
+                    {(selectedModel.startsWith("huggingface") || selectedModel === "local-custom" || 
                       selectedModel === "ollama-local" || selectedModel === "lmstudio-local" || 
                       selectedModel === "openai-like-local") && (
                       <div className="mb-4">
                         <div className="flex items-center justify-between mb-2">
                           <Label className="flex items-center gap-2">
                             <Key size={16} className="text-purple-500" />
-                            {selectedModel === "huggingface-custom" && "Hugging Face Configuration"}
+                            {selectedModel === "huggingface-endpoint" && "Hugging Face Endpoint Configuration"}
+                            {selectedModel === "huggingface-model" && "Hugging Face Model Configuration"}
+                            {selectedModel === "huggingface-streaming" && "Hugging Face Streaming Configuration"}
+                            {selectedModel === "huggingface-provider" && "Hugging Face Provider Configuration"}
                             {selectedModel === "local-custom" && "Custom API Configuration"}
                             {selectedModel === "ollama-local" && "Ollama Configuration"}
                             {selectedModel === "lmstudio-local" && "LM Studio Configuration"}
@@ -1158,22 +1210,107 @@ export default function ResumePage() {
                         
                         {showCustomConfig && (
                           <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
-                            {/* Hugging Face - Only Model Name */}
-                            {selectedModel === "huggingface-custom" && (
+                            {/* Hugging Face Endpoint - Model Name + Endpoint URL */}
+                            {selectedModel === "huggingface-endpoint" && (
+                              <div className="space-y-3">
+                                <div>
+                                  <Label htmlFor="custom-model">Model Name</Label>
+                                  <Input
+                                    id="custom-model"
+                                    placeholder="meta-llama/Llama-3.1-8B-Instruct"
+                                    value={customModel}
+                                    onChange={(e) => setCustomModel(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Hugging Face model identifier
+                                  </p>
+                                </div>
+                                
+                                <div>
+                                  <Label htmlFor="custom-endpoint">Endpoint URL</Label>
+                                  <Input
+                                    id="custom-endpoint"
+                                    placeholder="https://router.huggingface.co/hf-inference/models/meta-llama/Llama-3.1-8B-Instruct"
+                                    value={customEndpoint}
+                                    onChange={(e) => setCustomEndpoint(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Your Hugging Face inference endpoint URL
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Hugging Face Model - Only Model Name */}
+                            {selectedModel === "huggingface-model" && (
                               <div>
                                 <Label htmlFor="custom-model">Model Name</Label>
                                 <Input
                                   id="custom-model"
-                                  placeholder="google/gemma-3-270m"
+                                  placeholder="meta-llama/Llama-3.1-8B-Instruct"
                                   value={customModel}
                                   onChange={(e) => setCustomModel(e.target.value)}
                                   className="mt-1"
                                 />
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  Hugging Face model identifier (e.g., google/gemma-3-270m, nvidia/NVIDIA-Nemotron-Nano-9B-v2)
+                                  Hugging Face model identifier (e.g., meta-llama/Llama-3.1-8B-Instruct, google/gemma-3-270m)
                                 </p>
                               </div>
                             )}
+
+                            {/* Hugging Face Streaming - Only Model Name */}
+                            {selectedModel === "huggingface-streaming" && (
+                              <div>
+                                <Label htmlFor="custom-model">Model Name</Label>
+                                <Input
+                                  id="custom-model"
+                                  placeholder="meta-llama/Llama-3.1-8B-Instruct"
+                                  value={customModel}
+                                  onChange={(e) => setCustomModel(e.target.value)}
+                                  className="mt-1"
+                                />
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Hugging Face model identifier (e.g., meta-llama/Llama-3.1-8B-Instruct, google/gemma-3-270m)
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Hugging Face Provider - Model Name + Provider */}
+                            {selectedModel === "huggingface-provider" && (
+                              <div className="space-y-3">
+                                <div>
+                                  <Label htmlFor="custom-model">Model Name</Label>
+                                  <Input
+                                    id="custom-model"
+                                    placeholder="meta-llama/Llama-3.1-8B-Instruct"
+                                    value={customModel}
+                                    onChange={(e) => setCustomModel(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Hugging Face model identifier
+                                  </p>
+                                </div>
+                                
+                                <div>
+                                  <Label htmlFor="custom-provider">Provider</Label>
+                                  <Input
+                                    id="custom-provider"
+                                    placeholder="sambanova"
+                                    value={customHeaders}
+                                    onChange={(e) => setCustomHeaders(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Third-party provider (e.g., sambanova, together, fal-ai, replicate, cohere)
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
+
 
                             {/* Local Models - Only Base URL/Endpoint */}
                             {(selectedModel === "ollama-local" || selectedModel === "lmstudio-local" || selectedModel === "openai-like-local") && (
@@ -1274,50 +1411,7 @@ export default function ResumePage() {
                               </>
                             )}
 
-                            {/* Curl Example */}
-                            <div className="mt-4 p-3 bg-background rounded-lg border">
-                              <Label className="text-sm font-medium mb-2 block">cURL Example</Label>
-                              <div className="bg-muted p-2 rounded text-xs font-mono overflow-x-auto">
-                                <pre className="whitespace-pre-wrap break-words">
-{`curl ${customEndpoint || (
-  selectedModel === "huggingface-custom" 
-    ? "https://router.huggingface.co/v1/chat/completions"
-    : selectedModel === "ollama-local"
-    ? "http://127.0.0.1:11434/v1/chat/completions"
-    : selectedModel === "lmstudio-local"
-    ? "http://localhost:1234/v1/chat/completions"
-    : selectedModel === "openai-like-local"
-    ? "http://localhost:8000/v1/chat/completions"
-    : "http://localhost:8000/v1/chat/completions"
-)} \\
-    -H "Content-Type: application/json" \\
-${selectedModel === "huggingface-custom" && apiKey ? `    -H "Authorization: Bearer ${apiKey}" \\` : ""}
-${selectedModel === "local-custom" && customAuth === "bearer" && apiKey ? `    -H "Authorization: Bearer ${apiKey}" \\` : ""}
-${selectedModel === "local-custom" && customAuth === "api-key" && apiKey ? `    -H "X-API-Key: ${apiKey}" \\` : ""}
-${selectedModel === "local-custom" && customAuth === "custom" && customHeaders ? `    -H '${customHeaders.replace(/"/g, '\\"')}' \\` : ""}
-    -d '{
-        "messages": [
-            {
-                "role": "user",
-                "content": "What is the capital of France?"
-            }
-        ],
-        "model": "${customModel || (
-          selectedModel === "huggingface-custom" 
-            ? "google/gemma-3-270m"
-            : selectedModel === "ollama-local"
-            ? "llama3.1:8b"
-            : selectedModel === "lmstudio-local"
-            ? "local-model"
-            : selectedModel === "openai-like-local"
-            ? "local-model"
-            : "local-model"
-        )}",
-        "stream": true
-    }'`}
-                                </pre>
-                              </div>
-                            </div>
+
 
                             {/* Save Button */}
                             <div className="flex justify-end">
@@ -1528,20 +1622,23 @@ ${selectedModel === "local-custom" && customAuth === "custom" && customHeaders ?
                             )}
 
                             {/* Hugging Face Tutorials */}
-                            {selectedModel === "huggingface-custom" && (
+                            {selectedModel.startsWith("huggingface") && (
                               <div className="p-3 bg-white dark:bg-gray-800 rounded-lg border">
                                 <h4 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Hugging Face Tutorials</h4>
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-2 text-sm">
                                     <Youtube size={14} className="text-red-500" />
                                     <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                                      Hugging Face Models Overview
+                                      {selectedModel === "huggingface-endpoint" && "Custom Endpoint Configuration"}
+                                      {selectedModel === "huggingface-model" && "Hugging Face Model Setup"}
+                                      {selectedModel === "huggingface-streaming" && "Streaming Model Configuration"}
+                                      {selectedModel === "huggingface-provider" && "Third-party Provider Setup"}
                                     </a>
                                   </div>
                                   <div className="flex items-center gap-2 text-sm">
                                     <Youtube size={14} className="text-red-500" />
                                     <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                                      Custom Model Integration
+                                      Model Selection & Best Practices
                                     </a>
                                   </div>
                                 </div>

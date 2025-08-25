@@ -9,6 +9,7 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
     fontSize: 10,
     color: "#ffffff",
+    backgroundColor: "#1a1a1a",
   },
   gradientBackground: {
     position: "absolute",
@@ -22,76 +23,75 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 180,
-    backgroundColor: "#1e293b", // Dark blue-gray
+    height: 190,
+    backgroundColor: "#0f172a",
   },
   mainBackground: {
     position: "absolute",
-    top: 180,
+    top: 190,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "#334155", // Medium blue-gray
+    backgroundColor: "#1e293b",
   },
   contentWrapper: {
     position: "relative",
-    padding: 40,
+    padding: "35 45",
     height: "100%",
   },
   header: {
     flexDirection: "row",
     marginBottom: 30,
+    alignItems: "flex-start",
   },
   profileImageContainer: {
-    marginRight: 20,
+    marginRight: 25,
+    flexShrink: 0,
   },
   profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 3,
-    borderColor: "#64748b", // Border color
+    borderColor: "#3b82f6",
   },
   headerContent: {
     flex: 1,
   },
   name: {
-    fontSize: 24,
+    fontSize: 26,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
+    marginBottom: 5,
     color: "#ffffff",
-    letterSpacing: 0.5,
+    letterSpacing: 0.7,
   },
   title: {
-    fontSize: 14,
+    fontSize: 15,
     marginBottom: 12,
-    color: "#94a3b8", // Light blue-gray
+    color: "#60a5fa",
     fontFamily: "Helvetica-Oblique",
+    letterSpacing: 0.5,
   },
   contactInfo: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 5,
+    marginTop: 8,
+    columnGap: 12,
+    rowGap: 6,
   },
   contactItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 15,
-    marginBottom: 5,
     fontSize: 9,
-    color: "#e2e8f0", // Very light gray
+    color: "#e2e8f0",
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    padding: "5 9",
+    borderRadius: 4,
   },
   contactIcon: {
-    width: 12,
-    height: 12,
-    marginRight: 5,
-  },
-  divider: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#64748b", // Border color
-    borderBottomStyle: "solid",
-    marginTop: 5,
-    marginBottom: 25,
+    width: 11,
+    height: 11,
+    marginRight: 6,
   },
   section: {
     marginBottom: 20,
@@ -100,12 +100,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Helvetica-Bold",
     marginBottom: 12,
-    color: "#ffffff",
+    color: "#60a5fa",
     textTransform: "uppercase",
-    letterSpacing: 1,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: "#64748b", // Border color
+    letterSpacing: 1.2,
+    paddingBottom: 5,
+    borderBottomWidth: 2,
+    borderBottomColor: "#3b82f6",
     borderBottomStyle: "solid",
   },
   sectionContent: {
@@ -113,114 +113,152 @@ const styles = StyleSheet.create({
   },
   experienceItem: {
     marginBottom: 15,
-    paddingLeft: 12,
+    paddingLeft: 14,
     borderLeftWidth: 2,
-    borderLeftColor: "#94a3b8", // Light blue-gray
+    borderLeftColor: "#3b82f6",
     borderLeftStyle: "solid",
   },
   itemHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 4,
+    alignItems: "flex-start",
+    marginBottom: 5,
+  },
+  itemTitleWrapper: {
+    flex: 1,
+    marginRight: 8,
   },
   itemTitle: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
     color: "#ffffff",
+    letterSpacing: 0.3,
   },
   itemSubtitle: {
     fontSize: 10,
-    color: "#e2e8f0", // Very light gray
-    marginBottom: 2,
+    color: "#94a3b8",
+    marginBottom: 3,
+    letterSpacing: 0.2,
   },
   itemDate: {
     fontSize: 9,
-    color: "#94a3b8", // Light blue-gray
-    backgroundColor: "rgba(148, 163, 184, 0.1)", // Semi-transparent light blue-gray
-    padding: "3 6",
-    borderRadius: 3,
+    color: "#60a5fa",
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    padding: "4 8",
+    borderRadius: 4,
+    flexShrink: 0,
   },
   itemDescription: {
     fontSize: 9,
-    marginTop: 4,
+    marginTop: 5,
     lineHeight: 1.5,
-    color: "#e2e8f0", // Very light gray
+    color: "#e2e8f0",
+    letterSpacing: 0.2,
   },
   skillsContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 5,
+    marginTop: 8,
     gap: 6,
   },
   skillBadge: {
-    backgroundColor: "rgba(148, 163, 184, 0.2)", // Semi-transparent light blue-gray
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
     borderRadius: 4,
     padding: "4 8",
     fontSize: 9,
-    color: "#ffffff",
+    color: "#60a5fa",
+    letterSpacing: 0.2,
   },
   projectTech: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 5,
-    marginBottom: 5,
-    gap: 4,
+    marginTop: 6,
+    marginBottom: 6,
+    gap: 5,
   },
   techBadge: {
-    backgroundColor: "rgba(148, 163, 184, 0.2)", // Semi-transparent light blue-gray
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
     borderRadius: 4,
     padding: "3 6",
     fontSize: 8,
-    color: "#ffffff",
+    color: "#60a5fa",
+    letterSpacing: 0.2,
   },
   summary: {
     fontSize: 10,
     lineHeight: 1.6,
-    color: "#e2e8f0", // Very light gray
-    backgroundColor: "rgba(148, 163, 184, 0.1)", // Semi-transparent light blue-gray
+    color: "#e2e8f0",
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
     padding: 12,
-    borderRadius: 4,
+    borderRadius: 6,
     marginBottom: 20,
+    letterSpacing: 0.2,
   },
   portfolioLinks: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 5,
+    marginTop: 8,
+    gap: 10,
   },
   portfolioLink: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 15,
-    marginBottom: 5,
     fontSize: 9,
-    color: "#e2e8f0", // Very light gray
+    color: "#e2e8f0",
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    padding: "5 9",
+    borderRadius: 4,
   },
   link: {
-    color: "#94a3b8", // Light blue-gray
+    color: "#60a5fa",
     textDecoration: "none",
   },
   twoColumnContainer: {
     flexDirection: "row",
-    marginTop: 15,
-    gap: 20,
+    marginTop: 20,
+    gap: 25,
   },
   column: {
     flex: 1,
   },
   viewProjectLink: {
-    color: "#94a3b8", // Light blue-gray
+    color: "#60a5fa",
     fontSize: 9,
-    marginTop: 3,
+    marginTop: 5,
     textDecoration: "none",
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
+    padding: "4 8",
+    borderRadius: 4,
+    alignSelf: "flex-start",
   },
   languageItem: {
-    backgroundColor: "rgba(148, 163, 184, 0.2)", // Semi-transparent light blue-gray
+    backgroundColor: "rgba(59, 130, 246, 0.1)",
     borderRadius: 4,
     padding: "4 8",
     fontSize: 9,
-    color: "#ffffff",
+    color: "#60a5fa",
     marginRight: 6,
     marginBottom: 6,
+    letterSpacing: 0.2,
+  },
+  achievementContainer: {
+    marginBottom: 12,
+  },
+  achievementTitle: {
+    fontSize: 11,
+    fontFamily: "Helvetica-Bold",
+    color: "#ffffff",
+    marginBottom: 4,
+  },
+  achievementDate: {
+    fontSize: 9,
+    color: "#60a5fa",
+    marginBottom: 4,
+  },
+  achievementDescription: {
+    fontSize: 9,
+    color: "#e2e8f0",
+    lineHeight: 1.5,
   },
 })
 
