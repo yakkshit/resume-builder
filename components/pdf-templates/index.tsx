@@ -15,6 +15,7 @@ import { ProfessionalCoverLetterTemplate } from "./coverletter/professional-cove
 import { ElegantCoverLetterTemplate } from "./coverletter/elegant-cover-letter-template"
 import { DarkCoverLetterTemplate } from "./coverletter/dark-cover-letter-template"
 import { GradientCoverLetterTemplate } from "./coverletter/gradient-cover-letter-template"
+import { GermanLebenslaufTemplate } from "./cv/german-templates/GermanLebenslaufTemplate"
 
 // Cover Letter PDF Templates
 
@@ -30,6 +31,7 @@ export {
   GradientPDFTemplate,
   TwoColumnPDFTemplate,
   GradientGrayPDFTemplate,
+  GermanLebenslaufTemplate,
   // Cover letter templates
   StandardCoverLetterPDFTemplate,
   ModernCoverLetterPDFTemplate,
@@ -52,6 +54,7 @@ export const resumeTemplates = {
   gradient: GradientPDFTemplate,
   "two-column": TwoColumnPDFTemplate,
   "gradient-gray": GradientGrayPDFTemplate,
+  "german-cv": GermanLebenslaufTemplate,
 } as const
 
 // Template Mappings - Cover Letter
