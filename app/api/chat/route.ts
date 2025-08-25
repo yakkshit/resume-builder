@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
-
-// import { google as GoogleGenerativeAI } from '@ai-sdk/google';
+import { InferenceClient } from "@huggingface/inference"
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30
@@ -174,9 +173,24 @@ const AVAILABLE_MODELS = {
   },
 
   // Hugging Face Models
-  "huggingface-custom": {
+  "huggingface-endpoint": {
     provider: "huggingface",
-    modelId: "custom",
+    modelId: "endpoint",
+    apiKey: process.env.HUGGINGFACE_API_KEY,
+  },
+  "huggingface-model": {
+    provider: "huggingface",
+    modelId: "model",
+    apiKey: process.env.HUGGINGFACE_API_KEY,
+  },
+  "huggingface-streaming": {
+    provider: "huggingface",
+    modelId: "streaming",
+    apiKey: process.env.HUGGINGFACE_API_KEY,
+  },
+  "huggingface-provider": {
+    provider: "huggingface",
+    modelId: "provider",
     apiKey: process.env.HUGGINGFACE_API_KEY,
   },
 
@@ -311,7 +325,7 @@ const MOCK_RESPONSES = [
 
 // Update the POST function to handle attachedData
 export async function POST(req: Request) {
-  const { messages, resumeData, aiMode, jobDescription, model, apiKey, attachedData, attachedFiles, contextText } = await req.json()
+  const { messages, resumeData, aiMode, jobDescription, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth } = await req.json()
 
   // Create a system message based on the mode
   let systemMessage = ""
@@ -497,15 +511,31 @@ export async function POST(req: Request) {
         
       case "huggingface":
         try {
-          return await handleWithHuggingFace(formattedMessages, modelConfig.modelId, req, apiKey || modelConfig.apiKey)
+          return await handleWithHuggingFace(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || modelConfig.apiKey,
+            customModel,
+            customEndpoint,
+            customHeaders,
+          )
         } catch (error: any) {
           console.error("Error with Hugging Face model:", error)
           throw error
         }
+      
         
       case "local":
         try {
-          return await handleWithLocal(formattedMessages, modelConfig.modelId, req, apiKey || modelConfig.apiKey)
+          return await handleWithLocal(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || modelConfig.apiKey,
+            customEndpoint,
+            customModel,
+            customHeaders,
+            customAuth,
+          )
         } catch (error: any) {
           console.error("Error with Local model:", error)
           throw error
@@ -513,7 +543,13 @@ export async function POST(req: Request) {
         
       case "ollama":
         try {
-          return await handleWithOllama(formattedMessages, modelConfig.modelId, req, apiKey || modelConfig.apiKey)
+          return await handleWithOllama(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || modelConfig.apiKey,
+            customEndpoint,
+            customModel,
+          )
         } catch (error: any) {
           console.error("Error with Ollama model:", error)
           throw error
@@ -521,7 +557,13 @@ export async function POST(req: Request) {
         
       case "lmstudio":
         try {
-          return await handleWithLMStudio(formattedMessages, modelConfig.modelId, req, apiKey || modelConfig.apiKey)
+          return await handleWithLMStudio(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || modelConfig.apiKey,
+            customEndpoint,
+            customModel,
+          )
         } catch (error: any) {
           console.error("Error with LM Studio model:", error)
           throw error
@@ -529,7 +571,13 @@ export async function POST(req: Request) {
         
       case "openai-like":
         try {
-          return await handleWithOpenAILike(formattedMessages, modelConfig.modelId, req, apiKey || modelConfig.apiKey)
+          return await handleWithOpenAILike(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || modelConfig.apiKey,
+            customEndpoint,
+            customModel,
+          )
         } catch (error: any) {
           console.error("Error with OpenAI-like model:", error)
           throw error
@@ -537,7 +585,12 @@ export async function POST(req: Request) {
         
       case "lingo-ai":
         try {
-          return await handleWithLingoAI(formattedMessages, modelConfig.modelId, req, apiKey || modelConfig.apiKey)
+          return await handleWithLingoAI(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || modelConfig.apiKey,
+            customModel,
+          )
         } catch (error: any) {
           console.error("Error with Lingo AI model:", error)
           throw error
@@ -891,51 +944,143 @@ async function handleWithFireworks(messages: any[], modelId: string, apiKey?: st
 }
 
 // Hugging Face handler
-async function handleWithHuggingFace(messages: any[], modelId: string, req: Request, apiKey?: string) {
+async function handleWithHuggingFace(
+  messages: any[],
+  modelId: string,
+  apiKey?: string,
+  customModel?: string,
+  customEndpoint?: string,
+  customHeaders?: string,
+) {
   try {
-    const body = await req.json()
-    const { customEndpoint, customModel, customHeaders } = body
+    // Get the model name from UI configuration or use default
+    const model = customModel || "meta-llama/Llama-3.1-8B-Instruct"
     
-    const endpoint = customEndpoint || "https://router.huggingface.co/v1/chat/completions"
-    const model = customModel || "openai/gpt-oss-120b:novita"
+    // Get API key from UI or environment
+    const hfToken = apiKey || process.env.HUGGINGFACE_API_KEY
     
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+    if (!hfToken) {
+      throw new Error("Hugging Face API key is required. Please provide it in the UI or set HUGGINGFACE_API_KEY environment variable.")
     }
     
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`
-    }
+    // Create InferenceClient instance
+    const client = new InferenceClient(hfToken)
     
-    // Add custom headers if provided
-    if (customHeaders) {
-      try {
-        const parsedHeaders = JSON.parse(customHeaders)
-        Object.assign(headers, parsedHeaders)
-      } catch (error) {
-        console.warn("Invalid custom headers format:", error)
-      }
+    // Handle different Hugging Face configuration types
+    switch (modelId) {
+      case "endpoint":
+        // Endpoint-based chat completion
+        if (!customEndpoint) {
+          throw new Error("Custom endpoint is required for endpoint-based Hugging Face models")
+        }
+        
+        const endpointClient = client.endpoint(customEndpoint)
+        const endpointResponse = await endpointClient.chatCompletion({
+          model: model,
+          messages: messages.map(msg => ({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: msg.content,
+          })),
+          max_tokens: 4096,
+        })
+        
+        const endpointContent = endpointResponse.choices[0]?.message?.content || "No response generated"
+        return new Response(endpointContent, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        })
+        
+      case "model":
+        // Standard chat completion API
+        const modelResponse = await client.chatCompletion({
+          model: model,
+          messages: messages.map(msg => ({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: msg.content,
+          })),
+          max_tokens: 4096,
+        })
+        
+        const modelContent = modelResponse.choices[0]?.message?.content || "No response generated"
+        return new Response(modelContent, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        })
+        
+      case "streaming":
+        // Streaming chat completion API
+        const stream = new ReadableStream({
+          async start(controller) {
+            const encoder = new TextEncoder()
+            
+            try {
+              for await (const chunk of client.chatCompletionStream({
+                model: model,
+                messages: messages.map(msg => ({
+                  role: msg.role === "assistant" ? "assistant" : "user",
+                  content: msg.content,
+                })),
+                max_tokens: 4096,
+              })) {
+                const content = chunk.choices[0]?.delta?.content
+                if (content) {
+                  controller.enqueue(encoder.encode(content))
+                }
+              }
+              controller.close()
+            } catch (error) {
+              console.error("Error streaming from Hugging Face:", error)
+              controller.error(error)
+            }
+          },
+        })
+        
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        })
+        
+      case "provider":
+        // Provider-based chat completion
+        let provider = undefined
+        if (customHeaders) {
+          try {
+            const parsedHeaders = JSON.parse(customHeaders)
+            if (parsedHeaders.provider) {
+              provider = parsedHeaders.provider
+            }
+          } catch (error) {
+            console.warn("Invalid custom headers format:", error)
+          }
+        }
+        
+        if (!provider) {
+          throw new Error("Provider is required for provider-based Hugging Face models")
+        }
+        
+        const providerResponse = await client.chatCompletion({
+          model: model,
+          messages: messages.map(msg => ({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: msg.content,
+          })),
+          max_tokens: 4096,
+          provider: provider,
+        })
+        
+        const providerContent = providerResponse.choices[0]?.message?.content || "No response generated"
+        return new Response(providerContent, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        })
+        
+      default:
+        throw new Error(`Unsupported Hugging Face model type: ${modelId}`)
     }
-
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: model,
-        messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
-          content: msg.content,
-        })),
-        stream: true,
-        max_tokens: 4096,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Hugging Face API error: ${response.status}`)
-    }
-
-    return new Response(response.body)
   } catch (error) {
     console.error("Error with Hugging Face model:", error)
     throw error
@@ -943,11 +1088,16 @@ async function handleWithHuggingFace(messages: any[], modelId: string, req: Requ
 }
 
 // Local model handler
-async function handleWithLocal(messages: any[], modelId: string, req: Request, apiKey?: string) {
+async function handleWithLocal(
+  messages: any[],
+  modelId: string,
+  apiKey: string | undefined,
+  customEndpoint?: string,
+  customModel?: string,
+  customHeaders?: string,
+  customAuth?: "bearer" | "api-key" | "custom" | "none",
+) {
   try {
-    const body = await req.json()
-    const { customEndpoint, customModel, customHeaders, customAuth } = body
-    
     const endpoint = customEndpoint || "http://localhost:8000/v1/chat/completions"
     const model = customModel || "local-model"
     
@@ -1005,11 +1155,14 @@ async function handleWithLocal(messages: any[], modelId: string, req: Request, a
 }
 
 // Ollama handler
-async function handleWithOllama(messages: any[], modelId: string, req: Request, apiKey?: string) {
+async function handleWithOllama(
+  messages: any[],
+  modelId: string,
+  apiKey: string | undefined,
+  customEndpoint?: string,
+  customModel?: string,
+) {
   try {
-    const body = await req.json()
-    const { customEndpoint, customModel } = body
-    
     const endpoint = customEndpoint || "http://127.0.0.1:11434"
     const model = customModel || "llama3.1:8b"
     
@@ -1041,11 +1194,14 @@ async function handleWithOllama(messages: any[], modelId: string, req: Request, 
 }
 
 // LM Studio handler
-async function handleWithLMStudio(messages: any[], modelId: string, req: Request, apiKey?: string) {
+async function handleWithLMStudio(
+  messages: any[],
+  modelId: string,
+  apiKey: string | undefined,
+  customEndpoint?: string,
+  customModel?: string,
+) {
   try {
-    const body = await req.json()
-    const { customEndpoint, customModel } = body
-    
     const endpoint = customEndpoint || "http://localhost:1234"
     const model = customModel || "local-model"
     
@@ -1077,11 +1233,14 @@ async function handleWithLMStudio(messages: any[], modelId: string, req: Request
 }
 
 // OpenAI-like handler
-async function handleWithOpenAILike(messages: any[], modelId: string, req: Request, apiKey?: string) {
+async function handleWithOpenAILike(
+  messages: any[],
+  modelId: string,
+  apiKey: string | undefined,
+  customEndpoint?: string,
+  customModel?: string,
+) {
   try {
-    const body = await req.json()
-    const { customEndpoint, customModel } = body
-    
     const endpoint = customEndpoint || "http://localhost:8000"
     const model = customModel || "local-model"
     
@@ -1119,11 +1278,13 @@ async function handleWithOpenAILike(messages: any[], modelId: string, req: Reque
 }
 
 // Lingo AI handler
-async function handleWithLingoAI(messages: any[], modelId: string, req: Request, apiKey?: string) {
+async function handleWithLingoAI(
+  messages: any[],
+  modelId: string,
+  apiKey: string | undefined,
+  customModel?: string,
+) {
   try {
-    const body = await req.json()
-    const { customModel } = body
-    
     const endpoint = process.env.LINGOAI || "http://model.yakkshit.com/api/chat/completions"
     const model = customModel || "resume-model-v1"
     

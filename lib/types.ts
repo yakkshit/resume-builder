@@ -138,8 +138,13 @@ export interface PortfolioLink {
     | "fireworks-llama-3.1-70b-instruct"
     | "fireworks-mixtral-8x7b-instruct"
     
+    // Hugging Face Models
+    | "huggingface-endpoint"
+    | "huggingface-model"
+    | "huggingface-streaming"
+    | "huggingface-provider"
+    
     // Custom Models
-    | "huggingface-custom"
     | "local-custom"
     | "ollama-local"
     | "lmstudio-local"

@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { InferenceClient } from "@huggingface/inference"
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30
@@ -32,6 +33,24 @@ const AVAILABLE_MODELS = {
   "gemini-2.0-pro-exp-02-05": {
     provider: "google",
     modelId: "gemini-2.0-pro-exp-02-05",
+  },
+  
+  // Hugging Face Models
+  "huggingface-endpoint": {
+    provider: "huggingface",
+    modelId: "endpoint",
+  },
+  "huggingface-model": {
+    provider: "huggingface",
+    modelId: "model",
+  },
+  "huggingface-streaming": {
+    provider: "huggingface",
+    modelId: "streaming",
+  },
+  "huggingface-provider": {
+    provider: "huggingface",
+    modelId: "provider",
   },
   
   // GPT Models
@@ -80,7 +99,7 @@ const MOCK_RESPONSES = [
 ]
 
 export async function POST(req: Request) {
-  const { messages, coverLetterData, jobDescription, model, apiKey, attachedData } = await req.json()
+  const { messages, coverLetterData, jobDescription, model, apiKey, attachedData, customModel, customEndpoint, customHeaders } = await req.json()
 
   // Create a system message
   let systemMessage = `You are an AI cover letter assistant that helps users create and improve their cover letters.
@@ -124,32 +143,42 @@ Job description: ${jobDescription || "Not provided"}`
   const modelConfig = AVAILABLE_MODELS[model as keyof typeof AVAILABLE_MODELS] || AVAILABLE_MODELS[DEFAULT_MODEL]
 
   try {
-    // Currently we only support Google models
-    if (modelConfig.provider === "google") {
-      try {
-        return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey)
-      } catch (error: any) {
-        console.error("Error with Gemini model:", error)
+    // Route to the appropriate provider handler
+    switch (modelConfig.provider) {
+      case "google":
+        try {
+          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey)
+        } catch (error: any) {
+          console.error("Error with Gemini model:", error)
 
-        // Check if it's a quota exceeded error (429)
-        if (error.message && error.message.includes("429") && error.message.includes("quota")) {
-          return handleQuotaExceeded()
+          // Check if it's a quota exceeded error (429)
+          if (error.message && error.message.includes("429") && error.message.includes("quota")) {
+            return handleQuotaExceeded()
+          }
+
+          // For other errors, return a generic error message
+          return new Response(
+            JSON.stringify({
+              error: "Failed to generate response",
+              message: "There was an error processing your request. Please try again later.",
+            }),
+            {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            },
+          )
         }
-
-        // For other errors, return a generic error message
-        return new Response(
-          JSON.stringify({
-            error: "Failed to generate response",
-            message: "There was an error processing your request. Please try again later.",
-          }),
-          {
-            status: 500,
-            headers: { "Content-Type": "application/json" },
-          },
-        )
-      }
-    } else {
-      throw new Error(`Unsupported model provider: ${modelConfig.provider}`)
+        
+      case "huggingface":
+        try {
+          return await handleWithHuggingFace(formattedMessages, modelConfig.modelId, req, apiKey, customModel, customEndpoint, customHeaders)
+        } catch (error: any) {
+          console.error("Error with Hugging Face model:", error)
+          throw error
+        }
+        
+      default:
+        throw new Error(`Unsupported model provider: ${modelConfig.provider}`)
     }
   } catch (error) {
     console.error("Error generating response:", error)
@@ -252,4 +281,141 @@ function handleQuotaExceeded() {
       "Content-Type": "text/plain; charset=utf-8",
     },
   })
+}
+
+// Hugging Face handler
+async function handleWithHuggingFace(messages: any[], modelId: string, req: Request, apiKey?: string, customModel?: string, customEndpoint?: string, customHeaders?: string) {
+  try {
+    // Get the model name from UI configuration or use default
+    const model = customModel || "meta-llama/Llama-3.1-8B-Instruct"
+    
+    // Get API key from UI or environment
+    const hfToken = apiKey || process.env.HUGGINGFACE_API_KEY
+    
+    if (!hfToken) {
+      throw new Error("Hugging Face API key is required. Please provide it in the UI or set HUGGINGFACE_API_KEY environment variable.")
+    }
+    
+    // Create InferenceClient instance
+    const client = new InferenceClient(hfToken)
+    
+    // Handle different Hugging Face configuration types
+    switch (modelId) {
+      case "endpoint":
+        // Endpoint-based chat completion
+        if (!customEndpoint) {
+          throw new Error("Custom endpoint is required for endpoint-based Hugging Face models")
+        }
+        
+        const endpointClient = client.endpoint(customEndpoint)
+        const endpointResponse = await endpointClient.chatCompletion({
+          model: model,
+          messages: messages.map(msg => ({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: msg.content,
+          })),
+          max_tokens: 4096,
+        })
+        
+        const endpointContent = endpointResponse.choices[0]?.message?.content || "No response generated"
+        return new Response(endpointContent, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        })
+        
+      case "model":
+        // Standard chat completion API
+        const modelResponse = await client.chatCompletion({
+          model: model,
+          messages: messages.map(msg => ({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: msg.content,
+          })),
+          max_tokens: 4096,
+        })
+        
+        const modelContent = modelResponse.choices[0]?.message?.content || "No response generated"
+        return new Response(modelContent, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        })
+        
+      case "streaming":
+        // Streaming chat completion API
+        const stream = new ReadableStream({
+          async start(controller) {
+            const encoder = new TextEncoder()
+            
+            try {
+              for await (const chunk of client.chatCompletionStream({
+                model: model,
+                messages: messages.map(msg => ({
+                  role: msg.role === "assistant" ? "assistant" : "user",
+                  content: msg.content,
+                })),
+                max_tokens: 4096,
+              })) {
+                const content = chunk.choices[0]?.delta?.content
+                if (content) {
+                  controller.enqueue(encoder.encode(content))
+                }
+              }
+              controller.close()
+            } catch (error) {
+              console.error("Error streaming from Hugging Face:", error)
+              controller.error(error)
+            }
+          },
+        })
+        
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        })
+        
+      case "provider":
+        // Provider-based chat completion
+        let provider = undefined
+        if (customHeaders) {
+          try {
+            const parsedHeaders = JSON.parse(customHeaders)
+            if (parsedHeaders.provider) {
+              provider = parsedHeaders.provider
+            }
+          } catch (error) {
+            console.warn("Invalid custom headers format:", error)
+          }
+        }
+        
+        if (!provider) {
+          throw new Error("Provider is required for provider-based Hugging Face models")
+        }
+        
+        const providerResponse = await client.chatCompletion({
+          model: model,
+          messages: messages.map(msg => ({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: msg.content,
+          })),
+          max_tokens: 4096,
+          provider: provider,
+        })
+        
+        const providerContent = providerResponse.choices[0]?.message?.content || "No response generated"
+        return new Response(providerContent, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+          },
+        })
+        
+      default:
+        throw new Error(`Unsupported Hugging Face model type: ${modelId}`)
+    }
+  } catch (error) {
+    console.error("Error with Hugging Face model:", error)
+    throw error
+  }
 }
