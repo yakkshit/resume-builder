@@ -1,6 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Image, Link } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
-import { coloredIconUrls } from "../logos/logos"
+import { coloredIconUrls } from "../../../logos/logos"
 
 // Use only built-in fonts to avoid issues
 const styles = StyleSheet.create({
