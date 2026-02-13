@@ -1,5 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { InferenceClient } from "@huggingface/inference"
+import { GoogleGenAI } from "@google/genai"
+import mime from "mime"
+import { writeFile } from "fs"
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30
@@ -10,37 +13,30 @@ const AVAILABLE_MODELS = {
   "gemini-2.0-flash-exp": {
     provider: "google",
     modelId: "gemini-2.0-flash-exp",
-    apiKey: process.env.GOOGLE_API_KEY,
   },
   "gemini-2.0-flash": {
     provider: "google",
     modelId: "gemini-2.0-flash",
-    apiKey: process.env.GOOGLE_API_KEY,
-  },
-  "gemini-2.0-pro": {
-    provider: "google",
-    modelId: "gemini-2.0-pro",
-    apiKey: process.env.GOOGLE_API_KEY,
   },
   "gemini-2.0-flash-lite": {
     provider: "google",
     modelId: "gemini-2.0-flash-lite",
-    apiKey: process.env.GOOGLE_API_KEY,
+  },
+  "gemini-2.0-flash-live": {
+    provider: "google",
+    modelId: "gemini-2.0-flash-live-001"
   },
   "gemini-2.5-flash": {
     provider: "google",
     modelId: "gemini-2.5-flash",
-    apiKey: process.env.GOOGLE_API_KEY,
   },
   "gemini-2.5-pro": {
     provider: "google",
     modelId: "gemini-2.5-pro",
-    apiKey: process.env.GOOGLE_API_KEY,
   },
   "gemini-2.5-flash-lite": {
     provider: "google",
     modelId: "gemini-2.5-flash-lite",
-    apiKey: process.env.GOOGLE_API_KEY,
   },
 
 
@@ -57,7 +53,7 @@ const AVAILABLE_MODELS = {
   },
   "gpt-4-turbo": {
     provider: "openai",
-    modelId: "gpt-4-turbo-preview",
+    modelId: "gpt-4-turbo",
     apiKey: process.env.OPENAI_API_KEY,
   },
   "gpt-4": {
@@ -298,17 +294,14 @@ const AVAILABLE_MODELS = {
   "fireworks-llama-3.1-8b-instruct": {
     provider: "fireworks",
     modelId: "llama-3.1-8b-instruct",
-    apiKey: process.env.FIREWORKS_API_KEY,
   },
   "fireworks-llama-3.1-70b-instruct": {
     provider: "fireworks",
     modelId: "llama-3.1-70b-instruct",
-    apiKey: process.env.FIREWORKS_API_KEY,
   },
   "fireworks-mixtral-8x7b-instruct": {
     provider: "fireworks",
     modelId: "mixtral-8x7b-instruct",
-    apiKey: process.env.FIREWORKS_API_KEY,
   },
 };
 
@@ -325,51 +318,72 @@ const MOCK_RESPONSES = [
 
 // Update the POST function to handle attachedData
 export async function POST(req: Request) {
-  const { messages, resumeData, aiMode, jobDescription, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth } = await req.json()
+  const { messages, resumeData, aiMode, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth } = await req.json()
 
   // Create a system message based on the mode
-  let systemMessage = ""
+let systemMessage = "";
 
-  if (aiMode) {
-    systemMessage = `You are an AI resume assistant that helps users tailor their resumes for specific job descriptions. 
-  
-  The user has provided their resume data and a job description. Your task is to suggest improvements to their resume to better match the job requirements.
-  
-  When suggesting changes, provide specific recommendations for each section (summary, experience, skills, etc.) and explain why these changes would be beneficial.
-  
-  IMPORTANT: When suggesting specific text changes, you MUST format them as JSON within triple backticks like this:
-  \`\`\`json
-  {
-    "basicInfo": {
-      "summary": "Updated summary text here..."
-    },
-    "skills": ["Added Skill 1", "Added Skill 2"]
-  }
-  \`\`\`
-  
-  Only include the fields that you're suggesting changes for. The user can apply these changes with a button.
-  Make sure your JSON is valid and properly formatted with double quotes around property names.
-  
-  Current resume data: ${JSON.stringify(resumeData)}
-  
-  Job description: ${jobDescription || "Not provided"}`
-  } else {
-    systemMessage = `You are an AI resume assistant that helps users with their resumes.
-  
-  The user has provided their resume data. Your task is to answer any questions they have about their resume, provide suggestions for improvement, or help with formatting issues.
-  
-  When suggesting specific text changes, you MUST format them as JSON within triple backticks like this:
-  \`\`\`json
-  {
-    "basicInfo": {
-      "summary": "Updated summary text here..."
-    },
-    "skills": ["Added Skill 1", "Added Skill 2"]
-  }
-  \`\`\`
-  
-  Current resume data: ${JSON.stringify(resumeData)}`
-  }
+if (aiMode) {
+  systemMessage = `
+    You are an AI Resume Assistant that helps users tailor their resumes to specific job descriptions.
+
+    The user will provide:
+    1. Resume data (as JSON).
+    2. A specific job description as query.
+
+    Your tasks:
+    - Compare the resume to the job description.
+    - Suggest improvements to make the resume better match the job requirements.
+    - Provide **specific recommendations by section** (summary, experience, skills, etc.).
+    - Explain briefly *why* each change is helpful.
+
+    ⚠️ Formatting Rules (strict):
+    1. When suggesting text or structural changes, you MUST return them ONLY as valid JSON wrapped in triple backticks:
+      \`\`\`json
+      {
+        "basicInfo": {
+          "summary": "Updated summary text here..."
+        },
+        "skills": ["Added Skill 1", "Added Skill 2"]
+      }
+      \`\`\`
+
+    2. Output ONLY the fields that are being modified. Do not repeat unchanged data.
+    3. Do not add trailing commas or comments inside JSON.
+    4. Do not include a profilePicture field. Never generate or suggest one.
+    5. Any narrative explanations should be written *outside* the JSON block.
+
+    Provided Resume Data:
+    ${JSON.stringify(resumeData)} `;
+} else {
+  systemMessage = `
+    You are an AI Resume Assistant that helps users with general resume advice.
+
+    The user will provide resume data as JSON. Your tasks:
+    - Answer questions about their resume.
+    - Suggest formatting improvements.
+    - Recommend ways to make sections more impactful.
+
+    ⚠️ Formatting Rules:
+    1. When suggesting text or structural changes, return them ONLY as valid JSON wrapped in triple backticks:
+      \`\`\`json
+      {
+        "basicInfo": {
+          "summary": "Improved summary text..."
+        },
+        "experience": [
+          { "description": "Rephrased bullet point here..." }
+        ]
+      }
+      \`\`\`
+    2. Only include the fields that need modification.
+    3. No extra fields: never include profilePicture.
+    4. Write explanations *outside* the JSON block.
+
+    Provided Resume Data:
+    ${JSON.stringify(resumeData)} `;
+}
+
 
   // If there's attached data, add it to the system message
   if (attachedData) {
@@ -428,26 +442,36 @@ export async function POST(req: Request) {
     switch (modelConfig.provider) {
       case "google":
         try {
-          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Gemini model:", error)
           if (error.message && error.message.includes("429") && error.message.includes("quota")) {
             return handleQuotaExceeded()
+          }
+          try {
+            console.warn("Retrying with handleNewGemini...")
+            return await handleNewGemini(formattedMessages, modelConfig.modelId, apiKey)
+          } catch (newGeminiError: any) {
+            console.error("Error with New Gemini handler:", newGeminiError)
+            throw newGeminiError
           }
           throw error
         }
         
       case "openai":
         try {
-          return await handleWithOpenAI(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithOpenAI(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with OpenAI model:", error)
+          if (error.message && error.message.includes("429") && error.message.includes("quota")) {
+            return handleQuotaExceeded()
+          }
           throw error
         }
         
       case "anthropic":
         try {
-          return await handleWithAnthropic(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithAnthropic(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Anthropic model:", error)
           throw error
@@ -455,7 +479,7 @@ export async function POST(req: Request) {
         
       case "deepseek":
         try {
-          return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with DeepSeek model:", error)
           throw error
@@ -463,7 +487,7 @@ export async function POST(req: Request) {
         
       case "groq":
         try {
-          return await handleWithGroq(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithGroq(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Groq model:", error)
           throw error
@@ -471,7 +495,7 @@ export async function POST(req: Request) {
         
       case "mistral":
         try {
-          return await handleWithMistral(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithMistral(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Mistral model:", error)
           throw error
@@ -479,7 +503,7 @@ export async function POST(req: Request) {
         
       case "together":
         try {
-          return await handleWithTogether(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithTogether(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Together.ai model:", error)
           throw error
@@ -487,7 +511,7 @@ export async function POST(req: Request) {
         
       case "cohere":
         try {
-          return await handleWithCohere(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithCohere(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Cohere model:", error)
           throw error
@@ -495,7 +519,7 @@ export async function POST(req: Request) {
         
       case "perplexity":
         try {
-          return await handleWithPerplexity(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithPerplexity(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Perplexity model:", error)
           throw error
@@ -503,7 +527,7 @@ export async function POST(req: Request) {
         
       case "fireworks":
         try {
-          return await handleWithFireworks(formattedMessages, modelConfig.modelId, apiKey || modelConfig.apiKey)
+          return await handleWithFireworks(formattedMessages, modelConfig.modelId, apiKey  )
         } catch (error: any) {
           console.error("Error with Fireworks model:", error)
           throw error
@@ -514,7 +538,7 @@ export async function POST(req: Request) {
           return await handleWithHuggingFace(
             formattedMessages,
             modelConfig.modelId,
-            apiKey || modelConfig.apiKey,
+            apiKey  ,
             customModel,
             customEndpoint,
             customHeaders,
@@ -530,7 +554,7 @@ export async function POST(req: Request) {
           return await handleWithLocal(
             formattedMessages,
             modelConfig.modelId,
-            apiKey || modelConfig.apiKey,
+            apiKey  ,
             customEndpoint,
             customModel,
             customHeaders,
@@ -546,7 +570,7 @@ export async function POST(req: Request) {
           return await handleWithOllama(
             formattedMessages,
             modelConfig.modelId,
-            apiKey || modelConfig.apiKey,
+            apiKey  ,
             customEndpoint,
             customModel,
           )
@@ -560,7 +584,7 @@ export async function POST(req: Request) {
           return await handleWithLMStudio(
             formattedMessages,
             modelConfig.modelId,
-            apiKey || modelConfig.apiKey,
+            apiKey  ,
             customEndpoint,
             customModel,
           )
@@ -574,7 +598,7 @@ export async function POST(req: Request) {
           return await handleWithOpenAILike(
             formattedMessages,
             modelConfig.modelId,
-            apiKey || modelConfig.apiKey,
+            apiKey,
             customEndpoint,
             customModel,
           )
@@ -588,7 +612,7 @@ export async function POST(req: Request) {
           return await handleWithLingoAI(
             formattedMessages,
             modelConfig.modelId,
-            apiKey || modelConfig.apiKey,
+            apiKey,
             customModel,
           )
         } catch (error: any) {
@@ -614,10 +638,26 @@ export async function POST(req: Request) {
   }
 }
 
+// Helper to save files if Gemini returns inlineData (images, etc.)
+function saveBinaryFile(fileName: string, content: Buffer) {
+  writeFile(fileName, content, "utf8", (err) => {
+    if (err) {
+      console.error(`Error writing file ${fileName}:`, err)
+      return
+    }
+    console.log(`File ${fileName} saved to file system.`)
+  })
+}
+
 async function handleWithGemini(messages: any[], modelId: string, apiKey?: string) {
   try {
-    // Initialize the Gemini API - remove the 'new' keyword
-    const genAI = new GoogleGenerativeAI(apiKey || process.env.GOOGLE_API_KEY || "")
+    const key = apiKey || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
+    if (!key) {
+      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
+    }
+
+    // Initialize the Gemini API
+    const genAI = new GoogleGenerativeAI(key)
 
     // Create a Gemini model instance
     const gemini = genAI.getGenerativeModel({ model: modelId })
@@ -666,13 +706,78 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
   }
 }
 
+export async function handleNewGemini(
+  messages: any[],
+  modelId: string,
+  apiKey?: string
+) {
+  try {
+    const key = apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+    if (!key) {
+      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.")
+    }
+
+    // Initialize Gemini API client
+    const ai = new GoogleGenAI({
+      apiKey: key,
+    })
+
+    // Only request TEXT output
+    const config = {
+      responseModalities: ["TEXT"],
+    }
+
+    // Convert messages into correct Gemini format
+    const contents = messages.map((msg) => ({
+      role: msg.role === "user" ? "user" : "model",
+      parts: [{ text: msg.content }],
+    }))
+
+    // Request a streaming response
+    const response = await ai.models.generateContentStream({
+      model: modelId || "gemini-2.0-flash",
+      config,
+      contents,
+    })
+
+    // Stream back TEXT result
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        try {
+          for await (const chunk of response) {
+            if (chunk.text) {
+              controller.enqueue(encoder.encode(chunk.text))
+            }
+          }
+          controller.close()
+        } catch (err) {
+          console.error("Error streaming from New Gemini:", err)
+          controller.error(err)
+        }
+      },
+    })
+
+    // Return the stream as a Response object (same shape as handleWithGemini)
+    return new Response(stream)
+  } catch (error) {
+    console.error("Error with New Gemini model:", error)
+    throw error
+  }
+}
+
 // OpenAI handler
 async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.OPENAI_API_KEY
+    if (!key) {
+      throw new Error("OpenAI API key is required. Please provide it in the UI or set OPENAI_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -682,12 +787,12 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -700,10 +805,15 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
 // Anthropic handler
 async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.ANTHROPIC_API_KEY
+    if (!key) {
+      throw new Error("Anthropic API key is required. Please provide it in the UI or set ANTHROPIC_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
-        "x-api-key": apiKey || "",
+        "x-api-key": key,
         "anthropic-version": "2023-06-01",
         "Content-Type": "application/json",
       },
@@ -714,12 +824,12 @@ async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: st
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Anthropic API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`Anthropic API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -732,10 +842,15 @@ async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: st
 // DeepSeek handler
 async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.DEEPSEEK_API_KEY
+    if (!key) {
+      throw new Error("DeepSeek API key is required. Please provide it in the UI or set DEEPSEEK_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.deepseek.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -745,12 +860,12 @@ async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: str
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`DeepSeek API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`DeepSeek API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -763,10 +878,15 @@ async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: str
 // Groq handler
 async function handleWithGroq(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.GROQ_API_KEY
+    if (!key) {
+      throw new Error("Groq API key is required. Please provide it in the UI or set GROQ_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -776,12 +896,12 @@ async function handleWithGroq(messages: any[], modelId: string, apiKey?: string)
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`Groq API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -794,10 +914,15 @@ async function handleWithGroq(messages: any[], modelId: string, apiKey?: string)
 // Mistral handler
 async function handleWithMistral(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.MISTRAL_API_KEY
+    if (!key) {
+      throw new Error("Mistral API key is required. Please provide it in the UI or set MISTRAL_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -807,12 +932,12 @@ async function handleWithMistral(messages: any[], modelId: string, apiKey?: stri
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Mistral API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`Mistral API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -825,10 +950,15 @@ async function handleWithMistral(messages: any[], modelId: string, apiKey?: stri
 // Together.ai handler
 async function handleWithTogether(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.TOGETHER_API_KEY
+    if (!key) {
+      throw new Error("Together.ai API key is required. Please provide it in the UI or set TOGETHER_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.together.xyz/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -838,12 +968,12 @@ async function handleWithTogether(messages: any[], modelId: string, apiKey?: str
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Together.ai API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`Together.ai API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -856,22 +986,27 @@ async function handleWithTogether(messages: any[], modelId: string, apiKey?: str
 // Cohere handler
 async function handleWithCohere(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.COHERE_API_KEY
+    if (!key) {
+      throw new Error("Cohere API key is required. Please provide it in the UI or set COHERE_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.cohere.ai/v1/chat", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model: modelId,
         message: messages[messages.length - 1].content,
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Cohere API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`Cohere API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -884,10 +1019,15 @@ async function handleWithCohere(messages: any[], modelId: string, apiKey?: strin
 // Perplexity handler
 async function handleWithPerplexity(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.PERPLEXITY_API_KEY
+    if (!key) {
+      throw new Error("Perplexity API key is required. Please provide it in the UI or set PERPLEXITY_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -897,12 +1037,12 @@ async function handleWithPerplexity(messages: any[], modelId: string, apiKey?: s
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Perplexity API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`Perplexity API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -915,10 +1055,15 @@ async function handleWithPerplexity(messages: any[], modelId: string, apiKey?: s
 // Fireworks handler
 async function handleWithFireworks(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.FIREWORKS_API_KEY
+    if (!key) {
+      throw new Error("Fireworks API key is required. Please provide it in the UI or set FIREWORKS_API_KEY environment variable.")
+    }
+
     const response = await fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -928,12 +1073,12 @@ async function handleWithFireworks(messages: any[], modelId: string, apiKey?: st
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`Fireworks API error: ${response.status}`)
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`Fireworks API error: ${response.status} - ${errorText}`)
     }
 
     return new Response(response.body)
@@ -981,7 +1126,6 @@ async function handleWithHuggingFace(
             role: msg.role === "assistant" ? "assistant" : "user",
             content: msg.content,
           })),
-          max_tokens: 4096,
         })
         
         const endpointContent = endpointResponse.choices[0]?.message?.content || "No response generated"
@@ -999,7 +1143,6 @@ async function handleWithHuggingFace(
             role: msg.role === "assistant" ? "assistant" : "user",
             content: msg.content,
           })),
-          max_tokens: 4096,
         })
         
         const modelContent = modelResponse.choices[0]?.message?.content || "No response generated"
@@ -1022,7 +1165,6 @@ async function handleWithHuggingFace(
                   role: msg.role === "assistant" ? "assistant" : "user",
                   content: msg.content,
                 })),
-                max_tokens: 4096,
               })) {
                 const content = chunk.choices[0]?.delta?.content
                 if (content) {
@@ -1067,7 +1209,6 @@ async function handleWithHuggingFace(
             role: msg.role === "assistant" ? "assistant" : "user",
             content: msg.content,
           })),
-          max_tokens: 4096,
           provider: provider,
         })
         
@@ -1139,7 +1280,6 @@ async function handleWithLocal(
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
@@ -1178,7 +1318,6 @@ async function handleWithOllama(
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
@@ -1217,7 +1356,6 @@ async function handleWithLMStudio(
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
@@ -1262,7 +1400,6 @@ async function handleWithOpenAILike(
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
@@ -1306,7 +1443,6 @@ async function handleWithLingoAI(
           content: msg.content,
         })),
         stream: true,
-        max_tokens: 4096,
       }),
     })
 
