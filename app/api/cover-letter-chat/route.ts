@@ -197,8 +197,13 @@ Job description: ${jobDescription || "Not provided"}`
 
 async function handleWithGemini(messages: any[], modelId: string, apiKey?: string) {
   try {
+    const key = apiKey || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
+    if (!key) {
+      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
+    }
+
     // Initialize the Gemini API
-    const genAI = new GoogleGenerativeAI(apiKey || process.env.GOOGLE_API_KEY || "")
+    const genAI = new GoogleGenerativeAI(key)
 
     // Create a Gemini model instance
     const gemini = genAI.getGenerativeModel({ model: modelId })

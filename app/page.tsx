@@ -142,7 +142,6 @@ export default function ResumePage() {
     body: {
       resumeData,
       aiMode,
-      jobDescription,
       model: selectedModel,
       apiKey: apiKey || undefined,
       contextText: (selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") ? (contextText || undefined) : undefined,
@@ -993,7 +992,6 @@ export default function ResumePage() {
                           </div>
                           <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</SelectItem>
                           <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
-                          <SelectItem value="gemini-2.0-pro">Gemini 2.0 Pro</SelectItem>
                           <SelectItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</SelectItem>
                           
                           {/* Gemini 2.5 Models */}
