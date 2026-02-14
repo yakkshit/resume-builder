@@ -7,7 +7,10 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
-    "generate-pdf": "tsx scripts/generate-pdf.ts"
+    "generate-pdf": "tsx scripts/generate-pdf.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prod": "pnpm run test && pnpm run build"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.8",
@@ -77,7 +80,8 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.1",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/multer": "^2.0.0",
@@ -87,7 +91,7 @@
     "@types/react-dom": "^18.3.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
-    "tsx": "^4.21.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.0"
   }
 }

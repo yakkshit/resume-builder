@@ -62,7 +62,6 @@ import LoadingScreen from "@/components/resume-coverletter/loading-screen";
 // Import the correct components
 import InfiniteMarquee from "@/components/ui/infinite-marquee";
 import { galleryItems } from "@/lib/gallery-data";
-import dynamic from "next/dynamic";
 
 export default function ResumePage() {
   const { toast } = useToast();
@@ -136,7 +135,7 @@ export default function ResumePage() {
     handleInputChange,
     handleSubmit,
     setMessages,
-    isLoading,
+    status,
     error,
     stop,
   } = useChat({
@@ -1633,7 +1632,7 @@ export default function ResumePage() {
                       input={input}
                       handleInputChange={handleInputChange}
                       handleSubmit={handleChatSubmit}
-                      isLoading={isLoading}
+                      isLoading={status === "submitted" || status === "streaming"}
                       onStop={stop}
                       applyAiChanges={applyAiChanges}
                       aiMode={aiMode}

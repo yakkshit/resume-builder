@@ -1,18 +1,37 @@
 import { NextRequest, NextResponse } from "next/server"
 import { spawn } from "node:child_process"
+import path from "node:path"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, Template } from "@/lib/types"
 
 export const runtime = "nodejs"
+export const maxDuration = 30
 
 const MIN_PDF_SIZE = 200
-const PDF_HEADER = "%PDF"
 
-async function generateViaScript(resumeData: ResumeData, template: Template): Promise<Buffer> {
+function isValidPdfBuffer(buffer: Buffer | Uint8Array): boolean {
+  const len = buffer.length
+  if (len < MIN_PDF_SIZE) return false
+  const b = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+  return b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46
+}
+
+/**
+ * Generate PDF via subprocess so React and @react-pdf/renderer use a single
+ * React instance (avoids "Objects are not valid as a React child" #31).
+ * Works in local and production when Node can spawn the script.
+ */
+async function generateViaSubprocess(
+  resumeData: ResumeData,
+  templateName: string
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const input = JSON.stringify({ resumeData, template })
-    const child = spawn("npx", ["tsx", "scripts/generate-pdf.ts"], {
-      cwd: process.cwd(),
+    const cwd = process.cwd()
+    const scriptPath = path.join(cwd, "scripts", "generate-pdf.ts")
+    const input = JSON.stringify({ resumeData, template: templateName })
+
+    const child = spawn("npx", ["tsx", scriptPath], {
+      cwd,
       stdio: ["pipe", "pipe", "pipe"],
       shell: true,
     })
@@ -31,30 +50,20 @@ async function generateViaScript(resumeData: ResumeData, template: Template): Pr
 
     child.stdin.write(input, (err) => {
       if (err) reject(err)
-      child.stdin.end()
+      else child.stdin.end()
     })
   })
-}
-
-function isValidPdfBuffer(buffer: Buffer): boolean {
-  return (
-    buffer.length >= MIN_PDF_SIZE &&
-    buffer[0] === 0x25 && // %
-    buffer[1] === 0x50 && // P
-    buffer[2] === 0x44 && // D
-    buffer[3] === 0x46    // F
-  )
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { resumeData, template } = body as { resumeData: ResumeData; template: Template }
+    const { resumeData, template } = body as { resumeData: ResumeData; template?: Template }
 
     const sanitized = sanitizeResumeData(resumeData)
     const templateName = (template as string) || "modern"
 
-    const pdfBuffer = await generateViaScript(sanitized, templateName as Template)
+    const pdfBuffer = await generateViaSubprocess(sanitized, templateName)
 
     if (!isValidPdfBuffer(pdfBuffer)) {
       console.error("PDF script returned invalid output:", pdfBuffer.length, "bytes")
@@ -68,7 +77,7 @@ export async function POST(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": 'attachment; filename="resume.pdf"',
+        "Content-Disposition": 'inline; filename="resume.pdf"',
         "Cache-Control": "no-store",
       },
     })

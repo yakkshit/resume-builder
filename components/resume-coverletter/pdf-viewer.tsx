@@ -26,7 +26,8 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
   }, [])
 
   const fetchPdfBlob = async (): Promise<Blob> => {
-    const response = await fetch("/api/generate-pdf", {
+    const base = typeof window !== "undefined" ? window.location.origin : ""
+    const response = await fetch(`${base}/api/generate-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ resumeData, template }),
