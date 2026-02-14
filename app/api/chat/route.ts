@@ -14,31 +14,18 @@ const AVAILABLE_MODELS = {
     provider: "google",
     modelId: "gemini-2.0-flash-exp",
   },
+  "gemini-1.5-pro": {
+    provider: "google",
+    modelId: "gemini-1.5-pro",
+  },
+  "gemini-1.5-flash": {
+    provider: "google",
+    modelId: "gemini-1.5-flash",
+  },
   "gemini-2.0-flash": {
     provider: "google",
     modelId: "gemini-2.0-flash",
   },
-  "gemini-2.0-flash-lite": {
-    provider: "google",
-    modelId: "gemini-2.0-flash-lite",
-  },
-  "gemini-2.0-flash-live": {
-    provider: "google",
-    modelId: "gemini-2.0-flash-live-001"
-  },
-  "gemini-2.5-flash": {
-    provider: "google",
-    modelId: "gemini-2.5-flash",
-  },
-  "gemini-2.5-pro": {
-    provider: "google",
-    modelId: "gemini-2.5-pro",
-  },
-  "gemini-2.5-flash-lite": {
-    provider: "google",
-    modelId: "gemini-2.5-flash-lite",
-  },
-
 
   // OpenAI Models
   "gpt-4o": {
@@ -56,16 +43,6 @@ const AVAILABLE_MODELS = {
     modelId: "gpt-4-turbo",
     apiKey: process.env.OPENAI_API_KEY,
   },
-  "gpt-4": {
-    provider: "openai",
-    modelId: "gpt-4",
-    apiKey: process.env.OPENAI_API_KEY,
-  },
-  "gpt-3.5-turbo": {
-    provider: "openai",
-    modelId: "gpt-3.5-turbo",
-    apiKey: process.env.OPENAI_API_KEY,
-  },
 
   // Anthropic Claude Models
   "claude-3-5-sonnet": {
@@ -73,39 +50,14 @@ const AVAILABLE_MODELS = {
     modelId: "claude-3-5-sonnet-20241022",
     apiKey: process.env.ANTHROPIC_API_KEY,
   },
-  "claude-3-5-haiku": {
-    provider: "anthropic",
-    modelId: "claude-3-5-haiku-20241022",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
   "claude-3-opus": {
     provider: "anthropic",
     modelId: "claude-3-opus-20240229",
     apiKey: process.env.ANTHROPIC_API_KEY,
   },
-  "claude-3-sonnet": {
-    provider: "anthropic",
-    modelId: "claude-3-sonnet-20240229",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
   "claude-3-haiku": {
     provider: "anthropic",
     modelId: "claude-3-haiku-20240307",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-2.1": {
-    provider: "anthropic",
-    modelId: "claude-2.1",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-2.0": {
-    provider: "anthropic",
-    modelId: "claude-2.0",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-instant-1.2": {
-    provider: "anthropic",
-    modelId: "claude-instant-1.2",
     apiKey: process.env.ANTHROPIC_API_KEY,
   },
 
@@ -115,106 +67,24 @@ const AVAILABLE_MODELS = {
     modelId: "deepseek-chat",
     apiKey: process.env.DEEPSEEK_API_KEY,
   },
-  "deepseek-reasoner": {
-    provider: "deepseek",
-    modelId: "deepseek-reasoner",
-    apiKey: process.env.DEEPSEEK_API_KEY,
-  },
-  "deepseek-coder": {
-    provider: "deepseek",
-    modelId: "deepseek-coder",
-    apiKey: process.env.DEEPSEEK_API_KEY,
-  },
 
-  // Groq Models (Fast Inference)
-  "llama-3.1-8b-instant": {
-    provider: "groq",
-    modelId: "llama3-8b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
+  // Groq Models
   "llama-3.1-70b-versatile": {
     provider: "groq",
-    modelId: "llama3-70b-8192",
+    modelId: "llama-3.1-70b-versatile",
     apiKey: process.env.GROQ_API_KEY,
   },
-  "llama-3.3-70b-versatile": {
-    provider: "groq",
-    modelId: "llama3.3-70b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "mixtral-8x7b-32768": {
-    provider: "groq",
-    modelId: "mixtral-8x7b-32768",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "gemma2-9b-it": {
-    provider: "groq",
-    modelId: "gemma2-9b-it",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "llama-3.1-8b": {
-    provider: "groq",
-    modelId: "llama3-8b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "llama-3.1-70b": {
+  "llama3-70b-8192": {
     provider: "groq",
     modelId: "llama3-70b-8192",
     apiKey: process.env.GROQ_API_KEY,
   },
-  "llama-3.3-70b": {
-    provider: "groq",
-    modelId: "llama3.3-70b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
 
-  // Hugging Face Models
-  "huggingface-endpoint": {
-    provider: "huggingface",
-    modelId: "endpoint",
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-  },
-  "huggingface-model": {
-    provider: "huggingface",
-    modelId: "model",
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-  },
-  "huggingface-streaming": {
-    provider: "huggingface",
-    modelId: "streaming",
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-  },
-  "huggingface-provider": {
-    provider: "huggingface",
-    modelId: "provider",
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-  },
-
-  // Local Models
-  "local-custom": {
-    provider: "local",
-    modelId: "custom",
-    apiKey: undefined,
-  },
-  "ollama-local": {
-    provider: "ollama",
-    modelId: "custom",
-    apiKey: undefined,
-  },
-  "lmstudio-local": {
-    provider: "lmstudio",
-    modelId: "custom",
-    apiKey: undefined,
-  },
-  "openai-like-local": {
-    provider: "openai-like",
-    modelId: "custom",
-    apiKey: undefined,
-  },
-  "lingo-ai": {
-    provider: "lingo-ai",
-    modelId: "resume-model-v1",
-    apiKey: undefined,
+  // Perplexity Models
+  "llama-3.1-sonar-large-128k-online": {
+    provider: "perplexity",
+    modelId: "llama-3.1-sonar-large-128k-online",
+    apiKey: process.env.PERPLEXITY_API_KEY,
   },
 
   // Mistral Models
@@ -223,91 +93,16 @@ const AVAILABLE_MODELS = {
     modelId: "mistral-large-latest",
     apiKey: process.env.MISTRAL_API_KEY,
   },
-  "mistral-medium-latest": {
-    provider: "mistral",
-    modelId: "mistral-medium-latest",
-    apiKey: process.env.MISTRAL_API_KEY,
-  },
-  "mistral-small-latest": {
-    provider: "mistral",
-    modelId: "mistral-small-latest",
-    apiKey: process.env.MISTRAL_API_KEY,
-  },
-  "mistral-7b-instruct": {
-    provider: "mistral",
-    modelId: "mistral-7b-instruct",
-    apiKey: process.env.MISTRAL_API_KEY,
-  },
-
-  // Together.ai Models
-  "meta-llama/llama-3.1-8b-instruct": {
-    provider: "together",
-    modelId: "meta-llama/llama-3.1-8b-instruct",
-    apiKey: process.env.TOGETHER_API_KEY,
-  },
-  "meta-llama/llama-3.1-70b-instruct": {
-    provider: "together",
-    modelId: "meta-llama/llama-3.1-70b-instruct",
-    apiKey: process.env.TOGETHER_API_KEY,
-  },
-  "meta-llama/llama-3.3-70b-instruct": {
-    provider: "together",
-    modelId: "meta-llama/llama-3.3-70b-instruct",
-    apiKey: process.env.TOGETHER_API_KEY,
-  },
-
-  // Cohere Models
-  "command-r-plus": {
-    provider: "cohere",
-    modelId: "command-r-plus",
-    apiKey: process.env.COHERE_API_KEY,
-  },
-  "command-r": {
-    provider: "cohere",
-    modelId: "command-r",
-    apiKey: process.env.COHERE_API_KEY,
-  },
-  "command-light": {
-    provider: "cohere",
-    modelId: "command-light",
-    apiKey: process.env.COHERE_API_KEY,
-  },
-
-  // Perplexity Models
-  "llama-3.1-8b-instruct": {
-    provider: "perplexity",
-    modelId: "llama-3.1-8b-instruct",
-    apiKey: process.env.PERPLEXITY_API_KEY,
-  },
-  "llama-3.1-70b-instruct": {
-    provider: "perplexity",
-    modelId: "llama-3.1-70b-instruct",
-    apiKey: process.env.PERPLEXITY_API_KEY,
-  },
-  "mixtral-8x7b-instruct": {
-    provider: "perplexity",
-    modelId: "mixtral-8x7b-instruct",
-    apiKey: process.env.PERPLEXITY_API_KEY,
-  },
-
-  // Fireworks Models
-  "fireworks-llama-3.1-8b-instruct": {
-    provider: "fireworks",
-    modelId: "llama-3.1-8b-instruct",
-  },
-  "fireworks-llama-3.1-70b-instruct": {
-    provider: "fireworks",
-    modelId: "llama-3.1-70b-instruct",
-  },
-  "fireworks-mixtral-8x7b-instruct": {
-    provider: "fireworks",
-    modelId: "mixtral-8x7b-instruct",
+  "lingo-ai": {
+    provider: "lingo-ai",
+    modelId: "resume-model-v1",
+    apiKey: undefined,
   },
 };
 
 
 // Default model if none specified
-const DEFAULT_MODEL = "lingo-ai"
+const DEFAULT_MODEL = "gemini-1.5-flash"
 
 // Mock response for when API quota is exceeded
 const MOCK_RESPONSES = [
@@ -321,10 +116,10 @@ export async function POST(req: Request) {
   const { messages, resumeData, aiMode, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth } = await req.json()
 
   // Create a system message based on the mode
-let systemMessage = "";
+  let systemMessage = "";
 
-if (aiMode) {
-  systemMessage = `
+  if (aiMode) {
+    systemMessage = `
     You are an AI Resume Assistant that helps users tailor their resumes to specific job descriptions.
 
     The user will provide:
@@ -355,8 +150,8 @@ if (aiMode) {
 
     Provided Resume Data:
     ${JSON.stringify(resumeData)} `;
-} else {
-  systemMessage = `
+  } else {
+    systemMessage = `
     You are an AI Resume Assistant that helps users with general resume advice.
 
     The user will provide resume data as JSON. Your tasks:
@@ -382,7 +177,7 @@ if (aiMode) {
 
     Provided Resume Data:
     ${JSON.stringify(resumeData)} `;
-}
+  }
 
 
   // If there's attached data, add it to the system message
@@ -400,7 +195,7 @@ if (aiMode) {
   // If there are attached files, add them to the system message
   if (attachedFiles && attachedFiles.length > 0) {
     systemMessage += `\n\nThe user has attached the following files:\n`
-    
+
     for (const file of attachedFiles) {
       if (file.contentType === 'pdf') {
         systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${file.content}\n`
@@ -418,7 +213,7 @@ if (aiMode) {
         systemMessage += `\nFile: ${file.name}\nContent: ${file.content}\n`
       }
     }
-    
+
     systemMessage += `\nPlease analyze these files and use their content to provide relevant assistance.`
   }
 
@@ -457,7 +252,7 @@ if (aiMode) {
           }
           throw error
         }
-        
+
       case "openai":
         try {
           return await handleWithOpenAI(formattedMessages, modelConfig.modelId, apiKey)
@@ -468,7 +263,7 @@ if (aiMode) {
           }
           throw error
         }
-        
+
       case "anthropic":
         try {
           return await handleWithAnthropic(formattedMessages, modelConfig.modelId, apiKey)
@@ -476,7 +271,7 @@ if (aiMode) {
           console.error("Error with Anthropic model:", error)
           throw error
         }
-        
+
       case "deepseek":
         try {
           return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey)
@@ -484,7 +279,7 @@ if (aiMode) {
           console.error("Error with DeepSeek model:", error)
           throw error
         }
-        
+
       case "groq":
         try {
           return await handleWithGroq(formattedMessages, modelConfig.modelId, apiKey)
@@ -492,7 +287,7 @@ if (aiMode) {
           console.error("Error with Groq model:", error)
           throw error
         }
-        
+
       case "mistral":
         try {
           return await handleWithMistral(formattedMessages, modelConfig.modelId, apiKey)
@@ -500,7 +295,7 @@ if (aiMode) {
           console.error("Error with Mistral model:", error)
           throw error
         }
-        
+
       case "together":
         try {
           return await handleWithTogether(formattedMessages, modelConfig.modelId, apiKey)
@@ -508,7 +303,7 @@ if (aiMode) {
           console.error("Error with Together.ai model:", error)
           throw error
         }
-        
+
       case "cohere":
         try {
           return await handleWithCohere(formattedMessages, modelConfig.modelId, apiKey)
@@ -516,7 +311,7 @@ if (aiMode) {
           console.error("Error with Cohere model:", error)
           throw error
         }
-        
+
       case "perplexity":
         try {
           return await handleWithPerplexity(formattedMessages, modelConfig.modelId, apiKey)
@@ -524,21 +319,21 @@ if (aiMode) {
           console.error("Error with Perplexity model:", error)
           throw error
         }
-        
+
       case "fireworks":
         try {
-          return await handleWithFireworks(formattedMessages, modelConfig.modelId, apiKey  )
+          return await handleWithFireworks(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Fireworks model:", error)
           throw error
         }
-        
+
       case "huggingface":
         try {
           return await handleWithHuggingFace(
             formattedMessages,
             modelConfig.modelId,
-            apiKey  ,
+            apiKey,
             customModel,
             customEndpoint,
             customHeaders,
@@ -547,14 +342,14 @@ if (aiMode) {
           console.error("Error with Hugging Face model:", error)
           throw error
         }
-      
-        
+
+
       case "local":
         try {
           return await handleWithLocal(
             formattedMessages,
             modelConfig.modelId,
-            apiKey  ,
+            apiKey,
             customEndpoint,
             customModel,
             customHeaders,
@@ -564,13 +359,13 @@ if (aiMode) {
           console.error("Error with Local model:", error)
           throw error
         }
-        
+
       case "ollama":
         try {
           return await handleWithOllama(
             formattedMessages,
             modelConfig.modelId,
-            apiKey  ,
+            apiKey,
             customEndpoint,
             customModel,
           )
@@ -578,13 +373,13 @@ if (aiMode) {
           console.error("Error with Ollama model:", error)
           throw error
         }
-        
+
       case "lmstudio":
         try {
           return await handleWithLMStudio(
             formattedMessages,
             modelConfig.modelId,
-            apiKey  ,
+            apiKey,
             customEndpoint,
             customModel,
           )
@@ -592,7 +387,7 @@ if (aiMode) {
           console.error("Error with LM Studio model:", error)
           throw error
         }
-        
+
       case "openai-like":
         try {
           return await handleWithOpenAILike(
@@ -606,7 +401,7 @@ if (aiMode) {
           console.error("Error with OpenAI-like model:", error)
           throw error
         }
-        
+
       case "lingo-ai":
         try {
           return await handleWithLingoAI(
@@ -619,7 +414,7 @@ if (aiMode) {
           console.error("Error with Lingo AI model:", error)
           throw error
         }
-        
+
       default:
         throw new Error(`Unsupported model provider: ${modelConfig.provider}`)
     }
@@ -1100,17 +895,17 @@ async function handleWithHuggingFace(
   try {
     // Get the model name from UI configuration or use default
     const model = customModel || "meta-llama/Llama-3.1-8B-Instruct"
-    
+
     // Get API key from UI or environment
     const hfToken = apiKey || process.env.HUGGINGFACE_API_KEY
-    
+
     if (!hfToken) {
       throw new Error("Hugging Face API key is required. Please provide it in the UI or set HUGGINGFACE_API_KEY environment variable.")
     }
-    
+
     // Create InferenceClient instance
     const client = new InferenceClient(hfToken)
-    
+
     // Handle different Hugging Face configuration types
     switch (modelId) {
       case "endpoint":
@@ -1118,7 +913,7 @@ async function handleWithHuggingFace(
         if (!customEndpoint) {
           throw new Error("Custom endpoint is required for endpoint-based Hugging Face models")
         }
-        
+
         const endpointClient = client.endpoint(customEndpoint)
         const endpointResponse = await endpointClient.chatCompletion({
           model: model,
@@ -1127,14 +922,14 @@ async function handleWithHuggingFace(
             content: msg.content,
           })),
         })
-        
+
         const endpointContent = endpointResponse.choices[0]?.message?.content || "No response generated"
         return new Response(endpointContent, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
           },
         })
-        
+
       case "model":
         // Standard chat completion API
         const modelResponse = await client.chatCompletion({
@@ -1144,20 +939,20 @@ async function handleWithHuggingFace(
             content: msg.content,
           })),
         })
-        
+
         const modelContent = modelResponse.choices[0]?.message?.content || "No response generated"
         return new Response(modelContent, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
           },
         })
-        
+
       case "streaming":
         // Streaming chat completion API
         const stream = new ReadableStream({
           async start(controller) {
             const encoder = new TextEncoder()
-            
+
             try {
               for await (const chunk of client.chatCompletionStream({
                 model: model,
@@ -1178,13 +973,13 @@ async function handleWithHuggingFace(
             }
           },
         })
-        
+
         return new Response(stream, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
           },
         })
-        
+
       case "provider":
         // Provider-based chat completion
         let provider = undefined
@@ -1198,11 +993,11 @@ async function handleWithHuggingFace(
             console.warn("Invalid custom headers format:", error)
           }
         }
-        
+
         if (!provider) {
           throw new Error("Provider is required for provider-based Hugging Face models")
         }
-        
+
         const providerResponse = await client.chatCompletion({
           model: model,
           messages: messages.map(msg => ({
@@ -1211,14 +1006,14 @@ async function handleWithHuggingFace(
           })),
           provider: provider,
         })
-        
+
         const providerContent = providerResponse.choices[0]?.message?.content || "No response generated"
         return new Response(providerContent, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
           },
         })
-        
+
       default:
         throw new Error(`Unsupported Hugging Face model type: ${modelId}`)
     }
@@ -1241,11 +1036,11 @@ async function handleWithLocal(
   try {
     const endpoint = customEndpoint || "http://localhost:8000/v1/chat/completions"
     const model = customModel || "local-model"
-    
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    
+
     // Handle different authentication methods
     if (customAuth === "bearer" && apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`
@@ -1259,7 +1054,7 @@ async function handleWithLocal(
         console.warn("Invalid custom headers format:", error)
       }
     }
-    
+
     // Add custom headers if provided
     if (customHeaders && customAuth !== "custom") {
       try {
@@ -1305,7 +1100,7 @@ async function handleWithOllama(
   try {
     const endpoint = customEndpoint || "http://127.0.0.1:11434"
     const model = customModel || "llama3.1:8b"
-    
+
     const response = await fetch(`${endpoint}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -1343,7 +1138,7 @@ async function handleWithLMStudio(
   try {
     const endpoint = customEndpoint || "http://localhost:1234"
     const model = customModel || "local-model"
-    
+
     const response = await fetch(`${endpoint}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -1381,11 +1176,11 @@ async function handleWithOpenAILike(
   try {
     const endpoint = customEndpoint || "http://localhost:8000"
     const model = customModel || "local-model"
-    
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    
+
     if (apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`
     }
@@ -1424,11 +1219,11 @@ async function handleWithLingoAI(
   try {
     const endpoint = process.env.LINGOAI || "http://model.yakkshit.com/api/chat/completions"
     const model = customModel || "resume-model-v1"
-    
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    
+
     if (apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`
     }

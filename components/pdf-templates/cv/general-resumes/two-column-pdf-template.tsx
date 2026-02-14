@@ -176,9 +176,9 @@ export const TwoColumnPDFTemplate = ({ resumeData }: TwoColumnPDFTemplateProps) 
           <View style={styles.leftColumn}>
             {/* Profile Section */}
             <View style={styles.profileContainer}>
-              {basicInfo.profilePicture && (
-                <Image src={basicInfo.profilePicture || "/placeholder.svg"} style={styles.profileImage} cache={false} />
-              )}
+              {basicInfo.profilePicture ? (
+                <Image src={basicInfo.profilePicture} style={styles.profileImage} cache={false} />
+              ) : null}
               <Text style={styles.name}>{basicInfo.name}</Text>
               <Text style={styles.title}>{basicInfo.title}</Text>
             </View>
@@ -187,41 +187,41 @@ export const TwoColumnPDFTemplate = ({ resumeData }: TwoColumnPDFTemplateProps) 
             <View style={{ marginBottom: 20 }}>
               <Text style={styles.sectionTitle}>Contact</Text>
 
-              {basicInfo.email && (
+              {basicInfo.email ? (
                 <View style={styles.contactRow}>
                   <Image src={emailIcon || "/placeholder.svg"} style={styles.contactIcon} />
                   <Link src={`mailto:${basicInfo.email}`} style={styles.leftLink}>
                     <Text style={styles.contactItem}>{basicInfo.email}</Text>
                   </Link>
                 </View>
-              )}
+              ) : null}
 
-              {basicInfo.phone && (
+              {basicInfo.phone ? (
                 <View style={styles.contactRow}>
                   <Image src={phoneIcon || "/placeholder.svg"} style={styles.contactIcon} />
                   <Link src={`tel:${basicInfo.phone.replace(/[^\d+]/g, "")}`} style={styles.leftLink}>
                     <Text style={styles.contactItem}>{basicInfo.phone}</Text>
                   </Link>
                 </View>
-              )}
+              ) : null}
 
-              {basicInfo.location && (
+              {basicInfo.location ? (
                 <View style={styles.contactRow}>
                   <Image src={locationIcon || "/placeholder.svg"} style={styles.contactIcon} />
                   <Text style={styles.contactItem}>{basicInfo.location}</Text>
                 </View>
-              )}
+              ) : null}
 
-              {basicInfo.linkedin && (
+              {basicInfo.linkedin ? (
                 <View style={styles.contactRow}>
                   <Image src={linkedinIcon || "/placeholder.svg"} style={styles.contactIcon} />
                   <Link src={`https://linkedin.com/in/${basicInfo.linkedin}`} style={styles.leftLink}>
                     <Text style={styles.contactItem}>{basicInfo.linkedin}</Text>
                   </Link>
                 </View>
-              )}
+              ) : null}
 
-              {basicInfo.website && (
+              {basicInfo.website ? (
                 <View style={styles.contactRow}>
                   <Image src={websiteIcon || "/placeholder.svg"} style={styles.contactIcon} />
                   <Link
@@ -231,11 +231,11 @@ export const TwoColumnPDFTemplate = ({ resumeData }: TwoColumnPDFTemplateProps) 
                     <Text style={styles.contactItem}>{basicInfo.website}</Text>
                   </Link>
                 </View>
-              )}
+              ) : null}
             </View>
 
             {/* Portfolio Links */}
-            {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 && (
+            {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 ? (
               <View style={{ marginBottom: 20 }}>
                 <Text style={styles.sectionTitle}>Portfolio</Text>
                 {basicInfo.portfolioLinks.map((link, index) => (
@@ -249,7 +249,7 @@ export const TwoColumnPDFTemplate = ({ resumeData }: TwoColumnPDFTemplateProps) 
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
 
             {/* Skills Section */}
             <View style={{ marginBottom: 20 }}>
@@ -264,7 +264,7 @@ export const TwoColumnPDFTemplate = ({ resumeData }: TwoColumnPDFTemplateProps) 
             </View>
 
             {/* Languages Section */}
-            {basicInfo.languages && basicInfo.languages.length > 0 && (
+            {basicInfo.languages && basicInfo.languages.length > 0 ? (
               <View style={{ marginBottom: 20 }}>
                 <Text style={styles.sectionTitle}>Languages</Text>
                 <View style={styles.skillsContainer}>
@@ -275,17 +275,17 @@ export const TwoColumnPDFTemplate = ({ resumeData }: TwoColumnPDFTemplateProps) 
                   ))}
                 </View>
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Right Column */}
           <View style={styles.rightColumn}>
             {/* Summary */}
-            {basicInfo.summary && (
+            {basicInfo.summary ? (
               <View style={{ marginBottom: 20 }}>
                 <Text style={styles.summary}>{basicInfo.summary}</Text>
               </View>
-            )}
+            ) : null}
 
             {/* Experience */}
             <View style={{ marginBottom: 20 }}>
@@ -315,65 +315,65 @@ export const TwoColumnPDFTemplate = ({ resumeData }: TwoColumnPDFTemplateProps) 
                     <View>
                       <Text style={styles.itemTitle}>{edu.institution}</Text>
                       <Text style={styles.itemSubtitle}>
-                        {edu.degree} {edu.field && `in ${edu.field}`}
+                        {edu.degree}{edu.field ? ` in ${edu.field}` : ""}
                       </Text>
                     </View>
                     <Text style={styles.itemDate}>
                       {edu.startDate} - {edu.endDate}
                     </Text>
                   </View>
-                  {edu.gpa && <Text style={styles.itemDescription}>GPA: {edu.gpa}</Text>}
+                  {edu.gpa ? <Text style={styles.itemDescription}>GPA: {edu.gpa}</Text> : null}
                 </View>
               ))}
             </View>
 
             {/* Projects */}
-            {projects && projects.length > 0 && (
+            {projects && projects.length > 0 ? (
               <View style={{ marginBottom: 20 }}>
                 <Text style={styles.rightSectionTitle}>Projects</Text>
                 {projects.map((project, index) => (
                   <View key={`proj-${index}`} style={styles.experienceItem}>
                     <View style={styles.itemHeader}>
                       <Text style={styles.itemTitle}>{project.name}</Text>
-                      {(project.startDate || project.endDate) && (
+                      {(project.startDate || project.endDate) ? (
                         <Text style={styles.itemDate}>
                           {project.startDate} - {project.endDate || "Present"}
                         </Text>
-                      )}
+                      ) : null}
                     </View>
                     <Text style={styles.itemDescription}>{project.description}</Text>
                     <View style={styles.projectTech}>
-                      {project.technologies.map((tech, techIndex) => (
+                      {(project.technologies || []).map((tech, techIndex) => (
                         <Text key={`tech-${techIndex}`} style={styles.techBadge}>
-                          {tech}
+                          {typeof tech === "string" ? tech : String(tech)}
                         </Text>
                       ))}
                     </View>
-                    {project.link && (
+                    {project.link ? (
                       <Link src={project.link} style={[styles.link, { fontSize: 9 }]}>
                         <Text>View Project →</Text>
                       </Link>
-                    )}
+                    ) : null}
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
 
             {/* Achievements */}
-            {achievements && achievements.length > 0 && (
+            {achievements && achievements.length > 0 ? (
               <View style={{ marginBottom: 20 }}>
                 <Text style={styles.rightSectionTitle}>Achievements</Text>
                 {achievements.map((achievement, index) => (
                   <View key={`ach-${index}`} style={styles.experienceItem}>
                     <View style={styles.itemHeader}>
                       <Text style={styles.itemTitle}>{achievement.title}</Text>
-                      {achievement.date && <Text style={styles.itemDate}>{achievement.date}</Text>}
+                      {achievement.date ? <Text style={styles.itemDate}>{achievement.date}</Text> : null}
                     </View>
                     <Text style={styles.itemDescription}>{achievement.description}</Text>
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
           </View>
         </View>
       </Page>

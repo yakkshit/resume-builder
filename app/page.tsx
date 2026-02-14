@@ -61,6 +61,7 @@ import LoadingScreen from "@/components/resume-coverletter/loading-screen";
 // Import the correct components
 import InfiniteMarquee from "@/components/ui/infinite-marquee";
 import { galleryItems } from "@/lib/gallery-data";
+import dynamic from "next/dynamic";
 
 export default function ResumePage() {
   const { toast } = useToast();
@@ -94,7 +95,7 @@ export default function ResumePage() {
     return "";
   });
   const [showContextInput, setShowContextInput] = useState(false);
-  
+
   // Custom model configuration
   const [customEndpoint, setCustomEndpoint] = useState(() => {
     if (typeof window !== "undefined") {
@@ -505,13 +506,13 @@ export default function ResumePage() {
     if (attachedFiles.length > 0) {
       // Process attached files and send to AI model
       const fileData = await processAttachedFiles(attachedFiles);
-      
+
       // Create a comprehensive message that includes file content
       let enhancedInput = input;
       if (input.trim()) {
         enhancedInput += '\n\n';
       }
-      
+
       enhancedInput += 'Attached Files:\n';
       for (const file of fileData) {
         if (file.contentType === 'pdf') {
@@ -530,29 +531,29 @@ export default function ResumePage() {
           enhancedInput += `\nFile: ${file.name}\nContent: ${file.content}\n`;
         }
       }
-      
+
       // Update the input with file content and submit
       const originalInput = input;
       handleInputChange({ target: { value: enhancedInput } } as any);
-      
+
       // Submit the enhanced message
       setTimeout(() => {
         handleSubmit(e);
-        
+
         // Restore original input after submission
         setTimeout(() => {
           handleInputChange({ target: { value: originalInput } } as any);
         }, 100);
       }, 100);
-      
+
       // Clear attached files after processing
       setAttachedFiles([]);
-      
+
       toast({
         title: "Files processed",
         description: `${attachedFiles.length} file(s) have been processed and sent to the AI model.`,
       });
-      
+
       return;
     }
 
@@ -563,7 +564,7 @@ export default function ResumePage() {
   // Process attached files and convert them to text/data that can be sent to AI
   const processAttachedFiles = async (files: File[]): Promise<any[]> => {
     const processedFiles = [];
-    
+
     for (const file of files) {
       try {
         if (file.type === "application/json") {
@@ -592,14 +593,14 @@ export default function ResumePage() {
           try {
             const arrayBuffer = await file.arrayBuffer();
             const pdfjsLib = await import('pdfjs-dist');
-            
+
             // Set worker source for PDF.js
             pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-            
+
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
             let fullText = '';
             let pageCount = pdf.numPages;
-            
+
             // Extract text from each page
             for (let i = 1; i <= pageCount; i++) {
               const page = await pdf.getPage(i);
@@ -607,7 +608,7 @@ export default function ResumePage() {
               const pageText = textContent.items.map((item: any) => item.str).join(' ');
               fullText += `Page ${i}: ${pageText}\n\n`;
             }
-            
+
             processedFiles.push({
               name: file.name,
               type: file.type,
@@ -627,8 +628,8 @@ export default function ResumePage() {
               contentType: 'pdf-error'
             });
           }
-        } else if (file.type.includes("word") || file.type.includes("document") || 
-                   file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+        } else if (file.type.includes("word") || file.type.includes("document") ||
+          file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
           // For Word documents, extract text content using mammoth
           try {
             const arrayBuffer = await file.arrayBuffer();
@@ -677,9 +678,9 @@ export default function ResumePage() {
               contentType: 'image-error'
             });
           }
-        } else if (file.type.includes("excel") || file.type.includes("spreadsheet") || 
-                   file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-                   file.type === "application/vnd.ms-excel") {
+        } else if (file.type.includes("excel") || file.type.includes("spreadsheet") ||
+          file.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+          file.type === "application/vnd.ms-excel") {
           // For Excel files, provide information about processing
           try {
             processedFiles.push({
@@ -732,12 +733,12 @@ export default function ResumePage() {
         });
       }
     }
-    
+
     return processedFiles;
   };
 
   // Helper function to get image dimensions
-  const getImageDimensions = (file: File): Promise<{width: number, height: number} | null> => {
+  const getImageDimensions = (file: File): Promise<{ width: number, height: number } | null> => {
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -843,7 +844,7 @@ export default function ResumePage() {
                           Tailor Resume Mode
                         </Label>
                       </div>
-                      
+
                       {attachedFiles.length > 0 && (
                         <div className="flex items-center gap-2">
                           <span className="text-sm text-muted-foreground">
@@ -870,7 +871,7 @@ export default function ResumePage() {
                             AI Context of your profile (Optional)
                           </Label>
                           <Button
-                          
+
                             variant="ghost"
                             size="sm"
                             onClick={() => setShowContextInput(!showContextInput)}
@@ -993,7 +994,7 @@ export default function ResumePage() {
                           <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</SelectItem>
                           <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
                           <SelectItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</SelectItem>
-                          
+
                           {/* Gemini 2.5 Models */}
                           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
                             Gemini 2.5
@@ -1001,7 +1002,7 @@ export default function ResumePage() {
                           <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
                           <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
                           <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
-                          
+
                           {/* OpenAI Models */}
                           <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
                             OpenAI
@@ -1098,7 +1099,7 @@ export default function ResumePage() {
                             Custom Models
                           </div>
                           <SelectItem value="local-custom">Local/Custom API</SelectItem>
-                          
+
                           {/* Local Models */}
                           <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
                             Local Models
@@ -1106,7 +1107,7 @@ export default function ResumePage() {
                           <SelectItem value="ollama-local">Ollama Local</SelectItem>
                           <SelectItem value="lmstudio-local">LM Studio Local</SelectItem>
                           <SelectItem value="openai-like-local">OpenAI-like Local</SelectItem>
-                          
+
                         </SelectContent>
                       </Select>
                     </div>
@@ -1115,17 +1116,17 @@ export default function ResumePage() {
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <Label htmlFor="api-key">
-                          {selectedModel.startsWith("gemini") ? "Google" : 
-                           selectedModel.startsWith("gpt") ? "OpenAI" :
-                           selectedModel.startsWith("claude") ? "Anthropic" :
-                           selectedModel.startsWith("deepseek") ? "DeepSeek" :
-                           selectedModel.startsWith("llama") || selectedModel.startsWith("mixtral") || selectedModel.startsWith("gemma") ? "Groq" :
-                           selectedModel.startsWith("mistral") ? "Mistral" :
-                           selectedModel.startsWith("meta-llama") ? "Together.ai" :
-                           selectedModel.startsWith("command") ? "Cohere" :
-                           selectedModel.startsWith("fireworks") ? "Fireworks" :
-                           selectedModel.startsWith("huggingface") ? "Hugging Face" :
-                           selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"} API Key
+                          {selectedModel.startsWith("gemini") ? "Google" :
+                            selectedModel.startsWith("gpt") ? "OpenAI" :
+                              selectedModel.startsWith("claude") ? "Anthropic" :
+                                selectedModel.startsWith("deepseek") ? "DeepSeek" :
+                                  selectedModel.startsWith("llama") || selectedModel.startsWith("mixtral") || selectedModel.startsWith("gemma") ? "Groq" :
+                                    selectedModel.startsWith("mistral") ? "Mistral" :
+                                      selectedModel.startsWith("meta-llama") ? "Together.ai" :
+                                        selectedModel.startsWith("command") ? "Cohere" :
+                                          selectedModel.startsWith("fireworks") ? "Fireworks" :
+                                            selectedModel.startsWith("huggingface") ? "Hugging Face" :
+                                              selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"} API Key
                         </Label>
                         <Button
                           variant="ghost"
@@ -1140,19 +1141,18 @@ export default function ResumePage() {
                         <Input
                           id="api-key"
                           type={showApiKey ? "text" : "password"}
-                          placeholder={`Enter your ${
-                            selectedModel.startsWith("gemini") ? "Google" : 
-                            selectedModel.startsWith("gpt") ? "OpenAI" :
-                            selectedModel.startsWith("claude") ? "Anthropic" :
-                            selectedModel.startsWith("deepseek") ? "DeepSeek" :
-                            selectedModel.startsWith("llama") || selectedModel.startsWith("mixtral") || selectedModel.startsWith("gemma") ? "Groq" :
-                            selectedModel.startsWith("mistral") ? "Mistral" :
-                            selectedModel.startsWith("meta-llama") ? "Together.ai" :
-                            selectedModel.startsWith("command") ? "Cohere" :
-                            selectedModel.startsWith("fireworks") ? "Fireworks" :
-                            selectedModel.startsWith("huggingface") ? "Hugging Face" :
-                            selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"
-                          } API key`}
+                          placeholder={`Enter your ${selectedModel.startsWith("gemini") ? "Google" :
+                              selectedModel.startsWith("gpt") ? "OpenAI" :
+                                selectedModel.startsWith("claude") ? "Anthropic" :
+                                  selectedModel.startsWith("deepseek") ? "DeepSeek" :
+                                    selectedModel.startsWith("llama") || selectedModel.startsWith("mixtral") || selectedModel.startsWith("gemma") ? "Groq" :
+                                      selectedModel.startsWith("mistral") ? "Mistral" :
+                                        selectedModel.startsWith("meta-llama") ? "Together.ai" :
+                                          selectedModel.startsWith("command") ? "Cohere" :
+                                            selectedModel.startsWith("fireworks") ? "Fireworks" :
+                                              selectedModel.startsWith("huggingface") ? "Hugging Face" :
+                                                selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"
+                            } API key`}
                           value={apiKey}
                           onChange={(e) => setApiKey(e.target.value)}
                           className="flex-1"
@@ -1173,254 +1173,254 @@ export default function ResumePage() {
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {selectedModel.startsWith("gemini") ? "Get your API key from Google Ai Studio Platform." :
-                         selectedModel.startsWith("huggingface") ? "Get your API key from Hugging Face (huggingface.co/settings/tokens)" :
-                         selectedModel === "lingo-ai" ? "Get your Lingo AI API key from cedzlabs.com/resume-builder" :
-                         "API key required for this model. Get one from the provider's website." + "https://"+ selectedModel.split("-")[0] +".com/api-keys"}
+                          selectedModel.startsWith("huggingface") ? "Get your API key from Hugging Face (huggingface.co/settings/tokens)" :
+                            selectedModel === "lingo-ai" ? "Get your Lingo AI API key from cedzlabs.com/resume-builder" :
+                              "API key required for this model. Get one from the provider's website." + "https://" + selectedModel.split("-")[0] + ".com/api-keys"}
                       </p>
                     </div>
 
                     {/* Custom Model Configuration */}
-                    {(selectedModel.startsWith("huggingface") || selectedModel === "local-custom" || 
-                      selectedModel === "ollama-local" || selectedModel === "lmstudio-local" || 
+                    {(selectedModel.startsWith("huggingface") || selectedModel === "local-custom" ||
+                      selectedModel === "ollama-local" || selectedModel === "lmstudio-local" ||
                       selectedModel === "openai-like-local") && (
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="flex items-center gap-2">
-                            <Key size={16} className="text-purple-500" />
-                            {selectedModel === "huggingface-endpoint" && "Hugging Face Endpoint Configuration"}
-                            {selectedModel === "huggingface-model" && "Hugging Face Model Configuration"}
-                            {selectedModel === "huggingface-streaming" && "Hugging Face Streaming Configuration"}
-                            {selectedModel === "huggingface-provider" && "Hugging Face Provider Configuration"}
-                            {selectedModel === "local-custom" && "Custom API Configuration"}
-                            {selectedModel === "ollama-local" && "Ollama Configuration"}
-                            {selectedModel === "lmstudio-local" && "LM Studio Configuration"}
-                            {selectedModel === "openai-like-local" && "OpenAI-like Configuration"}
-                          </Label>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setShowCustomConfig(!showCustomConfig)}
-                            className="h-6 px-2"
-                          >
-                            {showCustomConfig ? "Hide" : "Show"}
-                          </Button>
-                        </div>
-                        
-                        {showCustomConfig && (
-                          <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
-                            {/* Hugging Face Endpoint - Model Name + Endpoint URL */}
-                            {selectedModel === "huggingface-endpoint" && (
-                              <div className="space-y-3">
-                                <div>
-                                  <Label htmlFor="custom-model">Model Name</Label>
-                                  <Input
-                                    id="custom-model"
-                                    placeholder="meta-llama/Llama-3.1-8B-Instruct"
-                                    value={customModel}
-                                    onChange={(e) => setCustomModel(e.target.value)}
-                                    className="mt-1"
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Hugging Face model identifier
-                                  </p>
-                                </div>
-                                
-                                <div>
-                                  <Label htmlFor="custom-endpoint">Endpoint URL</Label>
-                                  <Input
-                                    id="custom-endpoint"
-                                    placeholder="https://router.huggingface.co/hf-inference/models/meta-llama/Llama-3.1-8B-Instruct"
-                                    value={customEndpoint}
-                                    onChange={(e) => setCustomEndpoint(e.target.value)}
-                                    className="mt-1"
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Your Hugging Face inference endpoint URL
-                                  </p>
-                                </div>
-                              </div>
-                            )}
+                        <div className="mb-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <Label className="flex items-center gap-2">
+                              <Key size={16} className="text-purple-500" />
+                              {selectedModel === "huggingface-endpoint" && "Hugging Face Endpoint Configuration"}
+                              {selectedModel === "huggingface-model" && "Hugging Face Model Configuration"}
+                              {selectedModel === "huggingface-streaming" && "Hugging Face Streaming Configuration"}
+                              {selectedModel === "huggingface-provider" && "Hugging Face Provider Configuration"}
+                              {selectedModel === "local-custom" && "Custom API Configuration"}
+                              {selectedModel === "ollama-local" && "Ollama Configuration"}
+                              {selectedModel === "lmstudio-local" && "LM Studio Configuration"}
+                              {selectedModel === "openai-like-local" && "OpenAI-like Configuration"}
+                            </Label>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowCustomConfig(!showCustomConfig)}
+                              className="h-6 px-2"
+                            >
+                              {showCustomConfig ? "Hide" : "Show"}
+                            </Button>
+                          </div>
 
-                            {/* Hugging Face Model - Only Model Name */}
-                            {selectedModel === "huggingface-model" && (
-                              <div>
-                                <Label htmlFor="custom-model">Model Name</Label>
-                                <Input
-                                  id="custom-model"
-                                  placeholder="meta-llama/Llama-3.1-8B-Instruct"
-                                  value={customModel}
-                                  onChange={(e) => setCustomModel(e.target.value)}
-                                  className="mt-1"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Hugging Face model identifier (e.g., meta-llama/Llama-3.1-8B-Instruct, google/gemma-3-270m)
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Hugging Face Streaming - Only Model Name */}
-                            {selectedModel === "huggingface-streaming" && (
-                              <div>
-                                <Label htmlFor="custom-model">Model Name</Label>
-                                <Input
-                                  id="custom-model"
-                                  placeholder="meta-llama/Llama-3.1-8B-Instruct"
-                                  value={customModel}
-                                  onChange={(e) => setCustomModel(e.target.value)}
-                                  className="mt-1"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Hugging Face model identifier (e.g., meta-llama/Llama-3.1-8B-Instruct, google/gemma-3-270m)
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Hugging Face Provider - Model Name + Provider */}
-                            {selectedModel === "huggingface-provider" && (
-                              <div className="space-y-3">
-                                <div>
-                                  <Label htmlFor="custom-model">Model Name</Label>
-                                  <Input
-                                    id="custom-model"
-                                    placeholder="meta-llama/Llama-3.1-8B-Instruct"
-                                    value={customModel}
-                                    onChange={(e) => setCustomModel(e.target.value)}
-                                    className="mt-1"
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Hugging Face model identifier
-                                  </p>
-                                </div>
-                                
-                                <div>
-                                  <Label htmlFor="custom-provider">Provider</Label>
-                                  <Input
-                                    id="custom-provider"
-                                    placeholder="sambanova"
-                                    value={customHeaders}
-                                    onChange={(e) => setCustomHeaders(e.target.value)}
-                                    className="mt-1"
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Third-party provider (e.g., sambanova, together, fal-ai, replicate, cohere)
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-
-
-
-                            {/* Local Models - Only Base URL/Endpoint */}
-                            {(selectedModel === "ollama-local" || selectedModel === "lmstudio-local" || selectedModel === "openai-like-local") && (
-                              <div>
-                                <Label htmlFor="custom-endpoint">Base URL</Label>
-                                <Input
-                                  id="custom-endpoint"
-                                  placeholder={
-                                    selectedModel === "ollama-local"
-                                      ? "http://127.0.0.1:11434"
-                                      : selectedModel === "lmstudio-local"
-                                      ? "http://localhost:1234"
-                                      : "http://localhost:8000"
-                                  }
-                                  value={customEndpoint}
-                                  onChange={(e) => setCustomEndpoint(e.target.value)}
-                                  className="mt-1"
-                                />
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  {selectedModel === "ollama-local"
-                                    ? "Ollama local endpoint (default: 127.0.0.1:11434)"
-                                    : selectedModel === "lmstudio-local"
-                                    ? "LM Studio local endpoint (default: localhost:1234)"
-                                    : "OpenAI-compatible API endpoint"
-                                  }
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Custom API - Full Configuration */}
-                            {selectedModel === "local-custom" && (
-                              <>
-                                <div>
-                                  <Label htmlFor="custom-endpoint">API Endpoint</Label>
-                                  <Input
-                                    id="custom-endpoint"
-                                    placeholder="http://localhost:8000/v1/chat/completions"
-                                    value={customEndpoint}
-                                    onChange={(e) => setCustomEndpoint(e.target.value)}
-                                    className="mt-1"
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Your local or custom API endpoint
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="custom-model">Model Name</Label>
-                                  <Input
-                                    id="custom-model"
-                                    placeholder="local-model"
-                                    value={customModel}
-                                    onChange={(e) => setCustomModel(e.target.value)}
-                                    className="mt-1"
-                                  />
-                                  <p className="text-xs text-muted-foreground mt-1">
-                                    Model name for your local API
-                                  </p>
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="custom-auth">Authentication Method</Label>
-                                  <Select value={customAuth} onValueChange={(value: "bearer" | "api-key" | "custom" | "none") => setCustomAuth(value)}>
-                                    <SelectTrigger id="custom-auth" className="mt-1">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="bearer">Bearer Token</SelectItem>
-                                      <SelectItem value="api-key">API Key Header</SelectItem>
-                                      <SelectItem value="custom">Custom Headers</SelectItem>
-                                      <SelectItem value="none">No Authentication</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                {/* Custom Headers */}
-                                {(customAuth === "custom" || customAuth === "api-key") && (
+                          {showCustomConfig && (
+                            <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+                              {/* Hugging Face Endpoint - Model Name + Endpoint URL */}
+                              {selectedModel === "huggingface-endpoint" && (
+                                <div className="space-y-3">
                                   <div>
-                                    <Label htmlFor="custom-headers">Custom Headers (JSON)</Label>
-                                    <Textarea
-                                      id="custom-headers"
-                                      placeholder={customAuth === "api-key" 
-                                        ? '{"X-API-Key": "your-api-key"}'
-                                        : '{"Authorization": "Bearer token", "X-Custom": "value"}'
-                                      }
-                                      value={customHeaders}
-                                      onChange={(e) => setCustomHeaders(e.target.value)}
-                                      className="mt-1 min-h-[80px] resize-none"
+                                    <Label htmlFor="custom-model">Model Name</Label>
+                                    <Input
+                                      id="custom-model"
+                                      placeholder="meta-llama/Llama-3.1-8B-Instruct"
+                                      value={customModel}
+                                      onChange={(e) => setCustomModel(e.target.value)}
+                                      className="mt-1"
                                     />
                                     <p className="text-xs text-muted-foreground mt-1">
-                                      {customAuth === "api-key" 
-                                        ? "JSON format for custom API key headers"
-                                        : "JSON format for custom authentication headers"
-                                      }
+                                      Hugging Face model identifier
                                     </p>
                                   </div>
-                                )}
-                              </>
-                            )}
+
+                                  <div>
+                                    <Label htmlFor="custom-endpoint">Endpoint URL</Label>
+                                    <Input
+                                      id="custom-endpoint"
+                                      placeholder="https://router.huggingface.co/hf-inference/models/meta-llama/Llama-3.1-8B-Instruct"
+                                      value={customEndpoint}
+                                      onChange={(e) => setCustomEndpoint(e.target.value)}
+                                      className="mt-1"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Your Hugging Face inference endpoint URL
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Hugging Face Model - Only Model Name */}
+                              {selectedModel === "huggingface-model" && (
+                                <div>
+                                  <Label htmlFor="custom-model">Model Name</Label>
+                                  <Input
+                                    id="custom-model"
+                                    placeholder="meta-llama/Llama-3.1-8B-Instruct"
+                                    value={customModel}
+                                    onChange={(e) => setCustomModel(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Hugging Face model identifier (e.g., meta-llama/Llama-3.1-8B-Instruct, google/gemma-3-270m)
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Hugging Face Streaming - Only Model Name */}
+                              {selectedModel === "huggingface-streaming" && (
+                                <div>
+                                  <Label htmlFor="custom-model">Model Name</Label>
+                                  <Input
+                                    id="custom-model"
+                                    placeholder="meta-llama/Llama-3.1-8B-Instruct"
+                                    value={customModel}
+                                    onChange={(e) => setCustomModel(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Hugging Face model identifier (e.g., meta-llama/Llama-3.1-8B-Instruct, google/gemma-3-270m)
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Hugging Face Provider - Model Name + Provider */}
+                              {selectedModel === "huggingface-provider" && (
+                                <div className="space-y-3">
+                                  <div>
+                                    <Label htmlFor="custom-model">Model Name</Label>
+                                    <Input
+                                      id="custom-model"
+                                      placeholder="meta-llama/Llama-3.1-8B-Instruct"
+                                      value={customModel}
+                                      onChange={(e) => setCustomModel(e.target.value)}
+                                      className="mt-1"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Hugging Face model identifier
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <Label htmlFor="custom-provider">Provider</Label>
+                                    <Input
+                                      id="custom-provider"
+                                      placeholder="sambanova"
+                                      value={customHeaders}
+                                      onChange={(e) => setCustomHeaders(e.target.value)}
+                                      className="mt-1"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Third-party provider (e.g., sambanova, together, fal-ai, replicate, cohere)
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
 
 
 
-                            {/* Save Button */}
-                            <div className="flex justify-end">
-                              <Button onClick={saveCustomConfig} size="sm">
-                                Save Configuration
-                              </Button>
+                              {/* Local Models - Only Base URL/Endpoint */}
+                              {(selectedModel === "ollama-local" || selectedModel === "lmstudio-local" || selectedModel === "openai-like-local") && (
+                                <div>
+                                  <Label htmlFor="custom-endpoint">Base URL</Label>
+                                  <Input
+                                    id="custom-endpoint"
+                                    placeholder={
+                                      selectedModel === "ollama-local"
+                                        ? "http://127.0.0.1:11434"
+                                        : selectedModel === "lmstudio-local"
+                                          ? "http://localhost:1234"
+                                          : "http://localhost:8000"
+                                    }
+                                    value={customEndpoint}
+                                    onChange={(e) => setCustomEndpoint(e.target.value)}
+                                    className="mt-1"
+                                  />
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {selectedModel === "ollama-local"
+                                      ? "Ollama local endpoint (default: 127.0.0.1:11434)"
+                                      : selectedModel === "lmstudio-local"
+                                        ? "LM Studio local endpoint (default: localhost:1234)"
+                                        : "OpenAI-compatible API endpoint"
+                                    }
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Custom API - Full Configuration */}
+                              {selectedModel === "local-custom" && (
+                                <>
+                                  <div>
+                                    <Label htmlFor="custom-endpoint">API Endpoint</Label>
+                                    <Input
+                                      id="custom-endpoint"
+                                      placeholder="http://localhost:8000/v1/chat/completions"
+                                      value={customEndpoint}
+                                      onChange={(e) => setCustomEndpoint(e.target.value)}
+                                      className="mt-1"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Your local or custom API endpoint
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <Label htmlFor="custom-model">Model Name</Label>
+                                    <Input
+                                      id="custom-model"
+                                      placeholder="local-model"
+                                      value={customModel}
+                                      onChange={(e) => setCustomModel(e.target.value)}
+                                      className="mt-1"
+                                    />
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      Model name for your local API
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <Label htmlFor="custom-auth">Authentication Method</Label>
+                                    <Select value={customAuth} onValueChange={(value: "bearer" | "api-key" | "custom" | "none") => setCustomAuth(value)}>
+                                      <SelectTrigger id="custom-auth" className="mt-1">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="bearer">Bearer Token</SelectItem>
+                                        <SelectItem value="api-key">API Key Header</SelectItem>
+                                        <SelectItem value="custom">Custom Headers</SelectItem>
+                                        <SelectItem value="none">No Authentication</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  {/* Custom Headers */}
+                                  {(customAuth === "custom" || customAuth === "api-key") && (
+                                    <div>
+                                      <Label htmlFor="custom-headers">Custom Headers (JSON)</Label>
+                                      <Textarea
+                                        id="custom-headers"
+                                        placeholder={customAuth === "api-key"
+                                          ? '{"X-API-Key": "your-api-key"}'
+                                          : '{"Authorization": "Bearer token", "X-Custom": "value"}'
+                                        }
+                                        value={customHeaders}
+                                        onChange={(e) => setCustomHeaders(e.target.value)}
+                                        className="mt-1 min-h-[80px] resize-none"
+                                      />
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        {customAuth === "api-key"
+                                          ? "JSON format for custom API key headers"
+                                          : "JSON format for custom authentication headers"
+                                        }
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+
+
+
+                              {/* Save Button */}
+                              <div className="flex justify-end">
+                                <Button onClick={saveCustomConfig} size="sm">
+                                  Save Configuration
+                                </Button>
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          )}
+                        </div>
+                      )}
 
                     {/* Lingo AI Advertisement Box */}
                     {selectedModel === "lingo-ai" && (
@@ -1437,10 +1437,10 @@ export default function ResumePage() {
                                 Lingo AI - Specialized Resume & Job AI
                               </h3>
                               <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                                For our custom AI model for job recommendations, mock interviews, and job tracking, use Lingo AI. 
+                                For our custom AI model for job recommendations, mock interviews, and job tracking, use Lingo AI.
                                 Get your API key from <a href="https://cedzlabs.com/resume-builder" target="_blank" rel="noopener noreferrer" className="underline hover:text-blue-600 dark:hover:text-blue-300">cedzlabs.com/resume-builder</a>
                               </p>
-                              
+
                               {/* Video Player Accordion */}
                               <div className="mt-4">
                                 {/* <div className="flex items-center justify-between mb-2">
@@ -1497,7 +1497,7 @@ export default function ResumePage() {
                           {showTutorials ? "Hide" : "Show"}
                         </Button>
                       </div>
-                      
+
                       {showTutorials && (
                         <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
                           {/* Model-specific tutorials */}
@@ -1648,7 +1648,7 @@ export default function ResumePage() {
                               <h4 className="font-medium text-purple-900 dark:text-purple-100 mb-2">General AI & Resume Tips</h4>
                               <div className="space-y-2">
                                 <div className=
-                                "flex items-center gap-2 text-sm">
+                                  "flex items-center gap-2 text-sm">
                                   <Youtube size={14} className="text-red-500" />
                                   <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">
                                     AI Resume Writing Best Practices
@@ -1706,7 +1706,7 @@ export default function ResumePage() {
             {/* Right Column - Preview & Controls */}
             <div className="space-y-6">
 
-            <div className="h-[800px]">
+              <div className="h-[800px]">
                 <PDFViewer resumeData={resumeData} template={template} />
               </div>
 

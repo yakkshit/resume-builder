@@ -7,22 +7,36 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
   images: {
     unoptimized: true,
-    domains :['github.com']
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'github.com',
+      },
+    ],
   },
+  serverExternalPackages: [
+    '@react-pdf/renderer',
+    '@react-pdf/primitives',
+    '@react-pdf/layout',
+    '@react-pdf/pdfkit',
+    'yoga-layout',
+    'pdfkit',
+  ],
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
-  
+  turbopack: {},
+  webpack: (config) => {
+    config.resolve.alias.canvas = false
+    return config
+  },
 }
 
 mergeConfig(nextConfig, userConfig)
