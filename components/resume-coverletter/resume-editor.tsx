@@ -8,15 +8,55 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Plus, Trash2, Upload, X, LinkIcon } from "lucide-react"
+import { Plus, Trash2, Upload, X, LinkIcon, GripVertical } from "lucide-react"
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import DebugProfileImage from "./debug-profile-image"
 
+
 interface ResumeEditorProps {
   resumeData: ResumeData
   setResumeData: React.Dispatch<React.SetStateAction<ResumeData>>
+}
+
+function SortableItem({ id, children }: { id: string | number; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-start gap-2 mb-4 group">
+      <div
+        {...attributes}
+        {...listeners}
+        className="mt-4 cursor-grab text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <GripVertical size={20} />
+      </div>
+      <div className="flex-1">{children}</div>
+    </div>
+  )
 }
 
 export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditorProps) {
@@ -24,6 +64,65 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showDebug, setShowDebug] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [activeTab, setActiveTab] = useState("edit")
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent, section: string) => {
+    const { active, over } = event
+
+    if (active.id !== over?.id) {
+      setResumeData((prev) => {
+        const list = prev[section as keyof ResumeData] || prev.basicInfo[section as keyof typeof prev.basicInfo]
+        if (!Array.isArray(list)) return prev
+
+        const oldIndex = list.findIndex((item: any) => (item.id || JSON.stringify(item)) === active.id)
+        const newIndex = list.findIndex((item: any) => (item.id || JSON.stringify(item)) === over?.id)
+
+        // For arrays of strings (skills, languages) or objects without IDs, we need a stable ID strategy.
+        // However, dnd-kit needs stable IDs.
+        // If items don't have IDs, using index as ID is problematic for sorting.
+        // But here we are using the item itself or stringify as ID for finding index.
+        // Let's assume we pass the index as ID to SortableItem for simplicity if no ID exists,
+        // but that causes issues if content changes.
+        // A better approach for this editor is to use the index as the ID for the SortableItem,
+        // but that is also discouraged.
+        // Let's use a combination of content and index or just index if we accept re-rendering.
+        // Actually, let's use the index as ID for now as it's the most straightforward without adding IDs to data.
+
+        // Wait, if I use index as ID, arrayMove will use indices.
+        // active.id and over.id will be indices.
+
+        const oldIdx = active.id as number
+        const newIdx = over?.id as number
+
+        let newData = { ...prev }
+
+        if (section === "experience" || section === "education" || section === "projects" || section === "achievements") {
+          // @ts-ignore
+          newData[section] = arrayMove(list, oldIdx, newIdx)
+        } else if (section === "skills") {
+          // @ts-ignore
+          newData.skills = arrayMove(list, oldIdx, newIdx)
+        } else if (section === "languages" || section === "portfolioLinks") {
+          // @ts-ignore
+          newData.basicInfo[section] = arrayMove(list, oldIdx, newIdx)
+        }
+
+        return newData
+      })
+    }
+  }
 
   // Check if profile picture is loaded on component mount
   useEffect(() => {
@@ -573,60 +672,73 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
                   </Button>
                 </div>
 
-                {resumeData.basicInfo.portfolioLinks?.map((link, index) => (
-                  <div key={index} className="p-3 border rounded-md relative">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute top-2 right-2 h-6 w-6 text-destructive"
-                      onClick={() => removePortfolioLink(index)}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => handleDragEnd(event, "portfolioLinks")}
+                >
+                  <SortableContext
+                    items={resumeData.basicInfo.portfolioLinks?.map((_, i) => i) || []}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {resumeData.basicInfo.portfolioLinks?.map((link, index) => (
+                      <SortableItem key={index} id={index}>
+                        <div className="p-3 border rounded-md relative bg-background">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-6 w-6 text-destructive"
+                            onClick={() => removePortfolioLink(index)}
+                          >
+                            <Trash2 size={14} />
+                          </Button>
 
-                    <div className="grid grid-cols-1 gap-3 mb-2">
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Platform</label>
-                        <Select
-                          value={link.platform}
-                          onValueChange={(value) => updatePortfolioLink(index, "platform", value)}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select platform" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {platformOptions.map((platform) => (
-                              <SelectItem key={platform} value={platform}>
-                                {platform}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          <div className="grid grid-cols-1 gap-3 mb-2">
+                            <div>
+                              <label className="block text-xs font-medium mb-1">Platform</label>
+                              <Select
+                                value={link.platform}
+                                onValueChange={(value) => updatePortfolioLink(index, "platform", value)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select platform" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {platformOptions.map((platform) => (
+                                    <SelectItem key={platform} value={platform}>
+                                      {platform}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
 
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Username</label>
-                        <Input
-                          value={link.username || ""}
-                          onChange={(e) => updatePortfolioLink(index, "username", e.target.value)}
-                          placeholder="Your username"
-                        />
-                      </div>
+                            <div>
+                              <label className="block text-xs font-medium mb-1">Username</label>
+                              <Input
+                                value={link.username || ""}
+                                onChange={(e) => updatePortfolioLink(index, "username", e.target.value)}
+                                placeholder="Your username"
+                              />
+                            </div>
 
-                      <div>
-                        <label className="block text-xs font-medium mb-1">URL</label>
-                        <div className="flex items-center gap-2">
-                          <LinkIcon size={14} className="text-muted-foreground" />
-                          <Input
-                            value={link.url}
-                            onChange={(e) => updatePortfolioLink(index, "url", e.target.value)}
-                            placeholder="https://example.com/username"
-                          />
+                            <div>
+                              <label className="block text-xs font-medium mb-1">URL</label>
+                              <div className="flex items-center gap-2">
+                                <LinkIcon size={14} className="text-muted-foreground" />
+                                <Input
+                                  value={link.url}
+                                  onChange={(e) => updatePortfolioLink(index, "url", e.target.value)}
+                                  placeholder="https://example.com/username"
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                      </SortableItem>
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             </div>
           </AccordionContent>
@@ -639,66 +751,134 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
           <AccordionTrigger>Experience</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
-              {resumeData.experience.map((exp, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="p-4 border rounded-lg relative"
+              {isMounted ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => handleDragEnd(event, "experience")}
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 text-destructive"
-                    onClick={() => removeExperience(index)}
+                  <SortableContext
+                    items={resumeData.experience.map((_, i) => i) || []}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <Trash2 size={16} />
-                  </Button>
+                    {resumeData.experience.map((exp, index) => (
+                      <SortableItem key={index} id={index}>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="p-4 border rounded-lg relative bg-background"
+                        >
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 text-destructive"
+                            onClick={() => removeExperience(index)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Company</label>
-                      <Input value={exp.company} onChange={(e) => updateExperience(index, "company", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Position</label>
-                      <Input
-                        value={exp.position}
-                        onChange={(e) => updateExperience(index, "position", e.target.value)}
-                      />
-                    </div>
-                  </div>
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Company</label>
+                              <Input
+                                value={exp.company}
+                                onChange={(e) => updateExperience(index, "company", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Role</label>
+                              <Input value={exp.position} onChange={(e) => updateExperience(index, "position", e.target.value)} />
+                            </div>
+                          </div>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Start Date</label>
-                      <Input
-                        value={exp.startDate}
-                        onChange={(e) => updateExperience(index, "startDate", e.target.value)}
-                        placeholder="MM/YYYY"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">End Date</label>
-                      <Input
-                        value={exp.endDate}
-                        onChange={(e) => updateExperience(index, "endDate", e.target.value)}
-                        placeholder="MM/YYYY or Present"
-                      />
-                    </div>
-                  </div>
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Start Date</label>
+                              <Input
+                                value={exp.startDate}
+                                onChange={(e) => updateExperience(index, "startDate", e.target.value)}
+                                placeholder="MM/YYYY"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">End Date</label>
+                              <Input
+                                value={exp.endDate}
+                                onChange={(e) => updateExperience(index, "endDate", e.target.value)}
+                                placeholder="MM/YYYY or Present"
+                              />
+                            </div>
+                          </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Description</label>
-                    <Textarea
-                      value={exp.description}
-                      onChange={(e) => updateExperience(index, "description", e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </motion.div>
-              ))}
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Description</label>
+                            <Textarea
+                              value={exp.description}
+                              onChange={(e) => updateExperience(index, "description", e.target.value)}
+                              rows={3}
+                            />
+                          </div>
+                        </motion.div>
+                      </SortableItem>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="space-y-6">
+                  {resumeData.experience.map((exp, index) => (
+                    <div key={index} className="p-4 border rounded-lg relative bg-background">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 text-destructive"
+                        onClick={() => removeExperience(index)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Company</label>
+                          <Input
+                            value={exp.company}
+                            onChange={(e) => updateExperience(index, "company", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Role</label>
+                          <Input value={exp.position} onChange={(e) => updateExperience(index, "position", e.target.value)} />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Start Date</label>
+                          <Input
+                            value={exp.startDate}
+                            onChange={(e) => updateExperience(index, "startDate", e.target.value)}
+                            placeholder="MM/YYYY"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">End Date</label>
+                          <Input
+                            value={exp.endDate}
+                            onChange={(e) => updateExperience(index, "endDate", e.target.value)}
+                            placeholder="MM/YYYY or Present"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Description</label>
+                        <Textarea
+                          value={exp.description}
+                          onChange={(e) => updateExperience(index, "description", e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <Button
                 variant="outline"
@@ -716,66 +896,143 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
           <AccordionTrigger>Education</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
-              {resumeData.education.map((edu, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="p-4 border rounded-lg relative"
+              {isMounted ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => handleDragEnd(event, "education")}
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 text-destructive"
-                    onClick={() => removeEducation(index)}
+                  <SortableContext
+                    items={resumeData.education.map((_, i) => i) || []}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <Trash2 size={16} />
-                  </Button>
+                    {resumeData.education.map((edu, index) => (
+                      <SortableItem key={index} id={index}>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="p-4 border rounded-lg relative bg-background"
+                        >
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 text-destructive"
+                            onClick={() => removeEducation(index)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Institution</label>
-                      <Input
-                        value={edu.institution}
-                        onChange={(e) => updateEducation(index, "institution", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Degree</label>
-                      <Input value={edu.degree} onChange={(e) => updateEducation(index, "degree", e.target.value)} />
-                    </div>
-                  </div>
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Institution</label>
+                              <Input
+                                value={edu.institution}
+                                onChange={(e) => updateEducation(index, "institution", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Degree</label>
+                              <Input
+                                value={edu.degree}
+                                onChange={(e) => updateEducation(index, "degree", e.target.value)}
+                              />
+                            </div>
+                          </div>
 
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Field of Study</label>
-                    <Input value={edu.field} onChange={(e) => updateEducation(index, "field", e.target.value)} />
-                  </div>
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium mb-1">Field of Study</label>
+                            <Input value={edu.field} onChange={(e) => updateEducation(index, "field", e.target.value)} />
+                          </div>
 
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Start Date</label>
-                      <Input
-                        value={edu.startDate}
-                        onChange={(e) => updateEducation(index, "startDate", e.target.value)}
-                        placeholder="MM/YYYY"
-                      />
+                          <div className="grid grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Start Date</label>
+                              <Input
+                                value={edu.startDate}
+                                onChange={(e) => updateEducation(index, "startDate", e.target.value)}
+                                placeholder="MM/YYYY"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">End Date</label>
+                              <Input
+                                value={edu.endDate}
+                                onChange={(e) => updateEducation(index, "endDate", e.target.value)}
+                                placeholder="MM/YYYY or Present"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">GPA</label>
+                              <Input value={edu.gpa} onChange={(e) => updateEducation(index, "gpa", e.target.value)} />
+                            </div>
+                          </div>
+                        </motion.div>
+                      </SortableItem>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="space-y-6">
+                  {resumeData.education.map((edu, index) => (
+                    <div key={index} className="p-4 border rounded-lg relative bg-background">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 text-destructive"
+                        onClick={() => removeEducation(index)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Institution</label>
+                          <Input
+                            value={edu.institution}
+                            onChange={(e) => updateEducation(index, "institution", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Degree</label>
+                          <Input
+                            value={edu.degree}
+                            onChange={(e) => updateEducation(index, "degree", e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium mb-1">Field of Study</label>
+                        <Input value={edu.field} onChange={(e) => updateEducation(index, "field", e.target.value)} />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Start Date</label>
+                          <Input
+                            value={edu.startDate}
+                            onChange={(e) => updateEducation(index, "startDate", e.target.value)}
+                            placeholder="MM/YYYY"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">End Date</label>
+                          <Input
+                            value={edu.endDate}
+                            onChange={(e) => updateEducation(index, "endDate", e.target.value)}
+                            placeholder="MM/YYYY or Present"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">GPA</label>
+                          <Input value={edu.gpa} onChange={(e) => updateEducation(index, "gpa", e.target.value)} />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">End Date</label>
-                      <Input
-                        value={edu.endDate}
-                        onChange={(e) => updateEducation(index, "endDate", e.target.value)}
-                        placeholder="MM/YYYY or Present"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">GPA</label>
-                      <Input value={edu.gpa} onChange={(e) => updateEducation(index, "gpa", e.target.value)} />
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+                  ))}
+                </div>
+              )}
 
               <Button
                 variant="outline"
@@ -793,18 +1050,50 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
           <AccordionTrigger>Skills</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-4">
-              {resumeData.skills.map((skill, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    value={skill}
-                    onChange={(e) => updateSkill(index, e.target.value)}
-                    placeholder="e.g., JavaScript, Project Management, etc."
-                  />
-                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeSkill(index)}>
-                    <Trash2 size={16} />
-                  </Button>
+              {isMounted ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => handleDragEnd(event, "skills")}
+                >
+                  <SortableContext items={resumeData.skills.map((_, i) => i) || []} strategy={verticalListSortingStrategy}>
+                    {resumeData.skills.map((skill, index) => (
+                      <SortableItem key={index} id={index}>
+                        <div className="flex items-center gap-2 w-full">
+                          <Input
+                            value={skill}
+                            onChange={(e) => updateSkill(index, e.target.value)}
+                            placeholder="e.g., JavaScript, Project Management, etc."
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive shrink-0"
+                            onClick={() => removeSkill(index)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      </SortableItem>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="space-y-4">
+                  {resumeData.skills.map((skill, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={skill}
+                        onChange={(e) => updateSkill(index, e.target.value)}
+                        placeholder="e.g., JavaScript, Project Management, etc."
+                      />
+                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => removeSkill(index)}>
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
 
               <Button variant="outline" onClick={addSkill} className="w-full flex items-center justify-center gap-2">
                 <Plus size={16} />
@@ -818,97 +1107,205 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
           <AccordionTrigger>Projects</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
-              {resumeData.projects?.map((project, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="p-4 border rounded-lg relative"
+              {isMounted ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => handleDragEnd(event, "projects")}
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 text-destructive"
-                    onClick={() => removeProject(index)}
+                  <SortableContext
+                    items={resumeData.projects?.map((_, i) => i) || []}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <Trash2 size={16} />
-                  </Button>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Project Name</label>
-                      <Input value={project.name} onChange={(e) => updateProject(index, "name", e.target.value)} />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Project Link (Optional)</label>
-                      <Input
-                        value={project.link || ""}
-                        onChange={(e) => updateProject(index, "link", e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Start Date (Optional)</label>
-                      <Input
-                        value={project.startDate || ""}
-                        onChange={(e) => updateProject(index, "startDate", e.target.value)}
-                        placeholder="MM/YYYY"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">End Date (Optional)</label>
-                      <Input
-                        value={project.endDate || ""}
-                        onChange={(e) => updateProject(index, "endDate", e.target.value)}
-                        placeholder="MM/YYYY or Present"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Description</label>
-                    <Textarea
-                      value={project.description}
-                      onChange={(e) => updateProject(index, "description", e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Technologies</label>
-                    <div className="space-y-2">
-                      {project.technologies.map((tech, techIndex) => (
-                        <div key={techIndex} className="flex items-center gap-2">
-                          <Input
-                            value={tech}
-                            onChange={(e) => updateProjectTechnology(index, techIndex, e.target.value)}
-                            placeholder="e.g., React, Node.js, etc."
-                          />
+                    {resumeData.projects?.map((project, index) => (
+                      <SortableItem key={index} id={index}>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="p-4 border rounded-lg relative bg-background"
+                        >
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-destructive"
-                            onClick={() => removeProjectTechnology(index, techIndex)}
+                            className="absolute top-2 right-2 text-destructive"
+                            onClick={() => removeProject(index)}
                           >
                             <Trash2 size={16} />
                           </Button>
-                        </div>
-                      ))}
+
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Project Name</label>
+                              <Input value={project.name} onChange={(e) => updateProject(index, "name", e.target.value)} />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Project Link (Optional)</label>
+                              <Input
+                                value={project.link || ""}
+                                onChange={(e) => updateProject(index, "link", e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Start Date (Optional)</label>
+                              <Input
+                                value={project.startDate || ""}
+                                onChange={(e) => updateProject(index, "startDate", e.target.value)}
+                                placeholder="MM/YYYY"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">End Date (Optional)</label>
+                              <Input
+                                value={project.endDate || ""}
+                                onChange={(e) => updateProject(index, "endDate", e.target.value)}
+                                placeholder="MM/YYYY or Present"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium mb-1">Description</label>
+                            <Textarea
+                              value={project.description}
+                              onChange={(e) => updateProject(index, "description", e.target.value)}
+                              rows={3}
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Technologies</label>
+                            <div className="space-y-2">
+                              {project.technologies.map((tech, techIndex) => (
+                                <div key={techIndex} className="flex items-center gap-2">
+                                  <Input
+                                    value={tech}
+                                    onChange={(e) => updateProjectTechnology(index, techIndex, e.target.value)}
+                                    placeholder="e.g., React, Node.js, etc."
+                                  />
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive"
+                                    onClick={() => removeProjectTechnology(index, techIndex)}
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                </div>
+                              ))}
+                              <Button
+                                variant="outline"
+                                onClick={() => addProjectTechnology(index)}
+                                className="w-full flex items-center justify-center gap-2"
+                              >
+                                <Plus size={16} />
+                                Add Technology
+                              </Button>
+                            </div>
+                          </div>
+                        </motion.div>
+                      </SortableItem>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="space-y-6">
+                  {resumeData.projects?.map((project, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="p-4 border rounded-lg relative bg-background"
+                    >
                       <Button
-                        variant="outline"
-                        onClick={() => addProjectTechnology(index)}
-                        className="w-full flex items-center justify-center gap-2"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 text-destructive"
+                        onClick={() => removeProject(index)}
                       >
-                        <Plus size={16} />
-                        Add Technology
+                        <Trash2 size={16} />
                       </Button>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
+
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Project Name</label>
+                          <Input value={project.name} onChange={(e) => updateProject(index, "name", e.target.value)} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Project Link (Optional)</label>
+                          <Input
+                            value={project.link || ""}
+                            onChange={(e) => updateProject(index, "link", e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Start Date (Optional)</label>
+                          <Input
+                            value={project.startDate || ""}
+                            onChange={(e) => updateProject(index, "startDate", e.target.value)}
+                            placeholder="MM/YYYY"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">End Date (Optional)</label>
+                          <Input
+                            value={project.endDate || ""}
+                            onChange={(e) => updateProject(index, "endDate", e.target.value)}
+                            placeholder="MM/YYYY or Present"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium mb-1">Description</label>
+                        <Textarea
+                          value={project.description}
+                          onChange={(e) => updateProject(index, "description", e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Technologies</label>
+                        <div className="space-y-2">
+                          {project.technologies.map((tech, techIndex) => (
+                            <div key={techIndex} className="flex items-center gap-2">
+                              <Input
+                                value={tech}
+                                onChange={(e) => updateProjectTechnology(index, techIndex, e.target.value)}
+                                placeholder="e.g., React, Node.js, etc."
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="text-destructive"
+                                onClick={() => removeProjectTechnology(index, techIndex)}
+                              >
+                                <Trash2 size={16} />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            variant="outline"
+                            onClick={() => addProjectTechnology(index)}
+                            className="w-full flex items-center justify-center gap-2"
+                          >
+                            <Plus size={16} />
+                            Add Technology
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
 
               <Button variant="outline" onClick={addProject} className="w-full flex items-center justify-center gap-2">
                 <Plus size={16} />
@@ -922,51 +1319,113 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
           <AccordionTrigger>Achievements</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
-              {resumeData.achievements?.map((achievement, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="p-4 border rounded-lg relative"
+              {isMounted ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => handleDragEnd(event, "achievements")}
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 text-destructive"
-                    onClick={() => removeAchievement(index)}
+                  <SortableContext
+                    items={resumeData.achievements?.map((_, i) => i) || []}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <Trash2 size={16} />
-                  </Button>
+                    {resumeData.achievements?.map((achievement, index) => (
+                      <SortableItem key={index} id={index}>
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="p-4 border rounded-lg relative bg-background"
+                        >
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 text-destructive"
+                            onClick={() => removeAchievement(index)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
 
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Title</label>
-                      <Input
-                        value={achievement.title}
-                        onChange={(e) => updateAchievement(index, "title", e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Date (Optional)</label>
-                      <Input
-                        value={achievement.date || ""}
-                        onChange={(e) => updateAchievement(index, "date", e.target.value)}
-                        placeholder="YYYY or YYYY-Present"
-                      />
-                    </div>
-                  </div>
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Title</label>
+                              <Input
+                                value={achievement.title}
+                                onChange={(e) => updateAchievement(index, "title", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Date (Optional)</label>
+                              <Input
+                                value={achievement.date || ""}
+                                onChange={(e) => updateAchievement(index, "date", e.target.value)}
+                                placeholder="YYYY or YYYY-Present"
+                              />
+                            </div>
+                          </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Description</label>
-                    <Textarea
-                      value={achievement.description}
-                      onChange={(e) => updateAchievement(index, "description", e.target.value)}
-                      rows={3}
-                    />
-                  </div>
-                </motion.div>
-              ))}
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Description</label>
+                            <Textarea
+                              value={achievement.description}
+                              onChange={(e) => updateAchievement(index, "description", e.target.value)}
+                              rows={3}
+                            />
+                          </div>
+                        </motion.div>
+                      </SortableItem>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="space-y-6">
+                  {resumeData.achievements?.map((achievement, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="p-4 border rounded-lg relative bg-background"
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 text-destructive"
+                        onClick={() => removeAchievement(index)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Title</label>
+                          <Input
+                            value={achievement.title}
+                            onChange={(e) => updateAchievement(index, "title", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Date (Optional)</label>
+                          <Input
+                            value={achievement.date || ""}
+                            onChange={(e) => updateAchievement(index, "date", e.target.value)}
+                            placeholder="YYYY or YYYY-Present"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Description</label>
+                        <Textarea
+                          value={achievement.description}
+                          onChange={(e) => updateAchievement(index, "description", e.target.value)}
+                          rows={3}
+                        />
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
 
               <Button
                 variant="outline"
@@ -984,23 +1443,58 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
           <AccordionTrigger>Languages</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-4">
-              {resumeData.basicInfo.languages?.map((language, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <Input
-                    value={language}
-                    onChange={(e) => updateLanguage(index, e.target.value)}
-                    placeholder="e.g., English (Native), Spanish (Fluent)"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-destructive"
-                    onClick={() => removeLanguage(index)}
+              {isMounted ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => handleDragEnd(event, "languages")}
+                >
+                  <SortableContext
+                    items={resumeData.basicInfo.languages?.map((_, i) => i) || []}
+                    strategy={verticalListSortingStrategy}
                   >
-                    <Trash2 size={16} />
-                  </Button>
+                    {resumeData.basicInfo.languages?.map((language, index) => (
+                      <SortableItem key={index} id={index}>
+                        <div className="flex items-center gap-2 w-full">
+                          <Input
+                            value={language}
+                            onChange={(e) => updateLanguage(index, e.target.value)}
+                            placeholder="e.g., English (Native), Spanish (Fluent)"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive shrink-0"
+                            onClick={() => removeLanguage(index)}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      </SortableItem>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                <div className="space-y-4">
+                  {resumeData.basicInfo.languages?.map((language, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={language}
+                        onChange={(e) => updateLanguage(index, e.target.value)}
+                        placeholder="e.g., English (Native), Spanish (Fluent)"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive"
+                        onClick={() => removeLanguage(index)}
+                      >
+                        <Trash2 size={16} />
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
 
               <Button variant="outline" onClick={addLanguage} className="w-full flex items-center justify-center gap-2">
                 <Plus size={16} />

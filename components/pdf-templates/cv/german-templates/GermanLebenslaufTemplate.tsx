@@ -348,15 +348,15 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
         {/* Header with Circular Photo and Name */}
         <View style={styles.header}>
           {/* Circular Professional Photo */}
-          {basicInfo.profilePicture && (
+          {basicInfo.profilePicture ? (
             <View style={styles.photoContainer}>
               <Image 
-                src={basicInfo.profilePicture || "/placeholder.svg"} 
+                src={basicInfo.profilePicture} 
                 style={styles.profilePhoto} 
                 cache={false} 
               />
             </View>
-          )}
+          ) : null}
 
           {/* Header Content */}
           <View style={styles.headerContent}>
@@ -374,39 +374,39 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
                 <Text style={styles.personalLabel}>Name:</Text>
                 <Text style={styles.personalValue}>{basicInfo.name}</Text>
               </View>
-              {basicInfo.email && (
+              {basicInfo.email ? (
                 <View style={styles.personalItem}>
                   <Text style={styles.personalLabel}>E-Mail:</Text>
                   <Link src={`mailto:${basicInfo.email}`} style={styles.contactLink}>
                     <Text style={styles.personalValue}>{basicInfo.email}</Text>
                   </Link>
                 </View>
-              )}
-              {basicInfo.phone && (
+              ) : null}
+              {basicInfo.phone ? (
                 <View style={styles.personalItem}>
                   <Text style={styles.personalLabel}>Telefon:</Text>
                   <Link src={`tel:${basicInfo.phone.replace(/[^\d+]/g, "")}`} style={styles.contactLink}>
                     <Text style={styles.personalValue}>{basicInfo.phone}</Text>
                   </Link>
                 </View>
-              )}
+              ) : null}
             </View>
             <View style={styles.personalColumn}>
-              {basicInfo.location && (
+              {basicInfo.location ? (
                 <View style={styles.personalItem}>
                   <Text style={styles.personalLabel}>Adresse:</Text>
                   <Text style={styles.personalValue}>{basicInfo.location}</Text>
                 </View>
-              )}
-              {basicInfo.linkedin && (
+              ) : null}
+              {basicInfo.linkedin ? (
                 <View style={styles.personalItem}>
                   <Text style={styles.personalLabel}>LinkedIn:</Text>
                   <Link src={`https://linkedin.com/in/${basicInfo.linkedin}`} style={styles.contactLink}>
                     <Text style={styles.personalValue}>{basicInfo.linkedin}</Text>
                   </Link>
                 </View>
-              )}
-              {basicInfo.website && (
+              ) : null}
+              {basicInfo.website ? (
                 <View style={styles.personalItem}>
                   <Text style={styles.personalLabel}>Website:</Text>
                   <Link
@@ -416,21 +416,21 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
                     <Text style={styles.personalValue}>{basicInfo.website}</Text>
                   </Link>
                 </View>
-              )}
+              ) : null}
             </View>
           </View>
         </View>
 
         {/* Kurzprofil (Professional Summary) - Compact */}
-        {basicInfo.summary && (
+        {basicInfo.summary ? (
           <View style={styles.mainSection}>
             <Text style={styles.sectionTitle}>Kurzprofil</Text>
             <Text style={styles.summaryText}>{basicInfo.summary}</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Berufserfahrung (Professional Experience) */}
-        {experience && experience.length > 0 && (
+        {experience && experience.length > 0 ? (
           <View style={styles.mainSection}>
             <Text style={styles.sectionTitle}>Berufserfahrung</Text>
             <View style={styles.experienceContainer}>
@@ -450,14 +450,14 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
               ))}
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* Two Column Layout for Better Space Usage */}
         <View style={styles.twoColumnSection}>
           {/* Left Column */}
           <View style={styles.leftColumn}>
             {/* Ausbildung (Education) */}
-            {education && education.length > 0 && (
+            {education && education.length > 0 ? (
               <View style={styles.mainSection}>
                 <Text style={styles.sectionTitle}>Ausbildung</Text>
                 <View style={styles.experienceContainer}>
@@ -470,19 +470,19 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
                       </View>
                       <View style={styles.contentColumn}>
                         <Text style={styles.educationTitle}>
-                          {edu.degree} {edu.field && `in ${edu.field}`}
+                          {edu.degree}{edu.field ? ` in ${edu.field}` : ""}
                         </Text>
                         <Text style={styles.educationInstitution}>{edu.institution}</Text>
-                        {edu.gpa && <Text style={styles.educationDetails}>Note: {edu.gpa}</Text>}
+                        {edu.gpa ? <Text style={styles.educationDetails}>Note: {edu.gpa}</Text> : null}
                       </View>
                     </View>
                   ))}
                 </View>
               </View>
-            )}
+            ) : null}
 
             {/* Sprachen (Languages) */}
-            {basicInfo.languages && basicInfo.languages.length > 0 && (
+            {basicInfo.languages && basicInfo.languages.length > 0 ? (
               <View style={styles.mainSection}>
                 <Text style={styles.sectionTitle}>Sprachen</Text>
                 {basicInfo.languages.map((language, index) => (
@@ -492,34 +492,34 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Right Column */}
           <View style={styles.rightColumn}>
             {/* Kenntnisse und Fähigkeiten (Skills and Knowledge) */}
-            {skills && skills.length > 0 && (
+            {skills && skills.length > 0 ? (
               <View style={styles.mainSection}>
                 <Text style={styles.sectionTitle}>Kenntnisse</Text>
                 <View style={styles.skillsContainer}>
-                  {technical.length > 0 && (
+                  {technical.length > 0 ? (
                     <View style={styles.skillCategory}>
                       <Text style={styles.skillCategoryTitle}>Programmierung:</Text>
                       <Text style={styles.skillsList}>{technical.join(", ")}</Text>
                     </View>
-                  )}
-                  {other.length > 0 && (
+                  ) : null}
+                  {other.length > 0 ? (
                     <View style={styles.skillCategory}>
                       <Text style={styles.skillCategoryTitle}>Weitere:</Text>
                       <Text style={styles.skillsList}>{other.join(", ")}</Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
               </View>
-            )}
+            ) : null}
 
             {/* Sonstige Qualifikationen (Additional Qualifications) */}
-            {achievements && achievements.length > 0 && (
+            {achievements && achievements.length > 0 ? (
               <View style={styles.mainSection}>
                 <Text style={styles.sectionTitle}>Qualifikationen</Text>
                 {achievements.map((achievement, index) => (
@@ -529,12 +529,12 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
           </View>
         </View>
 
         {/* Projekte (Projects) - Full Width */}
-        {projects && projects.length > 0 && (
+        {projects && projects.length > 0 ? (
           <View style={styles.mainSection}>
             <Text style={styles.sectionTitle}>Projekte</Text>
             <View style={styles.experienceContainer}>
@@ -544,21 +544,21 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
                     <Text style={styles.dateText}>
                       {project.startDate && project.endDate 
                         ? `${project.startDate} - ${project.endDate}`
-                        : project.startDate || project.endDate || ""}
+                        : (project.startDate || project.endDate || "-")}
                     </Text>
                   </View>
                   <View style={styles.contentColumn}>
                     <Text style={styles.projectTitle}>{project.name}</Text>
                     <Text style={styles.projectDescription}>{project.description}</Text>
                     <Text style={styles.projectTechnologies}>
-                      Technologien: {project.technologies.join(", ")}
+                      Technologien: {(project.technologies || []).map(t => typeof t === "string" ? t : String(t)).join(", ")}
                     </Text>
                   </View>
                 </View>
               ))}
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* German CV Footer with Fancy Signature */}
         <View style={styles.footer}>

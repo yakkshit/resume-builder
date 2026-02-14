@@ -4,6 +4,7 @@ import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://yakkshit.com'),
   title: 'AI-Powered Resume Generator',
   description: 'Create, customize, and optimize your resume with AI assistance',
   generator: 'yakkshit.com',
@@ -33,8 +34,8 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
         {children}
         <Toaster />
         <Analytics />

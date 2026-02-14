@@ -372,15 +372,15 @@ export const GradientGrayPDFTemplate = ({ resumeData }: GradientGrayPDFTemplateP
         <View style={styles.leftColumn}>
           {/* Profile Section */}
           <View style={styles.profileSection}>
-            {basicInfo.profilePicture && (
+            {basicInfo.profilePicture ? (
               <View style={styles.profileImageContainer}>
                 <Image 
-                  src={basicInfo.profilePicture || "/placeholder.svg"} 
+                  src={basicInfo.profilePicture} 
                   style={styles.profileImage} 
                   cache={false} 
                 />
               </View>
-            )}
+            ) : null}
             <Text style={styles.profileName}>{basicInfo.name}</Text>
             <Text style={styles.profileTitle}>{basicInfo.title}</Text>
           </View>
@@ -388,37 +388,37 @@ export const GradientGrayPDFTemplate = ({ resumeData }: GradientGrayPDFTemplateP
           {/* Contact Information */}
           <View style={styles.contactSection}>
             <Text style={styles.sidebarSectionTitle}>Contact</Text>
-            {basicInfo.email && (
+            {basicInfo.email ? (
               <View style={styles.contactItem}>
                 <Image src={lightIconUrls.email || "/placeholder.svg"} style={styles.contactIcon} />
                 <Link src={`mailto:${basicInfo.email}`} style={styles.contactLink}>
                   <Text style={styles.contactText}>{basicInfo.email}</Text>
                 </Link>
               </View>
-            )}
-            {basicInfo.phone && (
+            ) : null}
+            {basicInfo.phone ? (
               <View style={styles.contactItem}>
                 <Image src={lightIconUrls.phone || "/placeholder.svg"} style={styles.contactIcon} />
                 <Link src={`tel:${basicInfo.phone.replace(/[^\d+]/g, "")}`} style={styles.contactLink}>
                   <Text style={styles.contactText}>{basicInfo.phone}</Text>
                 </Link>
               </View>
-            )}
-            {basicInfo.location && (
+            ) : null}
+            {basicInfo.location ? (
               <View style={styles.contactItem}>
                 <Image src={lightIconUrls.location || "/placeholder.svg"} style={styles.contactIcon} />
                 <Text style={styles.contactText}>{basicInfo.location}</Text>
               </View>
-            )}
-            {basicInfo.linkedin && (
+            ) : null}
+            {basicInfo.linkedin ? (
               <View style={styles.contactItem}>
                 <Image src={lightIconUrls.linkedin || "/placeholder.svg"} style={styles.contactIcon} />
                 <Link src={`https://linkedin.com/in/${basicInfo.linkedin}`} style={styles.contactLink}>
                   <Text style={styles.contactText}>{basicInfo.linkedin}</Text>
                 </Link>
               </View>
-            )}
-            {basicInfo.website && (
+            ) : null}
+            {basicInfo.website ? (
               <View style={styles.contactItem}>
                 <Image src={lightIconUrls.website || "/placeholder.svg"} style={styles.contactIcon} />
                 <Link
@@ -428,11 +428,11 @@ export const GradientGrayPDFTemplate = ({ resumeData }: GradientGrayPDFTemplateP
                   <Text style={styles.contactText}>{basicInfo.website}</Text>
                 </Link>
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Skills */}
-          {skills && skills.length > 0 && (
+          {skills && skills.length > 0 ? (
             <View style={styles.skillsSection}>
               <Text style={styles.sidebarSectionTitle}>Skills</Text>
               <View style={styles.skillsGrid}>
@@ -443,10 +443,10 @@ export const GradientGrayPDFTemplate = ({ resumeData }: GradientGrayPDFTemplateP
                 ))}
               </View>
             </View>
-          )}
+          ) : null}
 
           {/* Languages */}
-          {basicInfo.languages && basicInfo.languages.length > 0 && (
+          {basicInfo.languages && basicInfo.languages.length > 0 ? (
             <View style={styles.languagesSection}>
               <Text style={styles.sidebarSectionTitle}>Languages</Text>
               {basicInfo.languages.map((language, index) => (
@@ -455,10 +455,10 @@ export const GradientGrayPDFTemplate = ({ resumeData }: GradientGrayPDFTemplateP
                 </View>
               ))}
             </View>
-          )}
+          ) : null}
 
           {/* Portfolio Links */}
-          {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 && (
+          {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 ? (
             <View style={styles.portfolioSection}>
               <Text style={styles.sidebarSectionTitle}>Portfolio</Text>
               {basicInfo.portfolioLinks.map((link, index) => (
@@ -475,21 +475,21 @@ export const GradientGrayPDFTemplate = ({ resumeData }: GradientGrayPDFTemplateP
                 </View>
               ))}
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* Right Column - Optimized Main Content */}
         <View style={styles.rightColumn}>
           {/* Professional Summary */}
-          {basicInfo.summary && (
+          {basicInfo.summary ? (
             <View style={styles.summarySection}>
               <Text style={styles.mainSectionTitle}>Summary</Text>
               <Text style={styles.summaryText}>{basicInfo.summary}</Text>
             </View>
-          )}
+          ) : null}
 
           {/* Experience */}
-          {experience && experience.length > 0 && (
+          {experience && experience.length > 0 ? (
             <View style={styles.experienceSection}>
               <Text style={styles.mainSectionTitle}>Experience</Text>
               {experience.map((exp, index) => (
@@ -507,76 +507,76 @@ export const GradientGrayPDFTemplate = ({ resumeData }: GradientGrayPDFTemplateP
                 </View>
               ))}
             </View>
-          )}
+          ) : null}
 
           {/* Projects */}
-          {projects && projects.length > 0 && (
+          {projects && projects.length > 0 ? (
             <View style={styles.projectsSection}>
               <Text style={styles.mainSectionTitle}>Projects</Text>
               {projects.map((project, index) => (
                 <View key={`proj-${index}`} style={styles.projectItem}>
                   <View style={styles.projectHeader}>
                     <Text style={styles.projectTitle}>{project.name}</Text>
-                    {(project.startDate || project.endDate) && (
+                    {(project.startDate || project.endDate) ? (
                       <Text style={styles.projectDate}>
-                        {project.startDate} {project.endDate && `- ${project.endDate}`}
+                        {project.startDate}{project.endDate ? ` - ${project.endDate}` : ""}
                       </Text>
-                    )}
+                    ) : null}
                   </View>
                   <Text style={styles.projectDescription}>{project.description}</Text>
                   <View style={styles.projectTech}>
-                    {project.technologies.map((tech, techIndex) => (
+                    {(project.technologies || []).map((tech, techIndex) => (
                       <Text key={`tech-${techIndex}`} style={styles.techTag}>
-                        {tech}
+                        {typeof tech === "string" ? tech : String(tech)}
                       </Text>
                     ))}
                   </View>
-                  {project.link && (
+                  {project.link ? (
                     <Link src={project.link} style={styles.projectLink}>
                       <Text>View Project →</Text>
                     </Link>
-                  )}
+                  ) : null}
                 </View>
               ))}
             </View>
-          )}
+          ) : null}
 
           {/* Education */}
-          {education && education.length > 0 && (
+          {education && education.length > 0 ? (
             <View style={styles.educationSection}>
               <Text style={styles.mainSectionTitle}>Education</Text>
               {education.map((edu, index) => (
                 <View key={`edu-${index}`} style={styles.educationItem}>
                   <Text style={styles.educationDegree}>
-                    {edu.degree} {edu.field && `in ${edu.field}`}
+                    {edu.degree}{edu.field ? ` in ${edu.field}` : ""}
                   </Text>
                   <Text style={styles.educationInstitution}>{edu.institution}</Text>
                   <Text style={styles.educationDate}>
                     {edu.startDate} - {edu.endDate}
                   </Text>
-                  {edu.gpa && <Text style={styles.educationGPA}>GPA: {edu.gpa}</Text>}
+                  {edu.gpa ? <Text style={styles.educationGPA}>GPA: {edu.gpa}</Text> : null}
                 </View>
               ))}
             </View>
-          )}
+          ) : null}
 
           {/* Achievements */}
-          {achievements && achievements.length > 0 && (
+          {achievements && achievements.length > 0 ? (
             <View style={styles.achievementsSection}>
               <Text style={styles.mainSectionTitle}>Achievements</Text>
               {achievements.map((achievement, index) => (
                 <View key={`ach-${index}`} style={styles.achievementItem}>
                   <View style={styles.achievementHeader}>
                     <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                    {achievement.date && (
+                    {achievement.date ? (
                       <Text style={styles.achievementDate}>{achievement.date}</Text>
-                    )}
+                    ) : null}
                   </View>
                   <Text style={styles.achievementDescription}>{achievement.description}</Text>
                 </View>
               ))}
             </View>
-          )}
+          ) : null}
         </View>
       </Page>
     </Document>

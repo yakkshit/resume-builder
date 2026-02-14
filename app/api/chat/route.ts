@@ -1,313 +1,143 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { InferenceClient } from "@huggingface/inference"
 import { GoogleGenAI } from "@google/genai"
+import { formatAssistantStreamPart } from "@ai-sdk/ui-utils"
 import mime from "mime"
 import { writeFile } from "fs"
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30
 
-// Define available models with their providers and configurations
-const AVAILABLE_MODELS = {
-  // Google Gemini Models (Latest)
-  "gemini-2.0-flash-exp": {
-    provider: "google",
-    modelId: "gemini-2.0-flash-exp",
-  },
-  "gemini-2.0-flash": {
-    provider: "google",
-    modelId: "gemini-2.0-flash",
-  },
-  "gemini-2.0-flash-lite": {
-    provider: "google",
-    modelId: "gemini-2.0-flash-lite",
-  },
-  "gemini-2.0-flash-live": {
-    provider: "google",
-    modelId: "gemini-2.0-flash-live-001"
-  },
-  "gemini-2.5-flash": {
-    provider: "google",
-    modelId: "gemini-2.5-flash",
-  },
-  "gemini-2.5-pro": {
-    provider: "google",
-    modelId: "gemini-2.5-pro",
-  },
-  "gemini-2.5-flash-lite": {
-    provider: "google",
-    modelId: "gemini-2.5-flash-lite",
-  },
+// Define available models with their providers and configurations (aligned with UI selector)
+const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiKey?: string }> = {
+  // Specialized
+  "lingo-ai": { provider: "lingo-ai", modelId: "resume-model-v1" },
 
+  // Google Gemini — core + preview (2026)
+  "gemini-3-flash-preview": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-3-pro-preview": { provider: "google", modelId: "gemini-2.5-pro" },
+  "gemini-3-pro-image-preview": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-image": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-live": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-native-audio-preview-12-2025": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-native-audio-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-preview-tts": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-lite": { provider: "google", modelId: "gemini-2.5-flash-lite" },
+  "gemini-2.5-flash-lite-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash-lite" },
+  "gemini-2.5-pro": { provider: "google", modelId: "gemini-2.5-pro" },
+  "gemini-2.5-pro-preview-tts": { provider: "google", modelId: "gemini-2.5-pro" },
+  "gemini-2.0-flash-exp": { provider: "google", modelId: "gemini-2.0-flash-exp" },
+  "gemini-2.0-flash": { provider: "google", modelId: "gemini-2.0-flash" },
+  "gemini-2.0-flash-001": { provider: "google", modelId: "gemini-2.0-flash" },
+  "gemini-2.0-flash-lite": { provider: "google", modelId: "gemini-2.0-flash-lite" },
+  "gemini-2.0-flash-lite-001": { provider: "google", modelId: "gemini-2.0-flash-lite" },
+  "gemini-2.0-pro": { provider: "google", modelId: "gemini-2.0-pro" },
+  "gemini-1.5-pro": { provider: "google", modelId: "gemini-1.5-pro" },
+  "gemini-1.5-flash": { provider: "google", modelId: "gemini-1.5-flash" },
 
-  // OpenAI Models
-  "gpt-4o": {
-    provider: "openai",
-    modelId: "gpt-4o",
-    apiKey: process.env.OPENAI_API_KEY,
-  },
-  "gpt-4o-mini": {
-    provider: "openai",
-    modelId: "gpt-4o-mini",
-    apiKey: process.env.OPENAI_API_KEY,
-  },
-  "gpt-4-turbo": {
-    provider: "openai",
-    modelId: "gpt-4-turbo",
-    apiKey: process.env.OPENAI_API_KEY,
-  },
-  "gpt-4": {
-    provider: "openai",
-    modelId: "gpt-4",
-    apiKey: process.env.OPENAI_API_KEY,
-  },
-  "gpt-3.5-turbo": {
-    provider: "openai",
-    modelId: "gpt-3.5-turbo",
-    apiKey: process.env.OPENAI_API_KEY,
-  },
+  // OpenAI (core + 2026 roadmap IDs; newer may resolve to latest)
+  "gpt-5": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.2": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.2-instant": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.3-codex": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.3-codex-spark": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4o": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4o-mini": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4-turbo": { provider: "openai", modelId: "gpt-4-turbo", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4": { provider: "openai", modelId: "gpt-4-turbo", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-3.5-turbo": { provider: "openai", modelId: "gpt-3.5-turbo", apiKey: process.env.OPENAI_API_KEY },
 
-  // Anthropic Claude Models
-  "claude-3-5-sonnet": {
-    provider: "anthropic",
-    modelId: "claude-3-5-sonnet-20241022",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-3-5-haiku": {
-    provider: "anthropic",
-    modelId: "claude-3-5-haiku-20241022",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-3-opus": {
-    provider: "anthropic",
-    modelId: "claude-3-opus-20240229",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-3-sonnet": {
-    provider: "anthropic",
-    modelId: "claude-3-sonnet-20240229",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-3-haiku": {
-    provider: "anthropic",
-    modelId: "claude-3-haiku-20240307",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-2.1": {
-    provider: "anthropic",
-    modelId: "claude-2.1",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-2.0": {
-    provider: "anthropic",
-    modelId: "claude-2.0",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
-  "claude-instant-1.2": {
-    provider: "anthropic",
-    modelId: "claude-instant-1.2",
-    apiKey: process.env.ANTHROPIC_API_KEY,
-  },
+  // Anthropic Claude (4.x/5 + legacy; newer slugs may need API model IDs)
+  "claude-opus-4.6": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-opus-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-sonnet-5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-sonnet-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-haiku-4.5": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-5-sonnet": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-5-haiku": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-opus": { provider: "anthropic", modelId: "claude-3-opus-20240229", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-sonnet": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-haiku": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-2.1": { provider: "anthropic", modelId: "claude-2.1", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-2.0": { provider: "anthropic", modelId: "claude-2.0", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-instant-1.2": { provider: "anthropic", modelId: "claude-instant-1.2", apiKey: process.env.ANTHROPIC_API_KEY },
 
-  // DeepSeek Models
-  "deepseek-chat": {
-    provider: "deepseek",
-    modelId: "deepseek-chat",
-    apiKey: process.env.DEEPSEEK_API_KEY,
-  },
-  "deepseek-reasoner": {
-    provider: "deepseek",
-    modelId: "deepseek-reasoner",
-    apiKey: process.env.DEEPSEEK_API_KEY,
-  },
-  "deepseek-coder": {
-    provider: "deepseek",
-    modelId: "deepseek-coder",
-    apiKey: process.env.DEEPSEEK_API_KEY,
-  },
+  // DeepSeek
+  "deepseek-chat": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-reasoner": { provider: "deepseek", modelId: "deepseek-reasoner", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-coder": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-coder-v2": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-coder-v2-lite": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
 
-  // Groq Models (Fast Inference)
-  "llama-3.1-8b-instant": {
-    provider: "groq",
-    modelId: "llama3-8b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "llama-3.1-70b-versatile": {
-    provider: "groq",
-    modelId: "llama3-70b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "llama-3.3-70b-versatile": {
-    provider: "groq",
-    modelId: "llama3.3-70b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "mixtral-8x7b-32768": {
-    provider: "groq",
-    modelId: "mixtral-8x7b-32768",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "gemma2-9b-it": {
-    provider: "groq",
-    modelId: "gemma2-9b-it",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "llama-3.1-8b": {
-    provider: "groq",
-    modelId: "llama3-8b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "llama-3.1-70b": {
-    provider: "groq",
-    modelId: "llama3-70b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
-  "llama-3.3-70b": {
-    provider: "groq",
-    modelId: "llama3.3-70b-8192",
-    apiKey: process.env.GROQ_API_KEY,
-  },
+  // Groq
+  "llama-3.1-8b-instant": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.1-70b-versatile": { provider: "groq", modelId: "llama-3.1-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.3-70b-versatile": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "mixtral-8x7b-32768": { provider: "groq", modelId: "mixtral-8x7b-32768", apiKey: process.env.GROQ_API_KEY },
+  "gemma2-9b-it": { provider: "groq", modelId: "gemma2-9b-it", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.1-8b": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.1-70b": { provider: "groq", modelId: "llama-3.1-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.3-70b": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "llama3-70b-8192": { provider: "groq", modelId: "llama3-70b-8192", apiKey: process.env.GROQ_API_KEY },
 
-  // Hugging Face Models
-  "huggingface-endpoint": {
-    provider: "huggingface",
-    modelId: "endpoint",
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-  },
-  "huggingface-model": {
-    provider: "huggingface",
-    modelId: "model",
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-  },
-  "huggingface-streaming": {
-    provider: "huggingface",
-    modelId: "streaming",
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-  },
-  "huggingface-provider": {
-    provider: "huggingface",
-    modelId: "provider",
-    apiKey: process.env.HUGGINGFACE_API_KEY,
-  },
+  // Mistral (3.x + mini/magistral/devstral)
+  "mistral-large-3": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-3.1": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-small-3.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-3": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-small-3.1": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-14b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-8b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-3b": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
+  "magistral-medium-1.2": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "magistral-small-1.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "devstral-2": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "devstral-medium-1.0": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "devstral-small-2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-large-latest": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-latest": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-small-latest": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-7b-instruct": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
 
-  // Local Models
-  "local-custom": {
-    provider: "local",
-    modelId: "custom",
-    apiKey: undefined,
-  },
-  "ollama-local": {
-    provider: "ollama",
-    modelId: "custom",
-    apiKey: undefined,
-  },
-  "lmstudio-local": {
-    provider: "lmstudio",
-    modelId: "custom",
-    apiKey: undefined,
-  },
-  "openai-like-local": {
-    provider: "openai-like",
-    modelId: "custom",
-    apiKey: undefined,
-  },
-  "lingo-ai": {
-    provider: "lingo-ai",
-    modelId: "resume-model-v1",
-    apiKey: undefined,
-  },
+  // Together.ai
+  "meta-llama/llama-3.1-8b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.1-8B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
+  "meta-llama/llama-3.1-70b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.1-70B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
+  "meta-llama/llama-3.3-70b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.3-70B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
 
-  // Mistral Models
-  "mistral-large-latest": {
-    provider: "mistral",
-    modelId: "mistral-large-latest",
-    apiKey: process.env.MISTRAL_API_KEY,
-  },
-  "mistral-medium-latest": {
-    provider: "mistral",
-    modelId: "mistral-medium-latest",
-    apiKey: process.env.MISTRAL_API_KEY,
-  },
-  "mistral-small-latest": {
-    provider: "mistral",
-    modelId: "mistral-small-latest",
-    apiKey: process.env.MISTRAL_API_KEY,
-  },
-  "mistral-7b-instruct": {
-    provider: "mistral",
-    modelId: "mistral-7b-instruct",
-    apiKey: process.env.MISTRAL_API_KEY,
-  },
+  // Cohere
+  "command-r-plus": { provider: "cohere", modelId: "command-r-plus", apiKey: process.env.COHERE_API_KEY },
+  "command-r": { provider: "cohere", modelId: "command-r", apiKey: process.env.COHERE_API_KEY },
+  "command-light": { provider: "cohere", modelId: "command-light", apiKey: process.env.COHERE_API_KEY },
 
-  // Together.ai Models
-  "meta-llama/llama-3.1-8b-instruct": {
-    provider: "together",
-    modelId: "meta-llama/llama-3.1-8b-instruct",
-    apiKey: process.env.TOGETHER_API_KEY,
-  },
-  "meta-llama/llama-3.1-70b-instruct": {
-    provider: "together",
-    modelId: "meta-llama/llama-3.1-70b-instruct",
-    apiKey: process.env.TOGETHER_API_KEY,
-  },
-  "meta-llama/llama-3.3-70b-instruct": {
-    provider: "together",
-    modelId: "meta-llama/llama-3.3-70b-instruct",
-    apiKey: process.env.TOGETHER_API_KEY,
-  },
+  // Perplexity
+  "llama-3.1-sonar-large-128k-online": { provider: "perplexity", modelId: "llama-3.1-sonar-large-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
+  "llama-3.1-8b-instruct": { provider: "perplexity", modelId: "llama-3.1-sonar-small-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
+  "llama-3.1-70b-instruct": { provider: "perplexity", modelId: "llama-3.1-sonar-large-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
+  "mixtral-8x7b-instruct": { provider: "perplexity", modelId: "mixtral-8x7b-instruct", apiKey: process.env.PERPLEXITY_API_KEY },
 
-  // Cohere Models
-  "command-r-plus": {
-    provider: "cohere",
-    modelId: "command-r-plus",
-    apiKey: process.env.COHERE_API_KEY,
-  },
-  "command-r": {
-    provider: "cohere",
-    modelId: "command-r",
-    apiKey: process.env.COHERE_API_KEY,
-  },
-  "command-light": {
-    provider: "cohere",
-    modelId: "command-light",
-    apiKey: process.env.COHERE_API_KEY,
-  },
+  // Fireworks
+  "fireworks-llama-3.1-8b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/llama-v3p1-8b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
+  "fireworks-llama-3.1-70b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/llama-v3p1-70b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
+  "fireworks-mixtral-8x7b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/mixtral-8x7b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
 
-  // Perplexity Models
-  "llama-3.1-8b-instruct": {
-    provider: "perplexity",
-    modelId: "llama-3.1-8b-instruct",
-    apiKey: process.env.PERPLEXITY_API_KEY,
-  },
-  "llama-3.1-70b-instruct": {
-    provider: "perplexity",
-    modelId: "llama-3.1-70b-instruct",
-    apiKey: process.env.PERPLEXITY_API_KEY,
-  },
-  "mixtral-8x7b-instruct": {
-    provider: "perplexity",
-    modelId: "mixtral-8x7b-instruct",
-    apiKey: process.env.PERPLEXITY_API_KEY,
-  },
+  // Hugging Face
+  "huggingface-endpoint": { provider: "huggingface", modelId: "endpoint", apiKey: process.env.HUGGINGFACE_API_KEY },
+  "huggingface-model": { provider: "huggingface", modelId: "model", apiKey: process.env.HUGGINGFACE_API_KEY },
+  "huggingface-streaming": { provider: "huggingface", modelId: "streaming", apiKey: process.env.HUGGINGFACE_API_KEY },
+  "huggingface-provider": { provider: "huggingface", modelId: "provider", apiKey: process.env.HUGGINGFACE_API_KEY },
 
-  // Fireworks Models
-  "fireworks-llama-3.1-8b-instruct": {
-    provider: "fireworks",
-    modelId: "llama-3.1-8b-instruct",
-  },
-  "fireworks-llama-3.1-70b-instruct": {
-    provider: "fireworks",
-    modelId: "llama-3.1-70b-instruct",
-  },
-  "fireworks-mixtral-8x7b-instruct": {
-    provider: "fireworks",
-    modelId: "mixtral-8x7b-instruct",
-  },
+  // Local / Custom
+  "local-custom": { provider: "local", modelId: "local-custom" },
+  "ollama-local": { provider: "ollama", modelId: "ollama" },
+  "lmstudio-local": { provider: "lmstudio", modelId: "lmstudio" },
+  "openai-like-local": { provider: "openai-like", modelId: "openai-like" },
 };
 
 
-// Default model if none specified
-const DEFAULT_MODEL = "lingo-ai"
+// Default model if none specified (efficient for resume/cover letter)
+const DEFAULT_MODEL = "gemini-2.5-flash"
 
 // Mock response for when API quota is exceeded
 const MOCK_RESPONSES = [
@@ -321,68 +151,51 @@ export async function POST(req: Request) {
   const { messages, resumeData, aiMode, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth } = await req.json()
 
   // Create a system message based on the mode
-let systemMessage = "";
+  let systemMessage = "";
 
-if (aiMode) {
-  systemMessage = `
-    You are an AI Resume Assistant that helps users tailor their resumes to specific job descriptions.
+  const resumeJson = JSON.stringify(resumeData ?? {})
 
-    The user will provide:
-    1. Resume data (as JSON).
-    2. A specific job description as query.
+  if (aiMode) {
+    systemMessage = `You are an AI Resume Assistant. The user will give you their resume data and often a job description or request (e.g. "tailor my resume to this job", "update my summary").
 
-    Your tasks:
-    - Compare the resume to the job description.
-    - Suggest improvements to make the resume better match the job requirements.
-    - Provide **specific recommendations by section** (summary, experience, skills, etc.).
-    - Explain briefly *why* each change is helpful.
+Your response must follow this structure every time you suggest resume changes:
+1. Write a short human-readable explanation (1–3 sentences) before or after the code block.
+2. Include exactly one JSON code block with ONLY the resume fields you are changing. Use this format with no trailing commas or comments:
 
-    ⚠️ Formatting Rules (strict):
-    1. When suggesting text or structural changes, you MUST return them ONLY as valid JSON wrapped in triple backticks:
-      \`\`\`json
-      {
-        "basicInfo": {
-          "summary": "Updated summary text here..."
-        },
-        "skills": ["Added Skill 1", "Added Skill 2"]
-      }
-      \`\`\`
-
-    2. Output ONLY the fields that are being modified. Do not repeat unchanged data.
-    3. Do not add trailing commas or comments inside JSON.
-    4. Do not include a profilePicture field. Never generate or suggest one.
-    5. Any narrative explanations should be written *outside* the JSON block.
-
-    Provided Resume Data:
-    ${JSON.stringify(resumeData)} `;
-} else {
-  systemMessage = `
-    You are an AI Resume Assistant that helps users with general resume advice.
-
-    The user will provide resume data as JSON. Your tasks:
-    - Answer questions about their resume.
-    - Suggest formatting improvements.
-    - Recommend ways to make sections more impactful.
-
-    ⚠️ Formatting Rules:
-    1. When suggesting text or structural changes, return them ONLY as valid JSON wrapped in triple backticks:
-      \`\`\`json
-      {
-        "basicInfo": {
-          "summary": "Improved summary text..."
-        },
-        "experience": [
-          { "description": "Rephrased bullet point here..." }
-        ]
-      }
-      \`\`\`
-    2. Only include the fields that need modification.
-    3. No extra fields: never include profilePicture.
-    4. Write explanations *outside* the JSON block.
-
-    Provided Resume Data:
-    ${JSON.stringify(resumeData)} `;
+\`\`\`json
+{
+  "basicInfo": { "summary": "..." },
+  "skills": ["skill1", "skill2"],
+  "experience": [{ "company": "...", "position": "...", "startDate": "...", "endDate": "...", "description": "...", "highlights": [] }],
+  "education": [{ "institution": "...", "degree": "...", "field": "...", "startDate": "...", "endDate": "...", "gpa": "..." }],
+  "projects": [{ "name": "...", "description": "...", "technologies": [] }],
+  "achievements": [{ "title": "...", "description": "...", "date": "..." }]
 }
+\`\`\`
+
+Rules:
+- Output ONLY the keys and values you are modifying. Omit any section you are not changing.
+- Never include "profilePicture" in the JSON.
+- For partial updates (e.g. only summary), output only: \`\`\`json\n{"basicInfo":{"summary":"Your new summary text."}}\n\`\`\`
+- Keep JSON valid: no trailing commas, no comments, use double quotes for strings.
+- For "update my summary" or similar: return \`\`\`json\n{"basicInfo":{"summary":"<improved summary>"}}\n\`\`\` and a brief explanation.
+
+Provided resume data (for context; suggest only changes): ${resumeJson}`
+  } else {
+    systemMessage = `You are an AI Resume Assistant. The user will ask questions about their resume or ask for improvements.
+
+When you suggest specific text or structure changes, you MUST include exactly one JSON code block with only the fields you are changing, in this format:
+
+\`\`\`json
+{"basicInfo":{"summary":"..."},"skills":[],"experience":[],"education":[],"projects":[],"achievements":[]}
+\`\`\`
+
+- Include only keys you are modifying. Never include profilePicture.
+- Write a short explanation outside the JSON block.
+- Keep JSON valid (no trailing commas, double quotes only).
+
+Resume data: ${resumeJson}`
+  }
 
 
   // If there's attached data, add it to the system message
@@ -400,7 +213,7 @@ if (aiMode) {
   // If there are attached files, add them to the system message
   if (attachedFiles && attachedFiles.length > 0) {
     systemMessage += `\n\nThe user has attached the following files:\n`
-    
+
     for (const file of attachedFiles) {
       if (file.contentType === 'pdf') {
         systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${file.content}\n`
@@ -418,7 +231,7 @@ if (aiMode) {
         systemMessage += `\nFile: ${file.name}\nContent: ${file.content}\n`
       }
     }
-    
+
     systemMessage += `\nPlease analyze these files and use their content to provide relevant assistance.`
   }
 
@@ -434,8 +247,11 @@ if (aiMode) {
   // Format the conversation for the AI
   const formattedMessages = [{ role: "system", content: systemMessage }, ...messages]
 
-  // Get the model configuration or use default
-  const modelConfig = AVAILABLE_MODELS[model as keyof typeof AVAILABLE_MODELS] || AVAILABLE_MODELS[DEFAULT_MODEL]
+  // Resolve model: use selected if available, else default
+  const modelConfig = (model && AVAILABLE_MODELS[model]) ? AVAILABLE_MODELS[model] : AVAILABLE_MODELS[DEFAULT_MODEL]
+  if (!modelConfig) {
+    return new Response(JSON.stringify({ error: "Invalid model", message: "Selected model is not configured." }), { status: 400, headers: { "Content-Type": "application/json" } })
+  }
 
   try {
     // Route to the appropriate provider handler
@@ -457,7 +273,7 @@ if (aiMode) {
           }
           throw error
         }
-        
+
       case "openai":
         try {
           return await handleWithOpenAI(formattedMessages, modelConfig.modelId, apiKey)
@@ -468,7 +284,7 @@ if (aiMode) {
           }
           throw error
         }
-        
+
       case "anthropic":
         try {
           return await handleWithAnthropic(formattedMessages, modelConfig.modelId, apiKey)
@@ -476,7 +292,7 @@ if (aiMode) {
           console.error("Error with Anthropic model:", error)
           throw error
         }
-        
+
       case "deepseek":
         try {
           return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey)
@@ -484,7 +300,7 @@ if (aiMode) {
           console.error("Error with DeepSeek model:", error)
           throw error
         }
-        
+
       case "groq":
         try {
           return await handleWithGroq(formattedMessages, modelConfig.modelId, apiKey)
@@ -492,7 +308,7 @@ if (aiMode) {
           console.error("Error with Groq model:", error)
           throw error
         }
-        
+
       case "mistral":
         try {
           return await handleWithMistral(formattedMessages, modelConfig.modelId, apiKey)
@@ -500,7 +316,7 @@ if (aiMode) {
           console.error("Error with Mistral model:", error)
           throw error
         }
-        
+
       case "together":
         try {
           return await handleWithTogether(formattedMessages, modelConfig.modelId, apiKey)
@@ -508,7 +324,7 @@ if (aiMode) {
           console.error("Error with Together.ai model:", error)
           throw error
         }
-        
+
       case "cohere":
         try {
           return await handleWithCohere(formattedMessages, modelConfig.modelId, apiKey)
@@ -516,7 +332,7 @@ if (aiMode) {
           console.error("Error with Cohere model:", error)
           throw error
         }
-        
+
       case "perplexity":
         try {
           return await handleWithPerplexity(formattedMessages, modelConfig.modelId, apiKey)
@@ -524,21 +340,21 @@ if (aiMode) {
           console.error("Error with Perplexity model:", error)
           throw error
         }
-        
+
       case "fireworks":
         try {
-          return await handleWithFireworks(formattedMessages, modelConfig.modelId, apiKey  )
+          return await handleWithFireworks(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Fireworks model:", error)
           throw error
         }
-        
+
       case "huggingface":
         try {
           return await handleWithHuggingFace(
             formattedMessages,
             modelConfig.modelId,
-            apiKey  ,
+            apiKey,
             customModel,
             customEndpoint,
             customHeaders,
@@ -547,14 +363,14 @@ if (aiMode) {
           console.error("Error with Hugging Face model:", error)
           throw error
         }
-      
-        
+
+
       case "local":
         try {
           return await handleWithLocal(
             formattedMessages,
             modelConfig.modelId,
-            apiKey  ,
+            apiKey,
             customEndpoint,
             customModel,
             customHeaders,
@@ -564,13 +380,13 @@ if (aiMode) {
           console.error("Error with Local model:", error)
           throw error
         }
-        
+
       case "ollama":
         try {
           return await handleWithOllama(
             formattedMessages,
             modelConfig.modelId,
-            apiKey  ,
+            apiKey,
             customEndpoint,
             customModel,
           )
@@ -578,13 +394,13 @@ if (aiMode) {
           console.error("Error with Ollama model:", error)
           throw error
         }
-        
+
       case "lmstudio":
         try {
           return await handleWithLMStudio(
             formattedMessages,
             modelConfig.modelId,
-            apiKey  ,
+            apiKey,
             customEndpoint,
             customModel,
           )
@@ -592,7 +408,7 @@ if (aiMode) {
           console.error("Error with LM Studio model:", error)
           throw error
         }
-        
+
       case "openai-like":
         try {
           return await handleWithOpenAILike(
@@ -606,7 +422,7 @@ if (aiMode) {
           console.error("Error with OpenAI-like model:", error)
           throw error
         }
-        
+
       case "lingo-ai":
         try {
           return await handleWithLingoAI(
@@ -619,7 +435,7 @@ if (aiMode) {
           console.error("Error with Lingo AI model:", error)
           throw error
         }
-        
+
       default:
         throw new Error(`Unsupported model provider: ${modelConfig.provider}`)
     }
@@ -656,39 +472,43 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
       throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
     }
 
-    // Initialize the Gemini API
+    const systemMsg = messages.find((m) => m.role === "system")
+    const systemContent = systemMsg?.content ?? ""
+    const chatMessages = messages.filter((m) => m.role !== "system")
+
     const genAI = new GoogleGenerativeAI(key)
+    const gemini = genAI.getGenerativeModel({
+      model: modelId,
+      systemInstruction: systemContent || undefined,
+      generationConfig: { maxOutputTokens: 8192 },
+    })
 
-    // Create a Gemini model instance
-    const gemini = genAI.getGenerativeModel({ model: modelId })
-
-    // Convert messages to Gemini format
-    const geminiMessages = messages.map((msg) => ({
+    const geminiHistory = chatMessages.slice(0, -1).map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
     }))
 
-    // Start a chat session
+    const last = chatMessages[chatMessages.length - 1]
+    if (!last || last.role !== "user") {
+      throw new Error("Last message must be from user")
+    }
+    const lastText = last.content
+
     const chat = gemini.startChat({
-      history: geminiMessages.slice(0, -1),
-      generationConfig: {
-        maxOutputTokens: 8192,
-      },
+      history: geminiHistory,
+      generationConfig: { maxOutputTokens: 8192 },
     })
 
-    // Get the last message to send
-    const lastMessage = geminiMessages[geminiMessages.length - 1]
-    const result = await chat.sendMessageStream(lastMessage.parts[0].text)
+    const result = await chat.sendMessageStream(lastText)
 
-    // Create a readable stream from the Gemini response
+    // Stream in AI SDK assistant format (0:"text"\n) so useChat can parse it
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
-
         try {
           for await (const chunk of result.stream) {
             const text = chunk.text()
-            controller.enqueue(encoder.encode(text))
+            if (text) controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
           }
           controller.close()
         } catch (error) {
@@ -697,10 +517,14 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
         }
       },
     })
-
-    // Return the stream as the response
-    return new Response(stream)
-  } catch (error) {
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
+  } catch (error: unknown) {
+    const err = error as { message?: string; status?: number }
+    if (err?.message?.includes("429") || err?.message?.includes("quota") || err?.message?.includes("RESOURCE_EXHAUSTED")) {
+      return handleQuotaExceeded()
+    }
     console.error("Error with Gemini model:", error)
     throw error
   }
@@ -717,37 +541,39 @@ export async function handleNewGemini(
       throw new Error("Google Gemini API key is required. Please provide it in the UI or set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.")
     }
 
-    // Initialize Gemini API client
-    const ai = new GoogleGenAI({
-      apiKey: key,
-    })
+    const systemMsg = messages.find((m) => m.role === "system")
+    const systemContent = systemMsg?.content ?? ""
+    const chatMessages = messages.filter((m) => m.role !== "system")
 
-    // Only request TEXT output
-    const config = {
-      responseModalities: ["TEXT"],
-    }
-
-    // Convert messages into correct Gemini format
-    const contents = messages.map((msg) => ({
+    const contents: { role: "user" | "model"; parts: { text: string }[] }[] = chatMessages.map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
     }))
 
-    // Request a streaming response
+    if (contents.length > 0 && contents[0].role !== "user") {
+      const firstText = contents[0].parts[0].text
+      contents[0] = { role: "user", parts: [{ text: (systemContent ? systemContent + "\n\n" : "") + "[Assistant]: " + firstText }] }
+    } else if (systemContent && contents.length > 0) {
+      contents[0].parts[0].text = systemContent + "\n\n" + contents[0].parts[0].text
+    }
+
+    const ai = new GoogleGenAI({ apiKey: key })
+    const config: { responseModalities: string[] } = { responseModalities: ["TEXT"] }
+
     const response = await ai.models.generateContentStream({
       model: modelId || "gemini-2.0-flash",
       config,
       contents,
     })
 
-    // Stream back TEXT result
+    // Stream in AI SDK assistant format (0:"text"\n) so useChat can parse it
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
         try {
           for await (const chunk of response) {
             if (chunk.text) {
-              controller.enqueue(encoder.encode(chunk.text))
+              controller.enqueue(encoder.encode(formatAssistantStreamPart("text", chunk.text)))
             }
           }
           controller.close()
@@ -757,10 +583,14 @@ export async function handleNewGemini(
         }
       },
     })
-
-    // Return the stream as a Response object (same shape as handleWithGemini)
-    return new Response(stream)
-  } catch (error) {
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
+  } catch (error: unknown) {
+    const err = error as { message?: string; status?: number }
+    if (err?.message?.includes("429") || err?.message?.includes("quota") || err?.message?.includes("RESOURCE_EXHAUSTED")) {
+      return handleQuotaExceeded()
+    }
     console.error("Error with New Gemini model:", error)
     throw error
   }
@@ -802,13 +632,19 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
   }
 }
 
-// Anthropic handler
+// Anthropic handler (Messages API with streaming)
 async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: string) {
   try {
     const key = apiKey || process.env.ANTHROPIC_API_KEY
     if (!key) {
       throw new Error("Anthropic API key is required. Please provide it in the UI or set ANTHROPIC_API_KEY environment variable.")
     }
+
+    const systemContent = messages.find((m) => m.role === "system")?.content ?? ""
+    const chatMessages = messages.filter((m) => m.role !== "system").map((msg) => ({
+      role: msg.role === "assistant" ? "assistant" : "user",
+      content: msg.content,
+    }))
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -819,10 +655,9 @@ async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: st
       },
       body: JSON.stringify({
         model: modelId,
-        messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
-          content: msg.content,
-        })),
+        max_tokens: 8192,
+        system: systemContent,
+        messages: chatMessages,
         stream: true,
       }),
     })
@@ -1100,17 +935,17 @@ async function handleWithHuggingFace(
   try {
     // Get the model name from UI configuration or use default
     const model = customModel || "meta-llama/Llama-3.1-8B-Instruct"
-    
+
     // Get API key from UI or environment
     const hfToken = apiKey || process.env.HUGGINGFACE_API_KEY
-    
+
     if (!hfToken) {
       throw new Error("Hugging Face API key is required. Please provide it in the UI or set HUGGINGFACE_API_KEY environment variable.")
     }
-    
+
     // Create InferenceClient instance
     const client = new InferenceClient(hfToken)
-    
+
     // Handle different Hugging Face configuration types
     switch (modelId) {
       case "endpoint":
@@ -1118,7 +953,7 @@ async function handleWithHuggingFace(
         if (!customEndpoint) {
           throw new Error("Custom endpoint is required for endpoint-based Hugging Face models")
         }
-        
+
         const endpointClient = client.endpoint(customEndpoint)
         const endpointResponse = await endpointClient.chatCompletion({
           model: model,
@@ -1127,14 +962,14 @@ async function handleWithHuggingFace(
             content: msg.content,
           })),
         })
-        
+
         const endpointContent = endpointResponse.choices[0]?.message?.content || "No response generated"
         return new Response(endpointContent, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
           },
         })
-        
+
       case "model":
         // Standard chat completion API
         const modelResponse = await client.chatCompletion({
@@ -1144,20 +979,20 @@ async function handleWithHuggingFace(
             content: msg.content,
           })),
         })
-        
+
         const modelContent = modelResponse.choices[0]?.message?.content || "No response generated"
         return new Response(modelContent, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
           },
         })
-        
+
       case "streaming":
         // Streaming chat completion API
         const stream = new ReadableStream({
           async start(controller) {
             const encoder = new TextEncoder()
-            
+
             try {
               for await (const chunk of client.chatCompletionStream({
                 model: model,
@@ -1178,13 +1013,13 @@ async function handleWithHuggingFace(
             }
           },
         })
-        
+
         return new Response(stream, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
           },
         })
-        
+
       case "provider":
         // Provider-based chat completion
         let provider = undefined
@@ -1198,11 +1033,11 @@ async function handleWithHuggingFace(
             console.warn("Invalid custom headers format:", error)
           }
         }
-        
+
         if (!provider) {
           throw new Error("Provider is required for provider-based Hugging Face models")
         }
-        
+
         const providerResponse = await client.chatCompletion({
           model: model,
           messages: messages.map(msg => ({
@@ -1211,14 +1046,14 @@ async function handleWithHuggingFace(
           })),
           provider: provider,
         })
-        
+
         const providerContent = providerResponse.choices[0]?.message?.content || "No response generated"
         return new Response(providerContent, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
           },
         })
-        
+
       default:
         throw new Error(`Unsupported Hugging Face model type: ${modelId}`)
     }
@@ -1241,11 +1076,11 @@ async function handleWithLocal(
   try {
     const endpoint = customEndpoint || "http://localhost:8000/v1/chat/completions"
     const model = customModel || "local-model"
-    
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    
+
     // Handle different authentication methods
     if (customAuth === "bearer" && apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`
@@ -1259,7 +1094,7 @@ async function handleWithLocal(
         console.warn("Invalid custom headers format:", error)
       }
     }
-    
+
     // Add custom headers if provided
     if (customHeaders && customAuth !== "custom") {
       try {
@@ -1305,7 +1140,7 @@ async function handleWithOllama(
   try {
     const endpoint = customEndpoint || "http://127.0.0.1:11434"
     const model = customModel || "llama3.1:8b"
-    
+
     const response = await fetch(`${endpoint}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -1343,7 +1178,7 @@ async function handleWithLMStudio(
   try {
     const endpoint = customEndpoint || "http://localhost:1234"
     const model = customModel || "local-model"
-    
+
     const response = await fetch(`${endpoint}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -1381,11 +1216,11 @@ async function handleWithOpenAILike(
   try {
     const endpoint = customEndpoint || "http://localhost:8000"
     const model = customModel || "local-model"
-    
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    
+
     if (apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`
     }
@@ -1424,11 +1259,11 @@ async function handleWithLingoAI(
   try {
     const endpoint = process.env.LINGOAI || "http://model.yakkshit.com/api/chat/completions"
     const model = customModel || "resume-model-v1"
-    
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    
+
     if (apiKey) {
       headers["Authorization"] = `Bearer ${apiKey}`
     }
@@ -1458,17 +1293,11 @@ async function handleWithLingoAI(
 }
 
 function handleQuotaExceeded() {
-  // Select a random mock response
   const mockResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
-
-  // Create a readable stream from the mock response
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder()
-
-      // Split the mock response into chunks to simulate streaming
       const chunks = mockResponse.split(". ")
-
       let i = 0
       const interval = setInterval(() => {
         if (i >= chunks.length) {
@@ -1476,19 +1305,13 @@ function handleQuotaExceeded() {
           controller.close()
           return
         }
-
-        // Add the period back except for the last chunk
-        const chunk = chunks[i] + (i < chunks.length - 1 ? "." : "")
-        controller.enqueue(encoder.encode(chunk + " "))
+        const chunk = chunks[i] + (i < chunks.length - 1 ? ". " : "")
+        controller.enqueue(encoder.encode(formatAssistantStreamPart("text", chunk)))
         i++
-      }, 100) // Stream a chunk every 100ms
+      }, 80)
     },
   })
-
-  // Return the stream as the response with a 200 status
   return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-    },
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
   })
 }

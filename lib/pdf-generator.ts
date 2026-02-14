@@ -1,38 +1,33 @@
-import { pdf } from "@react-pdf/renderer"
-import { Document } from "@react-pdf/renderer"
-import { getResumeTemplate } from "@/components/pdf-templates"
 import type { ResumeData, Template } from "@/lib/types"
-import React from "react"
 
+/**
+ * Generates and downloads a PDF by calling the server-side API route.
+ * Uses the API to avoid Next.js 16 / React 19 conflicts with @react-pdf/renderer.
+ */
 export const generatePDF = async (resumeData: ResumeData, template: Template): Promise<void> => {
-  try {
-    // Get the template component
-    const PDFTemplate = getResumeTemplate(template as string)
+  const response = await fetch("/api/generate-pdf", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ resumeData, template }),
+  })
 
-    // Generate timestamp for filename
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-    const fileName = `resume-${resumeData.basicInfo.name.replace(/\s+/g, "-").toLowerCase()}-${timestamp}.pdf`
-
-    // Create PDF blob using React.createElement instead of JSX
-    const documentElement = React.createElement(Document, {}, React.createElement(PDFTemplate, { resumeData }))
-
-    const blob = await pdf(documentElement).toBlob()
-
-    // Create download link
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = fileName
-    document.body.appendChild(link)
-    link.click()
-
-    // Clean up
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-
-    return Promise.resolve()
-  } catch (error) {
-    console.error("Error generating PDF:", error)
-    return Promise.reject(error)
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err.details || err.error || "Failed to generate PDF")
   }
+
+  const blob = await response.blob()
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
+  const fileName = `resume-${resumeData.basicInfo.name.replace(/\s+/g, "-").toLowerCase()}-${timestamp}.pdf`
+
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement("a")
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }

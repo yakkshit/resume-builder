@@ -321,15 +321,15 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
         {/* Compact Header Section */}
         <View style={styles.header}>
           {/* Smaller Profile Picture */}
-          {basicInfo.profilePicture && (
+          {basicInfo.profilePicture ? (
             <View style={styles.profileImageContainer}>
               <Image 
-                src={basicInfo.profilePicture || "/placeholder.svg"} 
+                src={basicInfo.profilePicture} 
                 style={styles.profileImage} 
                 cache={false} 
               />
             </View>
-          )}
+          ) : null}
 
           <View style={styles.headerContent}>
             <Text style={styles.name}>{basicInfo.name}</Text>
@@ -337,37 +337,37 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
 
             {/* Compact Contact Information */}
             <View style={styles.contactInfo}>
-              {basicInfo.email && (
+              {basicInfo.email ? (
                 <View style={styles.contactItem}>
                   <Image src={lightIconUrls.email || "/placeholder.svg"} style={styles.contactIcon} />
                   <Link src={`mailto:${basicInfo.email}`} style={styles.contactLink}>
                     <Text>{basicInfo.email}</Text>
                   </Link>
                 </View>
-              )}
-              {basicInfo.phone && (
+              ) : null}
+              {basicInfo.phone ? (
                 <View style={styles.contactItem}>
                   <Image src={lightIconUrls.phone || "/placeholder.svg"} style={styles.contactIcon} />
                   <Link src={`tel:${basicInfo.phone.replace(/[^\d+]/g, "")}`} style={styles.contactLink}>
                     <Text>{basicInfo.phone}</Text>
                   </Link>
                 </View>
-              )}
-              {basicInfo.location && (
+              ) : null}
+              {basicInfo.location ? (
                 <View style={styles.contactItem}>
                   <Image src={lightIconUrls.location || "/placeholder.svg"} style={styles.contactIcon} />
                   <Text>{basicInfo.location}</Text>
                 </View>
-              )}
-              {basicInfo.linkedin && (
+              ) : null}
+              {basicInfo.linkedin ? (
                 <View style={styles.contactItem}>
                   <Image src={lightIconUrls.linkedin || "/placeholder.svg"} style={styles.contactIcon} />
                   <Link src={`https://linkedin.com/in/${basicInfo.linkedin}`} style={styles.contactLink}>
                     <Text>{basicInfo.linkedin}</Text>
                   </Link>
                 </View>
-              )}
-              {basicInfo.website && (
+              ) : null}
+              {basicInfo.website ? (
                 <View style={styles.contactItem}>
                   <Image src={lightIconUrls.website || "/placeholder.svg"} style={styles.contactIcon} />
                   <Link
@@ -377,11 +377,11 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
                     <Text>{basicInfo.website}</Text>
                   </Link>
                 </View>
-              )}
+              ) : null}
             </View>
 
             {/* Compact Portfolio Links */}
-            {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 && (
+            {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 ? (
               <View style={styles.portfolioLinks}>
                 {basicInfo.portfolioLinks.map((link, index) => (
                   <View key={`portfolio-${index}`} style={styles.portfolioLink}>
@@ -397,24 +397,24 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
                   </View>
                 ))}
               </View>
-            )}
+            ) : null}
           </View>
         </View>
 
         {/* Compact Summary Section */}
-        {basicInfo.summary && (
+        {basicInfo.summary ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Summary</Text>
             <Text style={styles.summary}>{basicInfo.summary}</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Compact Two Column Layout */}
         <View style={styles.twoColumnContainer}>
           {/* Left Column */}
           <View style={styles.column}>
             {/* Compact Experience Section */}
-            {experience && experience.length > 0 && (
+            {experience && experience.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Experience</Text>
                 <View style={styles.sectionContent}>
@@ -434,10 +434,10 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
                   ))}
                 </View>
               </View>
-            )}
+            ) : null}
 
             {/* Compact Education Section */}
-            {education && education.length > 0 && (
+            {education && education.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Education</Text>
                 <View style={styles.sectionContent}>
@@ -446,7 +446,7 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
                       <View style={styles.itemHeader}>
                         <View style={styles.itemTitleRow}>
                           <Text style={styles.itemTitle}>
-                            {edu.degree} {edu.field && `in ${edu.field}`}
+                            {edu.degree}{edu.field ? ` in ${edu.field}` : ""}
                           </Text>
                           <Text style={styles.itemDate}>
                             {edu.startDate} - {edu.endDate}
@@ -454,18 +454,18 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
                         </View>
                         <Text style={styles.itemSubtitle}>{edu.institution}</Text>
                       </View>
-                      {edu.gpa && <Text style={styles.itemDescription}>GPA: {edu.gpa}</Text>}
+                      {edu.gpa ? <Text style={styles.itemDescription}>GPA: {edu.gpa}</Text> : null}
                     </View>
                   ))}
                 </View>
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Right Column */}
           <View style={styles.column}>
             {/* Compact Projects Section */}
-            {projects && projects.length > 0 && (
+            {projects && projects.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Projects</Text>
                 <View style={styles.sectionContent}>
@@ -473,33 +473,33 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
                     <View key={`proj-${index}`} style={styles.projectItem}>
                       <View style={styles.projectHeader}>
                         <Text style={styles.projectTitle}>{project.name}</Text>
-                        {(project.startDate || project.endDate) && (
+                        {(project.startDate || project.endDate) ? (
                           <Text style={styles.itemDate}>
                             {project.startDate} - {project.endDate || "Present"}
                           </Text>
-                        )}
+                        ) : null}
                       </View>
                       <Text style={styles.projectDescription}>{project.description}</Text>
                       <View style={styles.projectTech}>
-                        {project.technologies.map((tech, techIndex) => (
+                        {(project.technologies || []).map((tech, techIndex) => (
                           <Text key={`tech-${techIndex}`} style={styles.techBadge}>
-                            {tech}
+                            {typeof tech === "string" ? tech : String(tech)}
                           </Text>
                         ))}
                       </View>
-                      {project.link && (
+                      {project.link ? (
                         <Link src={project.link} style={styles.projectLink}>
                           <Text>View →</Text>
                         </Link>
-                      )}
+                      ) : null}
                     </View>
                   ))}
                 </View>
               </View>
-            )}
+            ) : null}
 
             {/* Compact Skills Section */}
-            {skills && skills.length > 0 && (
+            {skills && skills.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Skills</Text>
                 <View style={styles.skillsContainer}>
@@ -510,10 +510,10 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
                   ))}
                 </View>
               </View>
-            )}
+            ) : null}
 
             {/* Compact Languages Section */}
-            {basicInfo.languages && basicInfo.languages.length > 0 && (
+            {basicInfo.languages && basicInfo.languages.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Languages</Text>
                 <View style={styles.skillsContainer}>
@@ -524,25 +524,25 @@ export const GradientPDFTemplate = ({ resumeData }: GradientPDFTemplateProps) =>
                   ))}
                 </View>
               </View>
-            )}
+            ) : null}
 
             {/* Compact Achievements Section */}
-            {achievements && achievements.length > 0 && (
+            {achievements && achievements.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Achievements</Text>
                 <View style={styles.sectionContent}>
                   {achievements.map((achievement, index) => (
                     <View key={`ach-${index}`} style={styles.achievementItem}>
                       <Text style={styles.achievementTitle}>{achievement.title}</Text>
-                      {achievement.date && (
+                      {achievement.date ? (
                         <Text style={styles.achievementDate}>{achievement.date}</Text>
-                      )}
+                      ) : null}
                       <Text style={styles.achievementDescription}>{achievement.description}</Text>
                     </View>
                   ))}
                 </View>
               </View>
-            )}
+            ) : null}
           </View>
         </View>
       </Page>

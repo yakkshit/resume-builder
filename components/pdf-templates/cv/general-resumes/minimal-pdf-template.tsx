@@ -127,43 +127,43 @@ export const MinimalPDFTemplate: React.FC<MinimalPDFTemplateProps> = ({ resumeDa
         {/* Header */}
         <View style={styles.header}>
           {/* Profile Picture */}
-          {basicInfo.profilePicture && (
-            <Image src={basicInfo.profilePicture || "/placeholder.svg"} style={styles.profileImage} cache={false} />
-          )}
+          {basicInfo.profilePicture ? (
+            <Image src={basicInfo.profilePicture} style={styles.profileImage} cache={false} />
+          ) : null}
 
           <View style={styles.headerContent}>
             <Text style={styles.name}>{basicInfo.name}</Text>
             <Text style={styles.title}>{basicInfo.title}</Text>
             <View style={styles.contactInfo}>
-              {basicInfo.email && <Text style={styles.contactItem}>{basicInfo.email}</Text>}
-              {basicInfo.email && basicInfo.phone && <Text style={styles.contactDivider}>•</Text>}
-              {basicInfo.phone && <Text style={styles.contactItem}>{basicInfo.phone}</Text>}
-              {basicInfo.phone && basicInfo.location && <Text style={styles.contactDivider}>•</Text>}
-              {basicInfo.location && <Text style={styles.contactItem}>{basicInfo.location}</Text>}
-              {basicInfo.location && basicInfo.linkedin && <Text style={styles.contactDivider}>•</Text>}
-              {basicInfo.linkedin && <Text style={styles.contactItem}>{basicInfo.linkedin}</Text>}
-              {basicInfo.linkedin && basicInfo.website && <Text style={styles.contactDivider}>•</Text>}
-              {basicInfo.website && <Text style={styles.contactItem}>{basicInfo.website}</Text>}
+              {basicInfo.email ? <Text style={styles.contactItem}>{basicInfo.email}</Text> : null}
+              {basicInfo.email && basicInfo.phone ? <Text style={styles.contactDivider}>•</Text> : null}
+              {basicInfo.phone ? <Text style={styles.contactItem}>{basicInfo.phone}</Text> : null}
+              {basicInfo.phone && basicInfo.location ? <Text style={styles.contactDivider}>•</Text> : null}
+              {basicInfo.location ? <Text style={styles.contactItem}>{basicInfo.location}</Text> : null}
+              {basicInfo.location && basicInfo.linkedin ? <Text style={styles.contactDivider}>•</Text> : null}
+              {basicInfo.linkedin ? <Text style={styles.contactItem}>{basicInfo.linkedin}</Text> : null}
+              {basicInfo.linkedin && basicInfo.website ? <Text style={styles.contactDivider}>•</Text> : null}
+              {basicInfo.website ? <Text style={styles.contactItem}>{basicInfo.website}</Text> : null}
             </View>
 
             {/* Portfolio Links */}
-            {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 && (
+            {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 ? (
               <View style={styles.portfolioLinks}>
                 {basicInfo.portfolioLinks.map((link, index) => (
                   <React.Fragment key={`portfolio-${index}`}>
-                    {index > 0 && <Text style={styles.portfolioDivider}>•</Text>}
+                    {index > 0 ? <Text style={styles.portfolioDivider}>•</Text> : null}
                     <Text style={styles.portfolioLink}>
                       {link.platform}: {link.username || link.url}
                     </Text>
                   </React.Fragment>
                 ))}
               </View>
-            )}
+            ) : null}
           </View>
         </View>
 
         {/* Summary */}
-        {basicInfo.summary && <Text style={styles.summary}>{basicInfo.summary}</Text>}
+        {basicInfo.summary ? <Text style={styles.summary}>{basicInfo.summary}</Text> : null}
 
         {/* Experience */}
         <View style={styles.section}>
@@ -183,31 +183,31 @@ export const MinimalPDFTemplate: React.FC<MinimalPDFTemplateProps> = ({ resumeDa
         </View>
 
         {/* Projects */}
-        {projects && projects.length > 0 && (
+        {projects && projects.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Projects</Text>
             {projects.map((project, index) => (
               <View key={`proj-${index}`} style={styles.experienceItem}>
                 <View style={styles.itemHeader}>
                   <Text style={styles.itemTitle}>{project.name}</Text>
-                  {(project.startDate || project.endDate) && (
+                  {(project.startDate || project.endDate) ? (
                     <Text style={styles.itemDate}>
                       {project.startDate} - {project.endDate || "Present"}
                     </Text>
-                  )}
+                  ) : null}
                 </View>
                 <Text style={styles.itemDescription}>{project.description}</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 3 }}>
-                  {project.technologies.map((tech, techIndex) => (
+                  {(project.technologies || []).map((tech, techIndex) => (
                     <Text key={`tech-${techIndex}`} style={styles.skillBadge}>
-                      {tech}
+                      {typeof tech === "string" ? tech : String(tech)}
                     </Text>
                   ))}
                 </View>
               </View>
             ))}
           </View>
-        )}
+        ) : null}
 
         {/* Education */}
         <View style={styles.section}>
@@ -222,30 +222,30 @@ export const MinimalPDFTemplate: React.FC<MinimalPDFTemplateProps> = ({ resumeDa
               </View>
               <Text style={styles.itemSubtitle}>
                 {edu.degree} {edu.field && `in ${edu.field}`}
-                {edu.gpa && <Text style={{ fontSize: 8 }}> GPA: {edu.gpa}</Text>}
+                {edu.gpa ? <Text style={{ fontSize: 8 }}> GPA: {edu.gpa}</Text> : null}
               </Text>
             </View>
           ))}
         </View>
 
         {/* Achievements */}
-        {achievements && achievements.length > 0 && (
+        {achievements && achievements.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Achievements</Text>
             {achievements.map((achievement, index) => (
               <View key={`ach-${index}`} style={styles.experienceItem}>
                 <View style={styles.itemHeader}>
                   <Text style={styles.itemTitle}>{achievement.title}</Text>
-                  {achievement.date && <Text style={styles.itemDate}>{achievement.date}</Text>}
+                  {achievement.date ? <Text style={styles.itemDate}>{achievement.date}</Text> : null}
                 </View>
                 <Text style={styles.itemDescription}>{achievement.description}</Text>
               </View>
             ))}
           </View>
-        )}
+        ) : null}
 
         {/* Languages */}
-        {basicInfo.languages && basicInfo.languages.length > 0 && (
+        {basicInfo.languages && basicInfo.languages.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Languages</Text>
             <View style={styles.skillsContainer}>
@@ -256,7 +256,7 @@ export const MinimalPDFTemplate: React.FC<MinimalPDFTemplateProps> = ({ resumeDa
               ))}
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* Skills */}
         <View style={styles.section}>

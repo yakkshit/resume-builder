@@ -124,22 +124,22 @@ export const ClassicPDFTemplate: React.FC<ClassicPDFTemplateProps> = ({ resumeDa
         {/* Header */}
         <View style={styles.header}>
           {/* Profile Picture */}
-          {basicInfo.profilePicture && (
-            <Image src={basicInfo.profilePicture || "/placeholder.svg"} style={styles.profileImage} cache={false} />
-          )}
+          {basicInfo.profilePicture ? (
+            <Image src={basicInfo.profilePicture} style={styles.profileImage} cache={false} />
+          ) : null}
 
           <Text style={styles.name}>{basicInfo.name}</Text>
           <Text style={styles.title}>{basicInfo.title}</Text>
           <View style={styles.contactInfo}>
-            {basicInfo.email && <Text style={styles.contactItem}>{basicInfo.email}</Text>}
-            {basicInfo.phone && <Text style={styles.contactItem}>{basicInfo.phone}</Text>}
-            {basicInfo.location && <Text style={styles.contactItem}>{basicInfo.location}</Text>}
-            {basicInfo.linkedin && <Text style={styles.contactItem}>LinkedIn: {basicInfo.linkedin}</Text>}
-            {basicInfo.website && <Text style={styles.contactItem}>{basicInfo.website}</Text>}
+            {basicInfo.email ? <Text style={styles.contactItem}>{basicInfo.email}</Text> : null}
+            {basicInfo.phone ? <Text style={styles.contactItem}>{basicInfo.phone}</Text> : null}
+            {basicInfo.location ? <Text style={styles.contactItem}>{basicInfo.location}</Text> : null}
+            {basicInfo.linkedin ? <Text style={styles.contactItem}>LinkedIn: {basicInfo.linkedin}</Text> : null}
+            {basicInfo.website ? <Text style={styles.contactItem}>{basicInfo.website}</Text> : null}
           </View>
 
           {/* Portfolio Links */}
-          {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 && (
+          {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 ? (
             <View style={styles.portfolioLinks}>
               {basicInfo.portfolioLinks.map((link, index) => (
                 <Text key={`portfolio-${index}`} style={styles.portfolioLink}>
@@ -147,16 +147,16 @@ export const ClassicPDFTemplate: React.FC<ClassicPDFTemplateProps> = ({ resumeDa
                 </Text>
               ))}
             </View>
-          )}
+          ) : null}
         </View>
 
         {/* Summary */}
-        {basicInfo.summary && (
+        {basicInfo.summary ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Professional Summary</Text>
             <Text style={styles.summary}>{basicInfo.summary}</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Experience */}
         <View style={styles.section}>
@@ -176,32 +176,32 @@ export const ClassicPDFTemplate: React.FC<ClassicPDFTemplateProps> = ({ resumeDa
         </View>
 
         {/* Projects */}
-        {projects && projects.length > 0 && (
+        {projects && projects.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Projects</Text>
             {projects.map((project, index) => (
               <View key={`proj-${index}`} style={styles.experienceItem}>
                 <View style={styles.itemHeader}>
                   <Text style={styles.itemTitle}>{project.name}</Text>
-                  {(project.startDate || project.endDate) && (
+                  {(project.startDate || project.endDate) ? (
                     <Text style={styles.itemDate}>
                       {project.startDate} - {project.endDate || "Present"}
                     </Text>
-                  )}
+                  ) : null}
                 </View>
                 <Text style={styles.itemDescription}>{project.description}</Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 3 }}>
-                  {project.technologies.map((tech, techIndex) => (
+                  {(project.technologies || []).map((tech, techIndex) => (
                     <Text key={`tech-${techIndex}`} style={{ fontSize: 8, marginRight: 5 }}>
-                      {tech}
-                      {techIndex < project.technologies.length - 1 ? "," : ""}
+                      {typeof tech === "string" ? tech : String(tech)}
+                      {techIndex < (project.technologies || []).length - 1 ? "," : ""}
                     </Text>
                   ))}
                 </View>
               </View>
             ))}
           </View>
-        )}
+        ) : null}
 
         {/* Education */}
         <View style={styles.section}>
@@ -215,31 +215,30 @@ export const ClassicPDFTemplate: React.FC<ClassicPDFTemplateProps> = ({ resumeDa
                 </Text>
               </View>
               <Text style={styles.itemSubtitle}>
-                {edu.degree} {edu.field && `in ${edu.field}`}
-                {edu.gpa && `, GPA: ${edu.gpa}`}
+                {edu.degree}{edu.field ? ` in ${edu.field}` : ""}{edu.gpa ? `, GPA: ${edu.gpa}` : ""}
               </Text>
             </View>
           ))}
         </View>
 
         {/* Achievements */}
-        {achievements && achievements.length > 0 && (
+        {achievements && achievements.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Achievements</Text>
             {achievements.map((achievement, index) => (
               <View key={`ach-${index}`} style={styles.experienceItem}>
                 <View style={styles.itemHeader}>
                   <Text style={styles.itemTitle}>{achievement.title}</Text>
-                  {achievement.date && <Text style={styles.itemDate}>{achievement.date}</Text>}
+                  {achievement.date ? <Text style={styles.itemDate}>{achievement.date}</Text> : null}
                 </View>
                 <Text style={styles.itemDescription}>{achievement.description}</Text>
               </View>
             ))}
           </View>
-        )}
+        ) : null}
 
         {/* Languages */}
-        {basicInfo.languages && basicInfo.languages.length > 0 && (
+        {basicInfo.languages && basicInfo.languages.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Languages</Text>
             <View style={styles.skillsContainer}>
@@ -251,7 +250,7 @@ export const ClassicPDFTemplate: React.FC<ClassicPDFTemplateProps> = ({ resumeDa
               ))}
             </View>
           </View>
-        )}
+        ) : null}
 
         {/* Skills */}
         <View style={styles.section}>
