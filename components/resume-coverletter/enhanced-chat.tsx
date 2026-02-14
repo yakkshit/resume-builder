@@ -14,6 +14,32 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import type { Message } from "ai"
+import { extractResumeJsonFromMessage, getSuggestedSectionsSummary } from "@/lib/extract-resume-json"
+
+function AssistantMessageContent({ content }: { content: string }) {
+  const update = extractResumeJsonFromMessage(content)
+  const sections = update ? getSuggestedSectionsSummary(update) : []
+  const hasSuggestedChanges = sections.length > 0
+
+  if (!hasSuggestedChanges) {
+    return <div className="whitespace-pre-wrap text-sm break-words">{content}</div>
+  }
+
+  const withoutJsonBlock = content.replace(/```(?:json)?\s*[\s\S]*?```/g, "").trim()
+  return (
+    <div className="space-y-2">
+      {withoutJsonBlock && (
+        <div className="whitespace-pre-wrap text-sm break-words">{withoutJsonBlock}</div>
+      )}
+      <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+        <p className="font-medium text-primary mb-1">Suggested resume updates</p>
+        <p className="text-muted-foreground">
+          {sections.join(" · ")} — use <strong>Apply AI Changes</strong> below to update your resume.
+        </p>
+      </div>
+    </div>
+  )
+}
 
 interface EnhancedChatProps {
   messages: Message[]
@@ -186,7 +212,6 @@ export default function EnhancedChat({
                   >
                     {message.role === "assistant" && (
                       <Avatar className="h-8 w-8 mt-1 flex-shrink-0">
-                        <AvatarImage src="/ai-avatar.png" alt="AI" />
                         <AvatarFallback className="bg-primary text-primary-foreground">
                           <Bot className="h-4 w-4" />
                         </AvatarFallback>
@@ -201,7 +226,7 @@ export default function EnhancedChat({
                           : "bg-muted/50 border border-border/50 mr-10",
                       )}
                     >
-                      <div className="whitespace-pre-wrap text-sm break-words">{message.content}</div>
+                      <AssistantMessageContent content={message.content} />
                       <div className="mt-1 text-xs opacity-70 text-right">
                         {formatTimestamp(new Date(message.createdAt || Date.now()))}
                       </div>
@@ -209,7 +234,6 @@ export default function EnhancedChat({
 
                     {message.role === "user" && (
                       <Avatar className="h-8 w-8 mt-1 flex-shrink-0">
-                        <AvatarImage src="/user-avatar.png" alt="User" />
                         <AvatarFallback className="bg-secondary text-secondary-foreground">
                           <User className="h-4 w-4" />
                         </AvatarFallback>
@@ -226,7 +250,6 @@ export default function EnhancedChat({
                     className="flex gap-3 max-w-full"
                   >
                     <Avatar className="h-8 w-8 mt-1">
-                      <AvatarImage src="/ai-avatar.png" alt="AI" />
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         <Bot className="h-4 w-4" />
                       </AvatarFallback>

@@ -3,7 +3,7 @@
 import type React from "react";
 
 import { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react";
+import { useChat } from "@ai-sdk/react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -56,6 +56,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { resumeTemplates } from "@/components/pdf-templates";
 import Link from "next/link";
 import EnhancedChat from "@/components/resume-coverletter/enhanced-chat";
+import { extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
 import LoadingScreen from "@/components/resume-coverletter/loading-screen";
 
 // Import the correct components
@@ -297,192 +298,106 @@ export default function ResumePage() {
     }
   };
 
-  // Fix the applyAiChanges function to properly extract and apply JSON changes from AI chat
   const applyAiChanges = () => {
-    // Find the last assistant message
-    const lastAssistantMessage = [...messages]
-      .reverse()
-      .find((m) => m.role === "assistant");
-    if (!lastAssistantMessage) return;
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    if (!lastAssistant?.content) return;
 
-    try {
-      // Improved regex to better match JSON in the message, handling multiline JSON blocks
-      const regex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/;
-      const match = lastAssistantMessage.content.match(regex);
+    const suggestedChanges = extractResumeJsonFromMessage(lastAssistant.content);
 
-      if (match && match[1]) {
-        try {
-          const suggestedChanges = JSON.parse(match[1].trim());
-          console.log("Parsed AI suggestions:", suggestedChanges);
-
-          // Deep merge changes instead of replacing entire objects
-          setResumeData((current) => {
-            const newResumeData = { ...current };
-
-            // Handle basic info properly to preserve profile picture and other fields
-            if (suggestedChanges.basicInfo) {
-              newResumeData.basicInfo = {
-                ...current.basicInfo,
-                ...suggestedChanges.basicInfo,
-              };
-            }
-
-            // Handle skills array properly
-            if (suggestedChanges.skills) {
-              newResumeData.skills = suggestedChanges.skills;
-            }
-
-            // Handle experience array properly
-            if (suggestedChanges.experience) {
-              // If specific experience items are updated, merge them
-              if (Array.isArray(suggestedChanges.experience)) {
-                newResumeData.experience = suggestedChanges.experience.map(
-                  (newExp: Partial<Experience>, index: number) => {
-                    // If there's an existing experience item, merge with it
-                    if (current.experience[index]) {
-                      return { ...current.experience[index], ...newExp };
-                    }
-                    return newExp as Experience;
-                  }
-                );
-              }
-            }
-
-            // Handle education array properly
-            if (suggestedChanges.education) {
-              if (Array.isArray(suggestedChanges.education)) {
-                newResumeData.education = suggestedChanges.education.map(
-                  (newEdu: Partial<Education>, index: number) => {
-                    if (current.education[index]) {
-                      return { ...current.education[index], ...newEdu };
-                    }
-                    return newEdu as Education;
-                  }
-                );
-              }
-            }
-
-            // Handle projects array properly
-            if (suggestedChanges.projects) {
-              if (Array.isArray(suggestedChanges.projects)) {
-                newResumeData.projects = suggestedChanges.projects.map(
-                  (newProj: Partial<Project>, index: number) => {
-                    if (current.projects && current.projects[index]) {
-                      return { ...current.projects[index], ...newProj };
-                    }
-                    return newProj as Project;
-                  }
-                );
-              }
-            }
-
-            // Handle achievements array properly
-            if (suggestedChanges.achievements) {
-              if (Array.isArray(suggestedChanges.achievements)) {
-                newResumeData.achievements = suggestedChanges.achievements.map(
-                  (newAch: Partial<Achievement>, index: number) => {
-                    if (current.achievements && current.achievements[index]) {
-                      return { ...current.achievements[index], ...newAch };
-                    }
-                    return newAch as Achievement;
-                  }
-                );
-              }
-            }
-
-            console.log("Updated resume data:", newResumeData);
-            return newResumeData;
-          });
-
-          toast({
-            title: "AI changes applied",
-            description:
-              "The suggested changes have been applied to your resume.",
-          });
-        } catch (jsonError) {
-          console.error(
-            "JSON parsing error:",
-            jsonError,
-            "Raw JSON:",
-            match[1]
-          );
-          toast({
-            title: "Error parsing JSON",
-            description:
-              "The AI suggestion contains invalid JSON. Please try again.",
-            variant: "destructive",
-          });
-        }
-      } else {
-        // Try to find JSON without code blocks
-        const jsonRegex = /\{[\s\S]*?\}/g;
-        const jsonMatches = lastAssistantMessage.content.match(jsonRegex);
-
-        if (jsonMatches) {
-          // Try each potential JSON match
-          for (const potentialJson of jsonMatches) {
-            try {
-              const suggestedChanges = JSON.parse(potentialJson);
-
-              // Check if this is a valid resume change (has at least one expected key)
-              const validKeys = [
-                "basicInfo",
-                "experience",
-                "education",
-                "skills",
-                "projects",
-                "achievements",
-              ];
-              if (validKeys.some((key) => key in suggestedChanges)) {
-                // Apply the changes using the same logic as above
-                setResumeData((current) => {
-                  const newResumeData = { ...current };
-
-                  if (suggestedChanges.basicInfo) {
-                    newResumeData.basicInfo = {
-                      ...current.basicInfo,
-                      ...suggestedChanges.basicInfo,
-                    };
-                  }
-
-                  if (suggestedChanges.skills) {
-                    newResumeData.skills = suggestedChanges.skills;
-                  }
-
-                  // Handle other sections similarly...
-
-                  return newResumeData;
-                });
-
-                toast({
-                  title: "AI changes applied",
-                  description:
-                    "The suggested changes have been applied to your resume.",
-                });
-
-                return; // Exit after successfully applying changes
-              }
-            } catch (e) {
-              // This wasn't valid JSON or wasn't a resume change, continue to next match
-              continue;
-            }
-          }
-        }
-
-        toast({
-          title: "No changes found",
-          description: "No applicable changes were found in the AI response.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Failed to parse AI suggestions", error);
+    if (!suggestedChanges) {
       toast({
-        title: "Error applying changes",
-        description: "There was an error applying the AI suggestions.",
+        title: "No changes found",
+        description: "No applicable resume changes were found in the last message. Try asking e.g. “Update my summary” or “Tailor my resume to this job.”",
         variant: "destructive",
       });
+      return;
     }
+
+    setResumeData((current) => {
+      const next = { ...current };
+
+      if (suggestedChanges.basicInfo && typeof suggestedChanges.basicInfo === "object") {
+        const b = suggestedChanges.basicInfo as Record<string, unknown>;
+        next.basicInfo = { ...current.basicInfo };
+        if (typeof b.summary === "string") next.basicInfo.summary = b.summary;
+        if (typeof b.name === "string") next.basicInfo.name = b.name;
+        if (typeof b.title === "string") next.basicInfo.title = b.title;
+        if (typeof b.email === "string") next.basicInfo.email = b.email;
+        if (typeof b.phone === "string") next.basicInfo.phone = b.phone;
+        if (typeof b.location === "string") next.basicInfo.location = b.location;
+        if (typeof b.linkedin === "string") next.basicInfo.linkedin = b.linkedin;
+        if (typeof b.website === "string") next.basicInfo.website = b.website;
+        if (Array.isArray(b.languages)) next.basicInfo.languages = b.languages.map(String);
+      }
+
+      if (Array.isArray(suggestedChanges.skills)) {
+        next.skills = suggestedChanges.skills.map((s) => (typeof s === "string" ? s : String(s)));
+      }
+
+      if (Array.isArray(suggestedChanges.experience)) {
+        next.experience = suggestedChanges.experience.map((newExp: unknown, i: number) => {
+          const e = newExp as Record<string, unknown>;
+          const prev = current.experience[i];
+          return {
+            company: typeof e.company === "string" ? e.company : prev?.company ?? "",
+            position: typeof e.position === "string" ? e.position : prev?.position ?? "",
+            startDate: typeof e.startDate === "string" ? e.startDate : prev?.startDate ?? "",
+            endDate: typeof e.endDate === "string" ? e.endDate : prev?.endDate ?? "",
+            description: typeof e.description === "string" ? e.description : prev?.description ?? "",
+            highlights: Array.isArray(e.highlights) ? e.highlights.map(String) : prev?.highlights ?? [],
+          };
+        });
+      }
+
+      if (Array.isArray(suggestedChanges.education)) {
+        next.education = suggestedChanges.education.map((newEdu: unknown, i: number) => {
+          const e = newEdu as Record<string, unknown>;
+          const prev = current.education[i];
+          return {
+            institution: typeof e.institution === "string" ? e.institution : prev?.institution ?? "",
+            degree: typeof e.degree === "string" ? e.degree : prev?.degree ?? "",
+            field: typeof e.field === "string" ? e.field : prev?.field ?? "",
+            startDate: typeof e.startDate === "string" ? e.startDate : prev?.startDate ?? "",
+            endDate: typeof e.endDate === "string" ? e.endDate : prev?.endDate ?? "",
+            gpa: typeof e.gpa === "string" ? e.gpa : prev?.gpa ?? "",
+          };
+        });
+      }
+
+      if (Array.isArray(suggestedChanges.projects)) {
+        next.projects = suggestedChanges.projects.map((newP: unknown, i: number) => {
+          const p = newP as Record<string, unknown>;
+          const prev = current.projects?.[i];
+          return {
+            name: typeof p.name === "string" ? p.name : prev?.name ?? "",
+            description: typeof p.description === "string" ? p.description : prev?.description ?? "",
+            technologies: Array.isArray(p.technologies) ? p.technologies.map(String) : prev?.technologies ?? [],
+            link: typeof p.link === "string" ? p.link : prev?.link,
+            startDate: typeof p.startDate === "string" ? p.startDate : prev?.startDate,
+            endDate: typeof p.endDate === "string" ? p.endDate : prev?.endDate,
+          };
+        });
+      }
+
+      if (Array.isArray(suggestedChanges.achievements)) {
+        next.achievements = suggestedChanges.achievements.map((newA: unknown, i: number) => {
+          const a = newA as Record<string, unknown>;
+          const prev = current.achievements?.[i];
+          return {
+            title: typeof a.title === "string" ? a.title : prev?.title ?? "",
+            description: typeof a.description === "string" ? a.description : prev?.description ?? "",
+            date: typeof a.date === "string" ? a.date : prev?.date,
+          };
+        });
+      }
+
+      return next;
+    });
+
+    toast({
+      title: "AI changes applied",
+      description: "The suggested changes have been applied to your resume.",
+    });
   };
 
   // Add a function to ensure data consistency between editor and PDF viewer
@@ -987,25 +902,51 @@ export default function ResumePage() {
                             Google Gemini
                           </div>
 
-                          {/* Gemini 2.0 Models */}
+                          {/* Gemini 3 (preview) */}
                           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
-                            Gemini 2.0
+                            Gemini 3 (preview)
                           </div>
-                          <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</SelectItem>
-                          <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
-                          <SelectItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</SelectItem>
+                          <SelectItem value="gemini-3-flash-preview">Gemini 3 Flash Preview</SelectItem>
+                          <SelectItem value="gemini-3-pro-preview">Gemini 3 Pro Preview</SelectItem>
+                          <SelectItem value="gemini-3-pro-image-preview">Gemini 3 Pro Image Preview</SelectItem>
 
-                          {/* Gemini 2.5 Models */}
+                          {/* Gemini 2.5 */}
                           <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
                             Gemini 2.5
                           </div>
                           <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
                           <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
                           <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
+                          <SelectItem value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</SelectItem>
 
-                          {/* OpenAI Models */}
+                          {/* Gemini 2.0 */}
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
+                            Gemini 2.0
+                          </div>
+                          <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</SelectItem>
+                          <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
+                          <SelectItem value="gemini-2.0-flash-001">Gemini 2.0 Flash 001</SelectItem>
+                          <SelectItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</SelectItem>
+                          <SelectItem value="gemini-2.0-pro">Gemini 2.0 Pro</SelectItem>
+
+                          {/* Gemini 1.5 */}
+                          <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
+                          <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
+
+                          {/* OpenAI (GPT-5 + 4) */}
                           <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
                             OpenAI
+                          </div>
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
+                            GPT-5 (roadmap)
+                          </div>
+                          <SelectItem value="gpt-5">GPT-5</SelectItem>
+                          <SelectItem value="gpt-5.2">GPT-5.2</SelectItem>
+                          <SelectItem value="gpt-5.2-instant">GPT-5.2 Instant</SelectItem>
+                          <SelectItem value="gpt-5.3-codex">GPT-5.3 Codex</SelectItem>
+                          <SelectItem value="gpt-5.3-codex-spark">GPT-5.3 Codex Spark</SelectItem>
+                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
+                            GPT-4
                           </div>
                           <SelectItem value="gpt-4o">GPT-4o</SelectItem>
                           <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
@@ -1013,10 +954,15 @@ export default function ResumePage() {
                           <SelectItem value="gpt-4">GPT-4</SelectItem>
                           <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
 
-                          {/* Anthropic Claude Models */}
+                          {/* Anthropic Claude (4/5 + 3) */}
                           <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
                             Anthropic Claude
                           </div>
+                          <SelectItem value="claude-opus-4.6">Claude Opus 4.6</SelectItem>
+                          <SelectItem value="claude-opus-4.5">Claude Opus 4.5</SelectItem>
+                          <SelectItem value="claude-sonnet-5">Claude Sonnet 5</SelectItem>
+                          <SelectItem value="claude-sonnet-4.5">Claude Sonnet 4.5</SelectItem>
+                          <SelectItem value="claude-haiku-4.5">Claude Haiku 4.5</SelectItem>
                           <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet</SelectItem>
                           <SelectItem value="claude-3-5-haiku">Claude 3.5 Haiku</SelectItem>
                           <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
@@ -1026,13 +972,15 @@ export default function ResumePage() {
                           <SelectItem value="claude-2.0">Claude 2.0</SelectItem>
                           <SelectItem value="claude-instant-1.2">Claude Instant 1.2</SelectItem>
 
-                          {/* DeepSeek Models */}
+                          {/* DeepSeek */}
                           <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
                             DeepSeek
                           </div>
                           <SelectItem value="deepseek-chat">DeepSeek Chat</SelectItem>
                           <SelectItem value="deepseek-reasoner">DeepSeek Reasoner</SelectItem>
                           <SelectItem value="deepseek-coder">DeepSeek Coder</SelectItem>
+                          <SelectItem value="deepseek-coder-v2">DeepSeek Coder v2</SelectItem>
+                          <SelectItem value="deepseek-coder-v2-lite">DeepSeek Coder v2 Lite</SelectItem>
 
                           {/* Groq Models (Fast Inference) */}
                           <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
@@ -1044,10 +992,16 @@ export default function ResumePage() {
                           <SelectItem value="mixtral-8x7b-32768">Mixtral 8x7B 32K</SelectItem>
                           <SelectItem value="gemma2-9b-it">Gemma2 9B IT</SelectItem>
 
-                          {/* Mistral Models */}
+                          {/* Mistral (3.x + mini/magistral/devstral) */}
                           <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
                             Mistral
                           </div>
+                          <SelectItem value="mistral-large-3">Mistral Large 3</SelectItem>
+                          <SelectItem value="mistral-medium-3.1">Mistral Medium 3.1</SelectItem>
+                          <SelectItem value="mistral-small-3.2">Mistral Small 3.2</SelectItem>
+                          <SelectItem value="ministral-3-14b">Ministral 3 14B</SelectItem>
+                          <SelectItem value="ministral-3-8b">Ministral 3 8B</SelectItem>
+                          <SelectItem value="devstral-2">Devstral 2</SelectItem>
                           <SelectItem value="mistral-large-latest">Mistral Large</SelectItem>
                           <SelectItem value="mistral-medium-latest">Mistral Medium</SelectItem>
                           <SelectItem value="mistral-small-latest">Mistral Small</SelectItem>
