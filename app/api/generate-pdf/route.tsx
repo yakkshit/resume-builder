@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { spawn } from "node:child_process"
 import path from "node:path"
+import React from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, Template } from "@/lib/types"
 
@@ -16,11 +17,7 @@ function isValidPdfBuffer(buffer: Buffer | Uint8Array): boolean {
   return b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46
 }
 
-/**
- * Generate PDF via subprocess so React and @react-pdf/renderer use a single
- * React instance (avoids "Objects are not valid as a React child" #31).
- * Works in local and production when Node can spawn the script.
- */
+/** Subprocess: works on localhost where Node can run tsx. */
 async function generateViaSubprocess(
   resumeData: ResumeData,
   templateName: string
@@ -55,6 +52,21 @@ async function generateViaSubprocess(
   })
 }
 
+/** In-process: fallback for production (serverless) where subprocess fails. Renderer is bundled so same React. */
+async function generateInProcess(
+  resumeData: ResumeData,
+  templateName: string
+): Promise<Buffer> {
+  const [{ renderToBuffer }, { getResumeTemplate }] = await Promise.all([
+    import("@react-pdf/renderer"),
+    import("@/components/pdf-templates"),
+  ])
+  const PDFTemplate = getResumeTemplate(templateName)
+  const doc = React.createElement(PDFTemplate, { resumeData })
+  const raw = await renderToBuffer(doc)
+  return Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -63,10 +75,15 @@ export async function POST(request: NextRequest) {
     const sanitized = sanitizeResumeData(resumeData)
     const templateName = (template as string) || "modern"
 
-    const pdfBuffer = await generateViaSubprocess(sanitized, templateName)
+    let pdfBuffer: Buffer
+    try {
+      pdfBuffer = await generateViaSubprocess(sanitized, templateName)
+    } catch (_subprocessError) {
+      pdfBuffer = await generateInProcess(sanitized, templateName)
+    }
 
     if (!isValidPdfBuffer(pdfBuffer)) {
-      console.error("PDF script returned invalid output:", pdfBuffer.length, "bytes")
+      console.error("PDF returned invalid output:", pdfBuffer.length, "bytes")
       return NextResponse.json(
         { error: "Failed to generate PDF", details: "Generated file is not a valid PDF" },
         { status: 500 }

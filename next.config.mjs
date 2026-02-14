@@ -19,8 +19,8 @@ const nextConfig = {
       },
     ],
   },
+  // Keep @react-pdf/renderer bundled so in-process fallback shares React (production).
   serverExternalPackages: [
-    '@react-pdf/renderer',
     '@react-pdf/primitives',
     '@react-pdf/layout',
     '@react-pdf/pdfkit',
