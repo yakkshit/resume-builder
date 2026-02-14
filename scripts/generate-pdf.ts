@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   const templateName = (template as string) || "modern"
   const PDFTemplate = getResumeTemplate(templateName)
   const doc = createElement(PDFTemplate, { resumeData: sanitized })
-  const raw = await renderToBuffer(doc)
+  const raw = await renderToBuffer(doc as any)
   const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer)
 
   if (!isPdfBuffer(buffer)) {
