@@ -8,7 +8,12 @@ export function sanitizeResumeData(data: ResumeData): ResumeData {
   const str = (v: unknown): string => {
     if (v == null) return ""
     if (typeof v === "string") return v
-    if (typeof v === "number") return String(v)
+    if (typeof v === "number" || typeof v === "boolean") return String(v)
+    // React elements and other objects must never reach <Text> (causes React #31 in production)
+    if (typeof v === "object") {
+      if ("$$typeof" in (v as object)) return ""
+      return ""
+    }
     return ""
   }
 
