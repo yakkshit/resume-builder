@@ -39,7 +39,7 @@ const nextConfig = {
   },
 }
 
-mergeConfig(nextConfig, userConfig)
+mergeConfig(nextConfig, userConfig, { swcMinify: false })
 
 function mergeConfig(nextConfig, userConfig) {
   if (!userConfig) {
