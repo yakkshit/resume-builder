@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { spawn } from "node:child_process"
 import path from "node:path"
-import React from "react"
+import React, { JSXElementConstructor, ReactElement } from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, Template } from "@/lib/types"
+import { DocumentProps } from "@react-pdf/renderer"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -63,8 +64,18 @@ async function generateInProcess(
   ])
   const PDFTemplate = getResumeTemplate(templateName)
   const doc = React.createElement(PDFTemplate, { resumeData })
-  const raw = await renderToBuffer(doc)
+  const raw = await renderToBuffer(doc as ReactElement<DocumentProps, string | JSXElementConstructor<any>>)
   return Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+}
+
+/** Strip non-JSON values (e.g. React elements) so only plain data reaches PDF. Prevents React #31 in production. */
+function normalizeResumeData(data: unknown): ResumeData {
+  if (data == null || typeof data !== "object") return {} as ResumeData
+  try {
+    return JSON.parse(JSON.stringify(data)) as ResumeData
+  } catch {
+    return data as ResumeData
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -72,7 +83,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { resumeData, template } = body as { resumeData: ResumeData; template?: Template }
 
-    const sanitized = sanitizeResumeData(resumeData)
+    const normalized = normalizeResumeData(resumeData)
+    const sanitized = sanitizeResumeData(normalized)
     const templateName = (template as string) || "modern"
 
     let pdfBuffer: Buffer

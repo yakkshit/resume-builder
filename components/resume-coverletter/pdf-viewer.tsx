@@ -1,5 +1,4 @@
-"use client"
-
+// "use client"
 import { useState, useEffect } from "react"
 import type { ResumeData, Template } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -26,7 +25,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
   }, [])
 
   const fetchPdfBlob = async (): Promise<Blob> => {
-    const base = typeof window !== "undefined" ? window.location.origin : ""
+    const base = typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
     const response = await fetch(`${base}/api/generate-pdf`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
