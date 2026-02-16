@@ -1,4 +1,4 @@
-"use client"
+// "use client"
 
 import { PDFViewer as ReactPDFViewer } from "@react-pdf/renderer"
 import type { ResumeData, Template } from "@/lib/types"
