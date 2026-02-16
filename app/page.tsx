@@ -37,7 +37,7 @@ import {
   TableIcon as TableOfContents,
   RotateCw,
 } from "lucide-react";
-import PDFViewer from "@/components/resume-coverletter/pdf-viewer";
+// import PDFViewer from "@/components/resume-coverletter/pdf-viewer";
 import ResumeEditor from "@/components/resume-coverletter/resume-editor";
 import { defaultResumeData } from "@/lib/default-resume-data";
 import type {
@@ -62,6 +62,12 @@ import LoadingScreen from "@/components/resume-coverletter/loading-screen";
 // Import the correct components
 import InfiniteMarquee from "@/components/ui/infinite-marquee";
 import { galleryItems } from "@/lib/gallery-data";
+import dynamic from "next/dynamic";
+
+const PdfPreviewClient = dynamic(
+  () => import("@/components/resume-coverletter/pdf-viewer"),
+  { ssr: false } // important
+);
 
 export default function ResumePage() {
   const { toast } = useToast();
@@ -1660,7 +1666,7 @@ export default function ResumePage() {
             <div className="space-y-6">
 
               <div className="h-[800px]">
-                <PDFViewer resumeData={resumeData} template={template} />
+                <PdfPreviewClient resumeData={resumeData} template={template} />
               </div>
 
               <Card className="p-2 border shadow-md">
