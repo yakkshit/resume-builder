@@ -3,7 +3,8 @@
 import type React from "react";
 
 import { useState, useRef, useEffect } from "react";
-import { useChat } from "@ai-sdk/react";
+import { useChat } from "ai/react";
+import type { Message } from "ai";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -37,7 +38,7 @@ import {
   TableIcon as TableOfContents,
   RotateCw,
 } from "lucide-react";
-import PDFViewer from "@/components/resume-coverletter/pdf-viewer";
+// import PDFViewer from "@/components/resume-coverletter/pdf-viewer";
 import ResumeEditor from "@/components/resume-coverletter/resume-editor";
 import { defaultResumeData } from "@/lib/default-resume-data";
 import type {
@@ -62,6 +63,12 @@ import LoadingScreen from "@/components/resume-coverletter/loading-screen";
 // Import the correct components
 import InfiniteMarquee from "@/components/ui/infinite-marquee";
 import { galleryItems } from "@/lib/gallery-data";
+import dynamic from "next/dynamic";
+
+const PdfPreviewClient = dynamic(
+  () => import("@/components/resume-coverletter/pdf-viewer"),
+  { ssr: false } // important
+);
 
 export default function ResumePage() {
   const { toast } = useToast();
@@ -298,7 +305,7 @@ export default function ResumePage() {
   };
 
   const applyAiChanges = () => {
-    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant") as any;
     if (!lastAssistant?.content) return;
 
     const suggestedChanges = extractResumeJsonFromMessage(lastAssistant.content);
@@ -1095,16 +1102,16 @@ export default function ResumePage() {
                           id="api-key"
                           type={showApiKey ? "text" : "password"}
                           placeholder={`Enter your ${selectedModel.startsWith("gemini") ? "Google" :
-                              selectedModel.startsWith("gpt") ? "OpenAI" :
-                                selectedModel.startsWith("claude") ? "Anthropic" :
-                                  selectedModel.startsWith("deepseek") ? "DeepSeek" :
-                                    selectedModel.startsWith("llama") || selectedModel.startsWith("mixtral") || selectedModel.startsWith("gemma") ? "Groq" :
-                                      selectedModel.startsWith("mistral") ? "Mistral" :
-                                        selectedModel.startsWith("meta-llama") ? "Together.ai" :
-                                          selectedModel.startsWith("command") ? "Cohere" :
-                                            selectedModel.startsWith("fireworks") ? "Fireworks" :
-                                              selectedModel.startsWith("huggingface") ? "Hugging Face" :
-                                                selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"
+                            selectedModel.startsWith("gpt") ? "OpenAI" :
+                              selectedModel.startsWith("claude") ? "Anthropic" :
+                                selectedModel.startsWith("deepseek") ? "DeepSeek" :
+                                  selectedModel.startsWith("llama") || selectedModel.startsWith("mixtral") || selectedModel.startsWith("gemma") ? "Groq" :
+                                    selectedModel.startsWith("mistral") ? "Mistral" :
+                                      selectedModel.startsWith("meta-llama") ? "Together.ai" :
+                                        selectedModel.startsWith("command") ? "Cohere" :
+                                          selectedModel.startsWith("fireworks") ? "Fireworks" :
+                                            selectedModel.startsWith("huggingface") ? "Hugging Face" :
+                                              selectedModel === "lingo-ai" ? "Lingo AI" : "Provider"
                             } API key`}
                           value={apiKey}
                           onChange={(e) => setApiKey(e.target.value)}
@@ -1628,7 +1635,7 @@ export default function ResumePage() {
 
                     {/* Enhanced Chat Component */}
                     <EnhancedChat
-                      messages={messages}
+                      messages={messages as any}
                       input={input}
                       handleInputChange={handleInputChange}
                       handleSubmit={handleChatSubmit}
@@ -1660,7 +1667,7 @@ export default function ResumePage() {
             <div className="space-y-6">
 
               <div className="h-[800px]">
-                <PDFViewer resumeData={resumeData} template={template} />
+                <PdfPreviewClient resumeData={resumeData} template={template} />
               </div>
 
               <Card className="p-2 border shadow-md">
