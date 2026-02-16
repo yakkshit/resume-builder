@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { spawn } from "node:child_process"
 import path from "node:path"
-import React, { JSXElementConstructor, ReactElement } from "react"
+import React from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, Template } from "@/lib/types"
-import { DocumentProps } from "@react-pdf/renderer"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -35,14 +34,21 @@ async function generateViaSubprocess(
     })
 
     const chunks: Buffer[] = []
+    const errors: Buffer[] = []
+    
     child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk))
-    child.stderr.on("data", (data: Buffer) => console.error("PDF script stderr:", data.toString()))
+    child.stderr.on("data", (data: Buffer) => {
+      errors.push(data)
+      console.error("PDF script stderr:", data.toString())
+    })
+    
     child.on("error", reject)
     child.on("close", (code) => {
       if (code === 0) {
         resolve(Buffer.concat(chunks))
       } else {
-        reject(new Error(`PDF script exited with code ${code}`))
+        const errorMsg = Buffer.concat(errors).toString()
+        reject(new Error(`PDF script exited with code ${code}. Error: ${errorMsg}`))
       }
     })
 
@@ -53,27 +59,47 @@ async function generateViaSubprocess(
   })
 }
 
-/** In-process: fallback for production (serverless) where subprocess fails. Renderer is bundled so same React. */
+/** 
+ * In-process: fallback for production (serverless) where subprocess fails. 
+ * CRITICAL: Template must be server-safe (no "use client", no hooks, no context)
+ */
 async function generateInProcess(
   resumeData: ResumeData,
   templateName: string
 ): Promise<Buffer> {
-  const [{ renderToBuffer }, { getResumeTemplate }] = await Promise.all([
-    import("@react-pdf/renderer"),
-    import("@/components/pdf-templates"),
-  ])
-  const PDFTemplate = getResumeTemplate(templateName)
-  const doc = React.createElement(PDFTemplate, { resumeData })
-  const raw = await renderToBuffer(doc as ReactElement<DocumentProps, string | JSXElementConstructor<any>>)
-  return Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+  try {
+    // Dynamic imports to avoid bundling issues
+    const { renderToBuffer } = await import("@react-pdf/renderer")
+    const { getResumeTemplate } = await import("@/components/pdf-templates")
+    
+    const PDFTemplate = getResumeTemplate(templateName)
+    
+    // Ensure we're passing plain data, not React elements
+    const cleanData = JSON.parse(JSON.stringify(resumeData))
+    
+    // Create element properly - this is key!
+    const doc = React.createElement(PDFTemplate, { resumeData: cleanData })
+    
+    // Render without type casting to catch errors early
+    const raw = await renderToBuffer(doc as any)
+    
+    return Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+  } catch (error) {
+    console.error("In-process PDF generation failed:", error)
+    throw new Error(
+      `In-process generation failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    )
+  }
 }
 
-/** Strip non-JSON values (e.g. React elements) so only plain data reaches PDF. Prevents React #31 in production. */
+/** Strip non-JSON values (e.g. React elements) so only plain data reaches PDF. */
 function normalizeResumeData(data: unknown): ResumeData {
   if (data == null || typeof data !== "object") return {} as ResumeData
   try {
+    // Deep clone to remove any non-serializable values
     return JSON.parse(JSON.stringify(data)) as ResumeData
-  } catch {
+  } catch (error) {
+    console.error("Failed to normalize resume data:", error)
     return data as ResumeData
   }
 }
@@ -83,24 +109,58 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { resumeData, template } = body as { resumeData: ResumeData; template?: Template }
 
+    if (!resumeData) {
+      return NextResponse.json(
+        { error: "Missing resumeData in request body" },
+        { status: 400 }
+      )
+    }
+
     const normalized = normalizeResumeData(resumeData)
     const sanitized = sanitizeResumeData(normalized)
     const templateName = (template as string) || "modern"
 
+    console.log(`Generating PDF with template: ${templateName}`)
+
     let pdfBuffer: Buffer
+    let method = "unknown"
+    
     try {
       pdfBuffer = await generateViaSubprocess(sanitized, templateName)
-    } catch (_subprocessError) {
-      pdfBuffer = await generateInProcess(sanitized, templateName)
+      method = "subprocess"
+      console.log("PDF generated via subprocess")
+    } catch (subprocessError) {
+      console.log("Subprocess failed, trying in-process:", subprocessError)
+      try {
+        pdfBuffer = await generateInProcess(sanitized, templateName)
+        method = "in-process"
+        console.log("PDF generated in-process")
+      } catch (inProcessError) {
+        console.error("Both methods failed!")
+        console.error("Subprocess error:", subprocessError)
+        console.error("In-process error:", inProcessError)
+        throw inProcessError
+      }
     }
 
     if (!isValidPdfBuffer(pdfBuffer)) {
-      console.error("PDF returned invalid output:", pdfBuffer.length, "bytes")
+      console.error("PDF validation failed:", {
+        size: pdfBuffer.length,
+        method,
+        firstBytes: Array.from(pdfBuffer.slice(0, 10))
+      })
       return NextResponse.json(
-        { error: "Failed to generate PDF", details: "Generated file is not a valid PDF" },
+        { 
+          error: "Failed to generate PDF", 
+          details: "Generated file is not a valid PDF",
+          method,
+          size: pdfBuffer.length
+        },
         { status: 500 }
       )
     }
+
+    console.log(`Valid PDF generated (${pdfBuffer.length} bytes) via ${method}`)
 
     return new Response(new Uint8Array(pdfBuffer), {
       status: 200,
@@ -112,10 +172,17 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error generating PDF:", error)
+    
+    // Log full error stack for debugging
+    if (error instanceof Error) {
+      console.error("Error stack:", error.stack)
+    }
+    
     return NextResponse.json(
       {
         error: "Failed to generate PDF",
         details: error instanceof Error ? error.message : "Unknown error",
+        stack: process.env.NODE_ENV === "development" && error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     )
