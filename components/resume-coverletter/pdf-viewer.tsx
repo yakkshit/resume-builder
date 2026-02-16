@@ -1,10 +1,12 @@
-// "use client"
+"use client"
 import { useState, useEffect } from "react"
+import { PDFViewer as ReactPDFViewer, pdf } from "@react-pdf/renderer"
 import type { ResumeData, Template } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Download, RefreshCw, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card } from "@/components/ui/card"
+import { getResumeTemplate } from "@/components/pdf-templates"
 
 interface PDFViewerProps {
   resumeData: ResumeData
@@ -13,84 +15,27 @@ interface PDFViewerProps {
 
 export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
   const [isClient, setIsClient] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
 
-  // Only set client flag
+  // Only render on client side
   useEffect(() => {
     setIsClient(true)
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 800)
+    return () => clearTimeout(timer)
   }, [])
 
-  const fetchPdfBlob = async (): Promise<Blob> => {
-    const base = typeof window !== "undefined" ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    const response = await fetch(`${base}/api/generate-pdf`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resumeData, template }),
-    })
-
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}))
-      throw new Error(errData.details || errData.error || "Failed to generate PDF")
-    }
-
-    const arrayBuffer = await response.arrayBuffer()
-    if (arrayBuffer.byteLength < 200) {
-      throw new Error("PDF response too small")
-    }
-    const header = new TextDecoder().decode(arrayBuffer.slice(0, 4))
-    if (header !== "%PDF") {
-      throw new Error("Invalid PDF: server did not return a PDF file")
-    }
-
-    return new Blob([arrayBuffer], { type: "application/pdf" })
-  }
-
-  const generatePdfUrl = async () => {
-    if (!isClient) return
-
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl)
-        setPdfUrl(null)
-      }
-
-      const blob = await fetchPdfBlob()
-      const url = URL.createObjectURL(blob)
-      setPdfUrl(url)
-    } catch (err) {
-      console.error("Error generating PDF preview:", err)
-      const message = err instanceof Error ? err.message : "Failed to generate PDF preview"
-      setError(message)
-      toast({
-        title: "Preview Error",
-        description: message,
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Generate PDF when client is ready or data changes
+  // Show loading state briefly when data or template changes to ensure refresh
   useEffect(() => {
-    if (isClient) {
-      generatePdfUrl()
-    }
-
-    // Cleanup on unmount
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl)
-      }
-    }
-  }, [isClient, resumeData, template])
+    setIsLoading(true)
+    const timer = setTimeout(() => {
+      setIsLoading(false)
+    }, 800)
+    return () => clearTimeout(timer)
+  }, [resumeData, template])
 
   const handleDownload = async () => {
     if (!isClient) return
@@ -98,7 +43,8 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
     try {
       setIsDownloading(true)
 
-      const blob = await fetchPdfBlob()
+      const PDFTemplate = getResumeTemplate(template as string)
+      const blob = await pdf(<PDFTemplate resumeData={resumeData} />).toBlob()
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
       const baseName = (resumeData.basicInfo?.name || "resume").replace(/\s+/g, "-").toLowerCase()
@@ -131,7 +77,14 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
   }
 
   const handleRefresh = () => {
-    generatePdfUrl()
+    setIsLoading(true)
+    setTimeout(() => {
+      setIsLoading(false)
+      toast({
+        title: "Refreshed",
+        description: "PDF preview has been refreshed.",
+      })
+    }, 500)
   }
 
   if (!isClient) {
@@ -146,6 +99,8 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
       </Card>
     )
   }
+
+  const PDFTemplate = getResumeTemplate(template as string)
 
   return (
     <Card className="flex flex-col h-full overflow-hidden border-0 shadow-lg">
@@ -168,31 +123,11 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
-        ) : error ? (
-          <div className="absolute inset-0 flex items-center justify-center p-8">
-            <div className="text-center max-w-md space-y-4">
-              <div className="flex justify-center">
-                <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center">
-                  <FileText size={40} className="text-destructive" />
-                </div>
-              </div>
-              <h4 className="text-xl font-semibold">Preview Unavailable</h4>
-              <p className="text-muted-foreground text-sm">{error}</p>
-              <Button onClick={handleDownload} disabled={isDownloading}>
-                <Download size={20} className="mr-2" />
-                Download PDF Instead
-              </Button>
-            </div>
-          </div>
-        ) : pdfUrl ? (
-          <iframe
-            src={pdfUrl}
-            className="w-full h-full border-none"
-            title="PDF Preview"
-          />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-            Initializing PDF preview...
+          <div className="w-full h-full">
+            <ReactPDFViewer style={{ width: "100%", height: "100%", border: "none" }} showToolbar={false}>
+              <PDFTemplate resumeData={resumeData} />
+            </ReactPDFViewer>
           </div>
         )}
       </div>
