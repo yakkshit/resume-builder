@@ -150,12 +150,12 @@ export const MinimalPDFTemplate: React.FC<MinimalPDFTemplateProps> = ({ resumeDa
             {basicInfo.portfolioLinks && basicInfo.portfolioLinks.length > 0 ? (
               <View style={styles.portfolioLinks}>
                 {basicInfo.portfolioLinks.map((link, index) => (
-                  <React.Fragment key={`portfolio-${index}`}>
+                  <View key={`portfolio-${index}`} style={{ flexDirection: "row", alignItems: "center" }}>
                     {index > 0 ? <Text style={styles.portfolioDivider}>•</Text> : null}
                     <Text style={styles.portfolioLink}>
-                      {link.platform}: {link.username || link.url}
+                      {String(link.platform)}: {String(link.username || link.url)}
                     </Text>
-                  </React.Fragment>
+                  </View>
                 ))}
               </View>
             ) : null}
@@ -222,7 +222,7 @@ export const MinimalPDFTemplate: React.FC<MinimalPDFTemplateProps> = ({ resumeDa
               </View>
               <Text style={styles.itemSubtitle}>
                 {edu.degree} {edu.field && `in ${edu.field}`}
-                {edu.gpa ? <Text style={{ fontSize: 8 }}> GPA: {edu.gpa}</Text> : null}
+                {edu.gpa ? ` GPA: ${edu.gpa}` : ""}
               </Text>
             </View>
           ))}

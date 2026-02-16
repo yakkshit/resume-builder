@@ -34,7 +34,7 @@ async function main(): Promise<void> {
   const sanitized = sanitizeResumeData(resumeData)
   const templateName = (template as string) || "modern"
   const PDFTemplate = getResumeTemplate(templateName)
-  const doc = createElement(PDFTemplate, { resumeData: sanitized })
+  const doc = React.createElement(PDFTemplate, { resumeData: sanitized })
   const raw = await renderToBuffer(doc as any)
   const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer)
 

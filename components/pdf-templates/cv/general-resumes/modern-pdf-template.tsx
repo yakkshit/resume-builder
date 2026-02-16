@@ -165,26 +165,24 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
             <View style={styles.contactInfo}>
               {basicInfo.email ? (
                 <View style={styles.contactItem}>
-                  <Text>Email:{" "}
-                    <Link
+                  <Text>Email:{" "}</Text>
+                  <Link
                     src={`mailto:${basicInfo.email}`}
                     style={{ textDecoration: "none", color: "#555" }}
-                    >
-                      {basicInfo.email}
-                    </Link>
-                    </Text>
+                  >
+                    <Text>{String(basicInfo.email)}</Text>
+                  </Link>
                 </View>
               ) : null}
               {basicInfo.phone ? (
                 <View style={styles.contactItem}>
-                  <Text>Phone:{" "}
+                  <Text>Phone:{" "}</Text>
                   <Link
                     src={`tel:${basicInfo.phone}`}
                     style={{ textDecoration: "none", color: "#555" }}
-                    >
-                    {basicInfo.phone}
-                    </Link>
-                  </Text>
+                  >
+                    <Text>{String(basicInfo.phone)}</Text>
+                  </Link>
                 </View>
               ) : null}
               {basicInfo.location ? (
@@ -197,18 +195,18 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
                   <Link
                     src={`https://linkedin.com/in/${basicInfo.linkedin}`}
                     style={{ textDecoration: "none", color: "#555" }}
-                    >
-                  <Text>LinkedIn: {basicInfo.linkedin}</Text>
+                  >
+                    <Text>LinkedIn: {String(basicInfo.linkedin)}</Text>
                   </Link>
                 </View>
               ) : null}
               {basicInfo.website ? (
                 <View style={styles.contactItem}>
-                    <Link
+                  <Link
                     src={basicInfo.website.startsWith("https://") ? basicInfo.website : `https://${basicInfo.website}`}
                     style={{ textDecoration: "none", color: "#555" }}
-                    >
-                  <Text>Website: {basicInfo.website}</Text>
+                  >
+                    <Text>Website: {String(basicInfo.website)}</Text>
                   </Link>
                 </View>
               ) : null}
@@ -220,12 +218,12 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
                 {basicInfo.portfolioLinks.map((link, index) => (
                   <View key={`portfolio-${index}`} style={styles.portfolioLink}>
                     <Link
-                    src={link.url?.startsWith("https://") || link.url?.startsWith("http://") ? link.url : `https://${link.url || link.platform}`}
-                    style={{ textDecoration: "none", color: "#555" }}
+                      src={link.url?.startsWith("https://") || link.url?.startsWith("http://") ? link.url : `https://${link.url || link.platform}`}
+                      style={{ textDecoration: "none", color: "#555" }}
                     >
-                    <Text>
-                      {link.platform}: {link.username || link.url}
-                    </Text>
+                      <Text>
+                        {link.platform}: {link.username || link.url}
+                      </Text>
                     </Link>
                   </View>
                 ))}

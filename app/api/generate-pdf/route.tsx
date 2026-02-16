@@ -62,10 +62,20 @@ async function generateInProcess(
     import("@react-pdf/renderer"),
     import("@/components/pdf-templates"),
   ])
+
   const PDFTemplate = getResumeTemplate(templateName)
-  const doc = React.createElement(PDFTemplate, { resumeData })
-  const raw = await renderToBuffer(doc as ReactElement<DocumentProps, string | JSXElementConstructor<any>>)
-  return Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+
+  // Ensure we pass a component, not an element, if we want to use props correctly.
+  // Or just call the function directly if it's a simple function component.
+  // Using React.createElement is standard, but we'll wrap it to be safe.
+  try {
+    const doc = <PDFTemplate resumeData={resumeData} />
+    const raw = await renderToBuffer(doc as any)
+    return Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
+  } catch (err) {
+    console.error("In-process PDF generation failed:", err)
+    throw err
+  }
 }
 
 /** Strip non-JSON values (e.g. React elements) so only plain data reaches PDF. Prevents React #31 in production. */
