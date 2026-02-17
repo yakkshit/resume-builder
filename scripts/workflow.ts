@@ -143,10 +143,14 @@ async function startWorkflow() {
 
     // Git operations
     try {
-        // 1. Git add
-        execSync("git add .", { stdio: "inherit" });
+        // 1. Update package.json version if changed
+        if (newVersion !== currentVersion) {
+            packageJson.version = newVersion;
+            fs.writeFileSync("package.json", JSON.stringify(packageJson, null, 2));
+            console.log(`✅ Updated package.json to ${newVersion}`);
+        }
 
-        // 2. Fetch modified files for report
+        // 2. Fetch modified files for report (now includes package.json)
         const modifiedFiles = execSync("git status --porcelain", { encoding: "utf-8" })
             .split("\n")
             .filter(line => line.trim())
@@ -162,7 +166,18 @@ async function startWorkflow() {
         // Write the enhanced report back
         fs.writeFileSync(reportPath, enhancedReport);
 
-        // 4. Construct final commit message
+        // 4. Create and switch to branch BEFORE staging/committing
+        console.log(`\n--- Switching to branch ${branchName} ---`);
+        try {
+            execSync(`git checkout -b ${branchName}`, { stdio: "inherit" });
+        } catch (e) {
+            execSync(`git checkout ${branchName}`, { stdio: "inherit" });
+        }
+
+        // 5. Git add (stages everything: package.json, report.md, and previous changes)
+        execSync("git add .", { stdio: "inherit" });
+
+        // 6. Construct final commit message
         let finalCommitMessage = "";
         if (typeChoice === 'o') {
             finalCommitMessage = commitMessageSubject;
@@ -170,25 +185,11 @@ async function startWorkflow() {
             finalCommitMessage = `${commitMessageSubject}\n\n${enhancedReport}`;
         }
 
-        // 5. Git commit (using file for multi-line support)
+        // 7. Git commit (using file for multi-line support)
         const tmpCommitMsgFile = path.join(process.cwd(), "summary", "commit_msg.tmp");
         fs.writeFileSync(tmpCommitMsgFile, finalCommitMessage);
         execSync(`git commit -F ${tmpCommitMsgFile}`, { stdio: "inherit" });
         fs.unlinkSync(tmpCommitMsgFile);
-
-        // 6. Update package.json version if changed
-        if (newVersion !== currentVersion) {
-            packageJson.version = newVersion;
-            fs.writeFileSync("package.json", JSON.stringify(packageJson, null, 2));
-            console.log(`✅ Updated package.json to ${newVersion}`);
-        }
-
-        // 7. Create and switch to branch
-        try {
-            execSync(`git checkout -b ${branchName}`, { stdio: "inherit" });
-        } catch (e) {
-            execSync(`git checkout ${branchName}`, { stdio: "inherit" });
-        }
 
         // 8. Push
         execSync(`git push -u origin ${branchName}`, { stdio: "inherit" });
