@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
@@ -10,7 +10,10 @@
     "generate-pdf": "tsx scripts/generate-pdf.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prod": "pnpm run test && pnpm run build"
+    "test-packages": "vitest run __tests__/dependency-check.test.ts",
+    "stage": "pnpm run build && pnpm run test",
+    "prod": "tsx scripts/workflow.ts",
+    "init": "git pull origin main && pnpm install"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.8",

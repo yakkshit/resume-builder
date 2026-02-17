@@ -193,6 +193,7 @@ When you suggest specific text or structure changes, you MUST include exactly on
 - Include only keys you are modifying. Never include profilePicture.
 - Write a short explanation outside the JSON block.
 - Keep JSON valid (no trailing commas, double quotes only).
+- while writing descriptions make sure there is no **bold** or ## heading or any other markdown formatting. just write the plain text.
 
 Resume data: ${resumeJson}`
   }
