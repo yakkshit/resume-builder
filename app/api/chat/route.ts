@@ -14,9 +14,9 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "lingo-ai": { provider: "lingo-ai", modelId: "resume-model-v1" },
 
   // Google Gemini — core + preview (2026)
-  "gemini-3-flash-preview": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-3-pro-preview": { provider: "google", modelId: "gemini-2.5-pro" },
-  "gemini-3-pro-image-preview": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-3-flash-preview": { provider: "google", modelId: "gemini-3-flash-preview" },
+  "gemini-3-pro-preview": { provider: "google", modelId: "gemini-3-pro-preview" },
+  "gemini-3-pro-image-preview": { provider: "google", modelId: "gemini-3-pro-image-preview" },
   "gemini-2.5-flash": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-flash-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-flash-image": { provider: "google", modelId: "gemini-2.5-flash" },
@@ -137,7 +137,7 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
 
 
 // Default model if none specified (efficient for resume/cover letter)
-const DEFAULT_MODEL = "gemini-2.5-flash"
+const DEFAULT_MODEL = "gemini-2.0-flash"
 
 // Mock response for when API quota is exceeded
 const MOCK_RESPONSES = [
@@ -500,6 +500,7 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
       generationConfig: { maxOutputTokens: 8192 },
     })
 
+    console.log(`Sending message to Gemini model: ${modelId}`)
     const result = await chat.sendMessageStream(lastText)
 
     // Stream in AI SDK assistant format (0:"text"\n) so useChat can parse it
@@ -614,7 +615,7 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
       body: JSON.stringify({
         model: modelId,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -626,7 +627,49 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
       throw new Error(`OpenAI API error: ${response.status} - ${errorText}`)
     }
 
-    return new Response(response.body)
+    // Convert raw OpenAI SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  console.error("Error parsing OpenAI stream chunk:", e)
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with OpenAI model:", error)
     throw error
@@ -668,7 +711,47 @@ async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: st
       throw new Error(`Anthropic API error: ${response.status} - ${errorText}`)
     }
 
-    return new Response(response.body)
+    // Convert Anthropic SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                try {
+                  const json = JSON.parse(data)
+                  if (json.type === "content_block_delta" && json.delta?.text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", json.delta.text)))
+                  }
+                } catch (e) {
+                  // Ignore parse errors for event types like message_start
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Anthropic model:", error)
     throw error
@@ -692,7 +775,7 @@ async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: str
       body: JSON.stringify({
         model: modelId,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -704,7 +787,49 @@ async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: str
       throw new Error(`DeepSeek API error: ${response.status} - ${errorText}`)
     }
 
-    return new Response(response.body)
+    // Convert DeepSeek SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  console.error("Error parsing DeepSeek stream chunk:", e)
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with DeepSeek model:", error)
     throw error
@@ -728,7 +853,7 @@ async function handleWithGroq(messages: any[], modelId: string, apiKey?: string)
       body: JSON.stringify({
         model: modelId,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -740,7 +865,49 @@ async function handleWithGroq(messages: any[], modelId: string, apiKey?: string)
       throw new Error(`Groq API error: ${response.status} - ${errorText}`)
     }
 
-    return new Response(response.body)
+    // Convert Groq SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  console.error("Error parsing Groq stream chunk:", e)
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Groq model:", error)
     throw error
@@ -764,7 +931,7 @@ async function handleWithMistral(messages: any[], modelId: string, apiKey?: stri
       body: JSON.stringify({
         model: modelId,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -776,7 +943,49 @@ async function handleWithMistral(messages: any[], modelId: string, apiKey?: stri
       throw new Error(`Mistral API error: ${response.status} - ${errorText}`)
     }
 
-    return new Response(response.body)
+    // Convert Mistral SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  console.error("Error parsing Mistral stream chunk:", e)
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Mistral model:", error)
     throw error
@@ -800,7 +1009,7 @@ async function handleWithTogether(messages: any[], modelId: string, apiKey?: str
       body: JSON.stringify({
         model: modelId,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -809,10 +1018,52 @@ async function handleWithTogether(messages: any[], modelId: string, apiKey?: str
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "")
-      throw new Error(`Together.ai API error: ${response.status} - ${errorText}`)
+      throw new Error(`Together.ai error: ${response.status} - ${errorText}`)
     }
 
-    return new Response(response.body)
+    // Convert Together SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Together.ai model:", error)
     throw error
@@ -869,7 +1120,7 @@ async function handleWithPerplexity(messages: any[], modelId: string, apiKey?: s
       body: JSON.stringify({
         model: modelId,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -881,7 +1132,49 @@ async function handleWithPerplexity(messages: any[], modelId: string, apiKey?: s
       throw new Error(`Perplexity API error: ${response.status} - ${errorText}`)
     }
 
-    return new Response(response.body)
+    // Convert Perplexity SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Perplexity model:", error)
     throw error
@@ -905,7 +1198,7 @@ async function handleWithFireworks(messages: any[], modelId: string, apiKey?: st
       body: JSON.stringify({
         model: modelId,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -917,7 +1210,49 @@ async function handleWithFireworks(messages: any[], modelId: string, apiKey?: st
       throw new Error(`Fireworks API error: ${response.status} - ${errorText}`)
     }
 
-    return new Response(response.body)
+    // Convert Fireworks SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Fireworks model:", error)
     throw error
@@ -998,13 +1333,13 @@ async function handleWithHuggingFace(
               for await (const chunk of client.chatCompletionStream({
                 model: model,
                 messages: messages.map(msg => ({
-                  role: msg.role === "assistant" ? "assistant" : "user",
+                  role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
                   content: msg.content,
                 })),
               })) {
                 const content = chunk.choices[0]?.delta?.content
                 if (content) {
-                  controller.enqueue(encoder.encode(content))
+                  controller.enqueue(encoder.encode(formatAssistantStreamPart("text", content)))
                 }
               }
               controller.close()
@@ -1112,7 +1447,7 @@ async function handleWithLocal(
       body: JSON.stringify({
         model: model,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -1123,7 +1458,49 @@ async function handleWithLocal(
       throw new Error(`Local API error: ${response.status}`)
     }
 
-    return new Response(response.body)
+    // Convert Local SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Local model:", error)
     throw error
@@ -1150,7 +1527,7 @@ async function handleWithOllama(
       body: JSON.stringify({
         model: model,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -1161,7 +1538,49 @@ async function handleWithOllama(
       throw new Error(`Ollama API error: ${response.status}`)
     }
 
-    return new Response(response.body)
+    // Convert Ollama SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Ollama model:", error)
     throw error
@@ -1188,7 +1607,7 @@ async function handleWithLMStudio(
       body: JSON.stringify({
         model: model,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -1199,7 +1618,49 @@ async function handleWithLMStudio(
       throw new Error(`LM Studio API error: ${response.status}`)
     }
 
-    return new Response(response.body)
+    // Convert LM Studio SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with LM Studio model:", error)
     throw error
@@ -1232,7 +1693,7 @@ async function handleWithOpenAILike(
       body: JSON.stringify({
         model: model,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -1243,7 +1704,49 @@ async function handleWithOpenAILike(
       throw new Error(`OpenAI-like API error: ${response.status}`)
     }
 
-    return new Response(response.body)
+    // Convert OpenAI-like SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with OpenAI-like model:", error)
     throw error
@@ -1275,7 +1778,7 @@ async function handleWithLingoAI(
       body: JSON.stringify({
         model: model,
         messages: messages.map(msg => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
+          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
           content: msg.content,
         })),
         stream: true,
@@ -1286,7 +1789,49 @@ async function handleWithLingoAI(
       throw new Error(`Lingo AI API error: ${response.status}`)
     }
 
-    return new Response(response.body)
+    // Convert Lingo AI SSE to AI SDK protocol
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder()
+        const reader = response.body?.getReader()
+        if (!reader) return controller.close()
+
+        try {
+          let partial = ""
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = new TextDecoder().decode(value)
+            const lines = (partial + chunk).split("\n")
+            partial = lines.pop() || ""
+
+            for (const line of lines) {
+              if (line.startsWith("data: ")) {
+                const data = line.slice(6).trim()
+                if (data === "[DONE]") continue
+                try {
+                  const json = JSON.parse(data)
+                  const text = json.choices[0]?.delta?.content
+                  if (text) {
+                    controller.enqueue(encoder.encode(formatAssistantStreamPart("text", text)))
+                  }
+                } catch (e) {
+                  // Ignore
+                }
+              }
+            }
+          }
+          controller.close()
+        } catch (error) {
+          controller.error(error)
+        }
+      },
+    })
+
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    })
   } catch (error) {
     console.error("Error with Lingo AI model:", error)
     throw error

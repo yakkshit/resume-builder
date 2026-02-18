@@ -152,7 +152,7 @@ export default function ResumePage() {
       aiMode,
       model: selectedModel,
       apiKey: apiKey || undefined,
-      contextText: (selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") ? (contextText || undefined) : undefined,
+      contextText: contextText || undefined,
       customEndpoint: customEndpoint || undefined,
       customModel: customModel || undefined,
       customHeaders: customHeaders || undefined,
