@@ -181,7 +181,7 @@ export default function ResumePage() {
 
     transport: new DefaultChatTransport({
       api: "/api/chat",
-      prepareSendMessagesRequest: () => ({ body: bodyRef.current }),
+      prepareSendMessagesRequest: ({ messages, id }) => ({ body: { ...bodyRef.current, messages, id } }),
     }),
   });
 

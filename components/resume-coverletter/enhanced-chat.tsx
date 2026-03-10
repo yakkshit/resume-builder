@@ -204,18 +204,34 @@ export default function EnhancedChat({
   }
 
   return (
-    <Card className="border shadow-lg overflow-hidden flex flex-col min-h-0">
-      <CardHeader className="p-4 bg-gradient-to-r from-primary/10 to-primary/5 border-b flex-shrink-0">
+    <Card className="relative overflow-hidden flex flex-col min-h-0 border shadow-xl bg-card/95 backdrop-blur-sm transition-all duration-300 hover:shadow-2xl hover:border-primary/20">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.02] via-transparent to-primary/[0.03] pointer-events-none" />
+      <CardHeader className="relative p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent dark:from-primary/20 dark:via-primary/10 border-b flex-shrink-0">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Bot className="h-5 w-5 text-primary" />
-            Chat with AI Assistant
+          <CardTitle className="flex items-center gap-3 text-lg font-semibold text-foreground">
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", bounce: 0.5 }}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 dark:bg-primary/20 ring-2 ring-primary/10"
+            >
+              <Bot className="h-5 w-5 text-primary" />
+            </motion.div>
+            <span>Chat with AI Assistant</span>
           </CardTitle>
           {contextText && contextText.trim() && (
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <motion.div
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/20"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }}
+                transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
+                className="w-2 h-2 bg-blue-500 rounded-full"
+              />
               <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Context Active</span>
-            </div>
+            </motion.div>
           )}
         </div>
       </CardHeader>
@@ -233,10 +249,21 @@ export default function EnhancedChat({
         >
           <div className="space-y-4 pb-2">
             {messages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center min-h-[200px] text-center p-4">
-                <Bot className="h-12 w-12 text-primary/20 mb-4" />
-                <h3 className="text-lg font-medium mb-2">AI Assistant Ready</h3>
-                <p className="text-sm text-muted-foreground max-w-md">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="flex flex-col items-center justify-center min-h-[200px] text-center p-4"
+              >
+                <motion.div
+                  animate={{ y: [0, -6, 0] }}
+                  transition={{ repeat: Number.POSITIVE_INFINITY, duration: 2.5, ease: "easeInOut" }}
+                  className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/5 dark:bg-primary/10 mb-4 ring-1 ring-primary/10 shadow-inner"
+                >
+                  <Bot className="h-8 w-8 text-primary/60 dark:text-primary/70" />
+                </motion.div>
+                <h3 className="text-lg font-semibold mb-2 text-foreground">AI Assistant Ready</h3>
+                <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
                   Ask me anything about your resume or how to improve it.
                   {aiMode && " I can also tailor your resume to match job descriptions."}
                   <br /> Always add at least a basic prompt in chat to tailor the resume. <br />
@@ -253,85 +280,107 @@ export default function EnhancedChat({
                     </>
                   )}
                 </p>
-              </div>
+              </motion.div>
             ) : (
               <AnimatePresence initial={false}>
-                {messages.map((message) => (
+                {messages.map((message, idx) => (
                   <motion.div
                     key={message.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
+                    initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
+                    transition={{
+                      type: "spring",
+                      stiffness: 400,
+                      damping: 30,
+                      mass: 0.8,
+                    }}
                     className={cn(
                       "flex gap-2 sm:gap-3 max-w-full group",
                       message.role === "user" ? "justify-end" : "justify-start",
                     )}
                   >
                     {message.role === "assistant" && (
-                      <Avatar className="h-7 w-7 sm:h-8 sm:w-8 mt-1 flex-shrink-0">
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                          <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </AvatarFallback>
-                      </Avatar>
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", bounce: 0.5, delay: 0.05 }}
+                      >
+                        <Avatar className="h-7 w-7 sm:h-8 sm:w-8 mt-1 flex-shrink-0 ring-2 ring-primary/10">
+                          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                            <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      </motion.div>
                     )}
 
-                    <div
+                    <motion.div
+                      whileHover={{ scale: 1.01 }}
                       className={cn(
                         "rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3 max-w-[90%] sm:max-w-[85%] shadow-sm",
-                        "border",
+                        "border transition-shadow duration-200",
                         message.role === "user"
-                          ? "bg-primary text-primary-foreground border-primary/30 ml-8 sm:ml-10"
-                          : "bg-muted/60 dark:bg-muted/40 border-border/50 mr-8 sm:mr-10",
+                          ? "bg-primary text-primary-foreground border-primary/30 ml-8 sm:ml-10 shadow-md hover:shadow-lg"
+                          : "bg-muted/70 dark:bg-muted/50 border-border/60 mr-8 sm:mr-10 dark:border-border/80 hover:shadow-md",
                       )}
                     >
                       <AssistantMessageContent content={getTextContent(message)} />
                       <div className="mt-1.5 text-[10px] sm:text-xs opacity-70 text-right">
                         {formatTimestamp(new Date((message as { createdAt?: number | string }).createdAt || Date.now()))}
                       </div>
-                    </div>
+                    </motion.div>
 
                     {message.role === "user" && (
-                      <Avatar className="h-7 w-7 sm:h-8 sm:w-8 mt-1 flex-shrink-0">
-                        <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-                          <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </AvatarFallback>
-                      </Avatar>
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", bounce: 0.5, delay: 0.05 }}
+                      >
+                        <Avatar className="h-7 w-7 sm:h-8 sm:w-8 mt-1 flex-shrink-0 ring-2 ring-secondary/20">
+                          <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                            <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          </AvatarFallback>
+                        </Avatar>
+                      </motion.div>
                     )}
                   </motion.div>
                 ))}
 
                 {typingIndicator && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 24 }}
                     className="flex gap-2 sm:gap-3 max-w-full"
                   >
-                    <Avatar className="h-7 w-7 sm:h-8 sm:w-8 mt-1">
+                    <Avatar className="h-7 w-7 sm:h-8 sm:w-8 mt-1 ring-2 ring-primary/10">
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </AvatarFallback>
                     </Avatar>
-                    <div className="rounded-2xl px-4 py-3 max-w-[85%] bg-muted/50 border border-border/50 mr-8 sm:mr-10 flex items-center">
-                      <div className="flex space-x-1">
-                        <motion.div
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1, delay: 0 }}
-                          className="h-2 w-2 bg-primary/60 rounded-full"
-                        />
-                        <motion.div
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1, delay: 0.2 }}
-                          className="h-2 w-2 bg-primary/60 rounded-full"
-                        />
-                        <motion.div
-                          animate={{ y: [0, -5, 0] }}
-                          transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1, delay: 0.4 }}
-                          className="h-2 w-2 bg-primary/60 rounded-full"
-                        />
+                    <motion.div
+                      animate={{ opacity: [0.7, 1, 0.7] }}
+                      transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.2 }}
+                      className="rounded-2xl px-4 py-3 max-w-[85%] bg-muted/70 dark:bg-muted/50 border border-border/60 mr-8 sm:mr-10 flex items-center gap-2"
+                    >
+                      <div className="flex space-x-1.5">
+                        {[0, 1, 2].map((i) => (
+                          <motion.div
+                            key={i}
+                            animate={{ y: [0, -6, 0], opacity: [0.6, 1, 0.6] }}
+                            transition={{
+                              repeat: Number.POSITIVE_INFINITY,
+                              duration: 0.8,
+                              delay: i * 0.15,
+                              ease: "easeInOut",
+                            }}
+                            className="h-2 w-2 bg-primary rounded-full"
+                          />
+                        ))}
                       </div>
-                    </div>
+                      <span className="text-xs text-muted-foreground">thinking...</span>
+                    </motion.div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -343,28 +392,35 @@ export default function EnhancedChat({
         <AnimatePresence>
           {showScrollToBottom && (
             <motion.div
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 4 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, y: 8, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
               className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10"
             >
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                className="rounded-full shadow-lg border bg-background/95 backdrop-blur hover:bg-background"
-                onClick={() => scrollToBottom("smooth")}
-              >
-                <ChevronDown className="h-4 w-4 mr-1" />
-                Scroll to bottom
-              </Button>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.98 }}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full shadow-lg border bg-background/95 backdrop-blur hover:bg-background gap-2"
+                  onClick={() => scrollToBottom("smooth")}
+                >
+                  <motion.span
+                    animate={{ y: [0, 2, 0] }}
+                    transition={{ repeat: Number.POSITIVE_INFINITY, duration: 1.5 }}
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </motion.span>
+                  New messages
+                </Button>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
       </CardContent>
 
-      <CardFooter className="p-4 border-t bg-background">
+      <CardFooter className="relative p-4 border-t bg-muted/30 dark:bg-muted/20">
         <form onSubmit={handleFormSubmit} className="w-full space-y-3">
           {/* Attached files */}
           {attachedFiles.length > 0 && (
@@ -409,11 +465,12 @@ export default function EnhancedChat({
                 }}
               />
               
-              <Textarea
-                value={input}
-                onChange={handleInputChange}
-                placeholder={aiMode ? "Ask AI to tailor your resume..." : "Ask questions about your resume..."}
-                className="min-h-[80px] pr-12 resize-none border rounded-lg focus-visible:ring-1 focus-visible:ring-primary"
+              <div className="rounded-xl">
+                <Textarea
+                  value={input}
+                  onChange={handleInputChange}
+                  placeholder={aiMode ? "Ask AI to tailor your resume..." : "Ask questions about your resume..."}
+                  className="min-h-[80px] pr-12 resize-none border-2 rounded-xl bg-background dark:bg-background/95 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary transition-all duration-200 placeholder:text-muted-foreground/70"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
@@ -424,6 +481,7 @@ export default function EnhancedChat({
                   }
                 }}
               />
+              </div>
               <div className="absolute right-3 bottom-3 flex items-center gap-2">
                 <TooltipProvider>
                   <Tooltip>
@@ -446,35 +504,53 @@ export default function EnhancedChat({
               </div>
             </div>
 
-            <Button
-              type="submit"
-              size="icon"
-              className={cn(
-                "h-10 w-10 rounded-full transition-all duration-200",
-                isLoading ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90",
-              )}
-            >
-              {isLoading ? <StopCircle className="h-5 w-5 animate-pulse" /> : <Send className="h-5 w-5" />}
-            </Button>
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                type="submit"
+                size="icon"
+                className={cn(
+                  "h-10 w-10 rounded-full transition-all duration-200 shadow-md",
+                  isLoading ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90 hover:shadow-lg",
+                )}
+              >
+                {isLoading ? (
+                  <motion.span animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}>
+                    <StopCircle className="h-5 w-5" />
+                  </motion.span>
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
+              </Button>
+            </motion.div>
           </div>
         </form>
       </CardFooter>
       {aiMode && messages.length > 0 && (
           <motion.div
-            className="mt-4 p-2 w-full"
+            className="relative mt-4 p-2 w-full overflow-hidden rounded-lg"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ type: "spring", stiffness: 300, damping: 24 }}
           >
-            <Button
-              onClick={applyAiChanges}
-              className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300"
-              disabled={!canApplyChanges}
-              variant="default"
+            <motion.div
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.99 }}
             >
-              <Sparkles size={16} className="mr-2" />
-              Apply AI Changes
-            </Button>
+              <Button
+                onClick={applyAiChanges}
+                className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-lg disabled:opacity-50"
+                disabled={!canApplyChanges}
+                variant="default"
+              >
+                <motion.span
+                  animate={canApplyChanges ? { rotate: [0, 10, -10, 0] } : {}}
+                  transition={{ duration: 0.5, repeat: canApplyChanges ? Infinity : 0, repeatDelay: 2 }}
+                >
+                  <Sparkles size={16} className="mr-2" />
+                </motion.span>
+                Apply AI Changes
+              </Button>
+            </motion.div>
           </motion.div>
         )}
     </Card>

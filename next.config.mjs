@@ -28,9 +28,10 @@ const nextConfig = {
     'pdfkit',
   ],
   experimental: {
-    webpackBuildWorker: true,
-    parallelServerBuildTraces: true,
-    parallelServerCompiles: true,
+    // Disabled - can trigger "Cannot read properties of undefined (reading 'length')" in webpack
+    // webpackBuildWorker: true,
+    // parallelServerBuildTraces: true,
+    // parallelServerCompiles: true,
   },
   turbopack: {},
   webpack: (config) => {
@@ -40,6 +41,14 @@ const nextConfig = {
 }
 
 mergeConfig(nextConfig, userConfig)
+
+// Ensure problematic experimental flags stay disabled (avoids "Cannot read properties of undefined (reading 'length')")
+nextConfig.experimental = {
+  ...nextConfig.experimental,
+  webpackBuildWorker: false,
+  parallelServerBuildTraces: false,
+  parallelServerCompiles: false,
+}
 
 function mergeConfig(nextConfig, userConfig) {
   if (!userConfig) {

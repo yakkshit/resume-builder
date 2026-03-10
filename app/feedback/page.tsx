@@ -4,7 +4,7 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from 'zod/v3';
+import * as z from "zod";
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -31,12 +31,8 @@ import { faqData, suggestionData } from "@/lib/faq"
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Please enter a valid email address" }),
-  type: z.enum(["feedback", "feature", "other"], {
-    required_error: "Please select a feedback type",
-  }),
-  service: z.enum(["cv", "coverletter", "ai"], {
-    required_error: "Please select a service",
-  }),
+  type: z.enum(["feedback", "feature", "other"] as const),
+  service: z.enum(["cv", "coverletter", "ai"] as const),
   message: z.string().min(10, { message: "Message must be at least 10 characters" }),
 })
 

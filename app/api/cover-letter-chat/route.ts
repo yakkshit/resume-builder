@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { createUIMessageStream, createUIMessageStreamResponse, generateId } from "ai"
 import { InferenceClient } from "@huggingface/inference"
+import type { NextRequest } from "next/server"
+import { requireApiKey } from "@/lib/api-auth"
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30
@@ -99,7 +101,10 @@ const MOCK_RESPONSES = [
   "API quota exceeded. While I can't analyze your specific cover letter right now, here are universal cover letter tips:\n\n- Address the letter to a specific person whenever possible\n- Avoid generic language and clichés\n- Quantify your achievements with numbers when possible\n- Proofread carefully for errors\n- Keep it to one page",
 ]
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const auth = requireApiKey(req)
+  if (auth) return auth
+
   const { messages, coverLetterData, jobDescription, model, apiKey, attachedData, customModel, customEndpoint, customHeaders } = await req.json()
 
   // Create a system message
@@ -138,7 +143,8 @@ Job description: ${jobDescription || "Not provided"}`
   }
 
   // Format the conversation for the AI
-  const formattedMessages = [{ role: "system", content: systemMessage }, ...messages]
+  const messagesList = Array.isArray(messages) ? messages : []
+  const formattedMessages = [{ role: "system", content: systemMessage }, ...messagesList]
 
   // Get the model configuration or use default
   const modelConfig = AVAILABLE_MODELS[model as keyof typeof AVAILABLE_MODELS] || AVAILABLE_MODELS[DEFAULT_MODEL]
@@ -148,13 +154,13 @@ Job description: ${jobDescription || "Not provided"}`
     switch (modelConfig.provider) {
       case "google":
         try {
-          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
         } catch (error: any) {
           console.error("Error with Gemini model:", error)
 
           // Check if it's a quota exceeded error (429)
           if (error.message && error.message.includes("429") && error.message.includes("quota")) {
-            return handleQuotaExceeded()
+            return handleQuotaExceeded(messagesList)
           }
 
           // For other errors, return a generic error message
@@ -196,7 +202,7 @@ Job description: ${jobDescription || "Not provided"}`
   }
 }
 
-async function handleWithGemini(messages: any[], modelId: string, apiKey?: string) {
+async function handleWithGemini(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key = apiKey || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
     if (!key) {
@@ -231,6 +237,7 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
 
     const textId = generateId()
     const stream = createUIMessageStream({
+      originalMessages: (clientMessages ?? []) as Parameters<typeof createUIMessageStream>[0]["originalMessages"],
       execute: async ({ writer }) => {
         writer.write({ type: "text-start", id: textId })
         try {
@@ -252,10 +259,11 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
   }
 }
 
-function handleQuotaExceeded() {
+function handleQuotaExceeded(clientMessages?: unknown[]) {
   const mockResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
   const textId = generateId()
   const stream = createUIMessageStream({
+    originalMessages: (clientMessages ?? []) as Parameters<typeof createUIMessageStream>[0]["originalMessages"],
     execute: async ({ writer }) => {
       writer.write({ type: "text-start", id: textId })
       const chunks = mockResponse.split(". ")

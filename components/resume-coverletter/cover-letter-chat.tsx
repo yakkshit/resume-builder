@@ -130,9 +130,11 @@ export default function CoverLetterChat({
 
   return (
     <Card className="border shadow-lg overflow-hidden">
-      <CardHeader className="p-4 bg-gradient-to-r from-primary/10 to-primary/5 border-b">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <Bot className="h-5 w-5 text-primary" />
+      <CardHeader className="p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent dark:from-primary/20 dark:via-primary/10 border-b">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/20">
+            <Bot className="h-5 w-5 text-primary" />
+          </div>
           Cover Letter Assistant
         </CardTitle>
       </CardHeader>
@@ -239,7 +241,7 @@ export default function CoverLetterChat({
         </ScrollArea>
       </CardContent>
 
-      <CardFooter className="p-4 border-t bg-background">
+      <CardFooter className="p-4 border-t bg-muted/30 dark:bg-muted/20">
         <form onSubmit={handleFormSubmit} className="w-full space-y-3">
           {/* Attached files */}
           {attachedFiles.length > 0 && (

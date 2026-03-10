@@ -3,15 +3,21 @@ import { InferenceClient } from "@huggingface/inference"
 import { GoogleGenAI } from "@google/genai"
 import { createUIMessageStream, createUIMessageStreamResponse, generateId } from 'ai'
 import mime from "mime"
+import type { NextRequest } from "next/server"
+import { requireApiKey } from "@/lib/api-auth"
 
 /** Extract text from message (supports v4 content and v5 parts) */
 const getMsgText = (m: { content?: string; parts?: Array<{ type: string; text?: string }> }) =>
   m.parts?.filter((p): p is { type: "text"; text: string } => p.type === "text").map((p) => p.text).join("") ?? m.content ?? ""
 
-/** Helper: stream text chunks to AI SDK v5 UIMessage format */
-function streamTextToResponse(produce: (write: (text: string) => void) => Promise<void>): Response {
+/** Helper: stream text chunks to AI SDK v5 UIMessage format. Pass originalMessages so useChat can display the response. */
+function streamTextToResponse(
+  produce: (write: (text: string) => void) => Promise<void>,
+  originalMessages?: unknown[],
+): Response {
   const textId = generateId()
   const stream = createUIMessageStream({
+    originalMessages: (originalMessages ?? []) as Parameters<typeof createUIMessageStream>[0]["originalMessages"],
     execute: async ({ writer }) => {
       writer.write({ type: "text-start", id: textId })
       await produce((text) => { if (text) writer.write({ type: "text-delta", id: textId, delta: text }) })
@@ -165,7 +171,10 @@ const MOCK_RESPONSES = [
 ]
 
 // Update the POST function to handle attachedData
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const auth = requireApiKey(req)
+  if (auth) return auth
+
   const { messages, resumeData, aiMode, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth } = await req.json()
 
   // Create a system message based on the mode
@@ -189,7 +198,6 @@ Your response must follow this structure every time you suggest resume changes:
   "projects": [{ "name": "...", "description": "...", "technologies": [] }],
   "achievements": [{ "title": "...", "description": "...", "date": "..." }]
 }
-\`\`\`
 
 Rules:
 - Output ONLY the keys and values you are modifying. Omit any section you are not changing.
@@ -264,7 +272,8 @@ Resume data: ${resumeJson}`
 
 
   // Format the conversation for the AI
-  const formattedMessages = [{ role: "system", content: systemMessage }, ...messages]
+  const messagesList = Array.isArray(messages) ? messages : []
+  const formattedMessages = [{ role: "system", content: systemMessage }, ...messagesList]
 
   // Resolve model: use selected if available, else default
   const modelConfig = (model && AVAILABLE_MODELS[model]) ? AVAILABLE_MODELS[model] : AVAILABLE_MODELS[DEFAULT_MODEL]
@@ -277,15 +286,15 @@ Resume data: ${resumeJson}`
     switch (modelConfig.provider) {
       case "google":
         try {
-          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
         } catch (error: any) {
           console.error("Error with Gemini model:", error)
           if (error.message && error.message.includes("429") && error.message.includes("quota")) {
-            return handleQuotaExceeded()
+            return handleQuotaExceeded(messagesList)
           }
           try {
             console.warn("Retrying with handleNewGemini...")
-            return await handleNewGemini(formattedMessages, modelConfig.modelId, apiKey)
+            return await handleNewGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
           } catch (newGeminiError: any) {
             console.error("Error with New Gemini handler:", newGeminiError)
             throw newGeminiError
@@ -299,7 +308,7 @@ Resume data: ${resumeJson}`
         } catch (error: any) {
           console.error("Error with OpenAI model:", error)
           if (error.message && error.message.includes("429") && error.message.includes("quota")) {
-            return handleQuotaExceeded()
+            return handleQuotaExceeded(messagesList)
           }
           throw error
         }
@@ -484,7 +493,7 @@ function saveBinaryFile(fileName: string, content: Buffer) {
   })
 }
 
-async function handleWithGemini(messages: any[], modelId: string, apiKey?: string) {
+async function handleWithGemini(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key = apiKey || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
     if (!key) {
@@ -523,6 +532,7 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
 
     const textId = generateId()
     const stream = createUIMessageStream({
+      originalMessages: (clientMessages ?? []) as Parameters<typeof createUIMessageStream>[0]["originalMessages"],
       execute: async ({ writer }) => {
         writer.write({ type: "text-start", id: textId })
         try {
@@ -541,17 +551,18 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
   } catch (error: unknown) {
     const err = error as { message?: string; status?: number }
     if (err?.message?.includes("429") || err?.message?.includes("quota") || err?.message?.includes("RESOURCE_EXHAUSTED")) {
-      return handleQuotaExceeded()
+      return handleQuotaExceeded(clientMessages)
     }
     console.error("Error with Gemini model:", error)
     throw error
   }
 }
 
-export async function handleNewGemini(
+async function handleNewGemini(
   messages: any[],
   modelId: string,
-  apiKey?: string
+  apiKey?: string,
+  clientMessages?: unknown[],
 ) {
   try {
     const key = apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
@@ -586,6 +597,7 @@ export async function handleNewGemini(
 
     const textId = generateId()
     const stream = createUIMessageStream({
+      originalMessages: (clientMessages ?? []) as Parameters<typeof createUIMessageStream>[0]["originalMessages"],
       execute: async ({ writer }) => {
         writer.write({ type: "text-start", id: textId })
         try {
@@ -605,7 +617,7 @@ export async function handleNewGemini(
   } catch (error: unknown) {
     const err = error as { message?: string; status?: number }
     if (err?.message?.includes("429") || err?.message?.includes("quota") || err?.message?.includes("RESOURCE_EXHAUSTED")) {
-      return handleQuotaExceeded()
+      return handleQuotaExceeded(clientMessages)
     }
     console.error("Error with New Gemini model:", error)
     throw error
@@ -1582,7 +1594,7 @@ async function handleWithLingoAI(
   }
 }
 
-function handleQuotaExceeded() {
+function handleQuotaExceeded(clientMessages?: unknown[]) {
   const mockResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
   return streamTextToResponse(async (write) => {
     const chunks = mockResponse.split(". ")
@@ -1591,5 +1603,5 @@ function handleQuotaExceeded() {
       write(chunk)
       await new Promise((r) => setTimeout(r, 80))
     }
-  })
+  }, clientMessages)
 }

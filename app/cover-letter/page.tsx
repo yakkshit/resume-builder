@@ -74,7 +74,7 @@ export default function CoverLetterPage() {
 
     transport: new DefaultChatTransport({
       api: "/api/cover-letter-chat",
-      prepareSendMessagesRequest: () => ({ body: bodyRef.current }),
+      prepareSendMessagesRequest: ({ messages, id }) => ({ body: { ...bodyRef.current, messages, id } }),
     }),
   })
 
