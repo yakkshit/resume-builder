@@ -1,10 +1,8 @@
 "use client";
 
-import type React from "react";
-
 import { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react";
-import type { Message } from "ai";
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -136,29 +134,19 @@ export default function ResumePage() {
   const attachmentRef = useRef<HTMLInputElement>(null);
   const [modelErrorBanner, setModelErrorBanner] = useState<string>("");
 
+  const [input, setInput] = useState('');
+
+  const bodyRef = useRef({ resumeData, aiMode, model: selectedModel, apiKey, contextText, customEndpoint, customModel, customHeaders, customAuth });
+  bodyRef.current = { resumeData, aiMode, model: selectedModel, apiKey, contextText, customEndpoint, customModel, customHeaders, customAuth };
+
   const {
     messages,
-    input,
-    handleInputChange,
-    handleSubmit,
+    sendMessage,
     setMessages,
     status,
     error,
-    stop,
+    stop
   } = useChat({
-    api: "/api/chat",
-    body: {
-      resumeData,
-      aiMode,
-      model: selectedModel,
-      apiKey: apiKey || undefined,
-      contextText: contextText || undefined,
-      customEndpoint: customEndpoint || undefined,
-      customModel: customModel || undefined,
-      customHeaders: customHeaders || undefined,
-      customAuth: customAuth || undefined,
-      attachedFiles: undefined, // We'll handle files in the submit handler instead
-    },
     onError: (error) => {
       console.error("Chat error:", error);
       if (
@@ -190,6 +178,11 @@ export default function ResumePage() {
         setModelErrorBanner(suggestion);
       }
     },
+
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      prepareSendMessagesRequest: ({ messages, id }) => ({ body: { ...bodyRef.current, messages, id } }),
+    }),
   });
 
   // Save to localStorage whenever resumeData changes
@@ -420,7 +413,7 @@ export default function ResumePage() {
 
   // Custom chat submission handler that supports file uploads
   const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setShowQuotaWarning(false);
 
     // Check if there are attached files
@@ -453,21 +446,8 @@ export default function ResumePage() {
         }
       }
 
-      // Update the input with file content and submit
-      const originalInput = input;
-      handleInputChange({ target: { value: enhancedInput } } as any);
-
-      // Submit the enhanced message
-      setTimeout(() => {
-        handleSubmit(e);
-
-        // Restore original input after submission
-        setTimeout(() => {
-          handleInputChange({ target: { value: originalInput } } as any);
-        }, 100);
-      }, 100);
-
-      // Clear attached files after processing
+      sendMessage({ text: enhancedInput });
+      setInput('');
       setAttachedFiles([]);
 
       toast({
@@ -478,8 +458,8 @@ export default function ResumePage() {
       return;
     }
 
-    // Normal submit without attachment using the useChat hook
-    handleSubmit(e);
+    sendMessage({ text: input });
+    setInput('');
   };
 
   // Process attached files and convert them to text/data that can be sent to AI
@@ -1637,7 +1617,7 @@ export default function ResumePage() {
                     <EnhancedChat
                       messages={messages as any}
                       input={input}
-                      handleInputChange={handleInputChange}
+                      handleInputChange={e => setInput(e.target.value)}
                       handleSubmit={handleChatSubmit}
                       isLoading={status === "submitted" || status === "streaming"}
                       onStop={stop}

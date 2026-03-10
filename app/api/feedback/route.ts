@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server"
 import { saveFeedbackToSheet } from "@/database/migrations"
+import type { NextRequest } from "next/server"
+import { requireApiKey } from "@/lib/api-auth"
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    const auth = requireApiKey(req)
+    if (auth) return auth
+
     const data = await req.json()
 
     // Validate required fields

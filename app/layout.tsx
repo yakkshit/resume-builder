@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
+import { ThemeProvider } from '@/components/resume-coverletter/theme-provider'
+import { AppNav } from '@/components/app-nav'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://yakkshit.com'),
@@ -36,9 +38,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        {children}
-        <Toaster />
-        <Analytics />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <AppNav />
+          <main className="min-h-[calc(100vh-5rem)] pt-2 pb-8">{children}</main>
+          <Toaster />
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

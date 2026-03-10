@@ -1,9 +1,9 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useRef, useEffect } from "react"
-import { useChat } from "ai/react"
+import { getTextContent } from "@/lib/message-utils"
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from "ai";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -53,20 +53,29 @@ export default function CoverLetterPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const attachmentRef = useRef<HTMLInputElement>(null)
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error, stop } = useChat({
-    api: "/api/cover-letter-chat",
-    body: {
-      coverLetterData,
-      jobDescription,
-      model: selectedModel,
-      apiKey: apiKey || undefined,
-    },
+  const [input, setInput] = useState('');
+
+  const bodyRef = useRef<Record<string, unknown>>({ coverLetterData, jobDescription, model: selectedModel, apiKey });
+  bodyRef.current = { coverLetterData, jobDescription, model: selectedModel, apiKey };
+
+  const {
+    messages,
+    sendMessage,
+    status,
+    error,
+    stop
+  } = useChat({
     onError: (error) => {
       console.error("Chat error:", error)
       if (error.message && error.message.includes("429") && error.message.includes("quota")) {
         setShowQuotaWarning(true)
       }
     },
+
+    transport: new DefaultChatTransport({
+      api: "/api/cover-letter-chat",
+      prepareSendMessagesRequest: ({ messages, id }) => ({ body: { ...bodyRef.current, messages, id } }),
+    }),
   })
 
   // Save to localStorage whenever coverLetterData changes
@@ -150,7 +159,8 @@ export default function CoverLetterPage() {
     try {
       // Improved regex to better match JSON in the message, handling multiline JSON blocks
       const regex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
-      const match = lastAssistantMessage.content.match(regex)
+      const content = getTextContent(lastAssistantMessage)
+      const match = content.match(regex)
 
       if (match && match[1]) {
         try {
@@ -191,7 +201,7 @@ export default function CoverLetterPage() {
       } else {
         // Try to find JSON without code blocks
         const jsonRegex = /\{[\s\S]*?\}/g
-        const jsonMatches = lastAssistantMessage.content.match(jsonRegex)
+        const jsonMatches = content.match(jsonRegex)
 
         if (jsonMatches) {
           // Try each potential JSON match
@@ -255,7 +265,7 @@ export default function CoverLetterPage() {
 
   // Handle chat submit
   const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
+    e?.preventDefault?.()
     setShowQuotaWarning(false)
 
     // Check if there's a file attachment
@@ -263,24 +273,19 @@ export default function CoverLetterPage() {
     if (files && files.length > 0) {
       const file = files[0]
 
-      // Handle file attachment
       if (file.type === "application/pdf") {
         toast({
           title: "PDF attached",
           description: "PDF attachments are being processed (demo only).",
         })
       } else if (file.type === "application/json") {
-        // For JSON files, we can parse and use the data
         const reader = new FileReader()
         reader.onload = async (event) => {
           try {
             const attachedData = JSON.parse(event.target?.result as string)
-            // Now we can use this data in our chat
-            await handleSubmit(e, {
-              data: {
-                attachedData: JSON.stringify(attachedData),
-              },
-            })
+            bodyRef.current = { ...bodyRef.current, attachedData: JSON.stringify(attachedData) }
+            sendMessage({ text: input })
+            setInput("")
           } catch (error) {
             toast({
               title: "Error processing JSON",
@@ -290,17 +295,14 @@ export default function CoverLetterPage() {
           }
         }
         reader.readAsText(file)
-        return // We'll handle the submit in the reader.onload
+        if (attachmentRef.current) attachmentRef.current.value = ""
+        return
       }
     }
 
-    // Normal submit without attachment
-    handleSubmit(e)
-
-    // Reset the file input
-    if (attachmentRef.current) {
-      attachmentRef.current.value = ""
-    }
+    sendMessage({ text: input })
+    setInput("")
+    if (attachmentRef.current) attachmentRef.current.value = ""
   }
 
   return (
@@ -439,9 +441,9 @@ export default function CoverLetterPage() {
                     <CoverLetterChat
                       messages={messages}
                       input={input}
-                      handleInputChange={handleInputChange}
+                      handleInputChange={e => setInput(e.target.value)}
                       handleSubmit={handleChatSubmit}
-                      isLoading={isLoading}
+                      isLoading={status === "submitted" || status === "streaming"}
                       onStop={stop}
                       applyAiChanges={applyAiChanges}
                       isApplyingChanges={isApplyingChanges}
@@ -525,5 +527,5 @@ export default function CoverLetterPage() {
         </div>
       </div>
     </LoadingScreen>
-  )
+  );
 }

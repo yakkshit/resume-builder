@@ -12,11 +12,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { getTextContent } from "@/lib/message-utils"
 import { useToast } from "@/hooks/use-toast"
-import type { Message } from "ai"
+import type { UIMessage } from "ai"
 
 interface CoverLetterChatProps {
-  messages: Message[]
+  messages: UIMessage[]
   input: string
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   handleSubmit: (e: React.FormEvent<HTMLFormElement>, options?: any) => void
@@ -129,9 +130,11 @@ export default function CoverLetterChat({
 
   return (
     <Card className="border shadow-lg overflow-hidden">
-      <CardHeader className="p-4 bg-gradient-to-r from-primary/10 to-primary/5 border-b">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <Bot className="h-5 w-5 text-primary" />
+      <CardHeader className="p-4 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent dark:from-primary/20 dark:via-primary/10 border-b">
+        <CardTitle className="flex items-center gap-2 text-lg font-semibold text-foreground">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/20">
+            <Bot className="h-5 w-5 text-primary" />
+          </div>
           Cover Letter Assistant
         </CardTitle>
       </CardHeader>
@@ -179,9 +182,9 @@ export default function CoverLetterChat({
                           : "bg-muted/50 border border-border/50 mr-10",
                       )}
                     >
-                      <div className="whitespace-pre-wrap text-sm break-words">{message.content}</div>
+                      <div className="whitespace-pre-wrap text-sm break-words">{getTextContent(message)}</div>
                       <div className="mt-1 text-xs opacity-70 text-right">
-                        {formatTimestamp(new Date(message.createdAt || Date.now()))}
+                        {formatTimestamp(new Date((message as { createdAt?: number | string }).createdAt || Date.now()))}
                       </div>
                     </div>
 
@@ -238,7 +241,7 @@ export default function CoverLetterChat({
         </ScrollArea>
       </CardContent>
 
-      <CardFooter className="p-4 border-t bg-background">
+      <CardFooter className="p-4 border-t bg-muted/30 dark:bg-muted/20">
         <form onSubmit={handleFormSubmit} className="w-full space-y-3">
           {/* Attached files */}
           {attachedFiles.length > 0 && (

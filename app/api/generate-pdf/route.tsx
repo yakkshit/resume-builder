@@ -4,6 +4,7 @@ import path from "node:path"
 import React from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, Template } from "@/lib/types"
+import { requireApiKey } from "@/lib/api-auth"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -106,6 +107,9 @@ function normalizeResumeData(data: unknown): ResumeData {
 
 export async function POST(request: NextRequest) {
   try {
+    const auth = requireApiKey(request)
+    if (auth) return auth
+
     const body = await request.json()
     const { resumeData, template } = body as { resumeData: ResumeData; template?: Template }
 
