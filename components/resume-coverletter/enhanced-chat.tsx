@@ -12,8 +12,9 @@ import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
-import type { Message } from "ai"
+import type { UIMessage } from "ai"
 import { extractResumeJsonFromMessage, getSuggestedSectionsSummary } from "@/lib/extract-resume-json"
+import { getTextContent } from "@/lib/message-utils"
 
 function AssistantMessageContent({ content }: { content: string }) {
   const update = extractResumeJsonFromMessage(content)
@@ -47,7 +48,7 @@ function AssistantMessageContent({ content }: { content: string }) {
 }
 
 interface EnhancedChatProps {
-  messages: Message[]
+  messages: UIMessage[]
   input: string
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   handleSubmit: (e: React.FormEvent<HTMLFormElement>, options?: any) => void
@@ -284,9 +285,9 @@ export default function EnhancedChat({
                           : "bg-muted/60 dark:bg-muted/40 border-border/50 mr-8 sm:mr-10",
                       )}
                     >
-                      <AssistantMessageContent content={message.content} />
+                      <AssistantMessageContent content={getTextContent(message)} />
                       <div className="mt-1.5 text-[10px] sm:text-xs opacity-70 text-right">
-                        {formatTimestamp(new Date(message.createdAt || Date.now()))}
+                        {formatTimestamp(new Date((message as { createdAt?: number | string }).createdAt || Date.now()))}
                       </div>
                     </div>
 

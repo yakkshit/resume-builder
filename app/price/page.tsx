@@ -1,9 +1,8 @@
 "use client";
 
-import type React from "react";
-
 import { useState, useRef, useEffect } from "react";
-import { useChat } from "ai/react";
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from "ai";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -40,6 +39,7 @@ import {
 import PDFViewer from "@/components/resume-coverletter/pdf-viewer";
 import ResumeEditor from "@/components/resume-coverletter/resume-editor";
 import { defaultResumeData } from "@/lib/default-resume-data";
+import { getTextContent } from "@/lib/message-utils";
 import type {
   ResumeData,
   Template,
@@ -94,7 +94,7 @@ export default function ResumePage() {
     return "";
   });
   const [showContextInput, setShowContextInput] = useState(false);
-  
+
   // Custom model configuration
   const [customEndpoint, setCustomEndpoint] = useState(() => {
     if (typeof window !== "undefined") {
@@ -128,29 +128,27 @@ export default function ResumePage() {
   const attachmentRef = useRef<HTMLInputElement>(null);
   const [modelErrorBanner, setModelErrorBanner] = useState<string>("");
 
+  const [input, setInput] = useState('');
+
+  const bodyRef = useRef({
+    resumeData, aiMode, model: selectedModel, apiKey,
+    contextText: (selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") ? contextText : undefined,
+    customEndpoint, customModel, customHeaders, customAuth,
+  });
+  bodyRef.current = {
+    resumeData, aiMode, model: selectedModel, apiKey,
+    contextText: (selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") ? contextText : undefined,
+    customEndpoint, customModel, customHeaders, customAuth,
+  };
+
   const {
     messages,
-    input,
-    handleInputChange,
-    handleSubmit,
+    sendMessage,
     setMessages,
-    isLoading,
+    status,
     error,
-    stop,
+    stop
   } = useChat({
-    api: "/api/chat",
-    body: {
-      resumeData,
-      aiMode,
-      model: selectedModel,
-      apiKey: apiKey || undefined,
-      contextText: (selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") ? (contextText || undefined) : undefined,
-      customEndpoint: customEndpoint || undefined,
-      customModel: customModel || undefined,
-      customHeaders: customHeaders || undefined,
-      customAuth: customAuth || undefined,
-      attachedFiles: undefined, // We'll handle files in the submit handler instead
-    },
     onError: (error) => {
       console.error("Chat error:", error);
       if (
@@ -182,6 +180,11 @@ export default function ResumePage() {
         setModelErrorBanner(suggestion);
       }
     },
+
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      prepareSendMessagesRequest: () => ({ body: bodyRef.current }),
+    }),
   });
 
   // Save to localStorage whenever resumeData changes
@@ -307,7 +310,8 @@ export default function ResumePage() {
     try {
       // Improved regex to better match JSON in the message, handling multiline JSON blocks
       const regex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/;
-      const match = lastAssistantMessage.content.match(regex);
+      const content = getTextContent(lastAssistantMessage);
+      const match = content.match(regex);
 
       if (match && match[1]) {
         try {
@@ -415,7 +419,7 @@ export default function ResumePage() {
       } else {
         // Try to find JSON without code blocks
         const jsonRegex = /\{[\s\S]*?\}/g;
-        const jsonMatches = lastAssistantMessage.content.match(jsonRegex);
+        const jsonMatches = content.match(jsonRegex);
 
         if (jsonMatches) {
           // Try each potential JSON match
@@ -498,20 +502,14 @@ export default function ResumePage() {
 
   // Custom chat submission handler that supports file uploads
   const handleChatSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setShowQuotaWarning(false);
 
     // Check if there are attached files
     if (attachedFiles.length > 0) {
-      // Process attached files and send to AI model
       const fileData = await processAttachedFiles(attachedFiles);
-      
-      // Create a comprehensive message that includes file content
       let enhancedInput = input;
-      if (input.trim()) {
-        enhancedInput += '\n\n';
-      }
-      
+      if (input.trim()) enhancedInput += '\n\n';
       enhancedInput += 'Attached Files:\n';
       for (const file of fileData) {
         if (file.contentType === 'pdf') {
@@ -530,34 +528,18 @@ export default function ResumePage() {
           enhancedInput += `\nFile: ${file.name}\nContent: ${file.content}\n`;
         }
       }
-      
-      // Update the input with file content and submit
-      const originalInput = input;
-      handleInputChange({ target: { value: enhancedInput } } as any);
-      
-      // Submit the enhanced message
-      setTimeout(() => {
-        handleSubmit(e);
-        
-        // Restore original input after submission
-        setTimeout(() => {
-          handleInputChange({ target: { value: originalInput } } as any);
-        }, 100);
-      }, 100);
-      
-      // Clear attached files after processing
+      sendMessage({ text: enhancedInput });
+      setInput('');
       setAttachedFiles([]);
-      
       toast({
         title: "Files processed",
         description: `${attachedFiles.length} file(s) have been processed and sent to the AI model.`,
       });
-      
       return;
     }
 
-    // Normal submit without attachment using the useChat hook
-    handleSubmit(e);
+    sendMessage({ text: input });
+    setInput('');
   };
 
   // Process attached files and convert them to text/data that can be sent to AI
@@ -1678,9 +1660,9 @@ export default function ResumePage() {
                     <EnhancedChat
                       messages={messages}
                       input={input}
-                      handleInputChange={handleInputChange}
+                      handleInputChange={e => setInput(e.target.value)}
                       handleSubmit={handleChatSubmit}
-                      isLoading={isLoading}
+                      isLoading={status === "submitted" || status === "streaming"}
                       onStop={stop}
                       applyAiChanges={applyAiChanges}
                       aiMode={aiMode}

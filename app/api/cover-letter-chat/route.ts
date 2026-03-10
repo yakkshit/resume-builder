@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { createUIMessageStream, createUIMessageStreamResponse, generateId } from "ai"
 import { InferenceClient } from "@huggingface/inference"
 
 // Allow streaming responses up to 30 seconds
@@ -208,10 +209,12 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
     // Create a Gemini model instance
     const gemini = genAI.getGenerativeModel({ model: modelId })
 
-    // Convert messages to Gemini format
+    // Convert messages to Gemini format (support both v4 content and v5 parts)
+    const getText = (m: { content?: string; parts?: Array<{ type: string; text?: string }> }) =>
+      m.parts?.filter((p): p is { type: "text"; text: string } => p.type === "text").map((p) => p.text).join("") ?? m.content ?? ""
     const geminiMessages = messages.map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.content }],
+      parts: [{ text: getText(msg) }],
     }))
 
     // Start a chat session
@@ -226,26 +229,23 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
     const lastMessage = geminiMessages[geminiMessages.length - 1]
     const result = await chat.sendMessageStream(lastMessage.parts[0].text)
 
-    // Create a readable stream from the Gemini response
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder()
-
+    const textId = generateId()
+    const stream = createUIMessageStream({
+      execute: async ({ writer }) => {
+        writer.write({ type: "text-start", id: textId })
         try {
           for await (const chunk of result.stream) {
             const text = chunk.text()
-            controller.enqueue(encoder.encode(text))
+            if (text) writer.write({ type: "text-delta", id: textId, delta: text })
           }
-          controller.close()
+          writer.write({ type: "text-end", id: textId })
         } catch (error) {
           console.error("Error streaming from Gemini:", error)
-          controller.error(error)
+          throw error
         }
       },
     })
-
-    // Return the stream as the response
-    return new Response(stream)
+    return createUIMessageStreamResponse({ stream })
   } catch (error) {
     console.error("Error with Gemini model:", error)
     throw error
@@ -253,39 +253,21 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
 }
 
 function handleQuotaExceeded() {
-  // Select a random mock response
   const mockResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
-
-  // Create a readable stream from the mock response
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder()
-
-      // Split the mock response into chunks to simulate streaming
+  const textId = generateId()
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      writer.write({ type: "text-start", id: textId })
       const chunks = mockResponse.split(". ")
-
-      let i = 0
-      const interval = setInterval(() => {
-        if (i >= chunks.length) {
-          clearInterval(interval)
-          controller.close()
-          return
-        }
-
-        // Add the period back except for the last chunk
-        const chunk = chunks[i] + (i < chunks.length - 1 ? "." : "")
-        controller.enqueue(encoder.encode(chunk + " "))
-        i++
-      }, 100) // Stream a chunk every 100ms
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i] + (i < chunks.length - 1 ? ". " : " ")
+        writer.write({ type: "text-delta", id: textId, delta: chunk })
+        await new Promise((r) => setTimeout(r, 100))
+      }
+      writer.write({ type: "text-end", id: textId })
     },
   })
-
-  // Return the stream as the response with a 200 status
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-    },
-  })
+  return createUIMessageStreamResponse({ stream })
 }
 
 // Hugging Face handler

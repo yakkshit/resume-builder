@@ -12,11 +12,12 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { getTextContent } from "@/lib/message-utils"
 import { useToast } from "@/hooks/use-toast"
-import type { Message } from "ai"
+import type { UIMessage } from "ai"
 
 interface CoverLetterChatProps {
-  messages: Message[]
+  messages: UIMessage[]
   input: string
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   handleSubmit: (e: React.FormEvent<HTMLFormElement>, options?: any) => void
@@ -179,9 +180,9 @@ export default function CoverLetterChat({
                           : "bg-muted/50 border border-border/50 mr-10",
                       )}
                     >
-                      <div className="whitespace-pre-wrap text-sm break-words">{message.content}</div>
+                      <div className="whitespace-pre-wrap text-sm break-words">{getTextContent(message)}</div>
                       <div className="mt-1 text-xs opacity-70 text-right">
-                        {formatTimestamp(new Date(message.createdAt || Date.now()))}
+                        {formatTimestamp(new Date((message as { createdAt?: number | string }).createdAt || Date.now()))}
                       </div>
                     </div>
 
