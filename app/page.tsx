@@ -53,9 +53,11 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { resumeTemplates } from "@/components/pdf-templates";
+import { CHAT_MODELS_BY_PROVIDER, CHAT_MODEL_IDS, DEFAULT_CHAT_MODEL } from "@/lib/chat-models";
 import Link from "next/link";
 import EnhancedChat from "@/components/resume-coverletter/enhanced-chat";
 import { extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
+import { getTextContent } from "@/lib/message-utils";
 import LoadingScreen from "@/components/resume-coverletter/loading-screen";
 
 // Import the correct components
@@ -88,7 +90,13 @@ export default function ResumePage() {
   });
   const [aiMode, setAiMode] = useState(true);
   const [jobDescription, setJobDescription] = useState("");
-  const [selectedModel, setSelectedModel] = useState<AIModel>("lingo-ai");
+  const [selectedModel, setSelectedModel] = useState<AIModel>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("resumeAiModel");
+      if (saved && CHAT_MODEL_IDS.includes(saved as any)) return saved as AIModel;
+    }
+    return DEFAULT_CHAT_MODEL as AIModel;
+  });
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [showQuotaWarning, setShowQuotaWarning] = useState(false);
@@ -199,6 +207,13 @@ export default function ResumePage() {
     }
   }, [template]);
 
+  // Save selected AI model to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined" && CHAT_MODEL_IDS.includes(selectedModel as any)) {
+      localStorage.setItem("resumeAiModel", selectedModel);
+    }
+  }, [selectedModel]);
+
   // Save context text to localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -298,10 +313,12 @@ export default function ResumePage() {
   };
 
   const applyAiChanges = () => {
-    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant") as any;
-    if (!lastAssistant?.content) return;
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    if (!lastAssistant) return;
+    const content = getTextContent(lastAssistant);
+    if (!content?.trim()) return;
 
-    const suggestedChanges = extractResumeJsonFromMessage(lastAssistant.content);
+    const suggestedChanges = extractResumeJsonFromMessage(content);
 
     if (!suggestedChanges) {
       toast({
@@ -681,7 +698,7 @@ export default function ResumePage() {
   return (
     <LoadingScreen minLoadingTime={5000}>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-        <div className="container mx-auto py-8 px-4">
+        <div className="container mx-auto py-8 px-2 sm:px-4">
           <header className="mb-8 text-center">
             <h1 className="text-4xl font-bold mb-2 text-primary">
               AI-Powered Resume Generator
@@ -877,177 +894,18 @@ export default function ResumePage() {
                           <SelectValue placeholder="Select AI model" />
                         </SelectTrigger>
                         <SelectContent className="max-h-96">
-                          {/* Specialized Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Specialized Models
-                          </div>
-                          <SelectItem value="lingo-ai">Lingo AI</SelectItem>
-
-                          {/* Google Gemini Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Google Gemini
-                          </div>
-
-                          {/* Gemini 3 (preview) */}
-                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
-                            Gemini 3 (preview)
-                          </div>
-                          <SelectItem value="gemini-3-flash-preview">Gemini 3 Flash Preview</SelectItem>
-                          <SelectItem value="gemini-3-pro-preview">Gemini 3 Pro Preview</SelectItem>
-                          <SelectItem value="gemini-3-pro-image-preview">Gemini 3 Pro Image Preview</SelectItem>
-
-                          {/* Gemini 2.5 */}
-                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
-                            Gemini 2.5
-                          </div>
-                          <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash</SelectItem>
-                          <SelectItem value="gemini-2.5-pro">Gemini 2.5 Pro</SelectItem>
-                          <SelectItem value="gemini-2.5-flash-lite">Gemini 2.5 Flash Lite</SelectItem>
-                          <SelectItem value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</SelectItem>
-
-                          {/* Gemini 2.0 */}
-                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
-                            Gemini 2.0
-                          </div>
-                          <SelectItem value="gemini-2.0-flash-exp">Gemini 2.0 Flash Exp</SelectItem>
-                          <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
-                          <SelectItem value="gemini-2.0-flash-001">Gemini 2.0 Flash 001</SelectItem>
-                          <SelectItem value="gemini-2.0-flash-lite">Gemini 2.0 Flash Lite</SelectItem>
-                          <SelectItem value="gemini-2.0-pro">Gemini 2.0 Pro</SelectItem>
-
-                          {/* Gemini 1.5 */}
-                          <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
-                          <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash</SelectItem>
-
-                          {/* OpenAI (GPT-5 + 4) */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            OpenAI
-                          </div>
-                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
-                            GPT-5 (roadmap)
-                          </div>
-                          <SelectItem value="gpt-5">GPT-5</SelectItem>
-                          <SelectItem value="gpt-5.2">GPT-5.2</SelectItem>
-                          <SelectItem value="gpt-5.2-instant">GPT-5.2 Instant</SelectItem>
-                          <SelectItem value="gpt-5.3-codex">GPT-5.3 Codex</SelectItem>
-                          <SelectItem value="gpt-5.3-codex-spark">GPT-5.3 Codex Spark</SelectItem>
-                          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground ml-2">
-                            GPT-4
-                          </div>
-                          <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                          <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-                          <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                          <SelectItem value="gpt-4">GPT-4</SelectItem>
-                          <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-
-                          {/* Anthropic Claude (4/5 + 3) */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Anthropic Claude
-                          </div>
-                          <SelectItem value="claude-opus-4.6">Claude Opus 4.6</SelectItem>
-                          <SelectItem value="claude-opus-4.5">Claude Opus 4.5</SelectItem>
-                          <SelectItem value="claude-sonnet-5">Claude Sonnet 5</SelectItem>
-                          <SelectItem value="claude-sonnet-4.5">Claude Sonnet 4.5</SelectItem>
-                          <SelectItem value="claude-haiku-4.5">Claude Haiku 4.5</SelectItem>
-                          <SelectItem value="claude-3-5-sonnet">Claude 3.5 Sonnet</SelectItem>
-                          <SelectItem value="claude-3-5-haiku">Claude 3.5 Haiku</SelectItem>
-                          <SelectItem value="claude-3-opus">Claude 3 Opus</SelectItem>
-                          <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
-                          <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
-                          <SelectItem value="claude-2.1">Claude 2.1</SelectItem>
-                          <SelectItem value="claude-2.0">Claude 2.0</SelectItem>
-                          <SelectItem value="claude-instant-1.2">Claude Instant 1.2</SelectItem>
-
-                          {/* DeepSeek */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            DeepSeek
-                          </div>
-                          <SelectItem value="deepseek-chat">DeepSeek Chat</SelectItem>
-                          <SelectItem value="deepseek-reasoner">DeepSeek Reasoner</SelectItem>
-                          <SelectItem value="deepseek-coder">DeepSeek Coder</SelectItem>
-                          <SelectItem value="deepseek-coder-v2">DeepSeek Coder v2</SelectItem>
-                          <SelectItem value="deepseek-coder-v2-lite">DeepSeek Coder v2 Lite</SelectItem>
-
-                          {/* Groq Models (Fast Inference) */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Groq (Fast)
-                          </div>
-                          <SelectItem value="llama-3.1-8b-instant">Llama 3.1 8B Instant</SelectItem>
-                          <SelectItem value="llama-3.1-70b-versatile">Llama 3.1 70B Versatile</SelectItem>
-                          <SelectItem value="llama-3.3-70b-versatile">Llama 3.3 70B Versatile</SelectItem>
-                          <SelectItem value="mixtral-8x7b-32768">Mixtral 8x7B 32K</SelectItem>
-                          <SelectItem value="gemma2-9b-it">Gemma2 9B IT</SelectItem>
-
-                          {/* Mistral (3.x + mini/magistral/devstral) */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Mistral
-                          </div>
-                          <SelectItem value="mistral-large-3">Mistral Large 3</SelectItem>
-                          <SelectItem value="mistral-medium-3.1">Mistral Medium 3.1</SelectItem>
-                          <SelectItem value="mistral-small-3.2">Mistral Small 3.2</SelectItem>
-                          <SelectItem value="ministral-3-14b">Ministral 3 14B</SelectItem>
-                          <SelectItem value="ministral-3-8b">Ministral 3 8B</SelectItem>
-                          <SelectItem value="devstral-2">Devstral 2</SelectItem>
-                          <SelectItem value="mistral-large-latest">Mistral Large</SelectItem>
-                          <SelectItem value="mistral-medium-latest">Mistral Medium</SelectItem>
-                          <SelectItem value="mistral-small-latest">Mistral Small</SelectItem>
-                          <SelectItem value="mistral-7b-instruct">Mistral 7B Instruct</SelectItem>
-
-                          {/* Together.ai Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Together.ai
-                          </div>
-                          <SelectItem value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B Instruct</SelectItem>
-                          <SelectItem value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B Instruct</SelectItem>
-                          <SelectItem value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B Instruct</SelectItem>
-
-                          {/* Cohere Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Cohere
-                          </div>
-                          <SelectItem value="command-r-plus">Command R+</SelectItem>
-                          <SelectItem value="command-r">Command R</SelectItem>
-                          <SelectItem value="command-light">Command Light</SelectItem>
-
-                          {/* Perplexity Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Perplexity
-                          </div>
-                          <SelectItem value="llama-3.1-8b-instruct">Llama 3.1 8B Instruct</SelectItem>
-                          <SelectItem value="llama-3.1-70b-instruct">Llama 3.1 70B Instruct</SelectItem>
-                          <SelectItem value="mixtral-8x7b-instruct">Mixtral 8x7B Instruct</SelectItem>
-
-                          {/* Fireworks Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Fireworks
-                          </div>
-                          <SelectItem value="fireworks-llama-3.1-8b-instruct">Llama 3.1 8B Instruct</SelectItem>
-                          <SelectItem value="fireworks-llama-3.1-70b-instruct">Llama 3.1 70B Instruct</SelectItem>
-                          <SelectItem value="fireworks-mixtral-8x7b-instruct">Mixtral 8x7B Instruct</SelectItem>
-
-                          {/* Hugging Face Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Hugging Face
-                          </div>
-                          <SelectItem value="huggingface-endpoint">Endpoint</SelectItem>
-                          <SelectItem value="huggingface-model">Model</SelectItem>
-                          <SelectItem value="huggingface-streaming">Model with Streaming</SelectItem>
-                          <SelectItem value="huggingface-provider">Third-party Provider</SelectItem>
-
-                          {/* Custom Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Custom Models
-                          </div>
-                          <SelectItem value="local-custom">Local/Custom API</SelectItem>
-
-                          {/* Local Models */}
-                          <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
-                            Local Models
-                          </div>
-                          <SelectItem value="ollama-local">Ollama Local</SelectItem>
-                          <SelectItem value="lmstudio-local">LM Studio Local</SelectItem>
-                          <SelectItem value="openai-like-local">OpenAI-like Local</SelectItem>
-
+                          {Object.entries(CHAT_MODELS_BY_PROVIDER).map(([providerName, ids]) => (
+                            <div key={providerName}>
+                              <div className="px-2 py-1.5 text-sm font-semibold text-muted-foreground">
+                                {providerName}
+                              </div>
+                              {(ids as readonly string[]).map((id) => (
+                                <SelectItem key={id} value={id}>
+                                  {id === "lingo-ai" ? "Lingo AI" : id === "cedz" ? "Cedz (URL + model below)" : id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                                </SelectItem>
+                              ))}
+                            </div>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1056,7 +914,8 @@ export default function ResumePage() {
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-1">
                         <Label htmlFor="api-key">
-                          {selectedModel.startsWith("gemini") ? "Google" :
+                          {selectedModel.startsWith("cedz") ? "Cedz API URL (optional if set in .env)" :
+                            selectedModel.startsWith("gemini") ? "Google" :
                             selectedModel.startsWith("gpt") ? "OpenAI" :
                               selectedModel.startsWith("claude") ? "Anthropic" :
                                 selectedModel.startsWith("deepseek") ? "DeepSeek" :
@@ -1081,7 +940,7 @@ export default function ResumePage() {
                         <Input
                           id="api-key"
                           type={showApiKey ? "text" : "password"}
-                          placeholder={`Enter your ${selectedModel.startsWith("gemini") ? "Google" :
+                          placeholder={selectedModel.startsWith("cedz") ? "Not needed for Cedz; set base URL above" : `Enter your ${selectedModel.startsWith("gemini") ? "Google" :
                             selectedModel.startsWith("gpt") ? "OpenAI" :
                               selectedModel.startsWith("claude") ? "Anthropic" :
                                 selectedModel.startsWith("deepseek") ? "DeepSeek" :
@@ -1112,12 +971,49 @@ export default function ResumePage() {
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {selectedModel.startsWith("gemini") ? "Get your API key from Google Ai Studio Platform." :
+                        {selectedModel.startsWith("cedz") ? "Set CEDZ_API_URL in .env or enter the Cedz/Ollama base URL above (e.g. https://xxx.ngrok-free.app)." :
+                          selectedModel.startsWith("gemini") ? "Get your API key from Google Ai Studio Platform." :
                           selectedModel.startsWith("huggingface") ? "Get your API key from Hugging Face (huggingface.co/settings/tokens)" :
                             selectedModel === "lingo-ai" ? "Get your Lingo AI API key from cedzlabs.com/resume-builder" :
-                              "API key required for this model. Get one from the provider's website." + "https://" + selectedModel.split("-")[0] + ".com/api-keys"}
+                              "API key required for this model. Get one from the provider's website."}
                       </p>
                     </div>
+
+                    {/* Cedz: URL + Model (no API key needed) */}
+                    {selectedModel === "cedz" && (
+                      <div className="mb-4 p-4 rounded-lg border border-primary/20 bg-primary/5 space-y-3">
+                        <p className="text-sm font-medium text-foreground">Cedz configuration</p>
+                        <div>
+                          <Label htmlFor="cedz-endpoint">API URL</Label>
+                          <Input
+                            id="cedz-endpoint"
+                            placeholder="https://xxx.ngrok-free.app or https://host/api/generate"
+                            value={customEndpoint}
+                            onChange={(e) => setCustomEndpoint(e.target.value)}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Base URL (e.g. https://xxx.ngrok-free.app) or full /api/generate URL
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="cedz-model">Model</Label>
+                          <Input
+                            id="cedz-model"
+                            placeholder="qwen3:8b"
+                            value={customModel}
+                            onChange={(e) => setCustomModel(e.target.value)}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Model name (e.g. qwen3:8b, llama3.1:8b)
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Cedz streams thinking when available; otherwise shows &quot;We are tailoring the resume.&quot;
+                        </p>
+                      </div>
+                    )}
 
                     {/* Custom Model Configuration */}
                     {(selectedModel.startsWith("huggingface") || selectedModel === "local-custom" ||
@@ -1616,10 +1512,13 @@ export default function ResumePage() {
                     {/* Enhanced Chat Component */}
                     <EnhancedChat
                       messages={messages as any}
+                      setMessages={setMessages}
+                      sendMessage={sendMessage}
                       input={input}
                       handleInputChange={e => setInput(e.target.value)}
                       handleSubmit={handleChatSubmit}
                       isLoading={status === "submitted" || status === "streaming"}
+                      isStreaming={status === "streaming"}
                       onStop={stop}
                       applyAiChanges={applyAiChanges}
                       aiMode={aiMode}
@@ -1631,27 +1530,17 @@ export default function ResumePage() {
                 </Tabs>
               </Card>
 
-              {/* Template Gallery Marquee */}
-              <div className="mt-6">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-semibold">Template Gallery</h3>
-                  <span className="text-sm text-muted-foreground">
-                    Hover to pause
-                  </span>
-                </div>
-                <InfiniteMarquee items={galleryItems} />
-              </div>
             </div>
 
             {/* Right Column - Preview & Controls */}
             <div className="space-y-6">
 
-              <div className="h-[800px]">
+              <div className="h-[500px] md:h-[700px] lg:h-[800px]">
                 <PdfPreviewClient resumeData={resumeData} template={template} />
               </div>
 
               <Card className="p-2 border shadow-md">
-                <div className="flex flex-wrap gap-2 justify-between items-center mb-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
                   <div className="flex flex-wrap gap-2">
                     <input
                       type="file"
@@ -1694,7 +1583,7 @@ export default function ResumePage() {
                     </Button>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 justify-start md:justify-end">
                     <Select
                       value={template}
                       onValueChange={(value: Template) => setTemplate(value)}

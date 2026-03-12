@@ -69,9 +69,13 @@ export type Template = keyof typeof resumeTemplates
 
 export type AIModel =
   | "lingo-ai"
+  // Gemini 3.x text / multimodal
+  | "gemini-3.1-pro-preview"
   | "gemini-3-flash-preview"
-  | "gemini-3-pro-preview"
+  | "gemini-3.1-flash-lite-preview"
+  | "gemini-3.1-flash-image-preview"
   | "gemini-3-pro-image-preview"
+  // Gemini 2.5 family (text / multimodal / media)
   | "gemini-2.5-flash"
   | "gemini-2.5-flash-preview-09-2025"
   | "gemini-2.5-flash-image"
@@ -165,7 +169,11 @@ export type AIModel =
   | "local-custom"
   | "ollama-local"
   | "lmstudio-local"
-  | "openai-like-local";
+  | "openai-like-local"
+  | "qwen3-8b"
+  | "cedz"
+  | "cedz-llama3-8b"
+  | "cedz-custom";
 
 
 // Cover Letter Types

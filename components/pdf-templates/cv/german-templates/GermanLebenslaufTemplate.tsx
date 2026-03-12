@@ -560,17 +560,6 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
           </View>
         ) : null}
 
-        {/* German CV Footer with Fancy Signature */}
-        <View style={styles.footer}>
-          <View style={styles.signatureSection}>
-            <Text style={styles.dateLocation}>
-              {basicInfo.location || "Ort"}, {new Date().toLocaleDateString("de-DE")}
-            </Text>
-            <Text style={styles.fancySignature}>{getSignatureName(basicInfo.name)}</Text>
-            <View style={styles.signatureLine} />
-            <Text style={styles.signatureLabel}>Unterschrift</Text>
-          </View>
-        </View>
       </Page>
     </Document>
   )
