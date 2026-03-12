@@ -124,9 +124,9 @@ const styles = StyleSheet.create({
     lineHeight: 1.5,
   },
   profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     marginRight: 15,
     borderWidth: 1,
     borderColor: "#333",

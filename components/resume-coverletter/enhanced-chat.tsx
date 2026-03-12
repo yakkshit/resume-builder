@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Send, StopCircle, FileText, X, Paperclip, Image, FileUp, Sparkles, Bot, User, ChevronDown } from "lucide-react"
+import { Send, StopCircle, FileText, X, Paperclip, Image, FileUp, Sparkles, Bot, User, ChevronDown, Pencil, RotateCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -14,27 +14,72 @@ import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import type { UIMessage } from "ai"
 import { extractResumeJsonFromMessage, getSuggestedSectionsSummary } from "@/lib/extract-resume-json"
-import { getTextContent } from "@/lib/message-utils"
+import { getTextContent, getReasoningContent } from "@/lib/message-utils"
+import ReactMarkdown from "react-markdown"
 
-function AssistantMessageContent({ content }: { content: string }) {
-  const update = extractResumeJsonFromMessage(content)
+function MarkdownContent({ content, className }: { content: string; className?: string }) {
+  if (!content || typeof content !== "string") return null
+  return (
+    <div className={cn("prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-2 prose-li:my-0", className)}>
+      <ReactMarkdown
+        components={{
+          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+          ul: ({ children }) => <ul className="list-disc pl-5 space-y-0.5 my-2">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-5 space-y-0.5 my-2">{children}</ol>,
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
+function AssistantMessageContent({ message, content, reasoning, isStreaming }: { message?: UIMessage; content: string; reasoning?: string; isStreaming?: boolean }) {
+  const safeContent = typeof content === "string" ? content : ""
+  const update = extractResumeJsonFromMessage(safeContent)
   const sections = update ? getSuggestedSectionsSummary(update) : []
-  const hasSuggestedChanges = sections.length > 0
+  const hasSuggestedChanges = Array.isArray(sections) && sections.length > 0 && !isStreaming
+  const showReasoning = (reasoning ?? "").trim().length > 0
 
   if (!hasSuggestedChanges) {
     return (
-      <div className="whitespace-pre-wrap text-sm break-words overflow-hidden hyphens-auto leading-relaxed">
-        {content}
+      <div className="space-y-2 relative">
+        {showReasoning && (
+          <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm">
+            <p className="font-medium text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" aria-hidden />
+              {isStreaming ? "Thinking…" : "Thought process"}
+            </p>
+            <div className="whitespace-pre-wrap text-xs text-muted-foreground break-words leading-relaxed">
+              {reasoning}
+            </div>
+          </div>
+        )}
+        {safeContent ? (
+          <div className="text-sm break-words overflow-hidden leading-relaxed">
+            <MarkdownContent content={safeContent} className="text-foreground" />
+            {isStreaming && (
+              <span className="inline-block w-2 h-4 ml-0.5 bg-primary animate-pulse align-middle" aria-hidden />
+            )}
+          </div>
+        ) : isStreaming && !showReasoning && !safeContent ? (
+          <p className="text-sm text-muted-foreground italic flex items-center gap-2">
+            <span className="inline-block w-2 h-4 bg-primary animate-pulse rounded" aria-hidden />
+            We are tailoring the resume.
+          </p>
+        ) : null}
       </div>
     )
   }
 
-  const withoutJsonBlock = content.replace(/```(?:json)?\s*[\s\S]*?```/g, "").trim()
+  const withoutJsonBlock = safeContent.replace(/```(?:json)?\s*[\s\S]*?```/g, "").trim()
   return (
     <div className="space-y-2">
       {withoutJsonBlock && (
-        <div className="whitespace-pre-wrap text-sm break-words overflow-hidden hyphens-auto leading-relaxed">
-          {withoutJsonBlock}
+        <div className="text-sm break-words overflow-hidden leading-relaxed">
+          <MarkdownContent content={withoutJsonBlock} className="text-foreground" />
         </div>
       )}
       <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
@@ -49,10 +94,13 @@ function AssistantMessageContent({ content }: { content: string }) {
 
 interface EnhancedChatProps {
   messages: UIMessage[]
+  setMessages?: (messages: UIMessage[] | ((prev: UIMessage[]) => UIMessage[])) => void
+  sendMessage?: (options: { text: string }) => void
   input: string
   handleInputChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
   handleSubmit: (e: React.FormEvent<HTMLFormElement>, options?: any) => void
   isLoading: boolean
+  isStreaming?: boolean
   onStop?: () => void
   applyAiChanges: () => void
   aiMode: boolean
@@ -63,10 +111,13 @@ interface EnhancedChatProps {
 
 export default function EnhancedChat({
   messages,
+  setMessages,
+  sendMessage,
   input,
   handleInputChange,
   handleSubmit,
   isLoading,
+  isStreaming = false,
   onStop,
   applyAiChanges,
   aiMode,
@@ -81,8 +132,11 @@ export default function EnhancedChat({
   const [canApplyChanges, setCanApplyChanges] = useState(false)
   const [typingIndicator, setTypingIndicator] = useState(false)
   const [showScrollToBottom, setShowScrollToBottom] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState("")
   const lastMessageCountRef = useRef(0)
   const userScrolledRef = useRef(false)
+  const canEdit = Boolean(setMessages && sendMessage)
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     messagesEndRef.current?.scrollIntoView({ behavior })
@@ -201,6 +255,41 @@ export default function EnhancedChat({
     const { scrollTop, scrollHeight, clientHeight } = el
     const nearBottom = scrollHeight - scrollTop - clientHeight < 80
     if (!nearBottom) userScrolledRef.current = true
+  }
+
+  const startEdit = (msg: UIMessage) => {
+    setEditingId(msg.id)
+    setEditDraft(getTextContent(msg))
+  }
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditDraft("")
+  }
+  const saveEdit = () => {
+    if (!setMessages || !editingId || editDraft.trim() === "") {
+      cancelEdit()
+      return
+    }
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === editingId
+          ? { ...m, parts: [{ type: "text" as const, text: editDraft.trim() }] }
+          : m
+      )
+    )
+    toast({ title: "Message updated", description: "Your edit has been saved." })
+    cancelEdit()
+  }
+  const resendFromMessage = (msg: UIMessage) => {
+    if (!setMessages || !sendMessage) return
+    const text = editingId === msg.id ? editDraft.trim() : getTextContent(msg)
+    if (!text) return
+    const idx = messages.findIndex((m) => m.id === msg.id)
+    if (idx < 0) return
+    setMessages((prev) => prev.slice(0, idx + 1))
+    cancelEdit()
+    sendMessage({ text })
+    toast({ title: "Resending", description: "New response will appear below." })
   }
 
   return (
@@ -324,10 +413,81 @@ export default function EnhancedChat({
                           : "bg-muted/70 dark:bg-muted/50 border-border/60 mr-8 sm:mr-10 dark:border-border/80 hover:shadow-md",
                       )}
                     >
-                      <AssistantMessageContent content={getTextContent(message)} />
-                      <div className="mt-1.5 text-[10px] sm:text-xs opacity-70 text-right">
-                        {formatTimestamp(new Date((message as { createdAt?: number | string }).createdAt || Date.now()))}
-                      </div>
+                      {message.role === "user" && editingId === message.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={editDraft}
+                            onChange={(e) => setEditDraft(e.target.value)}
+                            className="min-h-[80px] text-sm bg-background/90 text-foreground border-primary/30 resize-none"
+                            placeholder="Edit message..."
+                          />
+                          <div className="flex flex-wrap gap-2 justify-end">
+                            <Button type="button" variant="ghost" size="sm" onClick={cancelEdit}>
+                              Cancel
+                            </Button>
+                            <Button type="button" variant="secondary" size="sm" onClick={saveEdit}>
+                              Save
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => resendFromMessage(message)}
+                              disabled={!editDraft.trim()}
+                            >
+                              <RotateCw className="h-3.5 w-3.5 mr-1" />
+                              Resend from here
+                            </Button>
+                          </div>
+                        </div>
+                      ) : message.role === "assistant" ? (
+                        <AssistantMessageContent
+                          message={message}
+                          content={getTextContent(message)}
+                          reasoning={getReasoningContent(message)}
+                          isStreaming={isStreaming && idx === messages.length - 1}
+                        />
+                      ) : (
+                        <div className="whitespace-pre-wrap text-sm break-words">{getTextContent(message)}</div>
+                      )}
+                      {editingId !== message.id && (
+                        <div className="mt-1.5 flex items-center justify-end gap-2">
+                          {message.role === "user" && canEdit && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-70 hover:opacity-100"
+                                    onClick={() => startEdit(message)}
+                                  >
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left">Edit message</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 opacity-70 hover:opacity-100"
+                                    onClick={() => resendFromMessage(message)}
+                                  >
+                                    <RotateCw className="h-3 w-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="left">Resend from here</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                          <span className="text-[10px] sm:text-xs opacity-70">
+                            {formatTimestamp(new Date((message as { createdAt?: number | string }).createdAt || Date.now()))}
+                          </span>
+                        </div>
+                      )}
                     </motion.div>
 
                     {message.role === "user" && (

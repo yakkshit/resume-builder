@@ -4,7 +4,8 @@ import { GoogleGenAI } from "@google/genai"
 import { createUIMessageStream, createUIMessageStreamResponse, generateId } from 'ai'
 import mime from "mime"
 import type { NextRequest } from "next/server"
-import { requireApiKey } from "@/lib/api-auth"
+import { DEFAULT_CHAT_MODEL, CHAT_MODELS_BY_PROVIDER } from "@/lib/chat-models"
+import { redactResumePII, redactTextPII } from "@/lib/redact-resume-pii"
 
 /** Extract text from message (supports v4 content and v5 parts) */
 const getMsgText = (m: { content?: string; parts?: Array<{ type: string; text?: string }> }) =>
@@ -33,135 +34,49 @@ import { writeFile } from "fs"
 export const maxDuration = 30
 
 // Define available models with their providers and configurations (aligned with UI selector)
-const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiKey?: string }> = {
-  // Specialized
-  "lingo-ai": { provider: "lingo-ai", modelId: "resume-model-v1" },
+const AVAILABLE_MODELS = Object.entries(CHAT_MODELS_BY_PROVIDER).reduce((acc, [providerName, modelIds]) => {
+  // Provider mapping for internal handling
+  let internalProvider = "google"
+  if (providerName === "Cedz") internalProvider = "cedz"
+  else if (providerName === "Lingo AI") internalProvider = "lingo-ai"
+  else if (providerName === "OpenAI") internalProvider = "openai"
+  else if (providerName === "Anthropic Claude") internalProvider = "anthropic"
+  else if (providerName === "DeepSeek") internalProvider = "deepseek"
+  else if (providerName === "Groq") internalProvider = "groq"
+  else if (providerName === "Mistral") internalProvider = "mistral"
+  else if (providerName === "Hugging Face") internalProvider = "huggingface"
+  else if (providerName === "Local / Custom") internalProvider = "local" // Will be overridden in specific handlers
 
-  // Google Gemini — core + preview (2026)
-  "gemini-3-flash-preview": { provider: "google", modelId: "gemini-3-flash-preview" },
-  "gemini-3-pro-preview": { provider: "google", modelId: "gemini-3-pro-preview" },
-  "gemini-3-pro-image-preview": { provider: "google", modelId: "gemini-3-pro-image-preview" },
-  "gemini-2.5-flash": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-2.5-flash-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-2.5-flash-image": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-2.5-flash-live": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-2.5-flash-native-audio-preview-12-2025": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-2.5-flash-native-audio-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-2.5-flash-preview-tts": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-2.5-flash-lite": { provider: "google", modelId: "gemini-2.5-flash-lite" },
-  "gemini-2.5-flash-lite-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash-lite" },
-  "gemini-2.5-pro": { provider: "google", modelId: "gemini-2.5-pro" },
-  "gemini-2.5-pro-preview-tts": { provider: "google", modelId: "gemini-2.5-pro" },
-  "gemini-2.0-flash-exp": { provider: "google", modelId: "gemini-2.0-flash-exp" },
-  "gemini-2.0-flash": { provider: "google", modelId: "gemini-2.0-flash" },
-  "gemini-2.0-flash-001": { provider: "google", modelId: "gemini-2.0-flash" },
-  "gemini-2.0-flash-lite": { provider: "google", modelId: "gemini-2.0-flash-lite" },
-  "gemini-2.0-flash-lite-001": { provider: "google", modelId: "gemini-2.0-flash-lite" },
-  "gemini-2.0-pro": { provider: "google", modelId: "gemini-2.0-pro" },
-  "gemini-1.5-pro": { provider: "google", modelId: "gemini-1.5-pro" },
-  "gemini-1.5-flash": { provider: "google", modelId: "gemini-1.5-flash" },
+  for (const modelId of modelIds) {
+    // Basic local overrides
+    let mappedProvider = internalProvider
+    if (modelId === "ollama-local") mappedProvider = "ollama"
+    if (modelId === "lmstudio-local") mappedProvider = "lmstudio"
+    if (modelId === "openai-like-local") mappedProvider = "openai-like"
 
-  // OpenAI (core + 2026 roadmap IDs; newer may resolve to latest)
-  "gpt-5": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-5.2": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-5.2-instant": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-5.3-codex": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-5.3-codex-spark": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-4o": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-4o-mini": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-4-turbo": { provider: "openai", modelId: "gpt-4-turbo", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-4": { provider: "openai", modelId: "gpt-4-turbo", apiKey: process.env.OPENAI_API_KEY },
-  "gpt-3.5-turbo": { provider: "openai", modelId: "gpt-3.5-turbo", apiKey: process.env.OPENAI_API_KEY },
-
-  // Anthropic Claude (4.x/5 + legacy; newer slugs may need API model IDs)
-  "claude-opus-4.6": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-opus-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-sonnet-5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-sonnet-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-haiku-4.5": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-3-5-sonnet": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-3-5-haiku": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-3-opus": { provider: "anthropic", modelId: "claude-3-opus-20240229", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-3-sonnet": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-3-haiku": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-2.1": { provider: "anthropic", modelId: "claude-2.1", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-2.0": { provider: "anthropic", modelId: "claude-2.0", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-instant-1.2": { provider: "anthropic", modelId: "claude-instant-1.2", apiKey: process.env.ANTHROPIC_API_KEY },
-
-  // DeepSeek
-  "deepseek-chat": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
-  "deepseek-reasoner": { provider: "deepseek", modelId: "deepseek-reasoner", apiKey: process.env.DEEPSEEK_API_KEY },
-  "deepseek-coder": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
-  "deepseek-coder-v2": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
-  "deepseek-coder-v2-lite": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
-
-  // Groq
-  "llama-3.1-8b-instant": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
-  "llama-3.1-70b-versatile": { provider: "groq", modelId: "llama-3.1-70b-versatile", apiKey: process.env.GROQ_API_KEY },
-  "llama-3.3-70b-versatile": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
-  "mixtral-8x7b-32768": { provider: "groq", modelId: "mixtral-8x7b-32768", apiKey: process.env.GROQ_API_KEY },
-  "gemma2-9b-it": { provider: "groq", modelId: "gemma2-9b-it", apiKey: process.env.GROQ_API_KEY },
-  "llama-3.1-8b": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
-  "llama-3.1-70b": { provider: "groq", modelId: "llama-3.1-70b-versatile", apiKey: process.env.GROQ_API_KEY },
-  "llama-3.3-70b": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
-  "llama3-70b-8192": { provider: "groq", modelId: "llama3-70b-8192", apiKey: process.env.GROQ_API_KEY },
-
-  // Mistral (3.x + mini/magistral/devstral)
-  "mistral-large-3": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-medium-3.1": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-small-3.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-medium-3": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-small-3.1": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "ministral-3-14b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "ministral-3-8b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "ministral-3-3b": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
-  "magistral-medium-1.2": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "magistral-small-1.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "devstral-2": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "devstral-medium-1.0": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "devstral-small-2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-large-latest": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-medium-latest": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-small-latest": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-7b-instruct": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
-
-  // Together.ai
-  "meta-llama/llama-3.1-8b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.1-8B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
-  "meta-llama/llama-3.1-70b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.1-70B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
-  "meta-llama/llama-3.3-70b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.3-70B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
-
-  // Cohere
-  "command-r-plus": { provider: "cohere", modelId: "command-r-plus", apiKey: process.env.COHERE_API_KEY },
-  "command-r": { provider: "cohere", modelId: "command-r", apiKey: process.env.COHERE_API_KEY },
-  "command-light": { provider: "cohere", modelId: "command-light", apiKey: process.env.COHERE_API_KEY },
-
-  // Perplexity
-  "llama-3.1-sonar-large-128k-online": { provider: "perplexity", modelId: "llama-3.1-sonar-large-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
-  "llama-3.1-8b-instruct": { provider: "perplexity", modelId: "llama-3.1-sonar-small-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
-  "llama-3.1-70b-instruct": { provider: "perplexity", modelId: "llama-3.1-sonar-large-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
-  "mixtral-8x7b-instruct": { provider: "perplexity", modelId: "mixtral-8x7b-instruct", apiKey: process.env.PERPLEXITY_API_KEY },
-
-  // Fireworks
-  "fireworks-llama-3.1-8b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/llama-v3p1-8b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
-  "fireworks-llama-3.1-70b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/llama-v3p1-70b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
-  "fireworks-mixtral-8x7b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/mixtral-8x7b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
-
-  // Hugging Face
-  "huggingface-endpoint": { provider: "huggingface", modelId: "endpoint", apiKey: process.env.HUGGINGFACE_API_KEY },
-  "huggingface-model": { provider: "huggingface", modelId: "model", apiKey: process.env.HUGGINGFACE_API_KEY },
-  "huggingface-streaming": { provider: "huggingface", modelId: "streaming", apiKey: process.env.HUGGINGFACE_API_KEY },
-  "huggingface-provider": { provider: "huggingface", modelId: "provider", apiKey: process.env.HUGGINGFACE_API_KEY },
-
-  // Local / Custom
-  "local-custom": { provider: "local", modelId: "local-custom" },
-  "ollama-local": { provider: "ollama", modelId: "ollama" },
-  "lmstudio-local": { provider: "lmstudio", modelId: "lmstudio" },
-  "openai-like-local": { provider: "openai-like", modelId: "openai-like" },
-};
+    acc[modelId] = {
+      provider: mappedProvider,
+      modelId: modelId,
+    }
+  }
+  return acc
+}, {} as Record<string, { provider: string; modelId: string }>)
 
 
 // Default model if none specified (efficient for resume/cover letter)
-const DEFAULT_MODEL = "gemini-2.0-flash"
+const DEFAULT_MODEL = DEFAULT_CHAT_MODEL
+
+// Map our UI model IDs to provider-specific API model IDs where they differ
+const API_MODEL_IDS: Record<string, string> = {
+  "claude-3-5-sonnet": "claude-3-5-sonnet-20241022",
+  "claude-3-5-haiku": "claude-3-5-haiku-20241022",
+  "mistral-large-latest": "mistral-large-2411",
+  "mistral-medium-latest": "mistral-medium-latest",
+  "mistral-small-latest": "mistral-small-latest",
+  "llama-3.1-8b-instant": "llama-3.1-8b-instant",
+  "llama-3.1-70b-versatile": "llama-3.1-70b-versatile",
+  "mixtral-8x7b-32768": "mixtral-8x7b-32768",
+}
 
 // Mock response for when API quota is exceeded
 const MOCK_RESPONSES = [
@@ -170,17 +85,16 @@ const MOCK_RESPONSES = [
   "API quota exceeded. While I can't analyze your specific resume right now, here are universal resume tips:\n\n- Use a clean, professional layout with consistent formatting\n- Place the most relevant information at the top\n- Use bullet points for better readability\n- Include metrics and specific results when possible\n- Remove outdated or irrelevant information",
 ]
 
-// Update the POST function to handle attachedData
+// Update the POST function to handle attachedData (no app-level API key required; users provide provider keys in UI)
 export async function POST(req: NextRequest) {
-  const auth = requireApiKey(req)
-  if (auth) return auth
-
   const { messages, resumeData, aiMode, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth } = await req.json()
 
   // Create a system message based on the mode
-  let systemMessage = "";
+  let systemMessage = ""
 
-  const resumeJson = JSON.stringify(resumeData ?? {})
+  // Redact PII (name, email, phone, location) before sending to AI - protects user privacy
+  const redactedResume = redactResumePII(resumeData)
+  const resumeJson = JSON.stringify(redactedResume)
 
   if (aiMode) {
     systemMessage = `You are an AI Resume Assistant. The user will give you their resume data and often a job description or request (e.g. "tailor my resume to this job", "update my summary").
@@ -202,6 +116,7 @@ Your response must follow this structure every time you suggest resume changes:
 Rules:
 - Output ONLY the keys and values you are modifying. Omit any section you are not changing.
 - Never include "profilePicture" in the JSON.
+- Never include "name", "email", "phone", or "location" in basicInfo - these are privacy-protected; the user's values are preserved.
 - For partial updates (e.g. only summary), output only: \`\`\`json\n{"basicInfo":{"summary":"Your new summary text."}}\n\`\`\`
 - Keep JSON valid: no trailing commas, no comments, use double quotes for strings.
 - For "update my summary" or similar: return \`\`\`json\n{"basicInfo":{"summary":"<improved summary>"}}\n\`\`\` and a brief explanation.
@@ -216,7 +131,7 @@ When you suggest specific text or structure changes, you MUST include exactly on
 {"basicInfo":{"summary":"..."},"skills":[],"experience":[],"education":[],"projects":[],"achievements":[]}
 \`\`\`
 
-- Include only keys you are modifying. Never include profilePicture.
+- Include only keys you are modifying. Never include profilePicture. Never include name, email, phone, or location (privacy-protected).
 - Write a short explanation outside the JSON block.
 - Keep JSON valid (no trailing commas, double quotes only).
 - while writing descriptions make sure there is no **bold** or ## heading or any other markdown formatting. just write the plain text.
@@ -225,15 +140,14 @@ Resume data: ${resumeJson}`
   }
 
 
-  // If there's attached data, add it to the system message
+  // If there's attached data, add it to the system message (redact PII)
   if (attachedData) {
     try {
-      // If attachedData is a string that contains JSON, parse it
       const parsedData = typeof attachedData === "string" ? JSON.parse(attachedData) : attachedData
-      systemMessage += `\n\nThe user has also attached additional data: ${JSON.stringify(parsedData)}`
-    } catch (error) {
-      // If it's not valid JSON, just use it as is
-      systemMessage += `\n\nThe user has also attached additional data: ${attachedData}`
+      const dataToSend = parsedData && typeof parsedData === "object" ? redactResumePII(parsedData) : parsedData
+      systemMessage += `\n\nThe user has also attached additional data: ${JSON.stringify(dataToSend)}`
+    } catch {
+      systemMessage += `\n\nThe user has also attached additional data: ${redactTextPII(String(attachedData))}`
     }
   }
 
@@ -242,41 +156,70 @@ Resume data: ${resumeJson}`
     systemMessage += `\n\nThe user has attached the following files:\n`
 
     for (const file of attachedFiles) {
+      const safeContent = typeof file.content === "string" ? redactTextPII(file.content) : String(file.content ?? "")
       if (file.contentType === 'pdf') {
-        systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${file.content}\n`
+        systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${safeContent}\n`
       } else if (file.contentType === 'document') {
-        systemMessage += `\nDocument File: ${file.name}\nContent: ${file.content}\n`
+        systemMessage += `\nDocument File: ${file.name}\nContent: ${safeContent}\n`
       } else if (file.contentType === 'image') {
-        systemMessage += `\nImage File: ${file.name}\nDescription: ${file.content}\n`
+        systemMessage += `\nImage File: ${file.name}\nDescription: ${safeContent}\n`
       } else if (file.contentType === 'json') {
-        systemMessage += `\nJSON File: ${file.name}\nData: ${JSON.stringify(file.content)}\n`
+        let jsonContent = file.content
+        if (typeof jsonContent === "string") {
+          try {
+            jsonContent = redactResumePII(JSON.parse(jsonContent))
+          } catch {
+            jsonContent = redactTextPII(jsonContent)
+          }
+        } else if (jsonContent && typeof jsonContent === "object") {
+          jsonContent = redactResumePII(jsonContent)
+        }
+        systemMessage += `\nJSON File: ${file.name}\nData: ${JSON.stringify(jsonContent)}\n`
       } else if (file.contentType === 'text' || file.contentType === 'csv') {
-        systemMessage += `\nText/CSV File: ${file.name}\nContent: ${file.content}\n`
+        systemMessage += `\nText/CSV File: ${file.name}\nContent: ${safeContent}\n`
       } else if (file.contentType === 'excel') {
-        systemMessage += `\nExcel File: ${file.name}\nInfo: ${file.content}\n`
+        systemMessage += `\nExcel File: ${file.name}\nInfo: ${safeContent}\n`
       } else {
-        systemMessage += `\nFile: ${file.name}\nContent: ${file.content}\n`
+        systemMessage += `\nFile: ${file.name}\nContent: ${safeContent}\n`
       }
     }
 
     systemMessage += `\nPlease analyze these files and use their content to provide relevant assistance.`
   }
 
-  // If there's context text, add it to the system message
+  // If there's context text, add it to the system message (redact PII)
   if (contextText && contextText.trim()) {
-    systemMessage += `\n\nUser Context: ${contextText.trim()}`
+    systemMessage += `\n\nUser Context: ${redactTextPII(contextText.trim())}`
   }
 
 
 
 
 
-  // Format the conversation for the AI
+  // Format the conversation for the AI (redact PII from user messages)
   const messagesList = Array.isArray(messages) ? messages : []
-  const formattedMessages = [{ role: "system", content: systemMessage }, ...messagesList]
+  const redactedMessages = messagesList.map((m: { role?: string; content?: string; parts?: Array<{ type: string; text?: string }> }) => {
+    if (m?.role !== "user") return m
+    const text = getMsgText(m)
+    if (!text) return m
+    const redacted = redactTextPII(text)
+    return { ...m, content: redacted, parts: [{ type: "text", text: redacted }] }
+  })
+  const formattedMessages = [{ role: "system", content: systemMessage }, ...redactedMessages]
 
-  // Resolve model: use selected if available, else default
-  const modelConfig = (model && AVAILABLE_MODELS[model]) ? AVAILABLE_MODELS[model] : AVAILABLE_MODELS[DEFAULT_MODEL]
+  // Resolve model: use curated list, then allow known provider prefixes, then custom endpoint fallback
+  let modelConfig = (model && AVAILABLE_MODELS[model]) ? AVAILABLE_MODELS[model] : AVAILABLE_MODELS[DEFAULT_MODEL]
+  if (!modelConfig) {
+    // When using custom endpoint, route to local handler with customModel
+    if (customEndpoint && customEndpoint.trim()) {
+      modelConfig = { provider: "local", modelId: (customModel && customModel.trim()) || "local-model" }
+    } else if (model && typeof model === "string") {
+      // Allow Gemini model IDs from the API (e.g. gemini-2.5-flash-lite) even if not in curated list
+      if (model.startsWith("gemini-")) {
+        modelConfig = { provider: "google", modelId: model }
+      }
+    }
+  }
   if (!modelConfig) {
     return new Response(JSON.stringify({ error: "Invalid model", message: "Selected model is not configured." }), { status: 400, headers: { "Content-Type": "application/json" } })
   }
@@ -304,7 +247,7 @@ Resume data: ${resumeJson}`
 
       case "openai":
         try {
-          return await handleWithOpenAI(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithOpenAI(formattedMessages, API_MODEL_IDS[modelConfig.modelId] ?? modelConfig.modelId, apiKey, messagesList)
         } catch (error: any) {
           console.error("Error with OpenAI model:", error)
           if (error.message && error.message.includes("429") && error.message.includes("quota")) {
@@ -315,7 +258,7 @@ Resume data: ${resumeJson}`
 
       case "anthropic":
         try {
-          return await handleWithAnthropic(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithAnthropic(formattedMessages, API_MODEL_IDS[modelConfig.modelId] ?? modelConfig.modelId, apiKey, messagesList)
         } catch (error: any) {
           console.error("Error with Anthropic model:", error)
           throw error
@@ -323,7 +266,7 @@ Resume data: ${resumeJson}`
 
       case "deepseek":
         try {
-          return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey, messagesList)
         } catch (error: any) {
           console.error("Error with DeepSeek model:", error)
           throw error
@@ -331,7 +274,7 @@ Resume data: ${resumeJson}`
 
       case "groq":
         try {
-          return await handleWithGroq(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithGroq(formattedMessages, API_MODEL_IDS[modelConfig.modelId] ?? modelConfig.modelId, apiKey, messagesList)
         } catch (error: any) {
           console.error("Error with Groq model:", error)
           throw error
@@ -339,7 +282,7 @@ Resume data: ${resumeJson}`
 
       case "mistral":
         try {
-          return await handleWithMistral(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithMistral(formattedMessages, API_MODEL_IDS[modelConfig.modelId] ?? modelConfig.modelId, apiKey, messagesList)
         } catch (error: any) {
           console.error("Error with Mistral model:", error)
           throw error
@@ -461,6 +404,19 @@ Resume data: ${resumeJson}`
           )
         } catch (error: any) {
           console.error("Error with Lingo AI model:", error)
+          throw error
+        }
+
+      case "cedz":
+        try {
+          return await handleWithCedz(
+            formattedMessages,
+            (modelConfig.modelId === "cedz" && customModel?.trim()) ? customModel.trim() : modelConfig.modelId === "cedz" ? "qwen3:8b" : modelConfig.modelId,
+            customEndpoint,
+            messagesList,
+          )
+        } catch (error: any) {
+          console.error("Error with Cedz model:", error)
           throw error
         }
 
@@ -625,7 +581,7 @@ async function handleNewGemini(
 }
 
 // OpenAI handler
-async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: string) {
+async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key = apiKey || process.env.OPENAI_API_KEY
     if (!key) {
@@ -677,79 +633,47 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
           }
         }
       }
-    })
+    }, clientMessages)
   } catch (error) {
     console.error("Error with OpenAI model:", error)
     throw error
   }
 }
 
+import { createAnthropic } from '@ai-sdk/anthropic'
+import { streamText } from 'ai'
+
 // Anthropic handler (Messages API with streaming)
-async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: string) {
+async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key = apiKey || process.env.ANTHROPIC_API_KEY
     if (!key) {
       throw new Error("Anthropic API key is required. Please provide it in the UI or set ANTHROPIC_API_KEY environment variable.")
     }
 
-    const systemContent = (() => { const m = messages.find((x) => x.role === "system"); return m ? getMsgText(m) : "" })()
+    const systemContent = (() => { const m = messages.find((x) => x.role === "system"); return m ? getMsgText(m) : undefined })()
     const chatMessages = messages.filter((m) => m.role !== "system").map((msg) => ({
       role: msg.role === "assistant" ? "assistant" : "user",
       content: getMsgText(msg),
-    }))
+    })) as import('ai').ModelMessage[]
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: modelId,
-        max_tokens: 8192,
-        system: systemContent,
-        messages: chatMessages,
-        stream: true,
-      }),
+    const anthropicProvider = createAnthropic({ apiKey: key })
+
+    const result = await streamText({
+      model: anthropicProvider(modelId),
+      system: systemContent,
+      messages: chatMessages,
     })
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "")
-      throw new Error(`Anthropic API error: ${response.status} - ${errorText}`)
+    return result.toTextStreamResponse()
+    } catch (error) {
+      console.error("Error with Anthropic model:", error)
+      throw error
     }
-
-    return streamTextToResponse(async (write) => {
-      const reader = response.body?.getReader()
-      if (!reader) return
-      let partial = ""
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = new TextDecoder().decode(value)
-        const lines = (partial + chunk).split("\n")
-        partial = lines.pop() || ""
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6).trim()
-            try {
-              const json = JSON.parse(data)
-              if (json.type === "content_block_delta" && json.delta?.text) write(json.delta.text)
-            } catch {
-              // Ignore parse errors for event types like message_start
-            }
-          }
-        }
-      }
-    })
-  } catch (error) {
-    console.error("Error with Anthropic model:", error)
-    throw error
   }
-}
-
-// DeepSeek handler
-async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: string) {
+  
+  // DeepSeek handler
+async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key = apiKey || process.env.DEEPSEEK_API_KEY
     if (!key) {
@@ -801,7 +725,7 @@ async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: str
           }
         }
       }
-    })
+    }, clientMessages)
   } catch (error) {
     console.error("Error with DeepSeek model:", error)
     throw error
@@ -809,7 +733,7 @@ async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: str
 }
 
 // Groq handler
-async function handleWithGroq(messages: any[], modelId: string, apiKey?: string) {
+async function handleWithGroq(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key = apiKey || process.env.GROQ_API_KEY
     if (!key) {
@@ -861,7 +785,7 @@ async function handleWithGroq(messages: any[], modelId: string, apiKey?: string)
           }
         }
       }
-    })
+    }, clientMessages)
   } catch (error) {
     console.error("Error with Groq model:", error)
     throw error
@@ -869,7 +793,7 @@ async function handleWithGroq(messages: any[], modelId: string, apiKey?: string)
 }
 
 // Mistral handler
-async function handleWithMistral(messages: any[], modelId: string, apiKey?: string) {
+async function handleWithMistral(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key = apiKey || process.env.MISTRAL_API_KEY
     if (!key) {
@@ -921,7 +845,7 @@ async function handleWithMistral(messages: any[], modelId: string, apiKey?: stri
           }
         }
       }
-    })
+    }, clientMessages)
   } catch (error) {
     console.error("Error with Mistral model:", error)
     throw error
@@ -1530,6 +1454,178 @@ async function handleWithOpenAILike(
 }
 
 // Lingo AI handler
+// Cedz / Ollama-style generate API: POST /api/generate with { model, prompt, stream: true }
+async function handleWithCedz(
+  messages: any[],
+  modelId: string,
+  baseUrl?: string,
+  clientMessages?: unknown[],
+) {
+  const url = (baseUrl || process.env.CEDZ_API_URL || "").replace(/\/$/, "")
+  if (!url) {
+    throw new Error("Cedz API URL is required. Set CEDZ_API_URL in .env or provide the endpoint in the Cedz model settings (e.g. https://your-ngrok-url.ngrok-free.app).")
+  }
+  // Accept either a base URL (https://host) or a full generate URL (https://host/api/generate)
+  const generateUrl = url.endsWith("/api/generate") ? url : `${url}/api/generate`
+  const systemMsg = messages.find((m) => m.role === "system")
+  const systemContent = systemMsg ? getMsgText(systemMsg) : ""
+  const chatMessages = messages.filter((m) => m.role !== "system")
+  const promptParts: string[] = []
+  if (systemContent) promptParts.push(`System: ${systemContent}`)
+  for (const msg of chatMessages) {
+    const role = msg.role === "user" ? "User" : "Assistant"
+    promptParts.push(`${role}: ${getMsgText(msg)}`)
+  }
+  const prompt = promptParts.join("\n\n")
+  const CEDZ_TIMEOUT_MS = 180000 // 3 min - avoid long hangs and ECONNRESET from ngrok
+  const doFetch = (signal?: AbortSignal) =>
+    fetch(generateUrl, {
+      method: "POST",
+      signal,
+      headers: {
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
+      },
+      body: JSON.stringify({ model: modelId, prompt, stream: true }),
+    })
+  let response: Response
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), CEDZ_TIMEOUT_MS)
+    response = await doFetch(controller.signal)
+    clearTimeout(timeout)
+  } catch (err: any) {
+    const isConnReset = err?.cause?.code === "ECONNRESET" || err?.message?.includes("ECONNRESET")
+    const isTimeout = err?.name === "AbortError"
+    if (isConnReset || isTimeout) {
+      try {
+        const ctrl = new AbortController()
+        const t = setTimeout(() => ctrl.abort(), CEDZ_TIMEOUT_MS)
+        response = await doFetch(ctrl.signal)
+        clearTimeout(t)
+      } catch (retryErr: any) {
+        const msg = isTimeout
+          ? "Cedz API request timed out. Check that your Cedz URL is reachable and the model is responsive."
+          : "Cedz API connection was reset. If using ngrok, try refreshing the tunnel or check the URL."
+        throw new Error(`${msg} (${err?.message || err})`)
+      }
+    } else {
+      throw err
+    }
+  }
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "")
+    console.error("Cedz API error", {
+      status: response.status,
+      url: generateUrl,
+      model: modelId,
+      body: errText?.slice?.(0, 2000) ?? errText,
+    })
+    throw new Error(`Cedz API error: ${response.status} - ${errText}`)
+  }
+  const textId = generateId()
+  const reasoningId = generateId()
+  const stream = createUIMessageStream({
+    originalMessages: (clientMessages ?? []) as Parameters<typeof createUIMessageStream>[0]["originalMessages"],
+    execute: async ({ writer }) => {
+      const reader = response.body?.getReader()
+      if (reader) {
+        const dec = new TextDecoder()
+        let buf = ""
+        let reasoningStarted = false
+        let hadThinkingContent = false
+        let textStarted = false
+        let emittedFallback = false
+        const TAILOR_FALLBACK = "We are tailoring the resume."
+        try {
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            buf += dec.decode(value, { stream: true })
+            const lines = buf.split("\n")
+            buf = lines.pop() || ""
+            for (const line of lines) {
+              const t = line.trim()
+              if (!t) continue
+              try {
+                const j = JSON.parse(t)
+                const thinking = typeof j.thinking === "string" ? j.thinking : ""
+                const resp = typeof j.response === "string" ? j.response : ""
+                const token = typeof j.token === "string" ? j.token : ""
+                if (thinking) {
+                  if (reasoningStarted && emittedFallback && !hadThinkingContent) {
+                    writer.write({ type: "reasoning-end", id: reasoningId })
+                    reasoningStarted = false
+                    emittedFallback = false
+                  }
+                  if (!reasoningStarted) {
+                    writer.write({ type: "reasoning-start", id: reasoningId })
+                    reasoningStarted = true
+                  }
+                  hadThinkingContent = true
+                  writer.write({ type: "reasoning-delta", id: reasoningId, delta: thinking })
+                } else if (resp || token) {
+                  if (reasoningStarted) {
+                    writer.write({ type: "reasoning-end", id: reasoningId })
+                    reasoningStarted = false
+                  } else if (!hadThinkingContent && !textStarted && !emittedFallback) {
+                    writer.write({ type: "reasoning-start", id: reasoningId })
+                    writer.write({ type: "reasoning-delta", id: reasoningId, delta: TAILOR_FALLBACK })
+                    writer.write({ type: "reasoning-end", id: reasoningId })
+                    emittedFallback = true
+                  }
+                  const delta = resp || token
+                  if (!textStarted) {
+                    writer.write({ type: "text-start", id: textId })
+                    textStarted = true
+                  }
+                  if (delta) writer.write({ type: "text-delta", id: textId, delta })
+                } else if (!reasoningStarted && !emittedFallback && !textStarted) {
+                  writer.write({ type: "reasoning-start", id: reasoningId })
+                  writer.write({ type: "reasoning-delta", id: reasoningId, delta: TAILOR_FALLBACK })
+                  reasoningStarted = true
+                  emittedFallback = true
+                }
+              } catch (_err) {
+                if (!t.startsWith("data:") && !t.startsWith("{")) {
+                  if (!textStarted) {
+                    writer.write({ type: "text-start", id: textId })
+                    textStarted = true
+                  }
+                  writer.write({ type: "text-delta", id: textId, delta: t + "\n" })
+                }
+              }
+            }
+          }
+          if (buf.trim()) {
+            try {
+              const j = JSON.parse(buf)
+              const resp = typeof j.response === "string" ? j.response : ""
+              if (resp && !textStarted) writer.write({ type: "text-start", id: textId })
+              if (resp) writer.write({ type: "text-delta", id: textId, delta: resp })
+            } catch (_err) {
+              if (!textStarted) writer.write({ type: "text-start", id: textId })
+              writer.write({ type: "text-delta", id: textId, delta: buf })
+            }
+          }
+          if (reasoningStarted) writer.write({ type: "reasoning-end", id: reasoningId })
+          if (!textStarted) {
+            writer.write({ type: "text-start", id: textId })
+          }
+          writer.write({ type: "text-end", id: textId })
+        } catch (e) {
+          console.error("Cedz stream read error:", e)
+          throw e
+        }
+      } else {
+        writer.write({ type: "text-start", id: textId })
+        writer.write({ type: "text-end", id: textId })
+      }
+    },
+  })
+  return createUIMessageStreamResponse({ stream })
+}
+
 async function handleWithLingoAI(
   messages: any[],
   modelId: string,

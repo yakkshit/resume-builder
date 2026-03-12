@@ -94,8 +94,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   profileImage: {
-    width: 50,
-    height: 50,
+    width: 80,
+    height: 80,
     borderRadius: 25,
     marginRight: 15,
   },

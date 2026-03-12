@@ -60,6 +60,7 @@ export default function CoverLetterPage() {
 
   const {
     messages,
+    setMessages,
     sendMessage,
     status,
     error,
@@ -440,10 +441,13 @@ export default function CoverLetterPage() {
                     {/* Enhanced Chat UI */}
                     <CoverLetterChat
                       messages={messages}
+                      setMessages={setMessages}
+                      sendMessage={sendMessage}
                       input={input}
                       handleInputChange={e => setInput(e.target.value)}
                       handleSubmit={handleChatSubmit}
                       isLoading={status === "submitted" || status === "streaming"}
+                      isStreaming={status === "streaming"}
                       onStop={stop}
                       applyAiChanges={applyAiChanges}
                       isApplyingChanges={isApplyingChanges}

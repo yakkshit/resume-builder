@@ -57,8 +57,8 @@ export function AppNav() {
 
   return (
     <>
-      {/* Dark minimal top bar - inspired by reference */}
-      <header className="sticky top-0 z-50 w-full">
+      {/* Dark minimal bottom bar - inspired by reference */}
+      <header className="sticky top-2 z-50 w-full">
         <motion.div
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
