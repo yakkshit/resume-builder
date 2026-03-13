@@ -69,20 +69,18 @@ async function generateInProcess(
   templateName: string
 ): Promise<Buffer> {
   try {
-    // Dynamic imports to avoid bundling issues
     const { renderToBuffer } = await import("@react-pdf/renderer")
     const { getResumeTemplate } = await import("@/components/pdf-templates")
-    
+
     const PDFTemplate = getResumeTemplate(templateName)
-    
+
     // Ensure we're passing plain data, not React elements
     const cleanData = JSON.parse(JSON.stringify(resumeData))
-    
-    // Create element properly - this is key!
+
+    // Create element - use React to match @react-pdf's expectation
     const doc = React.createElement(PDFTemplate, { resumeData: cleanData })
-    
-    // Render without type casting to catch errors early
-    const raw = await renderToBuffer(doc as any)
+
+    const raw = await renderToBuffer(doc)
     
     return Buffer.isBuffer(raw) ? raw : Buffer.from(raw)
   } catch (error) {

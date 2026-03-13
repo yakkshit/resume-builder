@@ -4,6 +4,7 @@ import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 import { ThemeProvider } from '@/components/resume-coverletter/theme-provider'
 import { AppNav } from '@/components/app-nav'
+import CookieBanner from '@/components/cookie-banner'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://yakkshit.com'),
@@ -42,6 +43,7 @@ export default function RootLayout({
           <AppNav />
           <main className="min-h-[calc(100vh-5rem)] pt-2 pb-8">{children}</main>
           <Toaster />
+          <CookieBanner />
           <Analytics />
         </ThemeProvider>
       </body>

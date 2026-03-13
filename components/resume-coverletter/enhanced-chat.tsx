@@ -159,7 +159,7 @@ export default function EnhancedChat({
     const hadNewMessage = newCount > lastMessageCountRef.current
     lastMessageCountRef.current = newCount
 
-    if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
+    if (messages.length > 0 && messages[messages.length - 1].role === "assistant" && !isLoading) {
       setCanApplyChanges(true)
       setTypingIndicator(false)
     } else if (isLoading) {
