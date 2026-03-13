@@ -1,4 +1,5 @@
 import { createRequire } from "node:module"
+import path from "node:path"
 const require = createRequire(import.meta.url)
 
 let userConfig = undefined
@@ -38,10 +39,16 @@ const nextConfig = {
     // parallelServerCompiles: true,
   },
   turbopack: {},
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias.canvas = false
-    // Note: React aliases removed - they broke react/jsx-dev-runtime resolution in dev.
-    // For production React #31 with @react-pdf, serverExternalPackages + pnpm overrides should help.
+    // Production only: Force single React instance for @react-pdf (fixes Minified React #31 on Vercel).
+    // Alias to package DIRECTORIES so react/jsx-dev-runtime etc. still resolve. Skip in dev to avoid resolution issues.
+    if (isServer && process.env.NODE_ENV === "production") {
+      const reactDir = path.dirname(require.resolve("react/package.json"))
+      const reactDomDir = path.dirname(require.resolve("react-dom/package.json"))
+      config.resolve.alias["react"] = reactDir
+      config.resolve.alias["react-dom"] = reactDomDir
+    }
     return config
   },
 }
