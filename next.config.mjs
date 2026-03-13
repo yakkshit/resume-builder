@@ -1,3 +1,6 @@
+import { createRequire } from "node:module"
+const require = createRequire(import.meta.url)
+
 let userConfig = undefined
 try {
   userConfig = await import('./v0-user-next.config')
@@ -19,8 +22,9 @@ const nextConfig = {
       },
     ],
   },
-  // Keep @react-pdf/renderer bundled so in-process fallback shares React (production).
+  // Externalize @react-pdf packages so they share node_modules React (fixes Minified React #31 in production).
   serverExternalPackages: [
+    '@react-pdf/renderer',
     '@react-pdf/primitives',
     '@react-pdf/layout',
     '@react-pdf/pdfkit',
@@ -34,8 +38,14 @@ const nextConfig = {
     // parallelServerCompiles: true,
   },
   turbopack: {},
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.alias.canvas = false
+    // Force single React instance for @react-pdf/renderer (fixes Minified React error #31 in production)
+    if (isServer) {
+      // Use `$` to avoid breaking subpath imports like `react/jsx-dev-runtime`
+      config.resolve.alias["react$"] = require.resolve("react")
+      config.resolve.alias["react-dom$"] = require.resolve("react-dom")
+    }
     return config
   },
 }

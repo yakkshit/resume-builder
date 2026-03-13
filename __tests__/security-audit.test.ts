@@ -30,6 +30,11 @@ const IGNORED_FILES = [
     "API_KEYS_SETUP.md",      // Documentation about keys
 ];
 
+/** Benign strings that are not secrets (localStorage keys, feature flags, etc.) */
+const FALSE_POSITIVE_VALUES = [
+    "cookie-consent-accepted",
+];
+
 const SECRET_PATTERNS = [
     // Generic high-entropy strings assigned to key-like variables
     {
@@ -105,6 +110,11 @@ describe("Security Audit: Secret Leak Detection", () => {
                     for (const match of matches) {
                         // Exclude some common false positives (e.g., long class names in Tailwind or UI library)
                         if (line.includes("className") || line.includes("class=")) {
+                            continue;
+                        }
+                        // Exclude benign constants (localStorage keys, feature flags, etc.)
+                        const matchedValue = match[1] ?? match[0];
+                        if (FALSE_POSITIVE_VALUES.some((safe) => String(matchedValue).includes(safe))) {
                             continue;
                         }
 

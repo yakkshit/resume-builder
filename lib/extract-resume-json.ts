@@ -25,20 +25,29 @@ function tryParseJson(str: string): Record<string, unknown> | null {
 
 /**
  * Extract the first valid resume-update JSON from markdown/plain text.
- * Tries: (1) ```json ... ``` block, (2) ``` ... ``` block, (3) outermost { ... }.
+ * Tries: (1) ```json ... ``` block, (2) ``` ... ``` block, (3) raw JSON block, (4) outermost { ... }.
  */
 export function extractResumeJsonFromMessage(content: string): Record<string, unknown> | null {
   if (!content || typeof content !== "string") return null
 
-  // 1) ```json ... ``` (greedy: from first ```json to last ``` on same block)
+  const trimmed = content.trim()
+
+  // 1) ```json ... ``` or ``` ... ```
   const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/
-  const blockMatch = content.match(jsonBlockRegex)
+  const blockMatch = trimmed.match(jsonBlockRegex)
   if (blockMatch?.[1]) {
     const parsed = tryParseJson(blockMatch[1].trim())
     if (parsed) return parsed
   }
 
-  // 2) Find outermost { ... } that looks like resume update (brace matching)
+  // 2) Raw JSON at start (e.g. AI returns {"basicInfo":{...}} with no markdown)
+  const jsonStartMatch = trimmed.match(/^\s*(\{[\s\S]*\})\s*$/)
+  if (jsonStartMatch?.[1]) {
+    const parsed = tryParseJson(jsonStartMatch[1])
+    if (parsed) return parsed
+  }
+
+  // 3) Find outermost { ... } that looks like resume update (brace matching)
   let depth = 0
   let start = -1
   for (let i = 0; i < content.length; i++) {

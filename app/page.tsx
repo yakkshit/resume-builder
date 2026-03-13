@@ -314,9 +314,23 @@ export default function ResumePage() {
 
   const applyAiChanges = () => {
     const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-    if (!lastAssistant) return;
+    if (!lastAssistant) {
+      toast({
+        title: "No AI response",
+        description: "There is no assistant message to apply. Send a message first and wait for a response.",
+        variant: "destructive",
+      });
+      return;
+    }
     const content = getTextContent(lastAssistant);
-    if (!content?.trim()) return;
+    if (!content?.trim()) {
+      toast({
+        title: "No content found",
+        description: "Could not read the AI response. The message may still be loading or the format is unexpected. Try again after the response finishes.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const suggestedChanges = extractResumeJsonFromMessage(content);
 
