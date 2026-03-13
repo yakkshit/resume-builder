@@ -1,7 +1,13 @@
 {
   "name": "my-v0-project",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "private": true,
+  "pnpm": {
+    "overrides": {
+      "react": "^18.3.1",
+      "react-dom": "^18.3.1"
+    }
+  },
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build",

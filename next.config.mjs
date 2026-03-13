@@ -38,14 +38,10 @@ const nextConfig = {
     // parallelServerCompiles: true,
   },
   turbopack: {},
-  webpack: (config, { isServer }) => {
+  webpack: (config) => {
     config.resolve.alias.canvas = false
-    // Force single React instance for @react-pdf/renderer (fixes Minified React error #31 in production)
-    if (isServer) {
-      // Use `$` to avoid breaking subpath imports like `react/jsx-dev-runtime`
-      config.resolve.alias["react$"] = require.resolve("react")
-      config.resolve.alias["react-dom$"] = require.resolve("react-dom")
-    }
+    // Note: React aliases removed - they broke react/jsx-dev-runtime resolution in dev.
+    // For production React #31 with @react-pdf, serverExternalPackages + pnpm overrides should help.
     return config
   },
 }
