@@ -1,5 +1,20 @@
 import type { ResumeData } from "./types"
 
+/** Check if value looks like a React element - never pass to @react-pdf Text */
+function isReactElement(v: unknown): boolean {
+  return typeof v === "object" && v !== null && "$$typeof" in (v as object)
+}
+
+/** Only allow profilePicture as data URL or https - strip blob: and objects */
+function safeProfilePicture(v: unknown): string | undefined {
+  if (v == null) return undefined
+  if (typeof v !== "string") return undefined
+  const s = v.trim()
+  if (!s) return undefined
+  if (s.startsWith("data:image/") || s.startsWith("https://") || s.startsWith("http://")) return s
+  return undefined
+}
+
 /**
  * Sanitizes resume data to ensure all values passed to React PDF Text components
  * are primitives (string/number). Prevents "Objects are not valid as a React child" errors.
@@ -7,13 +22,10 @@ import type { ResumeData } from "./types"
 export function sanitizeResumeData(data: ResumeData): ResumeData {
   const str = (v: unknown): string => {
     if (v == null) return ""
+    if (isReactElement(v)) return ""
     if (typeof v === "string") return v
     if (typeof v === "number" || typeof v === "boolean") return String(v)
-    // React elements and other objects must never reach <Text> (causes React #31 in production)
-    if (typeof v === "object") {
-      if ("$$typeof" in (v as object)) return ""
-      return ""
-    }
+    if (typeof v === "object") return ""
     return ""
   }
 
@@ -22,24 +34,35 @@ export function sanitizeResumeData(data: ResumeData): ResumeData {
     return v.map(fn)
   }
 
+  // Ensure every string-like value is actually a string (never object/React element)
+  const safe = (v: unknown): string => {
+    const s = str(v)
+    return typeof s === "string" ? s : ""
+  }
+
+  const optStr = (v: unknown): string | undefined => {
+    const s = safe(v)
+    return s || undefined
+  }
+
   return {
     basicInfo: {
-      name: str(data.basicInfo?.name),
-      title: str(data.basicInfo?.title),
-      email: str(data.basicInfo?.email),
-      phone: str(data.basicInfo?.phone),
-      location: str(data.basicInfo?.location),
-      linkedin: str(data.basicInfo?.linkedin),
-      website: str(data.basicInfo?.website),
-      summary: str(data.basicInfo?.summary),
-      profilePicture: data.basicInfo?.profilePicture ? str(data.basicInfo.profilePicture) : undefined,
-      languages: arr(data.basicInfo?.languages, str),
+      name: safe(data.basicInfo?.name),
+      title: safe(data.basicInfo?.title),
+      email: safe(data.basicInfo?.email),
+      phone: safe(data.basicInfo?.phone),
+      location: safe(data.basicInfo?.location),
+      linkedin: safe(data.basicInfo?.linkedin),
+      website: safe(data.basicInfo?.website),
+      summary: safe(data.basicInfo?.summary),
+      profilePicture: safeProfilePicture(data.basicInfo?.profilePicture),
+      languages: arr(data.basicInfo?.languages, (x) => safe(x)),
       portfolioLinks: arr(data.basicInfo?.portfolioLinks, (link) =>
         typeof link === "object" && link !== null
           ? {
-              platform: str((link as { platform?: unknown }).platform),
-              url: str((link as { url?: unknown }).url),
-              username: str((link as { username?: unknown }).username) || undefined,
+              platform: safe((link as { platform?: unknown }).platform),
+              url: safe((link as { url?: unknown }).url),
+              username: optStr((link as { username?: unknown }).username),
             }
           : { platform: "", url: "", username: undefined }
       ).filter((l) => l.platform || l.url),
@@ -47,12 +70,12 @@ export function sanitizeResumeData(data: ResumeData): ResumeData {
     experience: arr(data.experience, (exp) =>
       typeof exp === "object" && exp !== null
         ? {
-            company: str((exp as { company?: unknown }).company),
-            position: str((exp as { position?: unknown }).position),
-            startDate: str((exp as { startDate?: unknown }).startDate),
-            endDate: str((exp as { endDate?: unknown }).endDate),
-            description: str((exp as { description?: unknown }).description),
-            highlights: arr((exp as { highlights?: unknown }).highlights, str),
+            company: safe((exp as { company?: unknown }).company),
+            position: safe((exp as { position?: unknown }).position),
+            startDate: safe((exp as { startDate?: unknown }).startDate),
+            endDate: safe((exp as { endDate?: unknown }).endDate),
+            description: safe((exp as { description?: unknown }).description),
+            highlights: arr((exp as { highlights?: unknown }).highlights, (x) => safe(x)),
           }
         : {
             company: "",
@@ -66,12 +89,12 @@ export function sanitizeResumeData(data: ResumeData): ResumeData {
     education: arr(data.education, (edu) =>
       typeof edu === "object" && edu !== null
         ? {
-            institution: str((edu as { institution?: unknown }).institution),
-            degree: str((edu as { degree?: unknown }).degree),
-            field: str((edu as { field?: unknown }).field),
-            startDate: str((edu as { startDate?: unknown }).startDate),
-            endDate: str((edu as { endDate?: unknown }).endDate),
-            gpa: str((edu as { gpa?: unknown }).gpa),
+            institution: safe((edu as { institution?: unknown }).institution),
+            degree: safe((edu as { degree?: unknown }).degree),
+            field: safe((edu as { field?: unknown }).field),
+            startDate: safe((edu as { startDate?: unknown }).startDate),
+            endDate: safe((edu as { endDate?: unknown }).endDate),
+            gpa: safe((edu as { gpa?: unknown }).gpa),
           }
         : {
             institution: "",
@@ -82,25 +105,25 @@ export function sanitizeResumeData(data: ResumeData): ResumeData {
             gpa: "",
           }
     ),
-    skills: arr(data.skills, str),
+    skills: arr(data.skills, (x) => safe(x)),
     projects: arr(data.projects, (proj) =>
       typeof proj === "object" && proj !== null
         ? {
-            name: str((proj as { name?: unknown }).name),
-            description: str((proj as { description?: unknown }).description),
-            technologies: arr((proj as { technologies?: unknown }).technologies, str),
-            link: str((proj as { link?: unknown }).link) || undefined,
-            startDate: str((proj as { startDate?: unknown }).startDate) || undefined,
-            endDate: str((proj as { endDate?: unknown }).endDate) || undefined,
+            name: safe((proj as { name?: unknown }).name),
+            description: safe((proj as { description?: unknown }).description),
+            technologies: arr((proj as { technologies?: unknown }).technologies, (x) => safe(x)),
+            link: optStr((proj as { link?: unknown }).link),
+            startDate: optStr((proj as { startDate?: unknown }).startDate),
+            endDate: optStr((proj as { endDate?: unknown }).endDate),
           }
         : { name: "", description: "", technologies: [] }
     ).filter((p) => p.name || p.description),
     achievements: arr(data.achievements, (ach) =>
       typeof ach === "object" && ach !== null
         ? {
-            title: str((ach as { title?: unknown }).title),
-            description: str((ach as { description?: unknown }).description),
-            date: str((ach as { date?: unknown }).date) || undefined,
+            title: safe((ach as { title?: unknown }).title),
+            description: safe((ach as { description?: unknown }).description),
+            date: optStr((ach as { date?: unknown }).date),
           }
         : { title: "", description: "" }
     ).filter((a) => a.title || a.description),

@@ -86,8 +86,46 @@ const MOCK_RESPONSES = [
 ]
 
 // Update the POST function to handle attachedData (no app-level API key required; users provide provider keys in UI)
+function buildCareerAssistantSystemPrompt(resumeJson: string): string {
+  return `You are an AI Career Assistant for resumes and job applications. You help users with:
+- CV/resume generation and tailoring
+- Cover letters
+- Job applications and job matching
+- CV scoring against job descriptions
+- Course recommendations for roles
+- Mock interview questions (behavioral + coding)
+- HR email notes
+
+IMPORTANT: You MUST embed interactive components using this exact format. The UI renders these as cards (CV editor, cover letter, job links, etc.):
+
+\`\`\`component:componentType
+{"prop": "value"}
+\`\`\`
+
+Valid component types: cv, coverLetter, jobLinks, cvScorer, course, mockInterview, hrNote, jobApplySimulator
+
+For resume/CV requests: ALWAYS include a \`\`\`component:cv\`\`\` block with resumeData.
+For cover letter requests: ALWAYS include a \`\`\`component:coverLetter\`\`\` block.
+For job suggestions: ALWAYS include \`\`\`component:jobLinks\`\`\`.
+For mock interviews: ALWAYS include \`\`\`component:mockInterview\`\`\`.
+
+Examples:
+- Cover letter: \`\`\`component:coverLetter\n{"head":"Dear...","body":"...","footer":"Sincerely"}\n\`\`\`
+- CV scorer: \`\`\`component:cvScorer\n{"score":78,"feedback":["..."],"jobDescription":"..."}\n\`\`\`
+- Job links: \`\`\`component:jobLinks\n{"links":[{"title":"...","url":"...","company":"..."}]}\n\`\`\`
+- CV: \`\`\`component:cv\n{"resumeData":{...},"template":"modern"}\n\`\`\`
+- Mock interview: \`\`\`component:mockInterview\n{"questions":["..."],"codingProblems":["..."],"role":"..."}\n\`\`\`
+- Course: \`\`\`component:course\n{"title":"...","provider":"...","skills":[...]}\n\`\`\`
+- HR note: \`\`\`component:hrNote\n{"subject":"...","body":"...","to":"..."}\n\`\`\`
+- Job apply simulator: \`\`\`component:jobApplySimulator\n{"steps":[{"action":"...","status":"done"},...]}\n\`\`\`
+
+Always include helpful markdown text before/after components. Use components when the response benefits from interactive UI.
+
+Resume data: ${resumeJson}`
+}
+
 export async function POST(req: NextRequest) {
-  const { messages, resumeData, aiMode, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth } = await req.json()
+  const { messages, resumeData, aiMode, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth, mode } = await req.json()
 
   // Create a system message based on the mode
   let systemMessage = ""
@@ -96,7 +134,9 @@ export async function POST(req: NextRequest) {
   const redactedResume = redactResumePII(resumeData)
   const resumeJson = JSON.stringify(redactedResume)
 
-  if (aiMode) {
+  if (mode === "career-assistant") {
+    systemMessage = buildCareerAssistantSystemPrompt(resumeJson)
+  } else if (aiMode) {
     systemMessage = `You are an AI Resume Assistant. The user will give you their resume data and often a job description or request (e.g. "tailor my resume to this job", "update my summary").
 
 Your response must follow this structure every time you suggest resume changes:

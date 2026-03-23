@@ -17,6 +17,7 @@ import {
   Sparkles,
   BookOpen,
   ArrowRight,
+  MessageCircle,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -24,6 +25,7 @@ import { cn } from "@/lib/utils"
 
 const navItems = [
   { href: "/", label: "Resume", icon: FileText },
+  { href: "/chat", label: "Chat", icon: MessageCircle },
   { href: "/cover-letter", label: "Cover Letter", icon: Mail },
   { href: "/price", label: "Pricing", icon: DollarSign },
   { href: "/donate", label: "Donate", icon: Heart },

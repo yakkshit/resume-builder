@@ -60,6 +60,24 @@ async function generateViaSubprocess(
   })
 }
 
+/**
+ * Deep strip React elements ($$typeof) - replace with empty string to prevent React #31.
+ * Preserves structure, only sanitizes leaf values that are React elements.
+ */
+function stripReactElements(value: unknown): unknown {
+  if (value === null || value === undefined) return value
+  if (typeof value === "object" && "$$typeof" in (value as object)) return ""
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value
+  if (Array.isArray(value)) return value.map(stripReactElements)
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>
+    const out: Record<string, unknown> = {}
+    for (const k of Object.keys(obj)) out[k] = stripReactElements(obj[k])
+    return out
+  }
+  return value
+}
+
 /** 
  * In-process: fallback for production (serverless) where subprocess fails. 
  * CRITICAL: Template must be server-safe (no "use client", no hooks, no context)
@@ -74,10 +92,10 @@ async function generateInProcess(
 
     const PDFTemplate = getResumeTemplate(templateName)
 
-    // Ensure we're passing plain data, not React elements
-    const cleanData = JSON.parse(JSON.stringify(resumeData))
+    // Double sanitize: JSON round-trip + recursive strip of React elements
+    const jsonClone = JSON.parse(JSON.stringify(resumeData))
+    const cleanData = stripReactElements(jsonClone) as ResumeData
 
-    // Create element - use React to match @react-pdf's expectation
     const doc = React.createElement(PDFTemplate, { resumeData: cleanData })
 
     const raw = await renderToBuffer(doc)
