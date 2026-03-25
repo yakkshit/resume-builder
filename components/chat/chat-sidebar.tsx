@@ -181,9 +181,9 @@ export function ChatSidebar({
       <div className="p-3 sm:p-4">
         <Button
           onClick={handleNewSession}
-          className="h-11 w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all duration-200 hover:scale-[1.01] hover:from-blue-600 hover:to-blue-700 hover:shadow-xl hover:shadow-blue-500/30 sm:h-12 sm:rounded-2xl"
+          className="h-10 w-full rounded-lg border border-neutral-200 bg-white text-sm font-medium text-neutral-800 shadow-sm transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-white dark:hover:bg-neutral-800"
         >
-          <Plus className="h-5 w-5 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           New chat
         </Button>
       </div>
@@ -191,12 +191,9 @@ export function ChatSidebar({
       {/* Chat History */}
       <ScrollArea className="flex-1 min-h-0 px-2 sm:px-3 [&>[data-radix-scroll-area-viewport]]:scroll-smooth">
         <div className="space-y-1 pb-4 pt-1">
-          <div className="sticky top-0 z-[1] -mx-1 mb-2 flex items-center gap-2 rounded-xl border border-border/60 bg-background/95 px-3 py-2.5 shadow-sm backdrop-blur-md sm:py-2 dark:border-white/5 dark:bg-gradient-to-b dark:from-neutral-900/95 dark:to-neutral-900/80 dark:shadow-none">
-            <MessageSquare className="h-4 w-4 shrink-0 text-primary dark:text-[#4da5fc]/80" />
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:text-xs dark:text-white/55">
-              Recent Chats
-            </p>
-          </div>
+          <p className="mb-2 px-1 text-[11px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-500">
+            Your chats
+          </p>
           {!mounted ? (
             <div className="px-3 py-8 text-center">
               <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/25 border-t-primary dark:border-white/20 dark:border-t-white/60" />
@@ -234,7 +231,7 @@ export function ChatSidebar({
       </ScrollArea>
 
       {/* Bottom Section - Context & Settings */}
-      <div className="space-y-3 border-t border-white/10 bg-white/[0.04] p-3 backdrop-blur-sm sm:p-4">
+      <div className="space-y-3 border-t border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-[#171717] sm:p-4">
         <ContextWindow
           value={context}
           onChange={handleContextChange}
@@ -334,25 +331,20 @@ export function ChatSidebar({
   const sidebarPanel = (
     <aside
       className={cn(
-        "fixed left-3 top-[4.5rem] z-50 flex w-[min(calc(100vw-1.5rem),18rem)] flex-col sm:left-4 sm:top-20 sm:w-80",
-        "h-[calc(100dvh-5.5rem)] max-h-[calc(100dvh-5.5rem)] rounded-2xl sm:h-[calc(100vh-6rem)] sm:max-h-[calc(100vh-6rem)] sm:rounded-3xl",
-        "overflow-hidden border border-border bg-card/95 text-card-foreground shadow-xl backdrop-blur-2xl",
-        "dark:border-white/10 dark:bg-gradient-to-br dark:from-neutral-900/95 dark:via-neutral-900/90 dark:to-neutral-950/95 dark:text-white",
-        "dark:shadow-2xl dark:shadow-black/50",
-        "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:bg-gradient-to-br before:from-primary/5 before:to-transparent sm:before:rounded-3xl",
-        "dark:before:from-white/5",
+        "fixed left-0 top-14 z-50 flex w-[min(100vw,280px)] flex-col border-r border-neutral-200 bg-[#f9f9f9] text-neutral-900 dark:border-neutral-800 dark:bg-[#171717] dark:text-neutral-100",
+        "h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)]",
         className
       )}
     >
       {/* Header */}
-      <div className="relative border-b border-border bg-muted/40 px-4 py-4 backdrop-blur-sm dark:border-white/10 dark:bg-gradient-to-br dark:from-white/[0.07] sm:px-5 sm:py-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/25 sm:h-11 sm:w-11 sm:rounded-2xl">
-            <MessageSquare className="h-5 w-5 text-white" />
+      <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
+            <MessageSquare className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="truncate text-base font-bold text-foreground sm:text-lg dark:text-white">Career Chat</h2>
-            <p className="text-[11px] font-medium text-muted-foreground sm:text-xs dark:text-white/50">Resumes & jobs</p>
+            <h2 className="truncate text-sm font-semibold tracking-tight">Chats</h2>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Resume & career</p>
           </div>
         </div>
       </div>
@@ -372,11 +364,8 @@ export function ChatSidebar({
             size="icon"
             onClick={() => onSidebarOpenChange(!isSidebarVisible)}
             className={cn(
-              "fixed top-20 z-[60] hidden h-10 w-10 rounded-2xl lg:flex",
-              "border border-border bg-card text-foreground shadow-lg backdrop-blur-xl transition-all duration-300 hover:scale-105",
-              "dark:border-white/10 dark:bg-neutral-900/90 dark:text-white dark:shadow-xl dark:shadow-black/20",
-              "hover:bg-muted dark:hover:bg-neutral-900",
-              isSidebarVisible ? "left-[calc(1rem+20rem+0.35rem)]" : "left-4"
+              "fixed top-[calc(3.5rem+0.5rem)] z-[60] hidden h-9 w-9 rounded-lg border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-all hover:bg-neutral-50 lg:flex dark:border-neutral-700 dark:bg-[#2f2f2f] dark:text-neutral-200 dark:hover:bg-neutral-800",
+              isSidebarVisible ? "left-[calc(280px+10px)]" : "left-3"
             )}
             aria-label={isSidebarVisible ? "Close sidebar" : "Open sidebar"}
           >
@@ -393,7 +382,7 @@ export function ChatSidebar({
             <Button
               variant="outline"
               size="icon"
-              className="fixed left-4 top-24 z-40 lg:hidden rounded-2xl border-white/20 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-xl shadow-xl"
+              className="fixed left-3 top-[calc(3.5rem+0.5rem)] z-40 h-9 w-9 rounded-lg border-neutral-200 bg-white dark:border-neutral-700 dark:bg-[#2f2f2f] lg:hidden"
               aria-label="Open menu"
             >
               <PanelLeft className="h-5 w-5" />
@@ -401,11 +390,11 @@ export function ChatSidebar({
           </SheetTrigger>
           <SheetContent
             side="left"
-            className="w-[min(100vw-1rem,22rem)] max-w-[90vw] border-0 bg-gradient-to-br from-neutral-950/98 via-neutral-900/95 to-neutral-950/98 p-0 backdrop-blur-2xl sm:w-[min(100vw-2rem,24rem)]"
+            className="w-[min(100vw,300px)] max-w-[90vw] border-r border-neutral-800 bg-[#171717] p-0 sm:w-[min(100vw-2rem,300px)]"
           >
-            <SheetHeader className="border-b border-white/10 bg-gradient-to-br from-white/[0.06] to-transparent px-4 py-4 sm:px-5 sm:py-5">
-              <SheetTitle className="text-left text-lg font-bold text-white">Career Chat</SheetTitle>
-              <p className="text-left text-xs font-medium text-white/45">History & settings</p>
+            <SheetHeader className="border-b border-neutral-800 px-4 py-4">
+              <SheetTitle className="text-left text-base font-semibold text-white">Chats</SheetTitle>
+              <p className="text-left text-xs text-neutral-500">History & settings</p>
             </SheetHeader>
             <div className="h-[calc(100dvh-5rem)] min-h-0 overflow-hidden sm:h-[calc(100vh-5.5rem)]">
               {sidebarContent}
@@ -438,10 +427,10 @@ function SessionItem({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className={cn(
-        "group relative flex items-start gap-1.5 rounded-xl px-2 py-2 text-left transition-all duration-200 sm:gap-2 sm:rounded-2xl sm:px-3 sm:py-2.5",
+        "group relative flex items-start gap-1.5 rounded-lg px-2 py-2 text-left transition-colors sm:gap-2 sm:px-2.5 sm:py-2",
         isActive
-          ? "bg-primary/12 shadow-md ring-1 ring-primary/25 dark:bg-gradient-to-r dark:from-blue-500/25 dark:to-blue-600/10 dark:shadow-blue-500/15 dark:ring-blue-400/20"
-          : "hover:bg-muted/80 hover:shadow-sm dark:hover:bg-white/[0.08] dark:hover:shadow-md dark:hover:shadow-black/10"
+          ? "bg-neutral-200/90 dark:bg-neutral-800"
+          : "hover:bg-neutral-200/70 dark:hover:bg-neutral-800/80"
       )}
     >
       <button
@@ -451,14 +440,14 @@ function SessionItem({
       >
         <span
           className={cn(
-            "line-clamp-2 text-sm font-medium leading-snug transition-colors sm:line-clamp-1 sm:truncate",
-            isActive ? "text-blue-200" : "text-white/90"
+            "line-clamp-2 text-[13px] font-medium leading-snug sm:line-clamp-1 sm:truncate",
+            isActive ? "text-neutral-900 dark:text-white" : "text-neutral-700 dark:text-neutral-200"
           )}
           title={title}
         >
           {title}
         </span>
-        <span className="mt-0.5 block text-[10px] font-medium text-white/40 sm:text-[11px]">{timeLabel}</span>
+        <span className="mt-0.5 block text-[10px] text-neutral-500 sm:text-[11px]">{timeLabel}</span>
       </button>
       {onDelete && (hover || isActive) && (
         <Button

@@ -30,8 +30,8 @@ function streamTextToResponse(
 
 import { writeFile } from "fs"
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30
+// Allow streaming + PDF text extraction for attachments
+export const maxDuration = 120
 
 // Define available models with their providers and configurations (aligned with UI selector)
 const AVAILABLE_MODELS = Object.entries(CHAT_MODELS_BY_PROVIDER).reduce((acc, [providerName, modelIds]) => {
@@ -121,6 +121,8 @@ Examples:
 
 Always include helpful markdown text before/after components. Use components when the response benefits from interactive UI.
 
+When the user attaches a resume PDF, DOCX, or text file, the extracted text appears under "The user has attached the following files". Parse it carefully and produce a complete \`\`\`component:cv\`\`\` block with resumeData that reflects their real experience (names may be redacted in the prompt — still map sections to experience, education, skills, projects).
+
 Resume data: ${resumeJson}`
 }
 
@@ -198,7 +200,10 @@ Resume data: ${resumeJson}`
     for (const file of attachedFiles) {
       const safeContent = typeof file.content === "string" ? redactTextPII(file.content) : String(file.content ?? "")
       if (file.contentType === 'pdf') {
-        systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${safeContent}\n`
+        const pages = typeof file.pages === "number" ? file.pages : "?"
+        systemMessage += `\nPDF File: ${file.name} (${pages} pages)\nContent: ${safeContent}\n`
+      } else if (file.contentType === 'pdf-error') {
+        systemMessage += `\nPDF File: ${file.name}\nExtraction issue: ${safeContent}\n`
       } else if (file.contentType === 'document') {
         systemMessage += `\nDocument File: ${file.name}\nContent: ${safeContent}\n`
       } else if (file.contentType === 'image') {

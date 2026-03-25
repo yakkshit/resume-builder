@@ -41,7 +41,7 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AppNav />
-          <main className="min-h-[calc(100vh-5rem)] pt-2 pb-8">{children}</main>
+          <main className="min-h-[calc(100vh-3.5rem)] pb-8 pt-0">{children}</main>
           <Toaster />
           <CookieBanner />
           <Analytics />

@@ -5,9 +5,7 @@ import { cn } from "@/lib/utils";
 import {
   Plus,
   Lightbulb,
-  Paperclip,
-  Image,
-  FileCode,
+  FileText,
   ChevronDown,
   Check,
   Sparkles,
@@ -15,7 +13,7 @@ import {
   Brain,
   Bolt,
   Github,
-  SendHorizontal,
+  ArrowUp,
   Square,
 } from "lucide-react";
 
@@ -180,19 +178,23 @@ export function BoltChatInput({
   attachedFiles = [],
   onFilesChange,
 }: BoltChatInputProps) {
-  const [showAttachMenu, setShowAttachMenu] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const minH = compact ? 56 : 80;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, asImage: boolean) => {
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length || !onFilesChange) return;
-    const fileList = Array.from(files);
-    const newItems: AttachedFile[] = new Array(fileList.length);
-    let pending = fileList.length;
+    const pdfOnly = Array.from(files).filter(
+      (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")
+    );
+    if (pdfOnly.length === 0) {
+      e.target.value = "";
+      return;
+    }
+    const newItems: AttachedFile[] = new Array(pdfOnly.length);
+    let pending = pdfOnly.length;
 
     const finishOne = () => {
       pending -= 1;
@@ -202,15 +204,15 @@ export function BoltChatInput({
       }
     };
 
-    fileList.forEach((f, index) => {
+    pdfOnly.forEach((f, index) => {
       const r = new FileReader();
       r.onload = () => {
         const raw = String(r.result);
         newItems[index] = {
           name: f.name,
-          type: f.type,
+          type: f.type || "application/pdf",
           data: raw.includes("base64,") ? raw.split("base64,")[1] ?? raw : raw,
-          isImage: asImage || f.type.startsWith("image/"),
+          isImage: false,
         };
         finishOne();
       };
@@ -244,21 +246,13 @@ export function BoltChatInput({
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md,.json,.pdf,.doc,.docx,.js,.ts,.tsx,.py,.html,.css"
+        accept="application/pdf,.pdf"
         multiple
         className="hidden"
-        onChange={(e) => handleFileUpload(e, false)}
+        onChange={handlePdfUpload}
       />
-      <input
-        ref={imageInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(e) => handleFileUpload(e, true)}
-      />
-      <div className="pointer-events-none absolute -inset-[1px] rounded-2xl bg-gradient-to-b from-primary/10 to-transparent dark:from-white/[0.08]" />
-      <div className="relative rounded-2xl border border-border bg-card/95 text-card-foreground shadow-md ring-1 ring-border/60 dark:bg-[#1e1e22] dark:ring-white/[0.08] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_2px_20px_rgba(0,0,0,0.4)]">
+      <div className="pointer-events-none absolute -inset-px rounded-[28px] bg-gradient-to-b from-white/10 to-transparent dark:from-white/[0.06]" />
+      <div className="relative rounded-[28px] border border-neutral-200/90 bg-white text-neutral-900 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.04] dark:border-neutral-700 dark:bg-[#2f2f2f] dark:text-neutral-100 dark:ring-white/[0.08] dark:shadow-[0_8px_32px_rgba(0,0,0,0.45)]">
         {attachedFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 border-b border-border/60 px-3 py-2.5 dark:border-white/10">
             {attachedFiles.map((f, i) => (
@@ -266,7 +260,7 @@ export function BoltChatInput({
                 key={`${f.name}-${i}`}
                 className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-primary/35 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm dark:border-[#1488fc]/35 dark:bg-[#1488fc]/12 dark:text-white/95"
               >
-                <Paperclip className="size-3.5 shrink-0 text-primary dark:text-[#6eb8fc]" aria-hidden />
+                <FileText className="size-3.5 shrink-0 text-[#d97757] dark:text-[#7ab8ff]" aria-hidden />
                 <span className="min-w-0 truncate" title={f.name}>
                   {f.name}
                 </span>
@@ -293,8 +287,8 @@ export function BoltChatInput({
             placeholder={placeholder}
             disabled={isLoading}
             className={cn(
-              "w-full resize-none bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none",
-              compact ? "text-[13px] px-3.5 pt-2.5 pb-1.5 max-h-[96px]" : "text-[15px] px-5 pt-5 pb-3 max-h-[200px]"
+              "w-full resize-none bg-transparent text-[15px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none dark:text-neutral-100 dark:placeholder:text-neutral-500",
+              compact ? "px-3.5 pt-2.5 pb-1.5 max-h-[96px]" : "px-5 pt-5 pb-3 max-h-[200px]"
             )}
             style={{ minHeight: compact ? 36 : 80, height: compact ? 36 : 80 }}
           />
@@ -302,64 +296,23 @@ export function BoltChatInput({
 
         <div className={cn("flex items-center justify-between pt-1", compact ? "px-2.5 pb-1.5" : "px-3 pb-3")}>
           <div className="flex items-center gap-1">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setShowAttachMenu(!showAttachMenu)}
-                className={cn(
-                  "relative flex items-center justify-center rounded-full bg-muted/80 text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-95 dark:bg-white/[0.08] dark:shadow-inner dark:hover:bg-white/[0.12] dark:hover:text-white",
-                  compact ? "size-7" : "size-8"
-                )}
-                aria-label={attachedFiles.length ? `${attachedFiles.length} file(s) attached` : "Add attachment"}
-              >
-                <Plus
-                  className={`size-4 transition-transform duration-200 ${showAttachMenu ? "rotate-45" : ""}`}
-                />
-                {attachedFiles.length > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-0.5 text-[10px] font-bold text-primary-foreground shadow-md dark:bg-[#1488fc] dark:text-white">
-                    {attachedFiles.length}
-                  </span>
-                )}
-              </button>
-
-              {showAttachMenu && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowAttachMenu(false)}
-                    aria-hidden
-                  />
-                  <div className="absolute bottom-full left-0 z-50 mb-2 overflow-hidden rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-white/10 dark:bg-[#1a1a1e]/95 dark:shadow-black/50">
-                    <div className="min-w-[180px] p-1.5">
-                      <button
-                        type="button"
-                        onClick={() => { fileInputRef.current?.click(); setShowAttachMenu(false); }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground dark:text-[#a0a0a5] dark:hover:bg-white/5 dark:hover:text-white"
-                      >
-                        <Paperclip className="size-4" />
-                        <span className="text-sm">Upload file</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { imageInputRef.current?.click(); setShowAttachMenu(false); }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground dark:text-[#a0a0a5] dark:hover:bg-white/5 dark:hover:text-white"
-                      >
-                        <Image className="size-4" />
-                        <span className="text-sm">Add image</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { fileInputRef.current?.click(); setShowAttachMenu(false); }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground dark:text-[#a0a0a5] dark:hover:bg-white/5 dark:hover:text-white"
-                      >
-                        <FileCode className="size-4" />
-                        <span className="text-sm">Import code</span>
-                      </button>
-                    </div>
-                  </div>
-                </>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={cn(
+                "relative flex items-center justify-center rounded-full border border-transparent text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-white/10 dark:hover:text-white",
+                compact ? "size-8" : "size-9"
               )}
-            </div>
+              aria-label={attachedFiles.length ? `${attachedFiles.length} PDF(s) attached` : "Attach PDF resume"}
+              title="PDF only"
+            >
+              <Plus className="size-5" />
+              {attachedFiles.length > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-neutral-900 px-0.5 text-[10px] font-bold text-white dark:bg-[#10a37f]">
+                  {attachedFiles.length}
+                </span>
+              )}
+            </button>
             <ModelSelector
               models={models}
               selectedModelId={selectedModelId}
@@ -386,7 +339,7 @@ export function BoltChatInput({
                 type="button"
                 onClick={onStop}
                 className={cn(
-                  "flex items-center gap-2 rounded-full text-sm font-medium bg-rose-500/90 hover:bg-rose-500 text-white transition-all duration-200 active:scale-95",
+                  "flex items-center gap-2 rounded-full bg-rose-600 text-sm font-medium text-white transition-all hover:bg-rose-500 active:scale-95",
                   compact ? "px-3 py-1.5" : "px-4 py-2"
                 )}
               >
@@ -398,12 +351,12 @@ export function BoltChatInput({
                 type="submit"
                 disabled={!value.trim() && attachedFiles.length === 0}
                 className={cn(
-                  "flex items-center gap-2 rounded-full bg-primary text-sm font-medium text-primary-foreground shadow-md transition-all duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95 dark:shadow-[0_0_20px_rgba(20,136,252,0.3)]",
-                  compact ? "px-3 py-1.5" : "px-4 py-2"
+                  "flex size-9 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30 dark:bg-white dark:text-neutral-900",
+                  "sm:size-10"
                 )}
+                aria-label="Send"
               >
-                <span className="hidden sm:inline">Send</span>
-                <SendHorizontal className="size-4" />
+                <ArrowUp className="size-5" strokeWidth={2.25} />
               </button>
             )}
           </div>

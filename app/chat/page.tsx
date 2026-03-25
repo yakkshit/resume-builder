@@ -7,7 +7,10 @@ import { ChatSidebar } from "@/components/chat/chat-sidebar";
 import { ChatMessageRenderer } from "@/components/chat/chat-message-renderer";
 import { ChatCvTabs } from "@/components/chat/chat-cv-tabs";
 import { renderChatComponent } from "@/components/chat/chat-component-registry";
-import { BoltChatInput, RayBackground, AnnouncementBadge, type AttachedFile } from "@/components/ui/bolt-style-chat";
+import { BoltChatInput, AnnouncementBadge, type AttachedFile } from "@/components/ui/bolt-style-chat";
+import { ChatAmbient } from "@/components/chat/chat-ambient";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { ThinkingIndicator } from "@/components/chat/thinking-indicator";
 import { TextSelectionPopover } from "@/components/chat/text-selection-popover";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -501,7 +504,8 @@ export default function ChatPage() {
   }, [messages]);
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background text-foreground dark:bg-[#0a0a0c] dark:bg-[radial-gradient(ellipse_120%_80%_at_50%_-20%,rgba(17,114,226,0.12),transparent_55%),radial-gradient(ellipse_80%_50%_at_100%_50%,rgba(99,102,241,0.06),transparent_50%)]">
+    <div className="relative flex h-full min-h-0 w-full flex-1 overflow-hidden bg-background text-foreground">
+      <ChatAmbient />
       <ChatSidebar
           selectedModel={selectedModel}
           onModelChange={setSelectedModel}
@@ -526,36 +530,39 @@ export default function ChatPage() {
 
       <main
         className={cn(
-          "flex h-full max-h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden pl-12 pr-2 py-2 transition-[margin] duration-200 sm:px-4 sm:py-4 lg:pl-2",
-          sidebarOpen ? "lg:ml-[calc(1rem+20rem+1rem)]" : ""
+          "flex h-full max-h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden py-2 pl-12 pr-2 transition-[margin,padding] duration-200 sm:px-4 sm:py-4",
+          sidebarOpen ? "lg:ml-[280px] lg:pl-4" : "lg:pl-4"
         )}
       >
         {!hasMessages ? (
           <>
-            <RayBackground />
-            <div className="pointer-events-none absolute top-3 left-1/2 z-[2] -translate-x-1/2 sm:top-5">
-              <div className="pointer-events-auto">
-                <AnnouncementBadge text="Career Assistant" />
-              </div>
+            <div className="pointer-events-none absolute left-1/2 top-3 z-[2] -translate-x-1/2 sm:top-5">
             </div>
             <div className="relative z-[1] flex h-full min-h-0 w-full flex-col items-center justify-between px-4">
-              <div className="flex-1 w-full max-w-[820px] flex items-center justify-center">
+              <div className="flex w-full max-w-[840px] flex-1 items-center justify-center">
                 <motion.div
                   initial={{ opacity: 0, y: 10, scale: 0.99 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.35, ease: "easeOut" }}
-                  className="w-full rounded-3xl border border-border bg-card/80 p-6 shadow-lg backdrop-blur-xl dark:border-white/10 dark:bg-white/5 dark:shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_18px_80px_-30px_rgba(77,165,252,0.35)] sm:p-8"
+                  className="w-full rounded-[1.75rem] border border-border/80 bg-card/70 p-6 shadow-2xl shadow-primary/5 ring-1 ring-black/5 backdrop-blur-2xl dark:border-white/[0.08] dark:bg-[#0c0c12]/75 dark:shadow-[0_24px_80px_-32px_rgba(59,130,246,0.35)] dark:ring-white/[0.06] sm:p-10"
                 >
-                  <div className="text-center">
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl dark:text-white">
-                      How can I help you?
+                  <div className="flex flex-col items-center text-center">
+                    <Badge
+                      variant="secondary"
+                      className="mb-4 border-primary/20 bg-primary/10 font-medium text-primary dark:border-[#3b82f6]/30 dark:bg-[#1e3a5f]/50 dark:text-sky-200"
+                    >
+                      AI-powered career studio
+                    </Badge>
+                    <h1 className="bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-3xl font-bold tracking-tight text-transparent sm:text-4xl md:text-5xl dark:from-white dark:to-white/75">
+                      How can we help you?
                     </h1>
-                    <p className="mt-3 text-base text-muted-foreground sm:text-lg">
-                      Chat to generate your resume, cover letter, job plan, and interactive workflows.
+                    <p className="mt-3 max-w-lg text-base text-muted-foreground sm:text-lg">
+                      Resumes, cover letters, mock interviews, and job search workflows — with rich interactive previews.
                     </p>
                   </div>
+                  <Separator className="my-8 bg-border/60 dark:bg-white/10" />
 
-                  <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
                     {[
                       {
                         label: "Create",
@@ -578,25 +585,25 @@ export default function ChatPage() {
                         key={pill.label}
                         type="button"
                         onClick={() => setInput(pill.prompt)}
-                        className="inline-flex items-center justify-center rounded-full border border-border bg-muted/60 px-4 py-2 text-sm font-medium text-foreground shadow-sm transition-all duration-200 hover:bg-muted active:scale-[0.98] dark:border-white/10 dark:bg-gradient-to-b dark:from-white/10 dark:to-white/5 dark:text-white/90 dark:shadow-[0_10px_40px_-20px_rgba(255,255,255,0.25)] dark:hover:shadow-[0_18px_60px_-30px_rgba(77,165,252,0.35)]"
+                        className="inline-flex items-center justify-center rounded-full border border-border/90 bg-background/80 px-4 py-2 text-sm font-medium text-foreground shadow-sm ring-1 ring-black/[0.04] transition-all duration-200 hover:border-primary/30 hover:bg-muted/80 active:scale-[0.98] dark:border-white/10 dark:bg-white/[0.06] dark:text-white/95 dark:ring-white/10 dark:hover:border-[#3b82f6]/40 dark:hover:bg-white/[0.1]"
                       >
                         {pill.label}
                       </button>
                     ))}
                   </div>
 
-                  <div className="mt-8 w-full max-w-[680px] mx-auto">
+                  <div className="mx-auto mt-2 w-full max-w-[680px]">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                         Suggested prompts
                       </p>
                     </div>
                     <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {[
+                        "I attached a PDF resume — recreate it as a modern CV in the editor and improve wording.",
                         "Write a cover letter for my resume and the job I’m applying to.",
                         "Score my CV against this job description and highlight gaps.",
                         "Generate a mock interview plan and questions for my role.",
-                        "Create an HR email to follow up after an interview.",
                       ].map((prompt) => (
                         <motion.button
                           key={prompt}
@@ -659,7 +666,7 @@ export default function ChatPage() {
               className="h-0 min-h-0 flex-1 touch-pan-y overflow-y-scroll overflow-x-hidden overscroll-contain px-3 py-4 sm:px-4 sm:py-6 md:px-6 lg:px-8"
               onScroll={handleScroll}
             >
-              <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border/80 bg-muted/20 shadow-inner sm:rounded-3xl sm:px-2 sm:py-2 md:px-4 md:py-3 xl:max-w-5xl dark:border-white/[0.06] dark:bg-white/[0.02] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)]">
+              <div className="mx-auto w-full max-w-4xl rounded-2xl border border-border/70 bg-card/40 shadow-inner ring-1 ring-black/[0.03] backdrop-blur-sm sm:rounded-3xl sm:px-2 sm:py-2 md:px-4 md:py-3 xl:max-w-5xl dark:border-white/[0.07] dark:bg-white/[0.03] dark:ring-white/[0.04] dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]">
                 <div className="space-y-6 pb-8">
                   {messages.map((msg, idx) => {
                     if (msg.role === "system") return null;

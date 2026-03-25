@@ -1,39 +1,32 @@
 import type { NextRequest } from "next/server";
+import { normalizeAttachedFile } from "@/lib/normalize-attached-file";
 
 /**
  * Chat Assistant API - proxies to /api/chat with mode: "career-assistant".
  * Uses the main chat API's full model support with career-assistant system prompt.
  */
-export const maxDuration = 60;
-
-function toContentType(type: string, name: string): string {
-  if (type.startsWith("image/")) return "image";
-  if (name.endsWith(".pdf")) return "pdf";
-  if (name.endsWith(".json")) return "json";
-  if ([".txt", ".md", ".csv"].some((e) => name.endsWith(e))) return "text";
-  return "document";
-}
+export const maxDuration = 120;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { messages = [], model, apiKey, resumeData, id, contextText, attachedData } = body;
 
-    const attachedFiles = Array.isArray(attachedData) ? attachedData.map((f: { name: string; type: string; data: string; isImage?: boolean }) => {
-      let content = f.data;
-      try {
-        if (!f.isImage && typeof f.data === "string") {
-          content = Buffer.from(f.data, "base64").toString("utf-8");
-        }
-      } catch {
-        content = f.data;
+    const attachedFiles: Array<{
+      name: string;
+      content: string;
+      contentType: string;
+      pages?: number;
+    }> = [];
+
+    if (Array.isArray(attachedData)) {
+      for (const f of attachedData) {
+        if (!f || typeof f !== "object") continue;
+        const file = f as { name: string; type: string; data: string; isImage?: boolean };
+        const normalized = await normalizeAttachedFile(file);
+        attachedFiles.push(normalized);
       }
-      return {
-        name: f.name,
-        content: typeof content === "string" ? content : String(content),
-        contentType: toContentType(f.type || "", f.name),
-      };
-    }) : [];
+    }
 
     const baseUrl = req.nextUrl.origin;
     const res = await fetch(`${baseUrl}/api/chat`, {

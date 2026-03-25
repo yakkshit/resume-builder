@@ -31,6 +31,8 @@ const nextConfig = {
     '@react-pdf/pdfkit',
     'yoga-layout',
     'pdfkit',
+    'pdf-parse',
+    'pdfjs-dist',
   ],
   experimental: {
     // Disabled - can trigger "Cannot read properties of undefined (reading 'length')" in webpack
