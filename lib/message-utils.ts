@@ -1,4 +1,4 @@
-import type { UIMessage } from "ai";
+import type { FileUIPart, UIMessage } from "ai";
 
 function getTextFromPart(part: unknown): string {
   if (!part || typeof part !== "object") return "";
@@ -38,6 +38,15 @@ export function getTextContent(message: UIMessage | undefined | null): string {
   }
 
   return "";
+}
+
+/** File parts on a user message (for attachment chips in the thread). */
+export function getMessageFileParts(message: UIMessage | undefined | null): FileUIPart[] {
+  if (!message?.parts?.length) return [];
+  return message.parts.filter((p): p is FileUIPart => {
+    if (!p || typeof p !== "object") return false;
+    return (p as { type?: string }).type === "file";
+  });
 }
 
 /**

@@ -243,7 +243,9 @@ Resume data: ${resumeJson}`
     const text = getMsgText(m)
     if (!text) return m
     const redacted = redactTextPII(text)
-    return { ...m, content: redacted, parts: [{ type: "text", text: redacted }] }
+    const parts = Array.isArray(m.parts) ? m.parts : []
+    const fileParts = parts.filter((p) => p && typeof p === "object" && (p as { type?: string }).type === "file")
+    return { ...m, content: redacted, parts: [{ type: "text", text: redacted }, ...fileParts] }
   })
   const formattedMessages = [{ role: "system", content: systemMessage }, ...redactedMessages]
 

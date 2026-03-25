@@ -35,63 +35,66 @@ export function ChatCvTabs({
   setTemplate,
 }: ChatCvTabsProps) {
   return (
-    <Tabs defaultValue="pdf" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="pdf" className="flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          PDF View
-        </TabsTrigger>
-        <TabsTrigger value="editor" className="flex items-center gap-2">
-          <Pencil className="h-4 w-4" />
-          Editor
-        </TabsTrigger>
-        <TabsTrigger value="settings" className="flex items-center gap-2">
-          <Settings className="h-4 w-4" />
-          Template
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="pdf" className="mt-3">
-        <Card className="overflow-hidden border-2">
-          <CardContent className="p-0 h-[450px]">
-            <PdfPreviewClient resumeData={resumeData} template={template} />
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="editor" className="mt-3">
-        <Card className="border-2">
-          <CardContent className="p-4 max-h-[500px] overflow-y-auto">
-            <ResumeEditor resumeData={resumeData} setResumeData={setResumeData} />
-          </CardContent>
-        </Card>
-      </TabsContent>
-      <TabsContent value="settings" className="mt-3">
-        <Card className="border-2">
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm">CV Template</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label>Select Template</Label>
-              <Select
-                value={template}
-                onValueChange={(v) => setTemplate(v as Template)}
-              >
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Choose template" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(resumeTemplates).map((key) => (
-                    <SelectItem key={key} value={key}>
-                      {key.charAt(0).toUpperCase() +
-                        key.slice(1).replace(/-/g, " ")}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      </TabsContent>
-    </Tabs>
+    <div data-no-selection-popover="true">
+      <Tabs defaultValue="pdf" className="w-full">
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-0.5 p-1 sm:gap-0">
+          <TabsTrigger value="pdf" className="flex items-center justify-center gap-1 px-1.5 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm">
+            <FileText className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+            <span className="truncate sm:inline">PDF</span>
+            <span className="hidden sm:inline">View</span>
+          </TabsTrigger>
+          <TabsTrigger value="editor" className="flex items-center justify-center gap-1 px-1.5 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm">
+            <Pencil className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+            <span className="truncate">Editor</span>
+          </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center justify-center gap-1 px-1.5 py-2 text-xs sm:gap-2 sm:px-3 sm:text-sm">
+            <Settings className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
+            <span className="truncate">Template</span>
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="pdf" className="mt-3">
+          <Card className="overflow-hidden border-2">
+            <CardContent className="p-0 min-h-[min(280px,45dvh)] h-[min(450px,55dvh)] max-h-[min(520px,80dvh)]">
+              <PdfPreviewClient resumeData={resumeData} template={template} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="editor" className="mt-3">
+          <Card className="border-2">
+            <CardContent className="p-3 sm:p-4 max-h-[min(500px,80dvh)] overflow-y-auto">
+              <ResumeEditor resumeData={resumeData} setResumeData={setResumeData} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="settings" className="mt-3">
+          <Card className="border-2">
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm">CV Template</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>Select Template</Label>
+                <Select
+                  value={template}
+                  onValueChange={(v) => setTemplate(v as Template)}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Choose template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(resumeTemplates).map((key) => (
+                      <SelectItem key={key} value={key}>
+                        {key.charAt(0).toUpperCase() +
+                          key.slice(1).replace(/-/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }

@@ -7,6 +7,7 @@ import type { ResumeData, Template } from "@/lib/types"
 import { requireApiKey } from "@/lib/api-auth"
 
 export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 export const maxDuration = 30
 
 const MIN_PDF_SIZE = 200

@@ -16,6 +16,7 @@ import {
   Bolt,
   Github,
   SendHorizontal,
+  Square,
 } from "lucide-react";
 
 // TYPES
@@ -82,7 +83,7 @@ export function ModelSelector({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 text-[#8a8a8f] hover:text-white hover:bg-white/5 active:scale-95"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-muted active:scale-95"
       >
         {selected.icon}
         <span>{selected.name}</span>
@@ -94,9 +95,9 @@ export function ModelSelector({
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} aria-hidden />
-          <div className="absolute bottom-full left-0 mb-2 z-50 min-w-[220px] max-h-[min(280px,70vh)] overflow-y-auto bg-[#1a1a1e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="absolute bottom-full left-0 mb-2 z-50 min-w-[220px] max-h-[min(280px,70vh)] overflow-y-auto rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-white/10 dark:bg-[#1a1a1e]/95 dark:shadow-black/50">
             <div className="p-1.5">
-              <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#5a5a5f]">
+              <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Select Model
               </div>
               {models.map((model) => (
@@ -106,8 +107,8 @@ export function ModelSelector({
                   onClick={() => handleSelect(model)}
                   className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-left transition-all duration-150 ${
                     selected.id === model.id
-                      ? "bg-white/10 text-white"
-                      : "text-[#a0a0a5] hover:bg-white/5 hover:text-white"
+                      ? "bg-muted text-foreground dark:bg-white/10 dark:text-white"
+                      : "text-muted-foreground hover:bg-muted/80 hover:text-foreground dark:text-[#a0a0a5] dark:hover:bg-white/5 dark:hover:text-white"
                   }`}
                 >
                   <div className="flex-shrink-0">{model.icon}</div>
@@ -126,7 +127,7 @@ export function ModelSelector({
                         </span>
                       )}
                     </div>
-                    <span className="text-[11px] text-[#6a6a6f]">{model.description}</span>
+                    <span className="text-[11px] text-muted-foreground">{model.description}</span>
                   </div>
                   {selected.id === model.id && (
                     <Check className="size-4 text-blue-400 flex-shrink-0" />
@@ -161,7 +162,8 @@ export interface BoltChatInputProps {
   onModelChange: (model: BoltModel) => void;
   compact?: boolean;
   attachedFiles?: AttachedFile[];
-  onFilesChange?: (files: AttachedFile[]) => void;
+  /** Prefer `setState` so multi-file uploads merge correctly (no stale closure). */
+  onFilesChange?: React.Dispatch<React.SetStateAction<AttachedFile[]>>;
 }
 
 export function BoltChatInput({
@@ -188,24 +190,35 @@ export function BoltChatInput({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, asImage: boolean) => {
     const files = e.target.files;
     if (!files?.length || !onFilesChange) return;
-    let done = 0;
-    const all: AttachedFile[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
+    const fileList = Array.from(files);
+    const newItems: AttachedFile[] = new Array(fileList.length);
+    let pending = fileList.length;
+
+    const finishOne = () => {
+      pending -= 1;
+      if (pending === 0) {
+        const ok = newItems.filter((x): x is AttachedFile => x != null);
+        onFilesChange((prev) => [...prev, ...ok]);
+      }
+    };
+
+    fileList.forEach((f, index) => {
       const r = new FileReader();
       r.onload = () => {
         const raw = String(r.result);
-        all.push({
+        newItems[index] = {
           name: f.name,
           type: f.type,
           data: raw.includes("base64,") ? raw.split("base64,")[1] ?? raw : raw,
           isImage: asImage || f.type.startsWith("image/"),
-        });
-        done++;
-        if (done === files.length) onFilesChange([...attachedFiles, ...all]);
+        };
+        finishOne();
+      };
+      r.onerror = () => {
+        finishOne();
       };
       r.readAsDataURL(f);
-    }
+    });
     e.target.value = "";
   };
 
@@ -220,18 +233,18 @@ export function BoltChatInput({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (!isLoading && value.trim()) {
+      if (!isLoading && (value.trim() || attachedFiles.length > 0)) {
         onSubmit(e as unknown as React.FormEvent);
       }
     }
   };
 
   return (
-    <form onSubmit={onSubmit} className="relative w-full max-w-[680px] mx-auto">
+    <form onSubmit={onSubmit} className="relative mx-auto w-full max-w-[min(100%,48rem)]">
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md,.json,.pdf,.js,.ts,.tsx,.py,.html,.css"
+        accept=".txt,.md,.json,.pdf,.doc,.docx,.js,.ts,.tsx,.py,.html,.css"
         multiple
         className="hidden"
         onChange={(e) => handleFileUpload(e, false)}
@@ -244,21 +257,24 @@ export function BoltChatInput({
         className="hidden"
         onChange={(e) => handleFileUpload(e, true)}
       />
-      <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-b from-white/[0.08] to-transparent pointer-events-none" />
-      <div className="relative rounded-2xl bg-[#1e1e22] ring-1 ring-white/[0.08] shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_2px_20px_rgba(0,0,0,0.4)]">
+      <div className="pointer-events-none absolute -inset-[1px] rounded-2xl bg-gradient-to-b from-primary/10 to-transparent dark:from-white/[0.08]" />
+      <div className="relative rounded-2xl border border-border bg-card/95 text-card-foreground shadow-md ring-1 ring-border/60 dark:bg-[#1e1e22] dark:ring-white/[0.08] dark:shadow-[0_0_0_1px_rgba(255,255,255,0.05),0_2px_20px_rgba(0,0,0,0.4)]">
         {attachedFiles.length > 0 && (
-          <div className="flex flex-wrap gap-2 px-3 pt-2">
+          <div className="flex flex-wrap gap-2 border-b border-border/60 px-3 py-2.5 dark:border-white/10">
             {attachedFiles.map((f, i) => (
               <span
-                key={i}
-                className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 text-xs text-[#a0a0a5]"
+                key={`${f.name}-${i}`}
+                className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-primary/35 bg-primary/10 px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm dark:border-[#1488fc]/35 dark:bg-[#1488fc]/12 dark:text-white/95"
               >
-                {f.name}
+                <Paperclip className="size-3.5 shrink-0 text-primary dark:text-[#6eb8fc]" aria-hidden />
+                <span className="min-w-0 truncate" title={f.name}>
+                  {f.name}
+                </span>
                 {onFilesChange && (
                   <button
                     type="button"
-                    onClick={() => onFilesChange(attachedFiles.filter((_, j) => j !== i))}
-                    className="hover:text-white"
+                    onClick={() => onFilesChange((prev) => prev.filter((_, j) => j !== i))}
+                    className="shrink-0 rounded-md px-1 text-muted-foreground hover:bg-muted hover:text-foreground dark:text-white/60 dark:hover:bg-white/10 dark:hover:text-white"
                     aria-label="Remove"
                   >
                     ×
@@ -277,7 +293,7 @@ export function BoltChatInput({
             placeholder={placeholder}
             disabled={isLoading}
             className={cn(
-              "w-full resize-none bg-transparent text-white placeholder-[#5a5a5f] focus:outline-none",
+              "w-full resize-none bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none",
               compact ? "text-[13px] px-3.5 pt-2.5 pb-1.5 max-h-[96px]" : "text-[15px] px-5 pt-5 pb-3 max-h-[200px]"
             )}
             style={{ minHeight: compact ? 36 : 80, height: compact ? 36 : 80 }}
@@ -291,13 +307,19 @@ export function BoltChatInput({
                 type="button"
                 onClick={() => setShowAttachMenu(!showAttachMenu)}
                 className={cn(
-                  "flex items-center justify-center rounded-full bg-white/[0.08] hover:bg-white/[0.12] text-[#8a8a8f] hover:text-white transition-all duration-200 active:scale-95",
+                  "relative flex items-center justify-center rounded-full bg-muted/80 text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-95 dark:bg-white/[0.08] dark:shadow-inner dark:hover:bg-white/[0.12] dark:hover:text-white",
                   compact ? "size-7" : "size-8"
                 )}
+                aria-label={attachedFiles.length ? `${attachedFiles.length} file(s) attached` : "Add attachment"}
               >
                 <Plus
                   className={`size-4 transition-transform duration-200 ${showAttachMenu ? "rotate-45" : ""}`}
                 />
+                {attachedFiles.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-0.5 text-[10px] font-bold text-primary-foreground shadow-md dark:bg-[#1488fc] dark:text-white">
+                    {attachedFiles.length}
+                  </span>
+                )}
               </button>
 
               {showAttachMenu && (
@@ -307,12 +329,12 @@ export function BoltChatInput({
                     onClick={() => setShowAttachMenu(false)}
                     aria-hidden
                   />
-                  <div className="absolute bottom-full left-0 mb-2 z-50 bg-[#1a1a1e]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
-                    <div className="p-1.5 min-w-[180px]">
+                  <div className="absolute bottom-full left-0 z-50 mb-2 overflow-hidden rounded-xl border border-border bg-popover/95 text-popover-foreground shadow-lg backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-200 dark:border-white/10 dark:bg-[#1a1a1e]/95 dark:shadow-black/50">
+                    <div className="min-w-[180px] p-1.5">
                       <button
                         type="button"
                         onClick={() => { fileInputRef.current?.click(); setShowAttachMenu(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[#a0a0a5] hover:bg-white/5 hover:text-white transition-all duration-150"
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground dark:text-[#a0a0a5] dark:hover:bg-white/5 dark:hover:text-white"
                       >
                         <Paperclip className="size-4" />
                         <span className="text-sm">Upload file</span>
@@ -320,7 +342,7 @@ export function BoltChatInput({
                       <button
                         type="button"
                         onClick={() => { imageInputRef.current?.click(); setShowAttachMenu(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[#a0a0a5] hover:bg-white/5 hover:text-white transition-all duration-150"
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground dark:text-[#a0a0a5] dark:hover:bg-white/5 dark:hover:text-white"
                       >
                         <Image className="size-4" />
                         <span className="text-sm">Add image</span>
@@ -328,7 +350,7 @@ export function BoltChatInput({
                       <button
                         type="button"
                         onClick={() => { fileInputRef.current?.click(); setShowAttachMenu(false); }}
-                        className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[#a0a0a5] hover:bg-white/5 hover:text-white transition-all duration-150"
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all duration-150 hover:bg-muted hover:text-foreground dark:text-[#a0a0a5] dark:hover:bg-white/5 dark:hover:text-white"
                       >
                         <FileCode className="size-4" />
                         <span className="text-sm">Import code</span>
@@ -351,7 +373,7 @@ export function BoltChatInput({
             <button
               type="button"
               className={cn(
-                "flex items-center gap-1.5 rounded-full text-xs font-medium text-[#6a6a6f] hover:text-white hover:bg-white/5 transition-all duration-200",
+                "flex items-center gap-1.5 rounded-full text-xs font-medium text-muted-foreground transition-all duration-200 hover:bg-muted hover:text-foreground dark:hover:bg-white/5 dark:hover:text-white",
                 compact ? "px-2 py-1.5" : "px-3 py-2"
               )}
             >
@@ -369,14 +391,14 @@ export function BoltChatInput({
                 )}
               >
                 <span className="hidden sm:inline">Stop</span>
-                <SendHorizontal className="size-4" />
+                <Square className="size-3.5 sm:size-4" strokeWidth={2.5} aria-hidden />
               </button>
             ) : (
               <button
                 type="submit"
-                disabled={!value.trim()}
+                disabled={!value.trim() && attachedFiles.length === 0}
                 className={cn(
-                  "flex items-center gap-2 rounded-full text-sm font-medium bg-[#1488fc] hover:bg-[#1a94ff] text-white transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 shadow-[0_0_20px_rgba(20,136,252,0.3)]",
+                  "flex items-center gap-2 rounded-full bg-primary text-sm font-medium text-primary-foreground shadow-md transition-all duration-200 hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40 active:scale-95 dark:shadow-[0_0_20px_rgba(20,136,252,0.3)]",
                   compact ? "px-3 py-1.5" : "px-4 py-2"
                 )}
               >
@@ -391,19 +413,20 @@ export function BoltChatInput({
   );
 }
 
-// Ray Background
+// Ray Background (light + dark)
 export function RayBackground() {
   return (
-    <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none select-none">
-      <div className="absolute inset-0 bg-[#0f0f0f]" />
+    <div className="pointer-events-none absolute inset-0 h-full w-full select-none overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-sky-50/90 via-background to-muted/30 dark:hidden" />
+      <div className="absolute inset-0 hidden bg-[#0f0f0f] dark:block" />
       <div
-        className="absolute left-1/2 -translate-x-1/2 w-[4000px] h-[1800px] sm:w-[6000px]"
+        className="absolute left-1/2 hidden h-[1800px] w-[4000px] -translate-x-1/2 dark:block sm:w-[6000px]"
         style={{
           background: `radial-gradient(circle at center 800px, rgba(20, 136, 252, 0.8) 0%, rgba(20, 136, 252, 0.35) 14%, rgba(20, 136, 252, 0.18) 18%, rgba(20, 136, 252, 0.08) 22%, rgba(17, 17, 20, 0.2) 25%)`,
         }}
       />
       <div
-        className="absolute top-[175px] left-1/2 w-[1600px] h-[1600px] sm:top-1/2 sm:w-[3043px] sm:h-[2865px]"
+        className="absolute left-1/2 top-[175px] hidden h-[1600px] w-[1600px] dark:block sm:top-1/2 sm:h-[2865px] sm:w-[3043px]"
         style={{ transform: "translate(-50%) rotate(180deg)" }}
       >
         <div
