@@ -8,6 +8,30 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 
+function getPackageManager(): 'npm' | 'yarn' | 'pnpm' | 'bun' {
+    const userAgent = process.env.npm_config_user_agent;
+    if (userAgent) {
+        if (userAgent.startsWith('yarn')) return 'yarn';
+        if (userAgent.startsWith('pnpm')) return 'pnpm';
+        if (userAgent.startsWith('bun')) return 'bun';
+        if (userAgent.startsWith('npm')) return 'npm';
+    }
+    // Fallback checks
+    if (fs.existsSync('yarn.lock')) return 'yarn';
+    if (fs.existsSync('pnpm-lock.yaml')) return 'pnpm';
+    if (fs.existsSync('bun.lockb')) return 'bun';
+    return 'npm';
+}
+
+function getRunCommand(): string {
+    const pm = getPackageManager();
+    if (pm === 'npm') return 'npm run';
+    if (pm === 'yarn') return 'yarn';
+    if (pm === 'pnpm') return 'pnpm';
+    if (pm === 'bun') return 'bun run';
+    return 'npm run';
+}
+
 const question = (query: string): Promise<string> => {
     return new Promise((resolve) => {
         rl.question(query, (answer) => {
@@ -49,15 +73,17 @@ async function startWorkflow() {
     console.log("Tip: At any prompt, type 'q' to quit.");
     console.log("=".repeat(70));
 
+    const runCmd = getRunCommand();
+
     // 1. Run Tests (Generates audit part of summary/report.md)
-    const testsPassed = await runCommand("pnpm test", "Package Status Audit & UI Tests");
+    const testsPassed = await runCommand(`${runCmd} test`, "Package Status Audit & UI Tests");
     if (!testsPassed) {
         console.log("\n⚠️ Tests failed. Check /issues/issues.md for details.");
         process.exit(1);
     }
 
     // 2. Build
-    const buildPassed = await runCommand("pnpm build", "Production Build");
+    const buildPassed = await runCommand(`${runCmd} build`, "Production Build");
     if (!buildPassed) {
         console.log("\n⚠️ Build failed. Stopping workflow.");
         process.exit(1);

@@ -171,12 +171,10 @@ const Toaster = forwardRef<ToasterRef, { defaultPosition?: Position }>(
       },
     }));
 
-    return (
-      <SonnerToaster
-        position={defaultPosition}
-        toastOptions={{ unstyled: true, className: 'flex justify-end' }}
-      />
-    );
+    // We return null here instead of <SonnerToaster /> to prevent React render loop crashes 
+    // ("Cannot update a component while rendering a different component").
+    // The global <Toaster /> from layout.tsx handles the actual DOM container for sonner!
+    return null;
   }
 );
 

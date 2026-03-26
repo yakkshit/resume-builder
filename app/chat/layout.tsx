@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Career Chat | AI Resume",
-  description:
-    "Chat with AI for cover letters, CV scoring, job links, mock interviews, and more.",
+  title: "AI Career Assistant — Chat",
+  description: "Chat with your AI career assistant for resume, jobs, and interviews",
 };
 
 export default function ChatLayout({
@@ -11,9 +10,6 @@ export default function ChatLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="-mt-2 -mb-8 h-[calc(100vh-5rem)] min-h-0 flex flex-col overflow-hidden">
-      {children}
-    </div>
-  );
+  // Isolated layout: no AppNav, no padding, full viewport
+  return <div className="w-full h-screen overflow-hidden">{children}</div>;
 }
