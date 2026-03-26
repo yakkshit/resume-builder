@@ -214,15 +214,12 @@ export function ChatMessageRenderer({
                   strong: ({ children }) => (
                     <strong className="font-semibold text-foreground">{children}</strong>
                   ),
-                  code: ({ className, children, ...props }) => {
+                  code: ({ node, className, children, ...props }: any) => {
                     const isBlock = className?.includes("language-");
                     if (isBlock) {
                       return (
-                        <pre
-                          className="bg-muted rounded-lg p-3 overflow-x-auto my-2 text-sm"
-                          {...props}
-                        >
-                          <code>{children}</code>
+                        <pre className="bg-muted rounded-lg p-3 overflow-x-auto my-2 text-sm">
+                          <code className={className}>{children}</code>
                         </pre>
                       );
                     }
