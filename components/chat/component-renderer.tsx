@@ -26,7 +26,12 @@ export function ComponentRenderer({ type, data }: ComponentRendererProps) {
   switch (type) {
     case "resume":             return <ResumeViewer data={data} />;
     case "cv-score":           return <CVScore data={data as any} />;
-    case "job-recommendations": return <JobRecommendations data={(data as any)?.jobs} />;
+    case "job-recommendations": {
+      const d = data as any;
+      // Server/UI typically emits jobLinks format: { links: [{ title, url, company }] }
+      // Our in-chat component uses JobRecommendations; accept either `links` or `jobs`.
+      return <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />;
+    }
     case "auto-applier":       return <AutoApplier />;
     case "mock-interview":     return <MockInterview data={data as any} />;
     case "coding-challenge":   return <CodingChallenge data={data as any} />;

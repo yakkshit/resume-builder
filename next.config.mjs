@@ -14,6 +14,15 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/chat',
+        permanent: true,
+      },
+    ]
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -31,6 +40,8 @@ const nextConfig = {
     '@react-pdf/pdfkit',
     'yoga-layout',
     'pdfkit',
+    'pdf-parse',
+    'pdfjs-dist',
   ],
   experimental: {
     // Disabled - can trigger "Cannot read properties of undefined (reading 'length')" in webpack

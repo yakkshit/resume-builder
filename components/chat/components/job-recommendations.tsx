@@ -1,6 +1,6 @@
 "use client";
 
-import { Briefcase, MapPin, DollarSign, Clock, Bookmark, ExternalLink } from "lucide-react";
+import { Briefcase, MapPin, DollarSign, Clock, Bookmark, ExternalLink, Link2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ interface Job {
   type: string;
   posted: string;
   match: number;
+  link?: string;
 }
 
 const DEFAULT_JOBS: Job[] = [
@@ -22,13 +23,59 @@ const DEFAULT_JOBS: Job[] = [
   { id: 3, title: "Frontend Architect", company: "BigTech Corp", location: "New York, NY", salary: "$150k–$200k", type: "Full-time", posted: "3d ago", match: 82 },
 ];
 
-export function JobRecommendations({ data = [] }: { data?: Job[] }) {
-  const jobs = data.length > 0 ? data : DEFAULT_JOBS;
+export function JobRecommendations({ data }: { data?: unknown }) {
+  const input =
+    Array.isArray(data)
+      ? data
+      : Array.isArray((data as any)?.links)
+        ? (data as any).links
+        : [];
+
+  const jobs: Job[] =
+    input && input.length > 0
+      ? (input as any[]).map((j, idx): Job => {
+          const title = typeof j?.title === "string" ? j.title : `Role ${idx + 1}`;
+          const company = typeof j?.company === "string" ? j.company : "Company";
+          const location = typeof j?.location === "string" ? j.location : "Location not specified";
+          const link = typeof j?.url === "string" ? j.url : typeof j?.link === "string" ? j.link : "";
+
+          // If we have no structured scoring, keep a reasonable visual match.
+          const match =
+            typeof j?.match === "number"
+              ? j.match
+              : typeof j?.postedMinutesAgo === "number"
+                ? j.postedMinutesAgo <= 5
+                  ? 92
+                  : 78
+                : 84;
+
+          return {
+            id: idx + 1,
+            title,
+            company,
+            location,
+            salary: typeof j?.salary === "string" ? j.salary : "",
+            type: typeof j?.type === "string" ? j.type : "",
+            posted: typeof j?.posted === "string" ? j.posted : "",
+            match,
+            link,
+          };
+        })
+      : DEFAULT_JOBS;
 
   const matchColor = (m: number) =>
     m >= 90 ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
     : m >= 80 ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
     : "bg-amber-500/15 text-amber-600 border-amber-500/30";
+
+  const fireApply = (job: Job) => {
+    // Let the chat container decide how to turn this into an AI message.
+    window.dispatchEvent(
+      new CustomEvent("ai-chat:apply-job", {
+        detail: job,
+      })
+    );
+  };
 
   return (
     <Card className="w-full border-border/60">
@@ -60,8 +107,13 @@ export function JobRecommendations({ data = [] }: { data?: Job[] }) {
               <Button size="sm" variant="outline" className="h-7 text-xs flex-shrink-0 gap-1">
                 <Bookmark className="w-3 h-3" /> Save
               </Button>
-              <Button size="sm" className="h-7 text-xs flex-1 gap-1 bg-indigo-500 hover:bg-indigo-600">
-                <ExternalLink className="w-3 h-3" /> Apply Now
+              <Button
+                size="sm"
+                className="h-7 text-xs flex-1 gap-1 bg-indigo-500 hover:bg-indigo-600"
+                onClick={() => fireApply(job)}
+              >
+                {job.link ? <ExternalLink className="w-3 h-3" /> : <Briefcase className="w-3 h-3" />}
+                Apply Now
               </Button>
             </div>
           </div>

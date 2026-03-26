@@ -10,20 +10,19 @@ import {
   Upload,
   Trash2,
   User,
-  KeyRound,
-  Cpu,
   MessageSquarePlus,
   FileText,
   AlignLeft,
+  Sun,
+  Moon,
+  Settings2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChatSession, ChatSettings, AVAILABLE_MODELS } from "./chat-store";
+import { ChatSession, ChatSettings } from "./chat-store";
 import Link from "next/link";
+import { useTheme } from "next-themes";
+import { ProfileSettingsDialog, getStoredProfile } from "./profile-settings-dialog";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -52,17 +51,18 @@ export function ChatSidebar({
   onImport,
   onSettingsChange,
 }: SidebarProps) {
+  const { theme, setTheme } = useTheme();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const [profileName, setProfileName] = React.useState("");
+  const [profileEmail, setProfileEmail] = React.useState("");
 
-  // Group models by provider for display
-  const modelsByProvider = AVAILABLE_MODELS.reduce<Record<string, typeof AVAILABLE_MODELS>>(
-    (acc, m) => {
-      if (!acc[m.provider]) acc[m.provider] = [];
-      acc[m.provider].push(m);
-      return acc;
-    },
-    {}
-  );
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const p = getStoredProfile();
+    setProfileName(p.name || "Your profile");
+    setProfileEmail(p.email || "Click to edit");
+  }, [profileOpen]);
 
   return (
     <AnimatePresence>
@@ -99,24 +99,51 @@ export function ChatSidebar({
 
             {/* Header */}
             <div className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                  <Sparkles className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Career Assistant</p>
-                  <p className="text-[10px] text-muted-foreground">AI-powered guide</p>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                className="h-8 w-8 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-foreground"
+              <button
+                type="button"
+                onClick={() => setProfileOpen(true)}
+                className="group flex min-w-0 items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-white/5 transition-colors"
+                aria-label="Open profile settings"
               >
-                <X className="w-4 h-4" />
-              </Button>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                  <User className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0 text-left">
+                  <p className="text-sm font-semibold text-foreground truncate">{profileName}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{profileEmail}</p>
+                </div>
+                <Settings2 className="ml-1 h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  type="button"
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="h-8 w-8 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                  aria-label="Toggle theme"
+                  title="Toggle theme"
+                >
+                  {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="h-8 w-8 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-foreground"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
+
+            <ProfileSettingsDialog
+              open={profileOpen}
+              onOpenChange={setProfileOpen}
+              settings={settings}
+              onSettingsChange={onSettingsChange}
+            />
 
             {/* Scrollable settings + history */}
             <div className="relative z-10 flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
@@ -142,101 +169,7 @@ export function ChatSidebar({
                 </div>
               </div>
 
-              {/* Settings section */}
-              <div className="px-4 py-3 border-b border-white/10 space-y-3">
-                {/* Model */}
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-1">
-                    <Cpu className="w-3.5 h-3.5 text-indigo-400" /> AI Model
-                  </Label>
-                  <Select
-                    value={settings.model}
-                    onValueChange={(v) => onSettingsChange({ model: v })}
-                  >
-                    <SelectTrigger className="h-9 px-3 w-full rounded-xl text-xs bg-black/20 hover:bg-black/40 border border-white/10 hover:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all shadow-inner">
-                      <SelectValue placeholder="Select a model..." />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[300px] border border-white/10 bg-neutral-950/90 backdrop-blur-xl rounded-xl shadow-2xl p-1">
-                      {Object.entries(modelsByProvider).map(([provider, models]) => (
-                        <React.Fragment key={provider}>
-                          <div className="px-2 py-1.5 mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 border-b border-white/5 mb-1">
-                            {provider}
-                          </div>
-                          {models.map((m) => (
-                            <SelectItem 
-                              key={m.value} 
-                              value={m.value} 
-                              className="text-xs pl-8 py-2 rounded-lg cursor-pointer focus:bg-indigo-500/20 focus:text-indigo-200 transition-colors"
-                            >
-                              {m.label}
-                            </SelectItem>
-                          ))}
-                        </React.Fragment>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* API Key */}
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-1">
-                    <KeyRound className="w-3.5 h-3.5 text-indigo-400" /> API Key
-                  </Label>
-                  <Input
-                    type="password"
-                    placeholder="sk-... or your key"
-                    value={settings.apiKey}
-                    onChange={(e) => onSettingsChange({ apiKey: e.target.value })}
-                    className="h-9 px-3 w-full rounded-xl text-xs bg-black/20 hover:bg-black/40 border border-white/10 hover:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all shadow-inner placeholder:text-muted-foreground/30"
-                  />
-                  <p className="text-[10px] text-muted-foreground/50 italic px-1">
-                    Required for external AI provider access.
-                  </p>
-                </div>
-
-                {/* Context Window */}
-                <div className="space-y-2">
-                  <Label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-1">
-                    <AlignLeft className="w-3.5 h-3.5 text-indigo-400" /> System Context
-                  </Label>
-                  <Textarea
-                    placeholder="Custom instructions, role description, or job context..."
-                    value={settings.contextWindow}
-                    onChange={(e) => onSettingsChange({ contextWindow: e.target.value })}
-                    className="text-xs px-3 py-2 w-full rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 hover:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all shadow-inner placeholder:text-muted-foreground/30 min-h-[80px] resize-none"
-                  />
-                  <p className="text-[10px] text-muted-foreground/50 italic px-1">
-                    Prepended invisibly to all your queries.
-                  </p>
-                </div>
-              </div>
-
-              {/* Export / Import */}
-              <div className="px-4 py-3 border-b border-white/10 flex gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 h-8 text-[11px] font-semibold bg-white/5 border border-white/10 hover:bg-indigo-500/20 hover:text-indigo-200 hover:border-indigo-500/30 transition-all rounded-lg"
-                  onClick={onExport}
-                >
-                  <Download className="w-3.5 h-3.5 mr-1.5" /> Export
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 h-8 text-[11px] font-semibold bg-white/5 border border-white/10 hover:bg-cyan-500/20 hover:text-cyan-200 hover:border-cyan-500/30 transition-all rounded-lg"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-3.5 h-3.5 mr-1.5" /> Import
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  className="hidden"
-                  onChange={onImport}
-                />
-              </div>
+            {/* Settings moved to profile popup */}
 
               {/* Chat history header */}
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.02]">
@@ -292,8 +225,35 @@ export function ChatSidebar({
               </div>
             </div>
 
+             {/* Export / Import */}
+             <div className="px-4 py-3 border-b border-white/10 flex gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-8 text-[11px] font-semibold bg-white/5 border border-white/10 hover:bg-indigo-500/20 hover:text-indigo-200 hover:border-indigo-500/30 transition-all rounded-lg"
+                  onClick={onExport}
+                >
+                  <Download className="w-3.5 h-3.5 mr-1.5" /> Export
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-8 text-[11px] font-semibold bg-white/5 border border-white/10 hover:bg-cyan-500/20 hover:text-cyan-200 hover:border-cyan-500/30 transition-all rounded-lg"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1.5" /> Import
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={onImport}
+                />
+              </div>
+
             {/* User profile at bottom */}
-            <div className="relative z-10 px-4 py-3 border-t border-white/10">
+            {/* <div className="relative z-10 px-4 py-3 border-t border-white/10">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
                   <User className="w-4 h-4 text-white" />
@@ -304,7 +264,7 @@ export function ChatSidebar({
                 </div>
                 <div className="w-2 h-2 bg-green-400 rounded-full" />
               </div>
-            </div>
+            </div>  */}
           </motion.aside>
         </>
       )}

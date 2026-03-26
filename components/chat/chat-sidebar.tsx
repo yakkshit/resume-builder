@@ -30,6 +30,7 @@ import {
   Settings,
   ChevronDown,
   PanelLeftClose,
+  Sparkles,
 } from "lucide-react";
 import { CHAT_MODELS_BY_PROVIDER } from "@/lib/chat-models";
 import type { AIModel } from "@/lib/types";
@@ -176,27 +177,35 @@ export function ChatSidebar({
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
-      <div className="p-3">
+      {/* New Chat Button */}
+      <div className="p-3 sm:p-4">
         <Button
           onClick={handleNewSession}
-          className="w-full rounded-xl bg-[#1172e2] hover:bg-[#1a94ff] text-white shadow-lg shadow-[#1172e2]/30 h-11 font-medium"
+          className="h-10 w-full rounded-lg border border-neutral-200 bg-white text-sm font-medium text-neutral-800 shadow-sm transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-white dark:hover:bg-neutral-800"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 h-4 w-4" />
           New chat
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 px-2 min-h-0">
-        <div className="space-y-1 pb-4">
-          <p className="px-2 py-2 text-xs font-medium text-[#5a5a5f] uppercase tracking-wider">
-            History
+      {/* Chat History */}
+      <ScrollArea className="flex-1 min-h-0 px-2 sm:px-3 [&>[data-radix-scroll-area-viewport]]:scroll-smooth">
+        <div className="space-y-1 pb-4 pt-1">
+          <p className="mb-2 px-1 text-[11px] font-medium uppercase tracking-wider text-neutral-500 dark:text-neutral-500">
+            Your chats
           </p>
           {!mounted ? (
-            <p className="px-2 py-4 text-sm text-[#8a8a8f]">Loading...</p>
+            <div className="px-3 py-8 text-center">
+              <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/25 border-t-primary dark:border-white/20 dark:border-t-white/60" />
+            </div>
           ) : sessions.length === 0 ? (
-            <p className="px-2 py-4 text-sm text-[#8a8a8f]">No sessions yet</p>
+            <div className="px-3 py-8 text-center">
+              <Sparkles className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40 dark:text-white/20" />
+              <p className="text-sm text-muted-foreground dark:text-white/40">No chats yet</p>
+              <p className="mt-1 text-xs text-muted-foreground/80 dark:text-white/30">Start a conversation above</p>
+            </div>
           ) : (
-            <>
+            <div className="space-y-1">
               {sessions.map((s) => (
                 <SessionItem
                   key={s.id}
@@ -216,40 +225,46 @@ export function ChatSidebar({
                   }
                 />
               ))}
-            </>
+            </div>
           )}
         </div>
       </ScrollArea>
 
-      <div className="border-t border-white/10 dark:border-neutral-700/50 p-3 space-y-2">
+      {/* Bottom Section - Context & Settings */}
+      <div className="space-y-3 border-t border-neutral-200 bg-white p-3 dark:border-neutral-800 dark:bg-[#171717] sm:p-4">
         <ContextWindow
           value={context}
           onChange={handleContextChange}
         />
+        
         <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="w-full justify-between h-10 px-3 text-white hover:bg-white/10">
-              <span className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-between h-11 px-4 text-white/90 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+            >
+              <span className="flex items-center gap-2.5 font-medium">
                 <Settings className="h-4 w-4" />
                 Settings
               </span>
-              <ChevronDown className={cn("h-4 w-4 transition-transform", settingsOpen && "rotate-180")} />
+              <ChevronDown className={cn("h-4 w-4 transition-transform duration-200", settingsOpen && "rotate-180")} />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <div className="space-y-4 pt-3">
-              <div>
-                <Label className="text-xs text-[#8a8a8f]">Model</Label>
+            <div className="space-y-4 pt-4">
+              {/* Model Selection */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-white/60 uppercase tracking-wide">Model</Label>
                 <Select value={selectedModel} onValueChange={(v) => onModelChange(v as AIModel)}>
-                  <SelectTrigger className="mt-1.5 h-9 bg-[#0f0f0f] border-white/10 text-white">
+                  <SelectTrigger className="mt-1.5 h-11 bg-white/5 border-white/10 text-white rounded-xl hover:bg-white/10 transition-colors backdrop-blur-sm">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-neutral-900/95 backdrop-blur-xl border-white/10">
                     {Object.entries(CHAT_MODELS_BY_PROVIDER).map(([provider, ids]) => (
                       <div key={provider}>
-                        <div className="px-2 py-1 text-xs font-medium text-muted-foreground">{provider}</div>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-white/40 uppercase tracking-wide">{provider}</div>
                         {(ids as readonly string[]).map((id) => (
-                          <SelectItem key={id} value={id}>
+                          <SelectItem key={id} value={id} className="text-white/90 focus:bg-white/10">
                             {id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                           </SelectItem>
                         ))}
@@ -258,29 +273,51 @@ export function ChatSidebar({
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <div className="flex justify-between mb-1">
-                  <Label className="text-xs text-[#8a8a8f]">API Key</Label>
-                  <Button variant="ghost" size="sm" className="h-6 px-1 text-xs text-[#8a8a8f] hover:text-white" onClick={() => setShowApiKey(!showApiKey)}>
+
+              {/* API Key */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs font-semibold text-white/60 uppercase tracking-wide">API Key</Label>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 px-2 text-xs text-white/50 hover:text-white/90 hover:bg-white/10 rounded-lg" 
+                    onClick={() => setShowApiKey(!showApiKey)}
+                  >
                     {showApiKey ? "Hide" : "Show"}
                   </Button>
                 </div>
-                <Input
-                  type={showApiKey ? "text" : "password"}
-                  placeholder="API key"
-                  value={apiKey}
-                  onChange={(e) => onApiKeyChange(e.target.value)}
-                  className="h-9 bg-[#0f0f0f] border-white/10 text-white font-mono text-sm placeholder:text-[#5a5a5f]"
-                />
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" />
+                  <Input
+                    type={showApiKey ? "text" : "password"}
+                    placeholder="Enter your API key"
+                    value={apiKey}
+                    onChange={(e) => onApiKeyChange(e.target.value)}
+                    className="h-11 pl-10 bg-white/5 border-white/10 text-white font-mono text-sm placeholder:text-white/30 rounded-xl hover:bg-white/10 focus:bg-white/10 transition-colors backdrop-blur-sm"
+                  />
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1 h-9" onClick={handleDownloadJson}>
-                  <Download className="h-3.5 w-3.5 mr-1.5" />
+
+              {/* Export/Import */}
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 h-10 bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:text-white rounded-xl transition-all backdrop-blur-sm" 
+                  onClick={handleDownloadJson}
+                >
+                  <Download className="h-4 w-4 mr-2" />
                   Export
                 </Button>
                 <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleUploadJson} />
-                <Button variant="outline" size="sm" className="flex-1 h-9" onClick={() => fileInputRef.current?.click()}>
-                  <Upload className="h-3.5 w-3.5 mr-1.5" />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1 h-10 bg-white/5 border-white/10 text-white/90 hover:bg-white/10 hover:text-white rounded-xl transition-all backdrop-blur-sm" 
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
                   Import
                 </Button>
               </div>
@@ -294,34 +331,25 @@ export function ChatSidebar({
   const sidebarPanel = (
     <aside
       className={cn(
-        "fixed left-4 top-20 z-50 flex h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] flex-col w-64 sm:w-72 rounded-2xl border border-white/10",
-        "bg-[#1a1a1e]/95 backdrop-blur-xl shadow-2xl shadow-black/40",
-        "text-white",
+        "fixed left-0 top-14 z-50 flex w-[min(100vw,280px)] flex-col border-r border-neutral-200 bg-[#f9f9f9] text-neutral-900 dark:border-neutral-800 dark:bg-[#171717] dark:text-neutral-100",
+        "h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)]",
         className
       )}
     >
-      <div className="p-4 border-b border-white/20 dark:border-neutral-700/50 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1172e2] text-white">
+      {/* Header */}
+      <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
             <MessageSquare className="h-4 w-4" />
           </div>
-          <div className="min-w-0">
-            <h2 className="font-semibold text-white truncate">Career Chat</h2>
-            <p className="text-xs text-[#8a8a8f]">Resumes & jobs</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-sm font-semibold tracking-tight">Chats</h2>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-400">Resume & career</p>
           </div>
         </div>
-        {onSidebarOpenChange && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onSidebarOpenChange(false)}
-            className="shrink-0 h-8 w-8 rounded-lg lg:flex hidden"
-            aria-label="Close sidebar"
-          >
-            <PanelLeftClose className="h-4 w-4" />
-          </Button>
-        )}
       </div>
+      
+      {/* Content */}
       <div className="flex-1 min-h-0 overflow-hidden">{sidebarContent}</div>
     </aside>
   );
@@ -336,15 +364,15 @@ export function ChatSidebar({
             size="icon"
             onClick={() => onSidebarOpenChange(!isSidebarVisible)}
             className={cn(
-              "fixed top-20 z-[60] hidden lg:flex h-9 w-9 rounded-xl border border-white/10 bg-[#1a1a1e]/95 hover:bg-[#1a1a1e] text-white shadow-lg transition-all",
-              isSidebarVisible ? "left-[296px]" : "left-4"
+              "fixed top-[calc(3.5rem+0.5rem)] z-[60] hidden h-9 w-9 rounded-lg border border-neutral-200 bg-white text-neutral-700 shadow-sm transition-all hover:bg-neutral-50 lg:flex dark:border-neutral-700 dark:bg-[#2f2f2f] dark:text-neutral-200 dark:hover:bg-neutral-800",
+              isSidebarVisible ? "left-[calc(280px+10px)]" : "left-3"
             )}
             aria-label={isSidebarVisible ? "Close sidebar" : "Open sidebar"}
           >
             {isSidebarVisible ? (
-              <PanelLeftClose className="h-4 w-4" />
+              <PanelLeftClose className="h-5 w-5" />
             ) : (
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft className="h-5 w-5" />
             )}
           </Button>
         )}
@@ -354,26 +382,28 @@ export function ChatSidebar({
             <Button
               variant="outline"
               size="icon"
-              className="fixed left-4 top-24 z-40 lg:hidden rounded-xl border-white/20 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-lg"
+              className="fixed left-3 top-[calc(3.5rem+0.5rem)] z-40 h-9 w-9 rounded-lg border-neutral-200 bg-white dark:border-neutral-700 dark:bg-[#2f2f2f] lg:hidden"
               aria-label="Open menu"
             >
-              <PanelLeft className="h-4 w-4" />
+              <PanelLeft className="h-5 w-5" />
             </Button>
           </SheetTrigger>
           <SheetContent
             side="left"
-            className="w-[300px] p-0 border-0 bg-white/95 dark:bg-neutral-950/95 backdrop-blur-xl"
+            className="w-[min(100vw,300px)] max-w-[90vw] border-r border-neutral-800 bg-[#171717] p-0 sm:w-[min(100vw-2rem,300px)]"
           >
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle>Career Chat</SheetTitle>
+            <SheetHeader className="border-b border-neutral-800 px-4 py-4">
+              <SheetTitle className="text-left text-base font-semibold text-white">Chats</SheetTitle>
+              <p className="text-left text-xs text-neutral-500">History & settings</p>
             </SheetHeader>
-            <div className="h-[calc(100vh-5rem)] overflow-hidden">{sidebarContent}</div>
+            <div className="h-[calc(100dvh-5rem)] min-h-0 overflow-hidden sm:h-[calc(100vh-5.5rem)]">
+              {sidebarContent}
+            </div>
           </SheetContent>
         </Sheet>
       </>
     );
   }
-
   return sidebarPanel;
 }
 
@@ -396,31 +426,41 @@ function SessionItem({
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-              className="group relative flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/10 text-[#e0e0e5]"
+      className={cn(
+        "group relative flex items-start gap-1.5 rounded-lg px-2 py-2 text-left transition-colors sm:gap-2 sm:px-2.5 sm:py-2",
+        isActive
+          ? "bg-neutral-200/90 dark:bg-neutral-800"
+          : "hover:bg-neutral-200/70 dark:hover:bg-neutral-800/80"
+      )}
     >
       <button
         type="button"
         onClick={onSelect}
-        className={cn(
-          "flex-1 min-w-0 text-sm truncate text-left rounded-lg py-1.5 px-2 -mx-2 -my-1.5 transition-colors",
-            isActive && "bg-[#1172e2]/20 text-[#6eb3f7] font-medium"
-        )}
+        className="min-h-[44px] flex-1 min-w-0 touch-manipulation text-left sm:min-h-0"
       >
-        <span className="block truncate">{title}</span>
-        <span className="block text-[10px] text-[#8a8a8f] mt-0.5">{timeLabel}</span>
+        <span
+          className={cn(
+            "line-clamp-2 text-[13px] font-medium leading-snug sm:line-clamp-1 sm:truncate",
+            isActive ? "text-neutral-900 dark:text-white" : "text-neutral-700 dark:text-neutral-200"
+          )}
+          title={title}
+        >
+          {title}
+        </span>
+        <span className="mt-0.5 block text-[10px] text-neutral-500 sm:text-[11px]">{timeLabel}</span>
       </button>
       {onDelete && (hover || isActive) && (
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 shrink-0 rounded-lg opacity-70 hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-600"
+          className="h-8 w-8 shrink-0 rounded-xl opacity-70 hover:opacity-100 hover:bg-red-500/20 hover:text-red-400 transition-all"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
           aria-label="Delete session"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-4 w-4" />
         </Button>
       )}
     </div>

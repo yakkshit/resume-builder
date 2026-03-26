@@ -23,6 +23,7 @@ import { defaultResumeData } from "@/lib/default-resume-data";
 import type { ResumeData, Template } from "@/lib/types";
 import { generatePDF } from "@/lib/pdf-generator";
 import { resumeTemplates } from "@/components/pdf-templates";
+import { sanitizeResumeData } from "@/lib/sanitize-resume-data";
 
 // PDF viewer loaded dynamically (client-only, heavy)
 const PdfPreviewClient = dynamic(
@@ -60,6 +61,99 @@ function deepMerge<T>(target: T, source: any): T {
   return result;
 }
 
+function stripBoldMarkersDeep(input: any): any {
+  if (typeof input === "string") return input.replace(/\*\*/g, "");
+  if (!input || typeof input !== "object") return input;
+  if (Array.isArray(input)) return input.map(stripBoldMarkersDeep);
+  const out: any = {};
+  for (const [k, v] of Object.entries(input)) out[k] = stripBoldMarkersDeep(v);
+  return out;
+}
+
+function stripProfilePictureDeep(input: any): any {
+  if (!input || typeof input !== "object") return input;
+  if (Array.isArray(input)) return input.map(stripProfilePictureDeep);
+  const out: any = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (k === "profilePicture") continue;
+    out[k] = stripProfilePictureDeep(v);
+  }
+  return out;
+}
+
+const PROFILE_CONTEXT_TOGGLE_ID = "ai-chat-use-profile-context";
+const PROFILE_STORE_ID = "ai-chat-profile";
+
+function normalizeUrlLike(s: string): string {
+  const v = (s || "").trim();
+  if (!v) return "";
+  if (/^https?:\/\//i.test(v)) return v;
+  return `https://${v}`;
+}
+
+function getGithubFromBasicInfo(basicInfo: any): string {
+  const links = Array.isArray(basicInfo?.portfolioLinks) ? basicInfo.portfolioLinks : [];
+  for (const l of links) {
+    if (!l || typeof l !== "object") continue;
+    const platform = String((l as any).platform || "").toLowerCase();
+    const url = String((l as any).url || "");
+    if (platform.includes("github") || /github\.com/i.test(url)) return url;
+  }
+  return "";
+}
+
+function setGithubOnBasicInfo(basicInfo: any, github: string) {
+  if (!basicInfo || typeof basicInfo !== "object") return;
+  const gh = normalizeUrlLike(github);
+  const links = Array.isArray(basicInfo.portfolioLinks) ? [...basicInfo.portfolioLinks] : [];
+  const idx = links.findIndex((l) => {
+    const platform = String(l?.platform || "").toLowerCase();
+    const url = String(l?.url || "");
+    return platform.includes("github") || /github\.com/i.test(url);
+  });
+  if (!gh) {
+    if (idx >= 0) links.splice(idx, 1);
+    basicInfo.portfolioLinks = links;
+    return;
+  }
+  const entry = { platform: "GitHub", url: gh };
+  if (idx >= 0) links[idx] = entry;
+  else links.push(entry);
+  basicInfo.portfolioLinks = links;
+}
+
+function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
+  const out = nextResume && typeof nextResume === "object" ? nextResume : {};
+  if (!out.basicInfo || typeof out.basicInfo !== "object") out.basicInfo = {};
+  const currentBasic = currentResume?.basicInfo && typeof currentResume.basicInfo === "object" ? currentResume.basicInfo : {};
+
+  const toggleRaw = typeof window !== "undefined" ? localStorage.getItem(PROFILE_CONTEXT_TOGGLE_ID) : null;
+  const useProfile = toggleRaw !== "false";
+
+  const fields = ["name", "email", "phone", "location", "linkedin", "website"] as const;
+  if (useProfile) {
+    let profile: any = {};
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem(PROFILE_STORE_ID) : null;
+      profile = raw ? JSON.parse(raw) : {};
+    } catch {
+      profile = {};
+    }
+    for (const f of fields) {
+      const pv = typeof profile?.[f] === "string" ? profile[f].trim() : "";
+      (out.basicInfo as any)[f] = pv || (currentBasic as any)?.[f] || "";
+    }
+    const gh = typeof profile?.github === "string" ? profile.github.trim() : "";
+    setGithubOnBasicInfo(out.basicInfo, gh || getGithubFromBasicInfo(currentBasic));
+  } else {
+    for (const f of fields) {
+      (out.basicInfo as any)[f] = (currentBasic as any)?.[f] || "";
+    }
+    setGithubOnBasicInfo(out.basicInfo, getGithubFromBasicInfo(currentBasic));
+  }
+  return out;
+}
+
 export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
   const toasterRef = useRef<ToasterRef>(null);
 
@@ -85,13 +179,25 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
     if (data) {
       const payload = data.resumeData ? data.resumeData : (Object.keys(data).length > 0 && !data.template ? data : null);
       if (payload) {
-        current = deepMerge(current, payload);
+        const beforeMerge = sanitizeResumeData(current);
+        // Keep existing profile picture locally; do not let large base64 re-enter storage.
+        const existingPicture =
+          (current as any)?.basicInfo && typeof (current as any).basicInfo === "object"
+            ? (current as any).basicInfo.profilePicture
+            : undefined;
+        const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(payload));
+        current = deepMerge(current, cleanedPayload);
+        current = applyIdentitySourceRule(current, beforeMerge);
+        if (existingPicture && (current as any)?.basicInfo && typeof (current as any).basicInfo === "object") {
+          (current as any).basicInfo.profilePicture = existingPicture;
+        }
+        current = sanitizeResumeData(current);
         if (typeof window !== "undefined") {
           localStorage.setItem("resumeData", JSON.stringify(current));
         }
       }
     }
-    return current;
+    return sanitizeResumeData(current);
   });
 
   const [template, setTemplate] = useState<Template>(() => {
@@ -113,7 +219,12 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
     const handleStorage = () => {
       const stored = localStorage.getItem("resumeData");
       if (stored) {
-        try { setResumeData(JSON.parse(stored)); } catch { /* ignore */ }
+        try {
+          const parsed = JSON.parse(stored);
+          setResumeData(sanitizeResumeData(parsed));
+        } catch {
+          /* ignore */
+        }
       }
     };
     window.addEventListener("storage", handleStorage);
@@ -170,6 +281,16 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
         </div>
         
         <div className="flex items-center gap-2 self-end sm:self-auto">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="h-8 rounded-full bg-black/5 dark:bg-white/10 p-0.5 border border-black/5 dark:border-white/5 shadow-inner">
+                <TabsTrigger value="preview" className="text-[11px] h-7 px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
+                  <Eye className="w-3 h-3" /> Preview
+                </TabsTrigger>
+                <TabsTrigger value="editor" className="text-[11px] h-7 px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
+                  <Edit className="w-3 h-3" /> Editor
+                </TabsTrigger>
+              </TabsList>
+          </Tabs>
           <Select value={template} onValueChange={(v) => setTemplate(v as Template)}>
             <SelectTrigger className="h-7 w-[110px] text-[11px] bg-background/50 border-border/60 focus:ring-0 rounded-md">
               <SelectValue />
@@ -193,7 +314,7 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
             <RefreshCw className="w-3.5 h-3.5" />
           </Button>
 
-          <Button
+          {/* <Button
             size="sm"
             className="h-7 text-[11px] gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-md shadow-md"
             onClick={handleDownloadPDF}
@@ -201,13 +322,13 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
           >
             <Download className="w-3 h-3" />
             {downloading ? "Building…" : "Export"}
-          </Button>
+          </Button> */}
         </div>
       </div>
 
       <div className="p-3 bg-white/40 dark:bg-black/20">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex justify-center mb-3">
+          {/* <div className="flex justify-center mb-3">
             <TabsList className="h-8 rounded-full bg-black/5 dark:bg-white/10 p-0.5 border border-black/5 dark:border-white/5 shadow-inner">
               <TabsTrigger value="preview" className="text-[11px] h-7 px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
                 <Eye className="w-3 h-3" /> Preview
@@ -216,7 +337,7 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
                 <Edit className="w-3 h-3" /> Editor
               </TabsTrigger>
             </TabsList>
-          </div>
+          </div> */}
 
           <TabsContent value="preview" className="m-0">
             <div className="rounded-xl overflow-hidden border border-border/40 bg-white/80 dark:bg-neutral-950/80 shadow-inner">

@@ -22,6 +22,25 @@ const STARTER_CODE: Record<string, string> = {
   python: `def two_sum(nums: list[int], target: int) -> list[int]:
     # Your solution here
     pass`,
+  java: `class Solution {
+  public int[] twoSum(int[] nums, int target) {
+    return new int[]{0, 1};
+  }
+}`,
+  cpp: `#include <vector>
+using namespace std;
+
+vector<int> twoSum(vector<int>& nums, int target) {
+  return {0, 1};
+}`,
+  go: `package main
+
+func twoSum(nums []int, target int) []int {
+  return []int{0, 1}
+}`,
+  rust: `fn two_sum(nums: Vec<i32>, target: i32) -> Vec<usize> {
+    vec![0, 1]
+}`,
 };
 
 export interface CodingChallengeProps {
@@ -36,13 +55,47 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
   const problemDesc = data?.codingProblems?.[0] || 'Given an array of integers `nums` and an integer `target`, return indices of the two numbers such that they add up to target.';
   const hasCustomDesc = !!data?.codingProblems?.[0];
 
-  const [lang, setLang] = useState("typescript");
+  const [lang, setLang] = useState<"typescript" | "javascript" | "python" | "java" | "cpp" | "go" | "rust">("typescript");
   const [code, setCode] = useState(STARTER_CODE.typescript);
   const [status, setStatus] = useState<null | "running" | "pass" | "fail">(null);
+  const [runError, setRunError] = useState<string | null>(null);
+  const [runDetails, setRunDetails] = useState<string | null>(null);
 
-  const handleRun = () => {
+  const handleRun = async () => {
+    setRunError(null);
+    setRunDetails(null);
     setStatus("running");
-    setTimeout(() => setStatus("pass"), 1800);
+    try {
+      const res = await fetch("/api/code-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ language: lang, code }),
+      });
+      const data = (await res.json().catch(() => null)) as any;
+      if (!res.ok) {
+        setStatus("fail");
+        setRunError(data?.error || `Run failed (${res.status})`);
+        return;
+      }
+      const passed = Boolean(data?.passed);
+      setStatus(passed ? "pass" : "fail");
+      if (typeof data?.error === "string") setRunError(data.error);
+      if (typeof data?.stdout === "string" && data.stdout.trim()) setRunDetails(data.stdout.trim());
+      if (typeof data?.stderr === "string" && data.stderr.trim()) setRunDetails(data.stderr.trim());
+      if (data?.feedback && typeof data.feedback === "object") {
+        const fb = data.feedback;
+        const lines = [
+          fb.summary ? `Summary: ${fb.summary}` : "",
+          Array.isArray(fb.strengths) && fb.strengths.length ? `Strengths:\n- ${fb.strengths.join("\n- ")}` : "",
+          Array.isArray(fb.improvements) && fb.improvements.length ? `Improvements:\n- ${fb.improvements.join("\n- ")}` : "",
+          fb.suggestedNextStep ? `Next step: ${fb.suggestedNextStep}` : "",
+        ].filter(Boolean);
+        if (lines.length) setRunDetails(lines.join("\n\n"));
+      }
+    } catch (e) {
+      setStatus("fail");
+      setRunError(e instanceof Error ? e.message : "Run failed");
+    }
   };
 
   return (
@@ -93,7 +146,13 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label className="text-xs">Solution</Label>
-            <Select value={lang} onValueChange={(v) => { setLang(v); setCode(STARTER_CODE[v] ?? ""); }}>
+            <Select
+              value={lang}
+              onValueChange={(v) => {
+                setLang(v as any);
+                setCode((STARTER_CODE as any)[v] ?? "");
+              }}
+            >
               <SelectTrigger className="h-7 w-[130px] text-xs border-border/50">
                 <SelectValue />
               </SelectTrigger>
@@ -101,6 +160,10 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
                 <SelectItem value="typescript" className="text-xs">TypeScript</SelectItem>
                 <SelectItem value="javascript" className="text-xs">JavaScript</SelectItem>
                 <SelectItem value="python" className="text-xs">Python</SelectItem>
+                <SelectItem value="java" className="text-xs">Java</SelectItem>
+                <SelectItem value="cpp" className="text-xs">C++</SelectItem>
+                <SelectItem value="go" className="text-xs">Go</SelectItem>
+                <SelectItem value="rust" className="text-xs">Rust</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -120,6 +183,22 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
             <CheckCircle2 className="w-4 h-4" /> All test cases passed! 🎉
           </div>
         )}
+        {status === "running" && (
+          <div className="flex items-center gap-2 text-muted-foreground text-xs">
+            <span className="inline-block h-2 w-2 rounded-full bg-primary animate-pulse" />
+            Running tests…
+          </div>
+        )}
+        {status === "fail" && (
+          <div className="text-rose-400 text-xs">
+            {runError ? runError : "Some tests failed."}
+          </div>
+        )}
+        {runDetails && status !== "running" && (
+          <div className="rounded-lg border border-border/60 bg-neutral-950 p-3 text-[11px] text-muted-foreground font-mono whitespace-pre-wrap max-h-40 overflow-auto">
+            {runDetails}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex gap-2">
@@ -127,7 +206,12 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
             variant="outline"
             size="sm"
             className="h-8 text-xs flex-1"
-            onClick={() => { setCode(STARTER_CODE[lang] ?? ""); setStatus(null); }}
+            onClick={() => {
+              setRunError(null);
+              setRunDetails(null);
+              setCode((STARTER_CODE as any)[lang] ?? "");
+              setStatus(null);
+            }}
           >
             <RotateCcw className="w-3 h-3 mr-1.5" /> Reset
           </Button>

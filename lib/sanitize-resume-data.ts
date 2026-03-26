@@ -1,4 +1,5 @@
 import type { ResumeData } from "./types"
+import { defaultResumeData } from "./default-resume-data"
 
 /** Check if value looks like a React element - never pass to @react-pdf Text */
 function isReactElement(v: unknown): boolean {
@@ -19,6 +20,29 @@ function safeProfilePicture(v: unknown): string | undefined {
  * Sanitizes resume data to ensure all values passed to React PDF Text components
  * are primitives (string/number). Prevents "Objects are not valid as a React child" errors.
  */
+/**
+ * Merges partial AI-generated resume JSON with defaults, then sanitizes.
+ * Prevents React-PDF / chat CV preview from crashing on missing fields or bad types.
+ */
+export function mergeResumeDataWithDefault(incoming: unknown): ResumeData {
+  const base = defaultResumeData
+  if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+    return sanitizeResumeData({ ...base })
+  }
+  const r = incoming as Partial<ResumeData>
+  const merged: ResumeData = {
+    ...base,
+    ...r,
+    basicInfo: { ...base.basicInfo, ...(r.basicInfo ?? {}) },
+    experience: Array.isArray(r.experience) ? (r.experience as ResumeData["experience"]) : base.experience,
+    education: Array.isArray(r.education) ? (r.education as ResumeData["education"]) : base.education,
+    skills: Array.isArray(r.skills) ? r.skills : base.skills,
+    projects: Array.isArray(r.projects) ? r.projects : base.projects,
+    achievements: Array.isArray(r.achievements) ? r.achievements : base.achievements,
+  }
+  return sanitizeResumeData(merged)
+}
+
 export function sanitizeResumeData(data: ResumeData): ResumeData {
   const str = (v: unknown): string => {
     if (v == null) return ""
