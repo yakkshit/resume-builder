@@ -352,7 +352,7 @@ export default function EnhancedChat({
                   <Bot className="h-8 w-8 text-primary/60 dark:text-primary/70" />
                 </motion.div>
                 <h3 className="text-lg font-semibold mb-2 text-foreground">AI Assistant Ready</h3>
-                <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
+                <div className="text-sm text-muted-foreground max-w-md leading-relaxed">
                   Ask me anything about your resume or how to improve it.
                   {aiMode && " I can also tailor your resume to match job descriptions."}
                   <br /> Always add at least a basic prompt in chat to tailor the resume. <br />
@@ -368,7 +368,7 @@ export default function EnhancedChat({
                       </div>
                     </>
                   )}
-                </p>
+                </div>
               </motion.div>
             ) : (
               <AnimatePresence initial={false}>
