@@ -7,6 +7,7 @@ import { Download, RefreshCw, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card } from "@/components/ui/card"
 import { getResumeTemplate } from "@/components/pdf-templates"
+import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 
 interface PDFViewerProps {
   resumeData: ResumeData
@@ -14,6 +15,7 @@ interface PDFViewerProps {
 }
 
 export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
+  const safeResumeData = sanitizeResumeData(resumeData)
   const [isClient, setIsClient] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
@@ -44,10 +46,10 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
       setIsDownloading(true)
 
       const PDFTemplate = getResumeTemplate(template as string)
-      const blob = await pdf(<PDFTemplate resumeData={resumeData} />).toBlob()
+      const blob = await pdf(<PDFTemplate resumeData={safeResumeData} />).toBlob()
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
-      const baseName = (resumeData.basicInfo?.name || "resume").replace(/\s+/g, "-").toLowerCase()
+      const baseName = (safeResumeData.basicInfo?.name || "resume").replace(/\s+/g, "-").toLowerCase()
       const fileName = `resume-${baseName}-${timestamp}.pdf`
 
       const url = URL.createObjectURL(blob)
@@ -126,7 +128,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
         ) : (
           <div className="w-full h-full">
             <ReactPDFViewer style={{ width: "100%", height: "100%", border: "none" }} showToolbar={false}>
-              <PDFTemplate resumeData={resumeData} />
+              <PDFTemplate resumeData={safeResumeData} />
             </ReactPDFViewer>
           </div>
         )}

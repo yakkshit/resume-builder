@@ -41,9 +41,9 @@ export default function RootLayout({
       <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {/* <AppNav /> */}
-          <main className="w-auto h-full">{children}</main>
+          <main className="h-full w-full pt-2">{children}</main>
           <Toaster />
-          <CookieBanner />
+          {/* <CookieBanner /> */}
           <Analytics />
         </ThemeProvider>
       </body>

@@ -32,6 +32,10 @@ import { ChatSidebar } from "./sidebar";
 import { ComponentRenderer } from "./component-renderer";
 import { useChatSettings, ChatMessage, AVAILABLE_MODELS } from "./chat-store";
 import { getTextContent } from "@/lib/message-utils";
+import type { JobSuggestion } from "@/lib/job-scraper/google-jobs";
+import { JobSuggestionsPanel } from "./job-suggestions-panel";
+import { sanitizeResumeData } from "@/lib/sanitize-resume-data";
+import { stripIncompleteJsonTail } from "@/lib/streaming-chat-content";
 
 // ── Welcome Screen ─────────────────────────────────────────────────────────
 
@@ -136,15 +140,23 @@ function extractComponents(text: string) {
     while ((match = componentRegex.exec(text)) !== null) {
         const rawMatch = match[0];
         const typeStr = match[1];
-        const dataStr = match[2].trim();
+        const dataStr = (match[2] ?? "").trim();
         const isComplete = rawMatch.endsWith("```");
 
-        let parsedData = {};
-        if (dataStr) {
+        let parsedData: any = {};
+        if (dataStr && isComplete) {
+            const candidate = stripIncompleteJsonTail(dataStr, false).trim();
             try {
-                parsedData = JSON.parse(dataStr);
-            } catch (e) {
-                // Partial or invalid JSON (e.g., during streaming)
+                parsedData = JSON.parse(candidate);
+            } catch {
+                // Salvage common "valid JSON but with prose" / partial issues:
+                // try to parse the largest {...} slice.
+                const first = candidate.indexOf("{");
+                const last = candidate.lastIndexOf("}");
+                if (first >= 0 && last > first) {
+                    const slice = candidate.slice(first, last + 1);
+                    try { parsedData = JSON.parse(slice); } catch { parsedData = {}; }
+                }
             }
         }
 
@@ -200,7 +212,7 @@ function MessageBubble({
                 </div>
             )}
 
-            <div className={`flex flex-col gap-3 ${isUser ? "items-end" : "items-start"} max-w-[80%]`}>
+            <div className={`flex flex-col gap-3 ${isUser ? "items-end" : "items-start"} max-w-[90%]`}>
                 {/* Bubble */}
                 <div
                     className={`relative px-4 py-3 rounded-2xl text-sm ${isUser
@@ -278,6 +290,8 @@ function ChatInput({
     model,
     onModelChange,
     disabled,
+    useProfileContext,
+    onToggleProfileContext,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -288,6 +302,8 @@ function ChatInput({
     model: string;
     onModelChange: (m: string) => void;
     disabled: boolean;
+    useProfileContext: boolean;
+    onToggleProfileContext: () => void;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -309,7 +325,7 @@ function ChatInput({
     const selectedModel = AVAILABLE_MODELS.find((m) => m.value === model);
 
     return (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 w-full max-w-3xl px-4 z-30">
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 z-30">
             {/* Quick prompt chips */}
             {attachedFiles.length === 0 && (
                 <div className="flex gap-2 mb-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
@@ -385,6 +401,20 @@ function ChatInput({
                 {/* Attach + send */}
                 <div className="flex items-center gap-1 flex-shrink-0">
                     <button
+                        type="button"
+                        onClick={onToggleProfileContext}
+                        className={`p-2 rounded-xl transition-all ${
+                            useProfileContext
+                                ? "text-foreground bg-muted"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                        }`}
+                        title={useProfileContext ? "Profile context ON" : "Profile context OFF"}
+                        aria-pressed={useProfileContext}
+                        aria-label="Toggle profile context"
+                    >
+                        <User className="w-4 h-4" />
+                    </button>
+                    <button
                         onClick={() => fileRef.current?.click()}
                         className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
                     >
@@ -418,18 +448,78 @@ export default function AICareerAssistantChat() {
     const [input, setInput] = useState("");
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+    const [jobPanelOpen, setJobPanelOpen] = useState(false);
+    const [jobPanelLoading, setJobPanelLoading] = useState(false);
+    const [jobPanelProgress, setJobPanelProgress] = useState(0);
+    const [jobPanelProgressLabel, setJobPanelProgressLabel] = useState("Searching Google jobs...");
+    const [jobPanelJobs, setJobPanelJobs] = useState<JobSuggestion[]>([]);
+    const [jobProfileDialogOpen, setJobProfileDialogOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const PROFILE_CONTEXT_TOGGLE_ID = "ai-chat-use-profile-context";
+    const [useProfileContext, setUseProfileContext] = useState(true);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const raw = localStorage.getItem(PROFILE_CONTEXT_TOGGLE_ID);
+        if (raw === "false") setUseProfileContext(false);
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        localStorage.setItem(PROFILE_CONTEXT_TOGGLE_ID, useProfileContext ? "true" : "false");
+    }, [useProfileContext]);
+
+    const buildProfileContextText = () => {
+        if (typeof window === "undefined") return "";
+        try {
+            const raw = localStorage.getItem("ai-chat-profile");
+            if (!raw) return "";
+            const p = JSON.parse(raw) as any;
+            const bits = [
+                typeof p?.name === "string" && p.name ? `Name: ${p.name}` : "",
+                typeof p?.email === "string" && p.email ? `Email: ${p.email}` : "",
+                typeof p?.phone === "string" && p.phone ? `Phone: ${p.phone}` : "",
+                typeof p?.location === "string" && p.location ? `Location: ${p.location}` : "",
+                typeof p?.linkedin === "string" && p.linkedin ? `LinkedIn: ${p.linkedin}` : "",
+                typeof p?.website === "string" && p.website ? `Website: ${p.website}` : "",
+                typeof p?.github === "string" && p.github ? `GitHub: ${p.github}` : "",
+            ].filter(Boolean);
+            return bits.length ? `User profile:\n${bits.join("\n")}` : "";
+        } catch {
+            return "";
+        }
+    };
+
+    const makeAssistantMessageId = () =>
+        `assistant_job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     // Ref so the transport closure always reads fresh settings
     const settingsRef = useRef(settings);
     settingsRef.current = settings;
 
-    // Get resumeData from localStorage to pass to /api/chat
+    function stripProfilePictureFromResumeData(input: any) {
+        if (!input || typeof input !== "object") return input;
+        try {
+            const cloned = structuredClone(input);
+            if (cloned?.basicInfo && typeof cloned.basicInfo === "object") {
+                delete (cloned.basicInfo as any).profilePicture;
+            }
+            return cloned;
+        } catch {
+            // Fallback shallow clone
+            const basicInfo = input?.basicInfo && typeof input.basicInfo === "object" ? { ...(input.basicInfo as any) } : input?.basicInfo;
+            if (basicInfo && typeof basicInfo === "object") delete (basicInfo as any).profilePicture;
+            return { ...(input as any), basicInfo };
+        }
+    }
+
+    // Get resumeData from localStorage to pass to /api/chat (strip heavy base64)
     const getResumeData = () => {
         if (typeof window === "undefined") return null;
         try {
             const raw = localStorage.getItem("resumeData");
-            return raw ? JSON.parse(raw) : null;
+            const parsed = raw ? JSON.parse(raw) : null;
+            return stripProfilePictureFromResumeData(parsed);
         } catch { return null; }
     };
 
@@ -453,7 +543,9 @@ export default function AICareerAssistantChat() {
                     id,
                     model: settingsRef.current.model,
                     apiKey: settingsRef.current.apiKey,
-                    contextText: settingsRef.current.contextWindow,
+                    contextText: useProfileContext
+                        ? [settingsRef.current.contextWindow, buildProfileContextText()].filter(Boolean).join("\n\n")
+                        : "",
                     resumeData: getResumeData(),
                     aiMode: true,
                     mode: "career-assistant",
@@ -557,8 +649,210 @@ export default function AICareerAssistantChat() {
         }
     }, [messages, isLoading]);
 
+    const JOB_PROFILE_STORE_ID = "job-search-profile-store";
+
+    const loadJobSearchProfile = (): {
+        name: string;
+        email: string;
+        phone: string;
+        location: string;
+    } | null => {
+        try {
+            const raw = localStorage.getItem(JOB_PROFILE_STORE_ID);
+            if (!raw) return null;
+            return JSON.parse(raw) as {
+                name: string;
+                email: string;
+                phone: string;
+                location: string;
+            };
+        } catch {
+            return null;
+        }
+    };
+
+    const shouldScrapeJobsCommand = (text: string) => {
+        const t = (text || "").toLowerCase();
+        // Guardrails: job scraping must ONLY happen on explicit job-search intent.
+        // This prevents intercepting prompts like "create me a resume..."
+        if (/\b(resume|cv|cover\s*letter)\b/.test(t)) return false;
+
+        // Explicit command still supported
+        if (/^\s*\/jobs\b/.test(t) || /^\s*\/job\b/.test(t)) return true;
+
+        // Natural language: require BOTH an action verb AND an explicit jobs token.
+        const hasAction = /\b(find|search|look\s*for|looking\s*for|show\s*me|get\s*me|list)\b/.test(t);
+        const hasJobsToken =
+            /\b(jobs?|job\s*openings?|vacanc(?:y|ies)|opportunit(?:y|ies))\b/.test(t);
+
+        return hasAction && hasJobsToken;
+    };
+
+    const getResumeQuery = (resumeData: any) => {
+        try {
+            const safe = sanitizeResumeData(resumeData);
+            const title = safe.basicInfo?.title || "";
+            const location = safe.basicInfo?.location || "";
+            const skills = Array.isArray(safe.skills) ? safe.skills.slice(0, 8) : [];
+            const summary = safe.basicInfo?.summary || "";
+            return {
+                query: [title, summary, skills.join(" ")].filter(Boolean).join(" ").trim() || "software engineer",
+                location,
+            };
+        } catch {
+            return { query: "software engineer", location: "" };
+        }
+    };
+
+    const startJobScrape = useCallback(async () => {
+        if (jobPanelLoading) return;
+
+        const resumeData = getResumeData();
+        if (!resumeData) {
+            showToast("warning", "Generate your resume first (so we know your role + skills).");
+            return;
+        }
+
+        const safeQuery = getResumeQuery(resumeData);
+        const profile = loadJobSearchProfile();
+        const location = profile?.location || safeQuery.location || "";
+        const query = safeQuery.query;
+
+        setJobPanelOpen(true);
+        setJobPanelLoading(true);
+        setJobPanelProgress(8);
+        setJobPanelProgressLabel("Preparing your job search…");
+        setJobPanelJobs([]);
+
+        const steps = [
+            { label: "Searching Google jobs…", pct: 35 },
+            { label: "Filtering jobs posted within 5 minutes…", pct: 70 },
+            { label: "Formatting suggestions…", pct: 88 },
+        ];
+
+        let cancelled = false;
+        let stepIdx = 0;
+        const stepTimer = window.setInterval(() => {
+            if (cancelled) return;
+            const next = steps[Math.min(stepIdx, steps.length - 1)];
+            setJobPanelProgress((prev) => Math.max(prev, next.pct));
+            setJobPanelProgressLabel(next.label);
+            stepIdx += 1;
+            if (stepIdx >= steps.length) window.clearInterval(stepTimer);
+        }, 550);
+
+        try {
+            const res = await fetch("/api/job-search", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    query,
+                    location,
+                    maxResults: 30,
+                    maxPostedMinutes: 5,
+                    // Use the API key from the user's profile/settings (in-memory).
+                    apiKey: settingsRef.current.apiKey || undefined,
+                }),
+            });
+
+            if (!res.ok) throw new Error(`Job scrape failed (${res.status})`);
+            const data = (await res.json()) as { jobs?: JobSuggestion[]; error?: string };
+
+            const jobs = Array.isArray(data.jobs) ? data.jobs : [];
+            if (!cancelled) {
+                setJobPanelJobs(jobs);
+                setJobPanelProgress(100);
+                setJobPanelProgressLabel(jobs.length ? "Done" : "No recent jobs found");
+                setJobPanelLoading(false);
+            }
+        } catch (e) {
+            if (cancelled) return;
+            setJobPanelJobs([]);
+            setJobPanelProgress(100);
+            setJobPanelProgressLabel("Could not fetch jobs");
+            setJobPanelLoading(false);
+            showToast("error", e instanceof Error ? e.message : "Failed to fetch jobs");
+        } finally {
+            cancelled = true;
+            window.clearInterval(stepTimer);
+        }
+    }, [getResumeData, jobPanelLoading]);
+
+    const handleUseJob = useCallback(
+        async (job: JobSuggestion) => {
+            setJobPanelOpen(false);
+            setJobPanelJobs([]);
+            setJobPanelLoading(false);
+            setJobPanelProgress(0);
+
+            const safeLink = job.link ? `\nJob link: ${job.link}` : "";
+            const text = `Tailor my resume and draft a short application plan for this role:\n\nTitle: ${job.title}\nCompany: ${job.company}\nLocation: ${job.location}${safeLink}\n\nInclude relevant keywords and suggest a cover letter outline.`;
+
+            sendMessage({ text });
+        },
+        [sendMessage]
+    );
+
+    const handleJobProfileSaved = useCallback(
+        (profile: { name: string; email: string; phone: string; location: string }) => {
+            try {
+                const raw = localStorage.getItem("resumeData");
+                const current = raw ? JSON.parse(raw) : {};
+                const next = {
+                    ...current,
+                    basicInfo: {
+                        ...(current.basicInfo || {}),
+                        name: profile.name,
+                        email: profile.email,
+                        phone: profile.phone,
+                        location: profile.location,
+                    },
+                };
+                localStorage.setItem("resumeData", JSON.stringify(next));
+            } catch {
+                // ignore
+            }
+        },
+        []
+    );
+
+    // If the user clicks “Apply Now” inside the job component,
+    // trigger the same flow as “Use this job” from the panel.
+    useEffect(() => {
+        const handler = (ev: Event) => {
+            const detail = (ev as CustomEvent<any>).detail;
+            if (!detail) return;
+            const job = detail as {
+                title?: string;
+                company?: string;
+                location?: string;
+                link?: string;
+            };
+
+            void handleUseJob({
+                id: String(detail.id ?? ""),
+                title: job.title ?? "Role",
+                company: job.company ?? "Company",
+                location: job.location ?? "Location not specified",
+                link: job.link ?? "",
+            } as JobSuggestion);
+        };
+
+        window.addEventListener("ai-chat:apply-job", handler);
+        return () => window.removeEventListener("ai-chat:apply-job", handler);
+    }, [handleUseJob]);
+
     const handleSend = useCallback(async () => {
-        if (!input.trim() && attachedFiles.length === 0) return;
+        const trimmed = input.trim();
+        if (!trimmed && attachedFiles.length === 0) return;
+
+        // If user explicitly asks for jobs, show scraped results instead of chatting.
+        if (shouldScrapeJobsCommand(trimmed) && getResumeData()) {
+            setInput("");
+            setAttachedFiles([]);
+            void startJobScrape();
+            return;
+        }
 
         let text = input.trim();
         if (attachedFiles.length > 0) {
@@ -568,7 +862,10 @@ export default function AICareerAssistantChat() {
         setInput("");
         setAttachedFiles([]);
         sendMessage({ text });
-    }, [input, attachedFiles, sendMessage]);
+    }, [input, attachedFiles, sendMessage, startJobScrape]);
+
+    // NOTE: We intentionally do NOT auto-open job suggestions after CV generation.
+    // Jobs should appear only when the user explicitly asks for them.
 
     const handlePrompt = useCallback((p: string) => {
         setInput(p);
@@ -580,14 +877,58 @@ export default function AICareerAssistantChat() {
     }, [sendMessage]);
 
     const handleExport = () => {
-        const json = JSON.stringify({ messages }, null, 2);
+        const safeJsonParse = (raw: string | null) => {
+            if (!raw) return null;
+            try { return JSON.parse(raw); } catch { return null; }
+        };
+
+        const storedSessions = safeJsonParse(typeof window !== "undefined" ? localStorage.getItem("chat_sessions") : null);
+        const sessionsToExport: any[] = Array.isArray(storedSessions) ? storedSessions : (Array.isArray(sessions) ? sessions : []);
+
+        const messagesBySessionId: Record<string, unknown> = {};
+        for (const s of sessionsToExport) {
+            const sid = String((s as any)?.id ?? "");
+            if (!sid) continue;
+            const storedMsgs = safeJsonParse(localStorage.getItem(`chat_messages_${sid}`));
+            if (Array.isArray(storedMsgs)) {
+                messagesBySessionId[sid] = storedMsgs;
+            } else if (sid === currentSessionId) {
+                messagesBySessionId[sid] = messages;
+            }
+        }
+
+        const profile = safeJsonParse(localStorage.getItem("ai-chat-profile"));
+        const storedSettings = safeJsonParse(localStorage.getItem("ai-chat-settings"));
+        const settingsToExport =
+            storedSettings && typeof storedSettings === "object"
+                ? (() => {
+                    const { apiKey: _apiKey, ...rest } = storedSettings as any;
+                    return rest;
+                })()
+                : { model: settings.model, contextWindow: settings.contextWindow };
+
+        const resumeData = safeJsonParse(localStorage.getItem("resumeData"));
+
+        const payload = {
+            schema: "ai-career-assistant-export",
+            version: 1,
+            exportedAt: Date.now(),
+            currentSessionId,
+            sessions: sessionsToExport,
+            messagesBySessionId,
+            profile,
+            settings: settingsToExport,
+            resumeData,
+        };
+
+        const json = JSON.stringify(payload, null, 2);
         const blob = new Blob([json], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `chat-${Date.now()}.json`;
+        a.download = `ai-career-assistant-${Date.now()}.json`;
         a.click();
-        showToast("success", "Chat session exported");
+        showToast("success", "Exported profile + settings + all sessions");
     };
 
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -596,18 +937,81 @@ export default function AICareerAssistantChat() {
         const reader = new FileReader();
         reader.onload = (ev) => {
             try {
-                const { messages: imported } = JSON.parse(ev.target?.result as string);
-                if (Array.isArray(imported) && imported.length > 0 && imported[0].role) { // Added check for array and role
-                    setMessages(imported);
-                    showToast("success", "Chat session imported");
-                } else {
-                    showToast("error", "Invalid session file format"); // Changed message
+                const parsed = JSON.parse(ev.target?.result as string);
+
+                // Back-compat: older exports were `{ messages: [...] }`
+                if (parsed && typeof parsed === "object" && Array.isArray((parsed as any).messages)) {
+                    const imported = (parsed as any).messages;
+                    if (Array.isArray(imported) && (imported.length === 0 || imported[0]?.role)) {
+                        setMessages(imported);
+                        if (currentSessionId) {
+                            localStorage.setItem(`chat_messages_${currentSessionId}`, JSON.stringify(imported));
+                        }
+                        showToast("success", "Imported current chat messages");
+                        return;
+                    }
                 }
+
+                // New "export everything" format
+                if ((parsed as any)?.schema === "ai-career-assistant-export") {
+                    const importedSessions = Array.isArray((parsed as any).sessions) ? (parsed as any).sessions : [];
+                    const importedMessagesById =
+                        (parsed as any).messagesBySessionId && typeof (parsed as any).messagesBySessionId === "object"
+                            ? (parsed as any).messagesBySessionId
+                            : {};
+                    const importedProfile = (parsed as any).profile;
+                    const importedSettings = (parsed as any).settings;
+                    const importedResumeData = (parsed as any).resumeData;
+
+                    localStorage.setItem("chat_sessions", JSON.stringify(importedSessions));
+                    for (const s of importedSessions) {
+                        const sid = String((s as any)?.id ?? "");
+                        if (!sid) continue;
+                        const msgs = (importedMessagesById as any)[sid];
+                        if (Array.isArray(msgs)) {
+                            localStorage.setItem(`chat_messages_${sid}`, JSON.stringify(msgs));
+                        }
+                    }
+
+                    if (importedProfile && typeof importedProfile === "object") {
+                        localStorage.setItem("ai-chat-profile", JSON.stringify(importedProfile));
+                    }
+
+                    if (importedSettings && typeof importedSettings === "object") {
+                        const { apiKey: _apiKey, ...rest } = importedSettings as any;
+                        localStorage.setItem("ai-chat-settings", JSON.stringify(rest));
+                        updateSettings({ ...rest, apiKey: "" });
+                    }
+
+                    if (importedResumeData && typeof importedResumeData === "object") {
+                        localStorage.setItem("resumeData", JSON.stringify(importedResumeData));
+                    }
+
+                    setSessions(importedSessions);
+                    const nextCurrentId =
+                        typeof (parsed as any).currentSessionId === "string" && (parsed as any).currentSessionId
+                            ? (parsed as any).currentSessionId
+                            : importedSessions[0]?.id || "default";
+                    setCurrentSessionId(nextCurrentId);
+
+                    const nextMsgs = localStorage.getItem(`chat_messages_${nextCurrentId}`);
+                    if (nextMsgs) {
+                        try { setMessages(JSON.parse(nextMsgs)); } catch { setMessages([]); }
+                    } else {
+                        setMessages([]);
+                    }
+
+                    showToast("success", "Imported profile + settings + all sessions");
+                    return;
+                }
+
+                showToast("error", "Invalid import file");
             } catch {
                 showToast("error", "Invalid session file");
             }
         };
         reader.readAsText(file);
+        e.target.value = "";
     };
 
     const handleFileAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -673,7 +1077,7 @@ export default function AICareerAssistantChat() {
                 className="relative z-10 h-screen overflow-y-auto pb-44 pt-16"
                 style={{ scrollbarWidth: "none" }}
             >
-                <div className="max-w-3xl mx-auto px-4">
+                <div className="max-w-4xl mx-auto px-4">
                     <AnimatePresence mode="wait">
                         {showWelcome ? (
                             <WelcomeScreen key="welcome" onPrompt={handlePrompt} />
@@ -720,18 +1124,39 @@ export default function AICareerAssistantChat() {
                 </div>
             </div>
 
-            {/* Input bar */}
-            <ChatInput
-                value={input}
-                onChange={setInput}
-                onSend={handleSend}
-                onFileAttach={handleFileAttach}
-                attachedFiles={attachedFiles}
-                onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                model={settings.model}
-                onModelChange={(m) => updateSettings({ model: m })}
-                disabled={isLoading}
-            />
+            {/* Input bar (replaced by job suggestions when scraping) */}
+            {jobPanelOpen ? (
+                <JobSuggestionsPanel
+                    jobs={jobPanelJobs}
+                    open={jobPanelOpen}
+                    loading={jobPanelLoading}
+                    progress={jobPanelProgress}
+                    progressLabel={jobPanelProgressLabel}
+                    onClose={() => {
+                        setJobPanelOpen(false);
+                        setJobPanelLoading(false);
+                    }}
+                    onUseJob={(job) => void handleUseJob(job)}
+                    resumeData={getResumeData()}
+                    jobProfileOpen={jobProfileDialogOpen}
+                    onJobProfileOpenChange={setJobProfileDialogOpen}
+                    onJobProfileSaved={handleJobProfileSaved}
+                />
+            ) : (
+                <ChatInput
+                    value={input}
+                    onChange={setInput}
+                    onSend={handleSend}
+                    onFileAttach={handleFileAttach}
+                    attachedFiles={attachedFiles}
+                    onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                    model={settings.model}
+                    onModelChange={(m) => updateSettings({ model: m })}
+                    disabled={isLoading}
+                    useProfileContext={useProfileContext}
+                    onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                />
+            )}
         </InfiniteGridBackground>
     );
 }

@@ -3,11 +3,16 @@
  * No database - all data stays in the browser.
  */
 
+/** Persisted message parts (text + optional file attachments for UI restore). */
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  parts?: Array<{ type: string; text?: string }>;
+  parts?: Array<
+    | { type: "text"; text?: string }
+    | { type: "file"; url: string; mediaType: string; filename?: string }
+    | { type: string; [key: string]: unknown }
+  >;
   createdAt?: number;
 }
 

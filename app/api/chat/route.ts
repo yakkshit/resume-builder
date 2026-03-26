@@ -30,8 +30,8 @@ function streamTextToResponse(
 
 import { writeFile } from "fs"
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30
+// Allow streaming + PDF text extraction for attachments
+export const maxDuration = 120
 
 // Define available models with their providers and configurations (aligned with UI selector)
 const AVAILABLE_MODELS = Object.entries(CHAT_MODELS_BY_PROVIDER).reduce((acc, [providerName, modelIds]) => {
@@ -85,6 +85,87 @@ const MOCK_RESPONSES = [
   "API quota exceeded. While I can't analyze your specific resume right now, here are universal resume tips:\n\n- Use a clean, professional layout with consistent formatting\n- Place the most relevant information at the top\n- Use bullet points for better readability\n- Include metrics and specific results when possible\n- Remove outdated or irrelevant information",
 ]
 
+function stripProfilePictureForModel(resume: any): any {
+  if (!resume || typeof resume !== "object") return resume
+  try {
+    const cloned = structuredClone(resume)
+    if (cloned?.basicInfo && typeof cloned.basicInfo === "object") {
+      delete cloned.basicInfo.profilePicture
+    }
+    return cloned
+  } catch {
+    const basicInfo = resume?.basicInfo && typeof resume.basicInfo === "object" ? { ...resume.basicInfo } : resume?.basicInfo
+    if (basicInfo && typeof basicInfo === "object") delete (basicInfo as any).profilePicture
+    return { ...(resume as any), basicInfo }
+  }
+}
+
+function tryApplyDeterministicExperienceReplace(userText: string, resume: any): { nextResume: any; applied: boolean; replacements: number; from: string; to: string } | null {
+  const m = userText.match(/replace\s+(.+?)\s+(?:to|with)\s+(.+?)\s+in\s+experience\b/i)
+  if (!m) return null
+  const from = (m[1] || "").trim()
+  const to = (m[2] || "").trim()
+  if (!from || !to || !resume || typeof resume !== "object") return null
+
+  const next = stripProfilePictureForModel(resume)
+  const exp = Array.isArray(next?.experience) ? next.experience : []
+  let replacements = 0
+
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  const replaceCi = (input: string, needle: string, value: string) => {
+    const rgx = new RegExp(esc(needle), "gi")
+    let changed = false
+    const out = input.replace(rgx, () => {
+      changed = true
+      return value
+    })
+    if (changed) replacements += 1
+    return { out, changed }
+  }
+
+  const tokens = from.split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length)
+  const fallbackToken = tokens.find((t) => t.length >= 4) || ""
+
+  for (const item of exp) {
+    if (!item || typeof item !== "object") continue
+    const stringKeys = ["company", "position", "description"] as const
+    for (const key of stringKeys) {
+      const raw = typeof (item as any)[key] === "string" ? (item as any)[key] : ""
+      if (!raw) continue
+      let out = raw
+      let changed = false
+      const full = replaceCi(out, from, to)
+      out = full.out
+      changed = full.changed
+      if (!changed && fallbackToken) {
+        const fb = replaceCi(out, fallbackToken, to)
+        out = fb.out
+        changed = fb.changed
+      }
+      if (changed) (item as any)[key] = out
+    }
+
+    if (Array.isArray((item as any).highlights)) {
+      (item as any).highlights = (item as any).highlights.map((h: unknown) => {
+        if (typeof h !== "string") return h
+        let out = h
+        let changed = false
+        const full = replaceCi(out, from, to)
+        out = full.out
+        changed = full.changed
+        if (!changed && fallbackToken) {
+          const fb = replaceCi(out, fallbackToken, to)
+          out = fb.out
+          changed = fb.changed
+        }
+        return out
+      })
+    }
+  }
+
+  return { nextResume: next, applied: replacements > 0, replacements, from, to }
+}
+
 // Update the POST function to handle attachedData (no app-level API key required; users provide provider keys in UI)
 function buildCareerAssistantSystemPrompt(resumeJson: string): string {
   return `You are an AI Career Assistant for resumes and job applications. You help users with:
@@ -102,12 +183,13 @@ IMPORTANT: You MUST embed interactive components using this exact format. The UI
 {"prop": "value"}
 \`\`\`
 
-Valid component types: cv, coverLetter, jobLinks, cvScorer, course, mockInterview, hrNote, jobApplySimulator
+Valid component types: cv, coverLetter, jobLinks, cvScorer, course, mockInterview, codingChallenge, hrNote, jobApplySimulator
 
 For resume/CV requests: ALWAYS include a \`\`\`component:cv\`\`\` block with resumeData.
 For cover letter requests: ALWAYS include a \`\`\`component:coverLetter\`\`\` block.
 For job suggestions: ALWAYS include \`\`\`component:jobLinks\`\`\`.
 For mock interviews: ALWAYS include \`\`\`component:mockInterview\`\`\`.
+For coding challenges: ALWAYS include \`\`\`component:codingChallenge\`\`\` with at least one problem in \`codingProblems\`.
 
 Examples:
 - Cover letter: \`\`\`component:coverLetter\n{"head":"Dear...","body":"...","footer":"Sincerely"}\n\`\`\`
@@ -115,11 +197,24 @@ Examples:
 - Job links: \`\`\`component:jobLinks\n{"links":[{"title":"...","url":"...","company":"..."}]}\n\`\`\`
 - CV: \`\`\`component:cv\n{"resumeData":{...},"template":"modern"}\n\`\`\`
 - Mock interview: \`\`\`component:mockInterview\n{"questions":["..."],"codingProblems":["..."],"role":"..."}\n\`\`\`
+- Coding challenge: \`\`\`component:codingChallenge\n{"codingProblems":["..."]}\n\`\`\`
 - Course: \`\`\`component:course\n{"title":"...","provider":"...","skills":[...]}\n\`\`\`
 - HR note: \`\`\`component:hrNote\n{"subject":"...","body":"...","to":"..."}\n\`\`\`
 - Job apply simulator: \`\`\`component:jobApplySimulator\n{"steps":[{"action":"...","status":"done"},...]}\n\`\`\`
 
 Always include helpful markdown text before/after components. Use components when the response benefits from interactive UI.
+
+When the user asks for a coding challenge, do NOT respond with only plain markdown. You MUST include a \`component:codingChallenge\` block so the UI can run tests.
+
+When the user asks for a mock interview, include \`component:mockInterview\` and tailor the questions to the user's role/skills from Resume data.
+
+When the user attaches a resume PDF, DOCX, or text file, the extracted text appears under "The user has attached the following files". Parse it carefully and produce a complete \`\`\`component:cv\`\`\` block with resumeData that reflects their real experience (names may be redacted in the prompt — still map sections to experience, education, skills, projects).
+
+CRITICAL RESUME UPDATE RULES:
+- If the user asks to UPDATE/REPLACE/EDIT something in the resume (e.g. "replace Netnedge AI to QuantomAI in experience"), you MUST output a \`\`\`component:cv\`\`\` block whose resumeData reflects that exact change.
+- Output VALID JSON only (no trailing commas, no comments). The UI parses this strictly.
+- NEVER include \`basicInfo.profilePicture\` in the JSON (it is large base64 and will break streaming / waste tokens). The app will preserve the existing picture automatically.
+- Do not use markdown formatting inside resume strings (no \`**bold**\`, no headings). Plain text only inside resumeData fields.
 
 Resume data: ${resumeJson}`
 }
@@ -198,7 +293,10 @@ Resume data: ${resumeJson}`
     for (const file of attachedFiles) {
       const safeContent = typeof file.content === "string" ? redactTextPII(file.content) : String(file.content ?? "")
       if (file.contentType === 'pdf') {
-        systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${safeContent}\n`
+        const pages = typeof file.pages === "number" ? file.pages : "?"
+        systemMessage += `\nPDF File: ${file.name} (${pages} pages)\nContent: ${safeContent}\n`
+      } else if (file.contentType === 'pdf-error') {
+        systemMessage += `\nPDF File: ${file.name}\nExtraction issue: ${safeContent}\n`
       } else if (file.contentType === 'document') {
         systemMessage += `\nDocument File: ${file.name}\nContent: ${safeContent}\n`
       } else if (file.contentType === 'image') {
@@ -238,12 +336,34 @@ Resume data: ${resumeJson}`
 
   // Format the conversation for the AI (redact PII from user messages)
   const messagesList = Array.isArray(messages) ? messages : []
+  const lastUserTextRaw = (() => {
+    for (let i = messagesList.length - 1; i >= 0; i -= 1) {
+      const m = messagesList[i]
+      if (m?.role === "user") return getMsgText(m)
+    }
+    return ""
+  })()
+
+  // Deterministic edit path for explicit "replace ... in experience" commands.
+  // This guarantees the resume updates even when model output is malformed.
+  const deterministicReplace = tryApplyDeterministicExperienceReplace(lastUserTextRaw || "", resumeData)
+  if (deterministicReplace) {
+    const { nextResume, applied, from, to } = deterministicReplace
+    const note = applied
+      ? `Applied your update: replaced "${from}" with "${to}" in experience.`
+      : `I could not find "${from}" in experience fields, so no change was applied.`
+    const payload = `${note}\n\n\`\`\`component:cv\n${JSON.stringify({ resumeData: nextResume, template: "modern" })}\n\`\`\``
+    return streamTextToResponse(async (write) => write(payload), messagesList)
+  }
+
   const redactedMessages = messagesList.map((m: { role?: string; content?: string; parts?: Array<{ type: string; text?: string }> }) => {
     if (m?.role !== "user") return m
     const text = getMsgText(m)
     if (!text) return m
     const redacted = redactTextPII(text)
-    return { ...m, content: redacted, parts: [{ type: "text", text: redacted }] }
+    const parts = Array.isArray(m.parts) ? m.parts : []
+    const fileParts = parts.filter((p) => p && typeof p === "object" && (p as { type?: string }).type === "file")
+    return { ...m, content: redacted, parts: [{ type: "text", text: redacted }, ...fileParts] }
   })
   const formattedMessages = [{ role: "system", content: systemMessage }, ...redactedMessages]
 
@@ -538,8 +658,27 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
           }
           writer.write({ type: "text-end", id: textId })
         } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error)
+          if (msg.toLowerCase().includes("recitation")) {
+            // Gemini may block outputs that look like verbatim copyrighted text.
+            // Recover by ending the stream with a paraphrase-only guidance message.
+            writer.write({
+              type: "text-delta",
+              id: textId,
+              delta:
+                "\n\nI couldn’t complete that response because the model flagged it as *recitation* (too close to verbatim text). " +
+                "Try again with: “Paraphrase and summarize; do not quote the attachment; rewrite in your own words.”",
+            })
+            writer.write({ type: "text-end", id: textId })
+            return
+          }
           console.error("Error streaming from Gemini:", error)
-          throw error
+          writer.write({
+            type: "text-delta",
+            id: textId,
+            delta: "\n\nSorry—something went wrong while streaming the response. Please try again.",
+          })
+          writer.write({ type: "text-end", id: textId })
         }
       },
     })
@@ -604,8 +743,25 @@ async function handleNewGemini(
           }
           writer.write({ type: "text-end", id: textId })
         } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err)
+          if (msg.toLowerCase().includes("recitation")) {
+            writer.write({
+              type: "text-delta",
+              id: textId,
+              delta:
+                "\n\nI couldn’t complete that response because the model flagged it as *recitation* (too close to verbatim text). " +
+                "Please ask me to paraphrase/summarize instead of quoting the attachment.",
+            })
+            writer.write({ type: "text-end", id: textId })
+            return
+          }
           console.error("Error streaming from New Gemini:", err)
-          throw err
+          writer.write({
+            type: "text-delta",
+            id: textId,
+            delta: "\n\nSorry—something went wrong while streaming the response. Please try again.",
+          })
+          writer.write({ type: "text-end", id: textId })
         }
       },
     })

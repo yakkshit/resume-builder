@@ -220,13 +220,16 @@ export function useChatSettings() {
 
   useEffect(() => {
     const stored = loadFromStorage<ChatSettings>(SETTINGS_STORAGE_ID, DEFAULT_SETTINGS);
-    setSettings(stored);
+    // API key should NOT persist in browser storage.
+    setSettings({ ...stored, apiKey: "" });
   }, []);
 
   const updateSettings = useCallback((patch: Partial<ChatSettings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
-      saveToStorage(SETTINGS_STORAGE_ID, next);
+      // Persist everything except API key.
+      const { apiKey: _apiKey, ...persistable } = next;
+      saveToStorage(SETTINGS_STORAGE_ID, persistable as ChatSettings);
       return next;
     });
   }, []);
