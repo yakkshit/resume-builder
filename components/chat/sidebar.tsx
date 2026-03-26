@@ -1,0 +1,313 @@
+"use client";
+
+import React from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  X,
+  Sparkles,
+  Clock,
+  Download,
+  Upload,
+  Trash2,
+  User,
+  KeyRound,
+  Cpu,
+  MessageSquarePlus,
+  FileText,
+  AlignLeft,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ChatSession, ChatSettings, AVAILABLE_MODELS } from "./chat-store";
+import Link from "next/link";
+
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+  sessions: ChatSession[];
+  currentId: string;
+  settings: ChatSettings;
+  onSessionSelect: (id: string) => void;
+  onNewSession: () => void;
+  onDeleteSession: (id: string) => void;
+  onExport: () => void;
+  onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSettingsChange: (patch: Partial<ChatSettings>) => void;
+}
+
+export function ChatSidebar({
+  isOpen,
+  onClose,
+  sessions,
+  currentId,
+  settings,
+  onSessionSelect,
+  onNewSession,
+  onDeleteSession,
+  onExport,
+  onImport,
+  onSettingsChange,
+}: SidebarProps) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Group models by provider for display
+  const modelsByProvider = AVAILABLE_MODELS.reduce<Record<string, typeof AVAILABLE_MODELS>>(
+    (acc, m) => {
+      if (!acc[m.provider]) acc[m.provider] = [];
+      acc[m.provider].push(m);
+      return acc;
+    },
+    {}
+  );
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            onClick={onClose}
+          />
+
+          {/* Sidebar panel */}
+          <motion.aside
+            key="sidebar"
+            initial={{ x: -320, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: -320, opacity: 0 }}
+            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            className="fixed left-3 top-3 bottom-3 z-50 w-[310px] flex flex-col rounded-2xl overflow-hidden shadow-2xl"
+            style={{
+              background:
+                "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)",
+              backdropFilter: "blur(24px)",
+              border: "1px solid rgba(255,255,255,0.12)",
+            }}
+          >
+            {/* Glow blobs */}
+            <div className="pointer-events-none absolute -top-16 -left-16 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl" />
+
+            {/* Header */}
+            <div className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Career Assistant</p>
+                  <p className="text-[10px] text-muted-foreground">AI-powered guide</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={onClose}
+                className="h-8 w-8 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {/* Scrollable settings + history */}
+            <div className="relative z-10 flex-1 overflow-y-auto" style={{ scrollbarWidth: "none" }}>
+              
+              {/* App Navigation section */}
+              <div className="px-4 py-3 border-b border-white/10 space-y-2">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-2 font-semibold">
+                  <AlignLeft className="w-3.5 h-3.5 text-cyan-400" /> App Navigation
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  <Link href="/" className="text-xs group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white transition-all border border-transparent hover:border-white/10">
+                    <FileText className="w-4 h-4 text-muted-foreground group-hover:text-cyan-400 transition-colors" /> Resume Builder
+                  </Link>
+                  <Link href="/chat" className="text-xs flex items-center gap-3 px-3 py-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-white shadow-[0_0_15px_rgba(99,102,241,0.1)] transition-all">
+                    <Sparkles className="w-4 h-4 text-indigo-400" /> Career Assistant
+                  </Link>
+                  <Link href="/cover-letter" className="text-xs group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white transition-all border border-transparent hover:border-white/10">
+                    <FileText className="w-4 h-4 text-muted-foreground group-hover:text-cyan-400 transition-colors" /> Cover Letter
+                  </Link>
+                  <Link href="/price" className="text-xs group flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white transition-all border border-transparent hover:border-white/10">
+                    <AlignLeft className="w-4 h-4 text-muted-foreground group-hover:text-cyan-400 transition-colors" /> Pricing
+                  </Link>
+                </div>
+              </div>
+
+              {/* Settings section */}
+              <div className="px-4 py-3 border-b border-white/10 space-y-3">
+                {/* Model */}
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-1">
+                    <Cpu className="w-3.5 h-3.5 text-indigo-400" /> AI Model
+                  </Label>
+                  <Select
+                    value={settings.model}
+                    onValueChange={(v) => onSettingsChange({ model: v })}
+                  >
+                    <SelectTrigger className="h-9 px-3 w-full rounded-xl text-xs bg-black/20 hover:bg-black/40 border border-white/10 hover:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all shadow-inner">
+                      <SelectValue placeholder="Select a model..." />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px] border border-white/10 bg-neutral-950/90 backdrop-blur-xl rounded-xl shadow-2xl p-1">
+                      {Object.entries(modelsByProvider).map(([provider, models]) => (
+                        <React.Fragment key={provider}>
+                          <div className="px-2 py-1.5 mt-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/50 border-b border-white/5 mb-1">
+                            {provider}
+                          </div>
+                          {models.map((m) => (
+                            <SelectItem 
+                              key={m.value} 
+                              value={m.value} 
+                              className="text-xs pl-8 py-2 rounded-lg cursor-pointer focus:bg-indigo-500/20 focus:text-indigo-200 transition-colors"
+                            >
+                              {m.label}
+                            </SelectItem>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* API Key */}
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-1">
+                    <KeyRound className="w-3.5 h-3.5 text-indigo-400" /> API Key
+                  </Label>
+                  <Input
+                    type="password"
+                    placeholder="sk-... or your key"
+                    value={settings.apiKey}
+                    onChange={(e) => onSettingsChange({ apiKey: e.target.value })}
+                    className="h-9 px-3 w-full rounded-xl text-xs bg-black/20 hover:bg-black/40 border border-white/10 hover:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all shadow-inner placeholder:text-muted-foreground/30"
+                  />
+                  <p className="text-[10px] text-muted-foreground/50 italic px-1">
+                    Required for external AI provider access.
+                  </p>
+                </div>
+
+                {/* Context Window */}
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5 mb-1">
+                    <AlignLeft className="w-3.5 h-3.5 text-indigo-400" /> System Context
+                  </Label>
+                  <Textarea
+                    placeholder="Custom instructions, role description, or job context..."
+                    value={settings.contextWindow}
+                    onChange={(e) => onSettingsChange({ contextWindow: e.target.value })}
+                    className="text-xs px-3 py-2 w-full rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 hover:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all shadow-inner placeholder:text-muted-foreground/30 min-h-[80px] resize-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground/50 italic px-1">
+                    Prepended invisibly to all your queries.
+                  </p>
+                </div>
+              </div>
+
+              {/* Export / Import */}
+              <div className="px-4 py-3 border-b border-white/10 flex gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-8 text-[11px] font-semibold bg-white/5 border border-white/10 hover:bg-indigo-500/20 hover:text-indigo-200 hover:border-indigo-500/30 transition-all rounded-lg"
+                  onClick={onExport}
+                >
+                  <Download className="w-3.5 h-3.5 mr-1.5" /> Export
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 h-8 text-[11px] font-semibold bg-white/5 border border-white/10 hover:bg-cyan-500/20 hover:text-cyan-200 hover:border-cyan-500/30 transition-all rounded-lg"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="w-3.5 h-3.5 mr-1.5" /> Import
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={onImport}
+                />
+              </div>
+
+              {/* Chat history header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.02]">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-cyan-400" /> History
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2.5 text-[11px] font-semibold text-white bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-lg transition-all shadow-sm"
+                  onClick={() => { onNewSession(); onClose(); }}
+                >
+                  <MessageSquarePlus className="w-3.5 h-3.5 mr-1" /> New
+                </Button>
+              </div>
+
+              {/* Session list */}
+              <div className="px-3 py-3 space-y-2">
+                {sessions.map((s) => (
+                  <div key={s.id} className="group relative">
+                    <button
+                      onClick={() => { onSessionSelect(s.id); onClose(); }}
+                      className={`w-full text-left px-3 py-3 rounded-xl text-sm transition-all flex items-start gap-3 shadow-none ${
+                        s.id === currentId
+                          ? "bg-gradient-to-r from-indigo-500/20 to-purple-500/10 border border-indigo-500/50 text-white shadow-[0_0_15px_rgba(99,102,241,0.15)]"
+                          : "bg-black/20 hover:bg-white/10 border border-white/5 text-muted-foreground hover:text-white"
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 shadow-sm transition-colors ${s.id === currentId ? "bg-indigo-400 shadow-[0_0_8px_rgba(129,140,248,0.8)]" : "bg-white/20 group-hover:bg-white/50"}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className={`truncate text-xs font-semibold pr-6 transition-colors ${s.id === currentId ? "text-indigo-50" : "text-muted-foreground group-hover:text-white"}`}>
+                          {s.title || "New Chat"}
+                        </p>
+                        <p className={`text-[10px] mt-1 font-medium transition-colors ${s.id === currentId ? "text-indigo-200/60" : "text-muted-foreground/50"}`}>
+                          {new Date(s.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => onDeleteSession(s.id)}
+                      className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 transition-all p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg focus:opacity-100"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+                {sessions.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-8 text-center opacity-60">
+                    <MessageSquarePlus className="w-8 h-8 mb-2 text-muted-foreground/30" />
+                    <p className="text-xs text-muted-foreground font-medium">No chat history yet</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* User profile at bottom */}
+            <div className="relative z-10 px-4 py-3 border-t border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center">
+                  <User className="w-4 h-4 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold truncate">You</p>
+                  <p className="text-[10px] text-muted-foreground">{sessions.length} session{sessions.length !== 1 ? "s" : ""}</p>
+                </div>
+                <div className="w-2 h-2 bg-green-400 rounded-full" />
+              </div>
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}

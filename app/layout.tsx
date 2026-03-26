@@ -40,8 +40,8 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <AppNav />
-          <main className="min-h-[calc(100vh-5rem)] pt-2 pb-8">{children}</main>
+          {/* <AppNav /> */}
+          <main className="w-auto h-full">{children}</main>
           <Toaster />
           <CookieBanner />
           <Analytics />
