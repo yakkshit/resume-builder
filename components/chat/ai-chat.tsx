@@ -121,6 +121,7 @@ function WelcomeScreen({ onPrompt }: { onPrompt: (p: string) => void }) {
 function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>[0]["type"] | null {
     const t = rawType.toLowerCase();
     if (t === "cv" || t === "resume") return "resume";
+    if (t === "coverletter" || t === "cover-letter") return "cover-letter";
     if (t === "cvscorer" || t === "cv-score") return "cv-score";
     if (t === "joblinks" || t === "job-recommendations") return "job-recommendations";
     if (t === "jobapplysimulator" || t === "auto-applier") return "auto-applier";
@@ -146,18 +147,31 @@ function extractComponents(text: string) {
         let parsedData: any = {};
         if (dataStr && isComplete) {
             const candidate = stripIncompleteJsonTail(dataStr, false).trim();
-            try {
-                parsedData = JSON.parse(candidate);
-            } catch {
-                // Salvage common "valid JSON but with prose" / partial issues:
-                // try to parse the largest {...} slice.
-                const first = candidate.indexOf("{");
-                const last = candidate.lastIndexOf("}");
+            const tryParseLoose = (raw: string) => {
+                const s = (raw || "").trim();
+                if (!s) return null;
+                try { return JSON.parse(s); } catch { /* continue */ }
+
+                // Common model glitches: trailing commas, stray semicolons before } or ]
+                const repaired = s
+                    .replace(/;(\s*[}\]])/g, "$1")
+                    .replace(/,\s*([}\]])/g, "$1");
+                try { return JSON.parse(repaired); } catch { /* continue */ }
+
+                // Last resort: parse the largest {...} slice and repair again.
+                const first = repaired.indexOf("{");
+                const last = repaired.lastIndexOf("}");
                 if (first >= 0 && last > first) {
-                    const slice = candidate.slice(first, last + 1);
-                    try { parsedData = JSON.parse(slice); } catch { parsedData = {}; }
+                    const slice = repaired.slice(first, last + 1)
+                        .replace(/;(\s*[}\]])/g, "$1")
+                        .replace(/,\s*([}\]])/g, "$1");
+                    try { return JSON.parse(slice); } catch { /* ignore */ }
                 }
-            }
+                return null;
+            };
+
+            const maybe = tryParseLoose(candidate);
+            parsedData = maybe && typeof maybe === "object" ? maybe : {};
         }
 
         components.push({
@@ -212,12 +226,12 @@ function MessageBubble({
                 </div>
             )}
 
-            <div className={`flex flex-col gap-3 ${isUser ? "items-end" : "items-start"} max-w-[90%]`}>
+            <div className={`flex flex-col gap-3 ${isUser ? "items-end" : "items-start"} ${isUser ? "max-w-[90%]" : "w-full max-w-[min(980px,calc(100%-3rem))]"}`}>
                 {/* Bubble */}
                 <div
                     className={`relative px-4 py-3 rounded-2xl text-sm ${isUser
                         ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-tr-sm"
-                        : "bg-background border border-border/60 rounded-tl-sm"
+                        : "w-full bg-background border border-border/60 rounded-tl-sm [overflow-wrap:anywhere]"
                         }`}
                 >
                     {isUser ? (
@@ -253,7 +267,7 @@ function MessageBubble({
 
                 {/* Inline dynamic components */}
                 {extracted.components.map((c, idx) => c.type && (!isStreaming || c.isComplete) && (
-                    <div key={idx} className="w-full max-w-[640px] mt-2">
+                    <div key={idx} className="w-full mt-2">
                         <ComponentRenderer type={c.type} data={c.data} />
                     </div>
                 ))}

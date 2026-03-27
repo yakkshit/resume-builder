@@ -497,15 +497,15 @@ export function MockInterviewInteractive({
                 return (
                   <div key={i} className={cn(itemShell, "dark:hover:border-[#4da5fc]/20")}>
                     <div className="flex items-start gap-1 p-2 sm:gap-2 sm:p-3">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedC(expandedC === i ? null : i)}
+                    <button
+                      type="button"
+                      onClick={() => setExpandedC(expandedC === i ? null : i)}
                         className="flex min-w-0 flex-1 items-start gap-2 rounded-lg text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 dark:hover:bg-white/[0.04] dark:focus-visible:ring-[#4da5fc]/40"
-                      >
+                    >
                         <Code2 className="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-[#4da5fc]" aria-hidden />
                         <span className="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground dark:text-white">
-                          {text}
-                        </span>
+                        {text}
+                      </span>
                         {expandedC === i ? (
                           <ChevronUp className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                         ) : (
@@ -520,7 +520,7 @@ export function MockInterviewInteractive({
                       >
                         <Copy className="h-3.5 w-3.5" aria-hidden />
                       </button>
-                    </div>
+                      </div>
                     {expandedC === i && (
                       <div className="border-t border-border px-3 pb-3 dark:border-white/5">
                         <div className="mt-3 rounded-lg border border-border bg-muted/50 p-3 dark:border-white/8 dark:bg-[#08080c]">

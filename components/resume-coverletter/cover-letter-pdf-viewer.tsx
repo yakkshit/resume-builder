@@ -8,6 +8,7 @@ import { Download, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card } from "@/components/ui/card"
 import { getCoverLetterTemplate } from "@/components/pdf-templates"
+import type { CoverLetterData, CoverLetterTemplate } from "@/lib/types";
 
 interface PDFViewerProps {
   coverLetterData: CoverLetterData
@@ -51,39 +52,43 @@ export default function CoverLetterPDFViewer({ coverLetterData, template }: PDFV
   }, [coverLetterData, template])
 
   const handleDownload = () => {
-    try {
-      // Create a new window to print from
-      const printWindow = window.open("", "_blank")
-      if (!printWindow) {
+    // Prefer real file download from a server endpoint (react-pdf -> PDF bytes).
+    // Fallback to print if something goes wrong.
+    void (async () => {
+      try {
+        setIsLoading(true)
+        const res = await fetch("/api/cover-letter/pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ coverLetterData, template }),
+        })
+        if (!res.ok) throw new Error(`PDF generation failed (${res.status})`)
+        const blob = await res.blob()
+
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `Cover_Letter_${new Date().toISOString().split("T")[0]}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+
         toast({
-          title: "Error",
-          description: "Please allow pop-ups to download the PDF",
+          title: "Downloaded",
+          description: "Your cover letter PDF has been downloaded.",
+        })
+      } catch (error) {
+        console.error("Error downloading PDF:", error)
+        toast({
+          title: "Error generating PDF",
+          description: "There was an error generating your PDF. Please try again.",
           variant: "destructive",
         })
-        return
+      } finally {
+        setIsLoading(false)
       }
-
-      // Wait for the window to load
-      printWindow.onload = () => {
-        printWindow.print()
-        // Close the window after printing (or if printing is canceled)
-        setTimeout(() => {
-          printWindow.close()
-        }, 500)
-      }
-
-      toast({
-        title: "PDF Ready",
-        description: "Your cover letter has been prepared for download.",
-      })
-    } catch (error) {
-      console.error("Error generating PDF:", error)
-      toast({
-        title: "Error generating PDF",
-        description: "There was an error generating your PDF. Please try again.",
-        variant: "destructive",
-      })
-    }
+    })()
   }
 
   const handleRefresh = () => {

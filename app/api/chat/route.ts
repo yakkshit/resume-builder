@@ -210,6 +210,11 @@ When the user asks for a mock interview, include \`component:mockInterview\` and
 
 When the user attaches a resume PDF, DOCX, or text file, the extracted text appears under "The user has attached the following files". Parse it carefully and produce a complete \`\`\`component:cv\`\`\` block with resumeData that reflects their real experience (names may be redacted in the prompt — still map sections to experience, education, skills, projects).
 
+For cover letters:
+- Always return \`\`\`component:coverLetter\`\`\` with \`head\`, \`body\`, \`footer\`.
+- If user says "for the job mentioned earlier", infer job context from recent conversation and tailor accordingly.
+- Keep writing professional, concise, and editable (plain text fields only).
+
 CRITICAL RESUME UPDATE RULES:
 - If the user asks to UPDATE/REPLACE/EDIT something in the resume (e.g. "replace Netnedge AI to QuantomAI in experience"), you MUST output a \`\`\`component:cv\`\`\` block whose resumeData reflects that exact change.
 - Output VALID JSON only (no trailing commas, no comments). The UI parses this strictly.

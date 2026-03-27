@@ -189,23 +189,19 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
             <View style={styles.contactInfo}>
               {basicInfo.email && (
                 <View style={styles.contactItem}>
-                  <Text>
-                    Email:{" "}
-                    <Link src={`mailto:${basicInfo.email}`} style={styles.linkStyle}>
-                      {basicInfo.email}
-                    </Link>
-                  </Text>
+                  <Text>Email: </Text>
+                  <Link src={`mailto:${basicInfo.email}`} style={styles.linkStyle}>
+                    <Text>{basicInfo.email}</Text>
+                  </Link>
                 </View>
               )}
               
               {basicInfo.phone && (
                 <View style={styles.contactItem}>
-                  <Text>
-                    Phone:{" "}
-                    <Link src={`tel:${basicInfo.phone}`} style={styles.linkStyle}>
-                      {basicInfo.phone}
-                    </Link>
-                  </Text>
+                  <Text>Phone: </Text>
+                  <Link src={`tel:${basicInfo.phone.replace(/[^\d+]/g, "")}`} style={styles.linkStyle}>
+                    <Text>{basicInfo.phone}</Text>
+                  </Link>
                 </View>
               )}
               
