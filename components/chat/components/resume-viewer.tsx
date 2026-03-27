@@ -156,6 +156,7 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
 
 export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
   const toasterRef = useRef<ToasterRef>(null);
+  const lastAppliedPayloadRef = useRef<string>("");
 
   const showToast = (variant: 'success' | 'error', msg: string) => {
     toasterRef.current?.show({
@@ -213,6 +214,48 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
 
   const [activeTab, setActiveTab] = useState("preview");
   const [downloading, setDownloading] = useState(false);
+
+  // Apply new assistant payloads even after initial mount.
+  useEffect(() => {
+    if (!data || typeof data !== "object") return;
+    const payload = (data as any).resumeData
+      ? (data as any).resumeData
+      : Object.keys(data).length > 0 && !(data as any).template
+        ? data
+        : null;
+    if (!payload || typeof payload !== "object") return;
+
+    let signature = "";
+    try {
+      signature = JSON.stringify(payload);
+    } catch {
+      signature = String(Date.now());
+    }
+    if (signature && lastAppliedPayloadRef.current === signature) return;
+    lastAppliedPayloadRef.current = signature;
+
+    setResumeData((prev) => {
+      const beforeMerge = sanitizeResumeData(prev);
+      const existingPicture =
+        (beforeMerge as any)?.basicInfo && typeof (beforeMerge as any).basicInfo === "object"
+          ? (beforeMerge as any).basicInfo.profilePicture
+          : undefined;
+
+      const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(payload));
+      let next = deepMerge(beforeMerge, cleanedPayload);
+      next = applyIdentitySourceRule(next, beforeMerge);
+      if (existingPicture && (next as any)?.basicInfo && typeof (next as any).basicInfo === "object") {
+        (next as any).basicInfo.profilePicture = existingPicture;
+      }
+      const safe = sanitizeResumeData(next);
+      try {
+        localStorage.setItem("resumeData", JSON.stringify(safe));
+      } catch {
+        // ignore
+      }
+      return safe;
+    });
+  }, [data]);
 
   // Sync logic if another window updates it
   useEffect(() => {

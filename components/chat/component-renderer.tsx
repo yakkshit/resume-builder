@@ -7,9 +7,11 @@ import { AutoApplier } from "./components/auto-applier";
 import { MockInterview } from "./components/mock-interview";
 import { CodingChallenge } from "./components/coding-challenge";
 import { LearningResources } from "./components/learning-resources";
+import { CoverLetterViewer } from "./components/cover-letter-viewer";
 
 export type ComponentType =
   | "resume"
+  | "cover-letter"
   | "cv-score"
   | "job-recommendations"
   | "auto-applier"
@@ -25,6 +27,7 @@ interface ComponentRendererProps {
 export function ComponentRenderer({ type, data }: ComponentRendererProps) {
   switch (type) {
     case "resume":             return <ResumeViewer data={data} />;
+    case "cover-letter":       return <CoverLetterViewer data={data as any} />;
     case "cv-score":           return <CVScore data={data as any} />;
     case "job-recommendations": {
       const d = data as any;
