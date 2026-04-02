@@ -42,3 +42,6 @@ summary.md
 
 # issues
 issues.md
+
+# local agent memory (do not commit)
+/.memory/

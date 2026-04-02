@@ -34,8 +34,10 @@ import { useChatSettings, ChatMessage, AVAILABLE_MODELS } from "./chat-store";
 import { getTextContent } from "@/lib/message-utils";
 import type { JobSuggestion } from "@/lib/job-scraper/google-jobs";
 import { JobSuggestionsPanel } from "./job-suggestions-panel";
-import { sanitizeResumeData } from "@/lib/sanitize-resume-data";
+import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import { stripIncompleteJsonTail } from "@/lib/streaming-chat-content";
+import { mergeAssistantResumeIntoCurrent, extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
+import type { ResumeData } from "@/lib/types";
 
 // ── Welcome Screen ─────────────────────────────────────────────────────────
 
@@ -172,6 +174,21 @@ function extractComponents(text: string) {
 
             const maybe = tryParseLoose(candidate);
             parsedData = maybe && typeof maybe === "object" ? maybe : {};
+            // Normalize flat resume JSON or odd envelopes into { resumeData } for ResumeViewer
+            if (mapComponentType(typeStr) === "resume" && parsedData && typeof parsedData === "object") {
+                const rec = parsedData as Record<string, unknown>;
+                if (!rec.resumeData) {
+                    const unwrapped = extractResumeJsonFromMessage(
+                        "```component:cv\n" + JSON.stringify(parsedData) + "\n```"
+                    );
+                    if (unwrapped) {
+                        parsedData = {
+                            resumeData: unwrapped,
+                            ...(typeof rec.template === "string" ? { template: rec.template } : {}),
+                        };
+                    }
+                }
+            }
         }
 
         components.push({
@@ -422,9 +439,13 @@ function ChatInput({
                                 ? "text-foreground bg-muted"
                                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
                         }`}
-                        title={useProfileContext ? "Profile context ON" : "Profile context OFF"}
+                        title={
+                            useProfileContext
+                                ? "Profile & knowledge ON — global profile, career notes, and RAG-style resume chunks are sent with each message"
+                                : "Profile & knowledge OFF — only your typed context (sidebar) is sent"
+                        }
                         aria-pressed={useProfileContext}
-                        aria-label="Toggle profile context"
+                        aria-label="Toggle global profile and knowledge context"
                     >
                         <User className="w-4 h-4" />
                     </button>
@@ -471,6 +492,8 @@ export default function AICareerAssistantChat() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const PROFILE_CONTEXT_TOGGLE_ID = "ai-chat-use-profile-context";
     const [useProfileContext, setUseProfileContext] = useState(true);
+    const useProfileContextRef = useRef(true);
+    useProfileContextRef.current = useProfileContext;
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -497,6 +520,8 @@ export default function AICareerAssistantChat() {
                 typeof p?.linkedin === "string" && p.linkedin ? `LinkedIn: ${p.linkedin}` : "",
                 typeof p?.website === "string" && p.website ? `Website: ${p.website}` : "",
                 typeof p?.github === "string" && p.github ? `GitHub: ${p.github}` : "",
+                typeof p?.targetRoles === "string" && p.targetRoles ? `Target roles: ${p.targetRoles}` : "",
+                typeof p?.careerNotes === "string" && p.careerNotes ? `Career notes: ${p.careerNotes}` : "",
             ].filter(Boolean);
             return bits.length ? `User profile:\n${bits.join("\n")}` : "";
         } catch {
@@ -506,6 +531,28 @@ export default function AICareerAssistantChat() {
 
     const makeAssistantMessageId = () =>
         `assistant_job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+    function loadFullResumeFromStorage(): ResumeData {
+        if (typeof window === "undefined") return mergeResumeDataWithDefault(null);
+        try {
+            const raw = localStorage.getItem("resumeData");
+            return mergeResumeDataWithDefault(raw ? JSON.parse(raw) : null);
+        } catch {
+            return mergeResumeDataWithDefault(null);
+        }
+    }
+
+    const readChatGlobalProfile = (): Record<string, unknown> | null => {
+        if (typeof window === "undefined") return null;
+        try {
+            const raw = localStorage.getItem("ai-chat-profile");
+            if (!raw) return null;
+            const p = JSON.parse(raw) as unknown;
+            return p && typeof p === "object" && !Array.isArray(p) ? (p as Record<string, unknown>) : null;
+        } catch {
+            return null;
+        }
+    };
 
     // Ref so the transport closure always reads fresh settings
     const settingsRef = useRef(settings);
@@ -557,10 +604,11 @@ export default function AICareerAssistantChat() {
                     id,
                     model: settingsRef.current.model,
                     apiKey: settingsRef.current.apiKey,
-                    contextText: useProfileContext
+                    contextText: useProfileContextRef.current
                         ? [settingsRef.current.contextWindow, buildProfileContextText()].filter(Boolean).join("\n\n")
                         : "",
                     resumeData: getResumeData(),
+                    chatGlobalProfile: readChatGlobalProfile(),
                     aiMode: true,
                     mode: "career-assistant",
                 },
@@ -571,6 +619,10 @@ export default function AICareerAssistantChat() {
             showToast("error", `AI error: ${err.message?.slice(0, 80) ?? "Unknown error"}`);
         },
     });
+
+    const lastMergedAssistantIdRef = useRef<string | null>(null);
+    const prevChatStatusRef = useRef<typeof status>("ready");
+    const [resumeApplyOfferId, setResumeApplyOfferId] = useState<string | null>(null);
 
     // History sessions management
     const [sessions, setSessions] = useState<any[]>([]);
@@ -628,6 +680,64 @@ export default function AICareerAssistantChat() {
             });
         }
     }, [messages, currentSessionId]);
+
+    useEffect(() => {
+        lastMergedAssistantIdRef.current = null;
+        setResumeApplyOfferId(null);
+    }, [currentSessionId]);
+
+    useEffect(() => {
+        const prev = prevChatStatusRef.current;
+        const wasStreaming = prev === "streaming" || prev === "submitted";
+        const nowIdle = status !== "streaming" && status !== "submitted";
+        prevChatStatusRef.current = status;
+        if (!wasStreaming || !nowIdle) return;
+
+        const last = messages[messages.length - 1];
+        if (!last || last.role !== "assistant" || !last.id) return;
+        const text = getTextContent(last) ?? "";
+        const { merged, template } = mergeAssistantResumeIntoCurrent(loadFullResumeFromStorage(), text);
+        if (!merged) return;
+        if (lastMergedAssistantIdRef.current === last.id) return;
+
+        if (settings.autoMergeAssistantResume !== false) {
+            lastMergedAssistantIdRef.current = last.id;
+            localStorage.setItem("resumeData", JSON.stringify(merged));
+            if (template) localStorage.setItem("resumeTemplate", template);
+            showToast("success", "Resume merged from the assistant’s latest reply.");
+            window.dispatchEvent(new CustomEvent("resume-storage-updated"));
+            setResumeApplyOfferId(null);
+        } else {
+            setResumeApplyOfferId(last.id);
+        }
+    }, [status, messages, settings.autoMergeAssistantResume]);
+
+    useEffect(() => {
+        if (status === "submitted" || status === "streaming") setResumeApplyOfferId(null);
+    }, [status]);
+
+    const applyResumeFromOffer = useCallback(() => {
+        const last = messages[messages.length - 1];
+        if (!last || last.role !== "assistant") return;
+        const text = getTextContent(last) ?? "";
+        const { merged, template } = mergeAssistantResumeIntoCurrent(loadFullResumeFromStorage(), text);
+        if (!merged) {
+            showToast("error", "No resume JSON found in the last reply.");
+            return;
+        }
+        lastMergedAssistantIdRef.current = last.id ?? null;
+        localStorage.setItem("resumeData", JSON.stringify(merged));
+        if (template) localStorage.setItem("resumeTemplate", template);
+        setResumeApplyOfferId(null);
+        showToast("success", "Resume saved. Your stored resume and exports use this data.");
+        window.dispatchEvent(new CustomEvent("resume-storage-updated"));
+    }, [messages]);
+
+    const dismissResumeApplyOffer = useCallback(() => {
+        const last = messages[messages.length - 1];
+        if (last?.id) lastMergedAssistantIdRef.current = last.id;
+        setResumeApplyOfferId(null);
+    }, [messages]);
 
     const handleNewSession = () => {
         const id = Date.now().toString();
@@ -1035,7 +1145,8 @@ export default function AICareerAssistantChat() {
     };
 
     return (
-        <InfiniteGridBackground className="fixed inset-0">
+        <InfiniteGridBackground className="fixed inset-0 h-[100dvh] max-h-[100dvh]">
+            <div className="relative z-[1] flex h-full min-h-0 w-full flex-col">
             <Toaster ref={toasterRef} />
 
             {/* Sidebar */}
@@ -1085,13 +1196,13 @@ export default function AICareerAssistantChat() {
                 </div>
             )}
 
-            {/* Chat area */}
+            {/* Chat area — flex-1 keeps input pinned; scroll only messages */}
             <div
                 ref={scrollRef}
-                className="relative z-10 h-screen overflow-y-auto pb-44 pt-16"
-                style={{ scrollbarWidth: "none" }}
+                className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-40 pt-16 sm:pb-44"
+                style={{ scrollbarWidth: "thin" }}
             >
-                <div className="max-w-4xl mx-auto px-4">
+                <div className="mx-auto w-full max-w-4xl px-3 sm:px-5">
                     <AnimatePresence mode="wait">
                         {showWelcome ? (
                             <WelcomeScreen key="welcome" onPrompt={handlePrompt} />
@@ -1138,6 +1249,23 @@ export default function AICareerAssistantChat() {
                 </div>
             </div>
 
+            {resumeApplyOfferId && !jobPanelOpen && (
+                <div className="pointer-events-none fixed inset-x-0 bottom-[5.75rem] z-[36] flex justify-center px-3 sm:bottom-[6.25rem]">
+                    <div className="pointer-events-auto flex w-full max-w-lg items-center gap-2 rounded-2xl border border-primary/35 bg-background/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl dark:border-primary/25 dark:bg-[#0c0c10]/95 sm:gap-3 sm:px-4">
+                        <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+                        <p className="min-w-0 flex-1 text-left text-[11px] leading-snug text-muted-foreground sm:text-xs">
+                            This reply includes resume JSON. Apply it to your saved resume (used across the app)?
+                        </p>
+                        <Button type="button" size="sm" className="h-8 shrink-0 text-xs" onClick={applyResumeFromOffer}>
+                            Apply
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" className="h-8 shrink-0 text-xs" onClick={dismissResumeApplyOffer}>
+                            Dismiss
+                        </Button>
+                    </div>
+                </div>
+            )}
+
             {/* Input bar (replaced by job suggestions when scraping) */}
             {jobPanelOpen ? (
                 <JobSuggestionsPanel
@@ -1171,6 +1299,7 @@ export default function AICareerAssistantChat() {
                     onToggleProfileContext={() => setUseProfileContext((v) => !v)}
                 />
             )}
+            </div>
         </InfiniteGridBackground>
     );
 }

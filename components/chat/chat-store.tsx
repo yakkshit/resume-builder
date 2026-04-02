@@ -32,6 +32,8 @@ export interface ChatSettings {
   apiKey: string;
   model: string;
   contextWindow: string; // context text/instructions passed with each request
+  /** When true, assistant replies that include resume JSON are merged into stored resumeData */
+  autoMergeAssistantResume: boolean;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -69,6 +71,7 @@ const DEFAULT_SETTINGS: ChatSettings = {
   apiKey: "",
   model: "gemini-2.5-flash",
   contextWindow: "",
+  autoMergeAssistantResume: true,
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -219,9 +222,9 @@ export function useChatSettings() {
   const [settings, setSettings] = useState<ChatSettings>(DEFAULT_SETTINGS);
 
   useEffect(() => {
-    const stored = loadFromStorage<ChatSettings>(SETTINGS_STORAGE_ID, DEFAULT_SETTINGS);
-    // API key should NOT persist in browser storage.
-    setSettings({ ...stored, apiKey: "" });
+    const stored = loadFromStorage<Partial<ChatSettings>>(SETTINGS_STORAGE_ID, {});
+    // API key should NOT persist in browser storage; merge so new keys get defaults.
+    setSettings({ ...DEFAULT_SETTINGS, ...stored, apiKey: "" });
   }, []);
 
   const updateSettings = useCallback((patch: Partial<ChatSettings>) => {

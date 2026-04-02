@@ -37,5 +37,34 @@ describe("resume skills safety", () => {
     const merged = mergeResumeDataWithDefault(incoming);
     expect(Array.isArray(merged.skills)).toBe(true);
   });
+
+  it("normalizes categorized AI skills { name, keywords }[] into displayable strings", () => {
+    const input = {
+      basicInfo: {
+        name: "Test",
+        title: "Engineer",
+        email: "",
+        phone: "",
+        location: "",
+        linkedin: "",
+        website: "",
+        summary: "",
+      },
+      experience: [],
+      education: [],
+      skills: [
+        { name: "Programming", keywords: ["Java", "TypeScript"] },
+        { name: "Cloud", keywords: ["AWS", "Azure"] },
+      ],
+      projects: [],
+      achievements: [],
+    } as unknown as ResumeData;
+
+    const result = sanitizeResumeData(input);
+    expect(result.skills).toEqual([
+      "Programming: Java, TypeScript",
+      "Cloud: AWS, Azure",
+    ]);
+  });
 });
 

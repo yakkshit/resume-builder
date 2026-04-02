@@ -44,10 +44,6 @@ import type {
   ResumeData,
   Template,
   AIModel,
-  Experience,
-  Education,
-  Project,
-  Achievement,
 } from "@/lib/types";
 import { generatePDF } from "@/lib/pdf-generator";
 import { Input } from "@/components/ui/input";
@@ -57,6 +53,7 @@ import { resumeTemplates } from "@/components/pdf-templates";
 import Link from "next/link";
 import EnhancedChat from "@/components/resume-coverletter/enhanced-chat";
 import LoadingScreen from "@/components/resume-coverletter/loading-screen";
+import { mergeAssistantResumeIntoCurrent } from "@/lib/extract-resume-json";
 
 // Import the correct components
 import InfiniteMarquee from "@/components/ui/infinite-marquee";
@@ -299,193 +296,45 @@ export default function ResumePage() {
     }
   };
 
-  // Fix the applyAiChanges function to properly extract and apply JSON changes from AI chat
   const applyAiChanges = () => {
-    // Find the last assistant message
     const lastAssistantMessage = [...messages]
       .reverse()
       .find((m) => m.role === "assistant");
-    if (!lastAssistantMessage) return;
-
-    try {
-      // Improved regex to better match JSON in the message, handling multiline JSON blocks
-      const regex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/;
-      const content = getTextContent(lastAssistantMessage);
-      const match = content.match(regex);
-
-      if (match && match[1]) {
-        try {
-          const suggestedChanges = JSON.parse(match[1].trim());
-          console.log("Parsed AI suggestions:", suggestedChanges);
-
-          // Deep merge changes instead of replacing entire objects
-          setResumeData((current) => {
-            const newResumeData = { ...current };
-
-            // Handle basic info properly to preserve profile picture and other fields
-            if (suggestedChanges.basicInfo) {
-              newResumeData.basicInfo = {
-                ...current.basicInfo,
-                ...suggestedChanges.basicInfo,
-              };
-            }
-
-            // Handle skills array properly
-            if (suggestedChanges.skills) {
-              newResumeData.skills = suggestedChanges.skills;
-            }
-
-            // Handle experience array properly
-            if (suggestedChanges.experience) {
-              // If specific experience items are updated, merge them
-              if (Array.isArray(suggestedChanges.experience)) {
-                newResumeData.experience = suggestedChanges.experience.map(
-                  (newExp: Partial<Experience>, index: number) => {
-                    // If there's an existing experience item, merge with it
-                    if (current.experience[index]) {
-                      return { ...current.experience[index], ...newExp };
-                    }
-                    return newExp as Experience;
-                  }
-                );
-              }
-            }
-
-            // Handle education array properly
-            if (suggestedChanges.education) {
-              if (Array.isArray(suggestedChanges.education)) {
-                newResumeData.education = suggestedChanges.education.map(
-                  (newEdu: Partial<Education>, index: number) => {
-                    if (current.education[index]) {
-                      return { ...current.education[index], ...newEdu };
-                    }
-                    return newEdu as Education;
-                  }
-                );
-              }
-            }
-
-            // Handle projects array properly
-            if (suggestedChanges.projects) {
-              if (Array.isArray(suggestedChanges.projects)) {
-                newResumeData.projects = suggestedChanges.projects.map(
-                  (newProj: Partial<Project>, index: number) => {
-                    if (current.projects && current.projects[index]) {
-                      return { ...current.projects[index], ...newProj };
-                    }
-                    return newProj as Project;
-                  }
-                );
-              }
-            }
-
-            // Handle achievements array properly
-            if (suggestedChanges.achievements) {
-              if (Array.isArray(suggestedChanges.achievements)) {
-                newResumeData.achievements = suggestedChanges.achievements.map(
-                  (newAch: Partial<Achievement>, index: number) => {
-                    if (current.achievements && current.achievements[index]) {
-                      return { ...current.achievements[index], ...newAch };
-                    }
-                    return newAch as Achievement;
-                  }
-                );
-              }
-            }
-
-            console.log("Updated resume data:", newResumeData);
-            return newResumeData;
-          });
-
-          toast({
-            title: "AI changes applied",
-            description:
-              "The suggested changes have been applied to your resume.",
-          });
-        } catch (jsonError) {
-          console.error(
-            "JSON parsing error:",
-            jsonError,
-            "Raw JSON:",
-            match[1]
-          );
-          toast({
-            title: "Error parsing JSON",
-            description:
-              "The AI suggestion contains invalid JSON. Please try again.",
-            variant: "destructive",
-          });
-        }
-      } else {
-        // Try to find JSON without code blocks
-        const jsonRegex = /\{[\s\S]*?\}/g;
-        const jsonMatches = content.match(jsonRegex);
-
-        if (jsonMatches) {
-          // Try each potential JSON match
-          for (const potentialJson of jsonMatches) {
-            try {
-              const suggestedChanges = JSON.parse(potentialJson);
-
-              // Check if this is a valid resume change (has at least one expected key)
-              const validKeys = [
-                "basicInfo",
-                "experience",
-                "education",
-                "skills",
-                "projects",
-                "achievements",
-              ];
-              if (validKeys.some((key) => key in suggestedChanges)) {
-                // Apply the changes using the same logic as above
-                setResumeData((current) => {
-                  const newResumeData = { ...current };
-
-                  if (suggestedChanges.basicInfo) {
-                    newResumeData.basicInfo = {
-                      ...current.basicInfo,
-                      ...suggestedChanges.basicInfo,
-                    };
-                  }
-
-                  if (suggestedChanges.skills) {
-                    newResumeData.skills = suggestedChanges.skills;
-                  }
-
-                  // Handle other sections similarly...
-
-                  return newResumeData;
-                });
-
-                toast({
-                  title: "AI changes applied",
-                  description:
-                    "The suggested changes have been applied to your resume.",
-                });
-
-                return; // Exit after successfully applying changes
-              }
-            } catch (e) {
-              // This wasn't valid JSON or wasn't a resume change, continue to next match
-              continue;
-            }
-          }
-        }
-
-        toast({
-          title: "No changes found",
-          description: "No applicable changes were found in the AI response.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Failed to parse AI suggestions", error);
+    if (!lastAssistantMessage) {
       toast({
-        title: "Error applying changes",
-        description: "There was an error applying the AI suggestions.",
+        title: "No AI response",
+        description: "Send a message and wait for the assistant reply first.",
         variant: "destructive",
       });
+      return;
     }
+    const content = getTextContent(lastAssistantMessage);
+    if (!content?.trim()) {
+      toast({
+        title: "No content found",
+        description: "The assistant message could not be read. Try again after the reply finishes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { merged, template } = mergeAssistantResumeIntoCurrent(resumeData, content);
+    if (!merged) {
+      toast({
+        title: "No changes found",
+        description:
+          "No resume JSON was found. The assistant should include a ```component:cv``` block or resume sections in JSON.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResumeData(merged);
+    if (template) setTemplate(template);
+    toast({
+      title: "AI changes applied",
+      description: "The suggested changes have been merged into your resume and PDF preview.",
+    });
   };
 
   // Add a function to ensure data consistency between editor and PDF viewer

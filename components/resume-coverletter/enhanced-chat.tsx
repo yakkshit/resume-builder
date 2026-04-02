@@ -85,7 +85,8 @@ function AssistantMessageContent({ message, content, reasoning, isStreaming }: {
       <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
         <p className="font-medium text-primary mb-1">Suggested resume updates</p>
         <p className="text-muted-foreground">
-          {sections.join(" · ")} — use <strong>Apply AI Changes</strong> below to update your resume.
+          {sections.join(" · ")} — click <strong>Apply AI Changes</strong> below to merge this JSON into your editor and PDF (the assistant may use a{" "}
+          <code className="rounded bg-muted px-1 py-0.5 text-xs">component:cv</code> block).
         </p>
       </div>
     </div>
@@ -159,12 +160,19 @@ export default function EnhancedChat({
     const hadNewMessage = newCount > lastMessageCountRef.current
     lastMessageCountRef.current = newCount
 
-    if (messages.length > 0 && messages[messages.length - 1].role === "assistant" && !isLoading) {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
+    const lastAssistantText = lastAssistant ? getTextContent(lastAssistant) ?? "" : ""
+    const hasResumePayload = extractResumeJsonFromMessage(lastAssistantText) !== null
+
+    if (messages.length > 0 && lastAssistant && !isLoading && hasResumePayload) {
       setCanApplyChanges(true)
       setTypingIndicator(false)
     } else if (isLoading) {
       setTypingIndicator(true)
       setCanApplyChanges(false)
+    } else {
+      setCanApplyChanges(false)
+      setTypingIndicator(false)
     }
 
     if (hadNewMessage || isLoading) {
@@ -696,20 +704,38 @@ export default function EnhancedChat({
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
             >
-              <Button
-                onClick={applyAiChanges}
-                className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-lg disabled:opacity-50"
-                disabled={!canApplyChanges}
-                variant="default"
-              >
-                <motion.span
-                  animate={canApplyChanges ? { rotate: [0, 10, -10, 0] } : {}}
-                  transition={{ duration: 0.5, repeat: canApplyChanges ? Infinity : 0, repeatDelay: 2 }}
-                >
-                  <Sparkles size={16} className="mr-2" />
-                </motion.span>
-                Apply AI Changes
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="block w-full" tabIndex={0}>
+                      <Button
+                        type="button"
+                        onClick={applyAiChanges}
+                        className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-lg disabled:opacity-50"
+                        disabled={!canApplyChanges}
+                        variant="default"
+                      >
+                        <motion.span
+                          animate={canApplyChanges ? { rotate: [0, 10, -10, 0] } : {}}
+                          transition={{ duration: 0.5, repeat: canApplyChanges ? Infinity : 0, repeatDelay: 2 }}
+                        >
+                          <Sparkles size={16} className="mr-2" />
+                        </motion.span>
+                        Apply AI Changes
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-left">
+                    <p className="font-medium">Merge the latest assistant reply into your resume</p>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Parses resume JSON from the last assistant message — including fenced{" "}
+                      <code className="rounded bg-background/80 px-0.5">component:cv</code> blocks with{" "}
+                      <code className="rounded bg-background/80 px-0.5">resumeData</code> — then merges it into the
+                      editor and PDF. Your profile photo in the editor is kept unless the model sends a valid image URL.
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </motion.div>
           </motion.div>
         )}
