@@ -1,53 +1,161 @@
 /**
  * Robustly extract resume-update JSON from AI assistant message content.
- * Handles ```json ... ```, ``` ... ```, and raw JSON objects.
+ * Handles:
+ * - ```component:cv ... ``` (API / system prompt format)
+ * - ```json ... ```, generic fenced blocks
+ * - {"resumeData": {...}} envelopes (unwraps to section shape)
+ * - Raw JSON objects in the message
  */
+
+import { deepMerge } from "@/lib/utils"
+import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
+import type { ResumeData, Template } from "@/lib/types"
+
+/** Keep in sync with `resumeTemplates` keys in components/pdf-templates — avoids pulling PDF bundle into lib */
+const RESUME_TEMPLATE_KEYS = new Set<string>([
+  "modern",
+  "classic",
+  "minimal",
+  "professional",
+  "elegant",
+  "dark",
+  "gradient",
+  "two-column",
+  "gradient-gray",
+  "german-cv",
+  "multi-colour",
+])
 
 const RESUME_KEYS = ["basicInfo", "experience", "education", "skills", "projects", "achievements"] as const
 
 function isResumeUpdateShape(obj: unknown): obj is Record<string, unknown> {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false
-  return RESUME_KEYS.some((k) => k in obj)
+  return RESUME_KEYS.some((k) => k in (obj as Record<string, unknown>))
 }
 
-function tryParseJson(str: string): Record<string, unknown> | null {
+function tryParseJsonRecord(str: string): Record<string, unknown> | null {
   const cleaned = str
-    .replace(/,(\s*[}\]])/g, "$1") // remove trailing commas
-    .replace(/\/\/[^\n]*/g, "")     // remove line comments
+    .replace(/;(\s*[}\]])/g, "$1")
+    .replace(/,(\s*[}\]])/g, "$1")
+    .replace(/\/\/[^\n]*/g, "")
     .trim()
   try {
     const out = JSON.parse(cleaned) as unknown
-    return isResumeUpdateShape(out) ? (out as Record<string, unknown>) : null
+    if (!out || typeof out !== "object" || Array.isArray(out)) return null
+    return out as Record<string, unknown>
   } catch {
     return null
   }
 }
 
 /**
- * Extract the first valid resume-update JSON from markdown/plain text.
- * Tries: (1) ```json ... ``` block, (2) ``` ... ``` block, (3) raw JSON block, (4) outermost { ... }.
+ * Unwrap common LLM envelopes to the flat resume section shape.
+ * Also returns optional template from the same envelope.
  */
-export function extractResumeJsonFromMessage(content: string): Record<string, unknown> | null {
-  if (!content || typeof content !== "string") return null
+export function unwrapResumeEnvelope(obj: Record<string, unknown> | null): {
+  resume: Record<string, unknown> | null
+  template?: string
+} {
+  if (!obj) return { resume: null }
+
+  const topTemplate = typeof obj.template === "string" ? obj.template : undefined
+
+  if (isResumeUpdateShape(obj)) {
+    return { resume: obj, template: topTemplate }
+  }
+
+  const rd = obj.resumeData
+  if (rd && typeof rd === "object" && !Array.isArray(rd) && isResumeUpdateShape(rd as Record<string, unknown>)) {
+    return { resume: rd as Record<string, unknown>, template: topTemplate }
+  }
+
+  if (typeof obj.component === "string" && obj.resumeData && typeof obj.resumeData === "object" && !Array.isArray(obj.resumeData)) {
+    const inner = obj.resumeData as Record<string, unknown>
+    if (isResumeUpdateShape(inner)) {
+      return { resume: inner, template: topTemplate }
+    }
+  }
+
+  const props = obj.props
+  if (props && typeof props === "object" && !Array.isArray(props)) {
+    const p = props as Record<string, unknown>
+    if (isResumeUpdateShape(p)) return { resume: p, template: typeof p.template === "string" ? p.template : topTemplate }
+    const prd = p.resumeData
+    if (prd && typeof prd === "object" && !Array.isArray(prd) && isResumeUpdateShape(prd as Record<string, unknown>)) {
+      return { resume: prd as Record<string, unknown>, template: typeof p.template === "string" ? p.template : topTemplate }
+    }
+  }
+
+  return { resume: null }
+}
+
+function tryUnwrapParsed(parsed: Record<string, unknown> | null): { resume: Record<string, unknown> | null; template?: string } {
+  if (!parsed) return { resume: null }
+  return unwrapResumeEnvelope(parsed)
+}
+
+/** Iterate ``` ... ``` fences in document order */
+function forEachFence(content: string, fn: (body: string, header: string) => void): void {
+  const re = /```([^\n]*)\n([\s\S]*?)```/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(content)) !== null) {
+    const header = (m[1] ?? "").trim()
+    const body = (m[2] ?? "").trim()
+    fn(body, header)
+  }
+}
+
+function safeTemplate(v: unknown): Template | undefined {
+  if (typeof v !== "string") return undefined
+  return RESUME_TEMPLATE_KEYS.has(v) ? (v as Template) : undefined
+}
+
+export interface ExtractedResumePayload {
+  resume: Record<string, unknown> | null
+  /** From the same JSON envelope as the resume, when present */
+  template?: Template
+}
+
+/**
+ * Extract resume sections + optional template from assistant message text.
+ */
+export function extractResumePayloadFromMessage(content: string): ExtractedResumePayload {
+  if (!content || typeof content !== "string") return { resume: null }
 
   const trimmed = content.trim()
 
-  // 1) ```json ... ``` or ``` ... ```
-  const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/
-  const blockMatch = trimmed.match(jsonBlockRegex)
-  if (blockMatch?.[1]) {
-    const parsed = tryParseJson(blockMatch[1].trim())
-    if (parsed) return parsed
+  // 0) Prefer explicit ```component:cv``` blocks first (system prompt format)
+  const cvFence = trimmed.match(/```\s*component\s*:\s*cv\s*([\s\S]*?)```/i)
+  if (cvFence?.[1]) {
+    const parsed = tryParseJsonRecord(cvFence[1].trim())
+    const { resume, template } = tryUnwrapParsed(parsed)
+    if (resume) {
+      return { resume, template: safeTemplate(template) }
+    }
   }
 
-  // 2) Raw JSON at start (e.g. AI returns {"basicInfo":{...}} with no markdown)
+  // 1) All fenced blocks, in order — try each JSON object
+  let fromFence: ExtractedResumePayload | null = null
+  forEachFence(trimmed, (body) => {
+    if (fromFence?.resume) return
+    if (!body.startsWith("{")) return
+    const parsed = tryParseJsonRecord(body)
+    const { resume, template } = tryUnwrapParsed(parsed)
+    if (resume) {
+      fromFence = { resume, template: safeTemplate(template) }
+    }
+  })
+  if (fromFence?.resume) return fromFence
+
+  // 2) Whole message is JSON
   const jsonStartMatch = trimmed.match(/^\s*(\{[\s\S]*\})\s*$/)
   if (jsonStartMatch?.[1]) {
-    const parsed = tryParseJson(jsonStartMatch[1])
-    if (parsed) return parsed
+    const parsed = tryParseJsonRecord(jsonStartMatch[1])
+    const { resume, template } = tryUnwrapParsed(parsed)
+    if (resume) return { resume, template: safeTemplate(template) }
   }
 
-  // 3) Find outermost { ... } that looks like resume update (brace matching)
+  // 3) Balanced { ... } slices (largest / first valid)
   let depth = 0
   let start = -1
   for (let i = 0; i < content.length; i++) {
@@ -58,13 +166,41 @@ export function extractResumeJsonFromMessage(content: string): Record<string, un
       depth--
       if (depth === 0 && start !== -1) {
         const candidate = content.slice(start, i + 1)
-        const parsed = tryParseJson(candidate)
-        if (parsed) return parsed
+        const parsed = tryParseJsonRecord(candidate)
+        const { resume, template } = tryUnwrapParsed(parsed)
+        if (resume) return { resume, template: safeTemplate(template) }
       }
     }
   }
 
-  return null
+  return { resume: null }
+}
+
+/**
+ * Extract the first valid resume-update JSON from markdown/plain text (sections only).
+ */
+export function extractResumeJsonFromMessage(content: string): Record<string, unknown> | null {
+  return extractResumePayloadFromMessage(content).resume
+}
+
+/**
+ * Merge assistant-extracted resume JSON into current editor state.
+ * Preserves existing profile photo (AI payloads omit or strip base64).
+ */
+export function mergeAssistantResumeIntoCurrent(current: ResumeData, assistantMessageText: string): {
+  merged: ResumeData | null
+  template?: Template
+} {
+  const { resume, template } = extractResumePayloadFromMessage(assistantMessageText)
+  if (!resume) return { merged: null }
+
+  const pic = current.basicInfo?.profilePicture
+  const merged = deepMerge(current, resume) as ResumeData
+  let next = sanitizeResumeData(merged)
+  if (pic && next.basicInfo) {
+    next.basicInfo.profilePicture = pic
+  }
+  return { merged: next, template }
 }
 
 /**

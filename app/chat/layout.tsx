@@ -11,5 +11,9 @@ export default function ChatLayout({
   children: React.ReactNode;
 }) {
   // Isolated layout: no AppNav, no padding, full viewport
-  return <div className="w-full h-screen overflow-hidden">{children}</div>;
+  return (
+    <div className="flex h-dvh min-h-0 w-full max-w-[100vw] flex-col overflow-hidden">
+      {children}
+    </div>
+  );
 }

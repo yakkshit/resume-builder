@@ -6,6 +6,8 @@ import mime from "mime"
 import type { NextRequest } from "next/server"
 import { DEFAULT_CHAT_MODEL, CHAT_MODELS_BY_PROVIDER } from "@/lib/chat-models"
 import { redactResumePII, redactTextPII } from "@/lib/redact-resume-pii"
+import { buildUserKnowledgeStoreChunks } from "@/lib/user-knowledge-context"
+import { ensureMemoryFilesystem, readCoreMemory, recallFromConversations, appendConversation, overwriteCoreMemory, appendNotes } from "@/lib/memory-store"
 
 /** Extract text from message (supports v4 content and v5 parts) */
 const getMsgText = (m: { content?: string; parts?: Array<{ type: string; text?: string }> }) =>
@@ -220,12 +222,33 @@ CRITICAL RESUME UPDATE RULES:
 - Output VALID JSON only (no trailing commas, no comments). The UI parses this strictly.
 - NEVER include \`basicInfo.profilePicture\` in the JSON (it is large base64 and will break streaming / waste tokens). The app will preserve the existing picture automatically.
 - Do not use markdown formatting inside resume strings (no \`**bold**\`, no headings). Plain text only inside resumeData fields.
+- For \`skills\`, prefer a compact flat array of strings (e.g. \`["Java","Spring Boot","TypeScript"]\`) to save tokens. Categorized objects like \`{"name":"Backend","keywords":["Java"]}\` are also accepted, but strings are smaller.
 
 Resume data: ${resumeJson}`
 }
 
 export async function POST(req: NextRequest) {
-  const { messages, resumeData, aiMode, model, apiKey, attachedData, attachedFiles, contextText, customModel, customEndpoint, customHeaders, customAuth, mode } = await req.json()
+  try {
+    await ensureMemoryFilesystem()
+  } catch {
+    // Keep chat working even if memory backend is unavailable.
+  }
+  const {
+    messages,
+    resumeData,
+    aiMode,
+    model,
+    apiKey,
+    attachedData,
+    attachedFiles,
+    contextText,
+    customModel,
+    customEndpoint,
+    customHeaders,
+    customAuth,
+    mode,
+    chatGlobalProfile,
+  } = await req.json()
 
   // Create a system message based on the mode
   let systemMessage = ""
@@ -233,6 +256,24 @@ export async function POST(req: NextRequest) {
   // Redact PII (name, email, phone, location) before sending to AI - protects user privacy
   const redactedResume = redactResumePII(resumeData)
   const resumeJson = JSON.stringify(redactedResume)
+
+  // Update core memory deterministically from global profile (stable facts only).
+  // This avoids trusting model-generated memory writes.
+  if (chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)) {
+    const p = chatGlobalProfile as Record<string, unknown>
+    const safe = (v: unknown) => (typeof v === "string" ? v.trim() : "")
+    const lines = [
+      "# Core Memory",
+      "- This file is generated from the user's global profile (do not store secrets).",
+      safe(p.targetRoles) ? `- Target roles: ${safe(p.targetRoles)}` : "",
+      safe(p.careerNotes) ? `- Career notes: ${safe(p.careerNotes)}` : "",
+    ].filter(Boolean)
+    try {
+      await overwriteCoreMemory(lines.join("\n") + "\n")
+    } catch {
+      /* ignore */
+    }
+  }
 
   if (mode === "career-assistant") {
     systemMessage = buildCareerAssistantSystemPrompt(resumeJson)
@@ -335,6 +376,22 @@ Resume data: ${resumeJson}`
     systemMessage += `\n\nUser Context: ${redactTextPII(contextText.trim())}`
   }
 
+  // Inject core memory + recall snippets
+  const core = await readCoreMemory()
+  if (core.trim()) {
+    systemMessage += `\n\n## Core memory (persistent)\n${redactTextPII(core)}`
+  }
+
+  // RAG-style knowledge: structured chunks from global profile + resume (deterministic, no vector DB)
+  const profileObj =
+    chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)
+      ? (chatGlobalProfile as Record<string, unknown>)
+      : null
+  const knowledgeChunks = buildUserKnowledgeStoreChunks(resumeData, profileObj)
+  if (knowledgeChunks.trim()) {
+    systemMessage += `\n\n## User knowledge store (retrieved memory — use for personalization; full resume JSON above is the edit source of truth)\n${redactTextPII(knowledgeChunks)}`
+  }
+
 
 
 
@@ -348,6 +405,32 @@ Resume data: ${resumeJson}`
     }
     return ""
   })()
+
+  // Recall: pull relevant prior conversation lines and inject (redacted).
+  const recallQuery = [lastUserTextRaw || "", contextText || ""].filter(Boolean).join(" ")
+  const recall = await recallFromConversations(recallQuery, 10)
+  if (recall.trim()) {
+    systemMessage += `\n\n## Recall memory (matching past conversation)\n${redactTextPII(recall)}`
+  }
+
+  // Log the most recent user turn (best-effort; assistant logging is harder with streaming provider responses).
+  try {
+    if (lastUserTextRaw && lastUserTextRaw.trim()) {
+      await appendConversation({
+        sessionId: (req as any)?.headers?.get?.("x-chat-session-id") ?? undefined,
+        role: "user",
+        content: redactTextPII(lastUserTextRaw.trim()),
+        timestamp: new Date().toISOString(),
+      })
+    }
+    if (contextText && contextText.trim()) {
+      await appendNotes(
+        `[${new Date().toISOString()}] context-window: ${redactTextPII(contextText.trim())}`
+      )
+    }
+  } catch {
+    /* ignore */
+  }
 
   // Deterministic edit path for explicit "replace ... in experience" commands.
   // This guarantees the resume updates even when model output is malformed.

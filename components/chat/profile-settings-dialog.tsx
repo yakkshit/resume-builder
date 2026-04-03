@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
+import { useToast } from "@/hooks/use-toast";
 
 export type UserProfile = {
   name: string;
@@ -17,15 +19,31 @@ export type UserProfile = {
   linkedin: string;
   website: string;
   github: string;
+  /** Comma-separated or free-text target roles for RAG-style context */
+  targetRoles: string;
+  /** Long-form career goals, constraints, preferences (chunked into knowledge store) */
+  careerNotes: string;
 };
 
 export const PROFILE_STORE_ID = "ai-chat-profile";
 
+const EMPTY_PROFILE: UserProfile = {
+  name: "",
+  email: "",
+  phone: "",
+  location: "",
+  linkedin: "",
+  website: "",
+  github: "",
+  targetRoles: "",
+  careerNotes: "",
+};
+
 function loadProfile(): UserProfile {
-  if (typeof window === "undefined") return { name: "", email: "", phone: "", location: "", linkedin: "", website: "", github: "" };
+  if (typeof window === "undefined") return { ...EMPTY_PROFILE };
   try {
     const raw = localStorage.getItem(PROFILE_STORE_ID);
-    if (!raw) return { name: "", email: "", phone: "", location: "", linkedin: "", website: "", github: "" };
+    if (!raw) return { ...EMPTY_PROFILE };
     const p = JSON.parse(raw) as Partial<UserProfile>;
     return {
       name: typeof p.name === "string" ? p.name : "",
@@ -35,9 +53,11 @@ function loadProfile(): UserProfile {
       linkedin: typeof p.linkedin === "string" ? p.linkedin : "",
       website: typeof p.website === "string" ? p.website : "",
       github: typeof p.github === "string" ? p.github : "",
+      targetRoles: typeof p.targetRoles === "string" ? p.targetRoles : "",
+      careerNotes: typeof p.careerNotes === "string" ? p.careerNotes : "",
     };
   } catch {
-    return { name: "", email: "", phone: "", location: "", linkedin: "", website: "", github: "" };
+    return { ...EMPTY_PROFILE };
   }
 }
 
@@ -60,8 +80,9 @@ export function ProfileSettingsDialog({
   settings: ChatSettings;
   onSettingsChange: (patch: Partial<ChatSettings>) => void;
 }) {
-  const [profile, setProfile] = useState<UserProfile>({ name: "", email: "", phone: "", location: "", linkedin: "", website: "", github: "" });
+  const [profile, setProfile] = useState<UserProfile>({ ...EMPTY_PROFILE });
   const [apiKeyDraft, setApiKeyDraft] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!open) return;
@@ -86,17 +107,21 @@ export function ProfileSettingsDialog({
       // API key is intentionally only kept in memory (not persisted in useChatSettings).
       apiKey: apiKeyDraft,
     });
+    toast({
+      title: "Profile saved",
+      description: "Global profile, RAG context, and chat settings have been updated.",
+    });
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl rounded-2xl border-border/60 bg-background/95 backdrop-blur-xl">
+      <DialogContent className="max-w-xl max-h-[85dvh] overflow-y-auto rounded-2xl border-border/60 bg-background/95 backdrop-blur-xl">
         <DialogHeader>
           <DialogTitle className="text-base">Profile & Settings</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="space-y-5 pb-1">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label className="text-xs">Name</Label>
@@ -142,12 +167,46 @@ export function ProfileSettingsDialog({
             </div>
           </div>
 
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label className="text-xs">GitHub</Label>
+              <Input
+                value={profile.github}
+                onChange={(e) => setProfile((p) => ({ ...p, github: e.target.value }))}
+                placeholder="github.com/username"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Target roles (for AI context)</Label>
+              <Input
+                value={profile.targetRoles}
+                onChange={(e) => setProfile((p) => ({ ...p, targetRoles: e.target.value }))}
+                placeholder="e.g. Embedded SWE, ML Engineer, Staff Backend"
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label className="text-xs">GitHub</Label>
-            <Input
-              value={profile.github}
-              onChange={(e) => setProfile((p) => ({ ...p, github: e.target.value }))}
-              placeholder="github.com/username"
+            <Label className="text-xs">Career notes & preferences</Label>
+            <Textarea
+              value={profile.careerNotes}
+              onChange={(e) => setProfile((p) => ({ ...p, careerNotes: e.target.value }))}
+              placeholder="Relocation, visa, salary band, industries you want — used as retrieved memory in chat."
+              className="min-h-[88px] rounded-xl"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2.5">
+            <div className="space-y-0.5">
+              <Label className="text-xs font-medium">Auto-merge assistant resume</Label>
+              <p className="text-[10px] text-muted-foreground leading-snug">
+                When the assistant sends a CV block, merge it into your saved resume automatically.
+              </p>
+            </div>
+            <Switch
+              checked={settings.autoMergeAssistantResume !== false}
+              onCheckedChange={(v) => onSettingsChange({ autoMergeAssistantResume: v })}
+              aria-label="Toggle auto-merge resume from assistant"
             />
           </div>
 

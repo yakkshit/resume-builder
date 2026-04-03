@@ -6,6 +6,70 @@ function isReactElement(v: unknown): boolean {
   return typeof v === "object" && v !== null && "$$typeof" in (v as object)
 }
 
+/**
+ * LLMs often return skills as categorized objects `{ name, keywords[] }`.
+ * Our UI/PDF expect `string[]`; plain `safe()` turns objects into "" and skills look "blank".
+ */
+export function normalizeSkillsToStringArray(skills: unknown): string[] {
+  const toStr = (v: unknown): string => {
+    if (v == null) return ""
+    if (isReactElement(v)) return ""
+    if (typeof v === "string") return v
+    if (typeof v === "number" || typeof v === "boolean") return String(v)
+    return ""
+  }
+  if (!Array.isArray(skills)) return []
+  const out: string[] = []
+  for (const x of skills) {
+    if (typeof x === "string") {
+      const s = x.trim()
+      if (s) out.push(s)
+      continue
+    }
+    if (x && typeof x === "object" && !Array.isArray(x)) {
+      const o = x as { name?: unknown; category?: unknown; title?: unknown; keywords?: unknown }
+      const cat = toStr(o.name ?? o.category ?? o.title).trim()
+      const kwRaw = o.keywords
+      const kws = Array.isArray(kwRaw)
+        ? kwRaw.map((k) => toStr(k).trim()).filter(Boolean)
+        : []
+      if (cat && kws.length) out.push(`${cat}: ${kws.join(", ")}`)
+      else if (kws.length) out.push(...kws)
+      else if (cat) out.push(cat)
+    }
+  }
+  return out
+}
+
+/** Languages are usually string[]; sometimes models emit `{ name, proficiency }`. */
+function normalizeLanguagesArray(languages: unknown): string[] {
+  const toStr = (v: unknown): string => {
+    if (v == null) return ""
+    if (isReactElement(v)) return ""
+    if (typeof v === "string") return v
+    if (typeof v === "number" || typeof v === "boolean") return String(v)
+    return ""
+  }
+  if (!Array.isArray(languages)) return []
+  const out: string[] = []
+  for (const x of languages) {
+    if (typeof x === "string") {
+      const s = x.trim()
+      if (s) out.push(s)
+      continue
+    }
+    if (x && typeof x === "object" && !Array.isArray(x)) {
+      const o = x as { name?: unknown; language?: unknown; label?: unknown; proficiency?: unknown; level?: unknown }
+      const label = toStr(o.name || o.language || o.label).trim()
+      const prof = toStr(o.proficiency || o.level).trim()
+      if (label && prof) out.push(`${label} (${prof})`)
+      else if (label) out.push(label)
+      else if (prof) out.push(prof)
+    }
+  }
+  return out
+}
+
 /** Only allow profilePicture as data URL or https - strip blob: and objects */
 function safeProfilePicture(v: unknown): string | undefined {
   if (v == null) return undefined
@@ -80,7 +144,7 @@ export function sanitizeResumeData(data: ResumeData): ResumeData {
       website: safe(data.basicInfo?.website),
       summary: safe(data.basicInfo?.summary),
       profilePicture: safeProfilePicture(data.basicInfo?.profilePicture),
-      languages: arr(data.basicInfo?.languages, (x) => safe(x)),
+      languages: normalizeLanguagesArray(data.basicInfo?.languages),
       portfolioLinks: arr(data.basicInfo?.portfolioLinks, (link) =>
         typeof link === "object" && link !== null
           ? {
@@ -129,7 +193,7 @@ export function sanitizeResumeData(data: ResumeData): ResumeData {
             gpa: "",
           }
     ),
-    skills: arr(data.skills, (x) => safe(x)),
+    skills: normalizeSkillsToStringArray(data.skills),
     projects: arr(data.projects, (proj) =>
       typeof proj === "object" && proj !== null
         ? {

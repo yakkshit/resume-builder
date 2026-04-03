@@ -259,19 +259,33 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
 
   // Sync logic if another window updates it
   useEffect(() => {
-    const handleStorage = () => {
-      const stored = localStorage.getItem("resumeData");
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          setResumeData(sanitizeResumeData(parsed));
-        } catch {
-          /* ignore */
+    const reloadFromDisk = () => {
+      try {
+        const stored = localStorage.getItem("resumeData");
+        if (stored) setResumeData(sanitizeResumeData(JSON.parse(stored)));
+      } catch {
+        /* ignore */
+      }
+      try {
+        const savedTpl = localStorage.getItem("resumeTemplate");
+        if (savedTpl && Object.keys(resumeTemplates).includes(savedTpl)) {
+          setTemplate(savedTpl as Template);
         }
+      } catch {
+        /* ignore */
       }
     };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
+
+    // `storage` fires only across tabs; our app also dispatches a same-tab event when it mutates storage.
+    const onStorage = () => reloadFromDisk();
+    const onResumeUpdated = () => reloadFromDisk();
+
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("resume-storage-updated", onResumeUpdated as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("resume-storage-updated", onResumeUpdated as EventListener);
+    };
   }, []);
 
   useEffect(() => {
