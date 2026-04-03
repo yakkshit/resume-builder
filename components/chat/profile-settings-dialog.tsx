@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
+import { useToast } from "@/hooks/use-toast";
 
 export type UserProfile = {
   name: string;
@@ -81,6 +82,7 @@ export function ProfileSettingsDialog({
 }) {
   const [profile, setProfile] = useState<UserProfile>({ ...EMPTY_PROFILE });
   const [apiKeyDraft, setApiKeyDraft] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!open) return;
@@ -104,6 +106,10 @@ export function ProfileSettingsDialog({
       contextWindow: settings.contextWindow,
       // API key is intentionally only kept in memory (not persisted in useChatSettings).
       apiKey: apiKeyDraft,
+    });
+    toast({
+      title: "Profile saved",
+      description: "Global profile, RAG context, and chat settings have been updated.",
     });
     onOpenChange(false);
   };

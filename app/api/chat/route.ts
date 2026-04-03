@@ -7,7 +7,7 @@ import type { NextRequest } from "next/server"
 import { DEFAULT_CHAT_MODEL, CHAT_MODELS_BY_PROVIDER } from "@/lib/chat-models"
 import { redactResumePII, redactTextPII } from "@/lib/redact-resume-pii"
 import { buildUserKnowledgeStoreChunks } from "@/lib/user-knowledge-context"
-import { ensureMemoryFilesystem, readCoreMemory, recallFromConversations, appendConversation, overwriteCoreMemory } from "@/lib/memory-store"
+import { ensureMemoryFilesystem, readCoreMemory, recallFromConversations, appendConversation, overwriteCoreMemory, appendNotes } from "@/lib/memory-store"
 
 /** Extract text from message (supports v4 content and v5 parts) */
 const getMsgText = (m: { content?: string; parts?: Array<{ type: string; text?: string }> }) =>
@@ -228,7 +228,11 @@ Resume data: ${resumeJson}`
 }
 
 export async function POST(req: NextRequest) {
-  await ensureMemoryFilesystem()
+  try {
+    await ensureMemoryFilesystem()
+  } catch {
+    // Keep chat working even if memory backend is unavailable.
+  }
   const {
     messages,
     resumeData,
@@ -403,7 +407,8 @@ Resume data: ${resumeJson}`
   })()
 
   // Recall: pull relevant prior conversation lines and inject (redacted).
-  const recall = await recallFromConversations(lastUserTextRaw || "", 10)
+  const recallQuery = [lastUserTextRaw || "", contextText || ""].filter(Boolean).join(" ")
+  const recall = await recallFromConversations(recallQuery, 10)
   if (recall.trim()) {
     systemMessage += `\n\n## Recall memory (matching past conversation)\n${redactTextPII(recall)}`
   }
@@ -417,6 +422,11 @@ Resume data: ${resumeJson}`
         content: redactTextPII(lastUserTextRaw.trim()),
         timestamp: new Date().toISOString(),
       })
+    }
+    if (contextText && contextText.trim()) {
+      await appendNotes(
+        `[${new Date().toISOString()}] context-window: ${redactTextPII(contextText.trim())}`
+      )
     }
   } catch {
     /* ignore */

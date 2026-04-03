@@ -2,7 +2,9 @@ import { mkdir, readFile, appendFile, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
 
 const MEMORY_DIR = ".memory"
-const MEMORY_ROOT = resolve(process.cwd(), MEMORY_DIR)
+const MEMORY_ROOT = process.env.VERCEL
+  ? resolve("/tmp", MEMORY_DIR)
+  : resolve(process.cwd(), MEMORY_DIR)
 const CORE_PATH = join(MEMORY_ROOT, "core.md")
 const NOTES_PATH = join(MEMORY_ROOT, "notes.md")
 const CONVERSATIONS_PATH = join(MEMORY_ROOT, "conversations.jsonl")
@@ -25,10 +27,14 @@ async function ensureFile(path: string, content: string) {
 }
 
 export async function ensureMemoryFilesystem() {
-  await mkdir(MEMORY_ROOT, { recursive: true })
-  await ensureFile(CORE_PATH, DEFAULT_CORE)
-  await ensureFile(NOTES_PATH, DEFAULT_NOTES)
-  await ensureFile(CONVERSATIONS_PATH, "")
+  try {
+    await mkdir(MEMORY_ROOT, { recursive: true })
+    await ensureFile(CORE_PATH, DEFAULT_CORE)
+    await ensureFile(NOTES_PATH, DEFAULT_NOTES)
+    await ensureFile(CONVERSATIONS_PATH, "")
+  } catch {
+    // Non-fatal in constrained runtimes; route falls back without memory persistence.
+  }
 }
 
 export async function readCoreMemory(): Promise<string> {
@@ -48,12 +54,20 @@ export async function readNotesMemory(): Promise<string> {
 }
 
 export async function overwriteCoreMemory(content: string) {
-  await writeFile(CORE_PATH, content, "utf8")
+  try {
+    await writeFile(CORE_PATH, content, "utf8")
+  } catch {
+    // ignore
+  }
 }
 
 export async function appendNotes(line: string) {
   const s = line.endsWith("\n") ? line : `${line}\n`
-  await appendFile(NOTES_PATH, s, "utf8")
+  try {
+    await appendFile(NOTES_PATH, s, "utf8")
+  } catch {
+    // ignore
+  }
 }
 
 export async function appendConversation(entry: {
@@ -63,7 +77,11 @@ export async function appendConversation(entry: {
   timestamp: string
 }) {
   const line = JSON.stringify(entry)
-  await appendFile(CONVERSATIONS_PATH, `${line}\n`, "utf8")
+  try {
+    await appendFile(CONVERSATIONS_PATH, `${line}\n`, "utf8")
+  } catch {
+    // ignore
+  }
 }
 
 const STOP = new Set([
