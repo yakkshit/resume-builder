@@ -16,15 +16,20 @@ import {
   Sun,
   Moon,
   Settings2,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChatSession, ChatSettings } from "./chat-store";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { ProfileSettingsDialog, getStoredProfile } from "./profile-settings-dialog";
+import { cn } from "@/lib/utils";
 
 interface SidebarProps {
+  /** Lift above onboarding dim layer so the panel stays readable during the tour */
+  elevateForOnboarding?: boolean;
   isOpen: boolean;
   onClose: () => void;
   sessions: ChatSession[];
@@ -39,6 +44,7 @@ interface SidebarProps {
 }
 
 export function ChatSidebar({
+  elevateForOnboarding = false,
   isOpen,
   onClose,
   sessions,
@@ -74,7 +80,10 @@ export function ChatSidebar({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            className={cn(
+              "fixed inset-0 bg-black/40 backdrop-blur-sm",
+              elevateForOnboarding ? "z-[65]" : "z-40",
+            )}
             onClick={onClose}
           />
 
@@ -85,7 +94,10 @@ export function ChatSidebar({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -320, opacity: 0 }}
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
-            className="fixed left-3 top-3 bottom-3 z-50 w-[310px] flex flex-col rounded-2xl overflow-hidden shadow-2xl"
+            className={cn(
+              "fixed left-3 top-3 bottom-3 flex w-[310px] flex-col overflow-hidden rounded-2xl shadow-2xl",
+              elevateForOnboarding ? "z-[68]" : "z-50",
+            )}
             style={{
               background:
                 "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)",
@@ -98,23 +110,53 @@ export function ChatSidebar({
             <div className="pointer-events-none absolute -bottom-16 -right-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl" />
 
             {/* Header */}
-            <div className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/10">
-              <button
-                type="button"
-                onClick={() => setProfileOpen(true)}
-                className="group flex min-w-0 items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-white/5 transition-colors"
-                aria-label="Open profile settings"
-              >
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <div className="min-w-0 text-left">
-                  <p className="text-sm font-semibold text-foreground truncate">{profileName}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{profileEmail}</p>
-                </div>
-                <Settings2 className="ml-1 h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
+            <div className="relative z-10 flex items-center justify-between gap-2 px-4 py-3 border-b border-white/10">
+              <div className="flex min-w-0 flex-1 items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(true)}
+                  className="group flex min-w-0 flex-1 items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-white/5 transition-colors"
+                  aria-label="Open global profile and settings"
+                >
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="text-sm font-semibold text-foreground truncate">{profileName}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{profileEmail}</p>
+                  </div>
+                  <Settings2 className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-muted-foreground transition-colors hover:bg-white/10 hover:text-foreground"
+                      aria-label="What is global profile?"
+                    >
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="end"
+                    sideOffset={8}
+                    collisionPadding={16}
+                    className="z-[200] w-[min(calc(100vw-2rem),17rem)] rounded-xl border border-border/80 bg-popover p-3 text-popover-foreground shadow-xl"
+                  >
+                    <p className="text-xs font-semibold text-foreground">Global profile</p>
+                    <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                      Opens contact info, HR email provider, default model, and career context. Data stays in this browser only (not synced to a server).
+                    </p>
+                    <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                      Extra fields for OpenAI-compatible or Hugging Face appear only when those models are selected.
+                    </p>
+                  </PopoverContent>
+                </Popover>
+              </div>
               <div className="flex items-center gap-1.5">
+                <Tooltip>
+                  <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -122,19 +164,26 @@ export function ChatSidebar({
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
                   className="h-8 w-8 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-foreground"
                   aria-label="Toggle theme"
-                  title="Toggle theme"
                 >
                   {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                 </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">Light / dark theme</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={onClose}
                   className="h-8 w-8 rounded-xl hover:bg-white/10 text-muted-foreground hover:text-foreground"
-                  aria-label="Close"
+                  aria-label="Close sidebar"
                 >
                   <X className="w-4 h-4" />
                 </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="text-xs">Close</TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
@@ -176,6 +225,8 @@ export function ChatSidebar({
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
                   <Clock className="w-3.5 h-3.5 text-cyan-400" /> History
                 </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -184,6 +235,9 @@ export function ChatSidebar({
                 >
                   <MessageSquarePlus className="w-3.5 h-3.5 mr-1" /> New
                 </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="text-xs">Start a fresh conversation</TooltipContent>
+                </Tooltip>
               </div>
 
               {/* Session list */}
@@ -208,12 +262,19 @@ export function ChatSidebar({
                         </p>
                       </div>
                     </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
                     <button
+                      type="button"
                       onClick={() => onDeleteSession(s.id)}
                       className="absolute right-2 top-3 opacity-0 group-hover:opacity-100 transition-all p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg focus:opacity-100"
+                      aria-label="Delete chat"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="text-xs">Delete this chat</TooltipContent>
+                    </Tooltip>
                   </div>
                 ))}
                 {sessions.length === 0 && (
@@ -227,6 +288,8 @@ export function ChatSidebar({
 
              {/* Export / Import */}
              <div className="px-4 py-3 border-b border-white/10 flex gap-3">
+                <Tooltip>
+                  <TooltipTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
@@ -235,6 +298,13 @@ export function ChatSidebar({
                 >
                   <Download className="w-3.5 h-3.5 mr-1.5" /> Export
                 </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[220px] text-xs">
+                    Download chats, profile, settings, and resume as JSON (no API keys).
+                  </TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
@@ -243,6 +313,11 @@ export function ChatSidebar({
                 >
                   <Upload className="w-3.5 h-3.5 mr-1.5" /> Import
                 </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-[220px] text-xs">
+                    Restore from an export file created here.
+                  </TooltipContent>
+                </Tooltip>
                 <input
                   ref={fileInputRef}
                   type="file"

@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { PDFViewer as ReactPDFViewer, pdf } from "@react-pdf/renderer"
 import type { ResumeData, Template } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -16,10 +16,19 @@ interface PDFViewerProps {
 
 export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
   const safeResumeData = sanitizeResumeData(resumeData)
+  /** Content signature for remounting the PDF viewer (deps on resumeData ref + template, not per-render sanitize identity). */
+  const resumeFingerprint = useMemo(
+    () => `${JSON.stringify(sanitizeResumeData(resumeData))}|${template}`,
+    [resumeData, template],
+  )
   const [isClient, setIsClient] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isDownloading, setIsDownloading] = useState(false)
   const { toast } = useToast()
+
+  /** Force react-pdf to remount when resume JSON changes (viewer often ignores in-place updates). */
+  const [pdfInstanceKey, setPdfInstanceKey] = useState(0)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Only render on client side
   useEffect(() => {
@@ -30,14 +39,16 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
     return () => clearTimeout(timer)
   }, [])
 
-  // Show loading state briefly when data or template changes to ensure refresh
+  // Debounce remount so typing does not thrash the PDF; avoid full-screen spinner on every edit (only initial client mount uses it).
   useEffect(() => {
-    setIsLoading(true)
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [resumeData, template])
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setPdfInstanceKey((k) => k + 1)
+    }, 450)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [resumeFingerprint])
 
   const handleDownload = async () => {
     if (!isClient) return
@@ -126,7 +137,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : (
-          <div className="w-full h-full">
+          <div className="h-full w-full" key={pdfInstanceKey}>
             <ReactPDFViewer style={{ width: "100%", height: "100%", border: "none" }} showToolbar={false}>
               <PDFTemplate resumeData={safeResumeData} />
             </ReactPDFViewer>

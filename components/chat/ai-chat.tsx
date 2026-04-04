@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
     Send,
@@ -19,9 +19,19 @@ import {
     Menu,
     X,
     AlertCircle,
+    BookMarked,
+    Search,
+    Settings2,
+    Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import Toaster, { ToasterRef } from '@/components/ui/toast';
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
@@ -30,7 +40,14 @@ import { InfiniteGridBackground } from "@/components/ui/the-infinite-grid";
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ChatSidebar } from "./sidebar";
 import { ComponentRenderer } from "./component-renderer";
-import { useChatSettings, ChatMessage, AVAILABLE_MODELS } from "./chat-store";
+import { useChatSettings, ChatMessage, AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
+import {
+    HF_CUSTOM_HUB_MODEL_ID,
+    OPENAI_COMPAT_CHAT_MODEL_ID,
+    isHuggingFaceCustomHubModel,
+    isOpenAiCompatibleChatModel,
+    needsHuggingFaceCustomModelField,
+} from "@/lib/chat-provider-settings";
 import { getTextContent } from "@/lib/message-utils";
 import type { JobSuggestion } from "@/lib/job-scraper/google-jobs";
 import { JobSuggestionsPanel } from "./job-suggestions-panel";
@@ -38,6 +55,11 @@ import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-r
 import { stripIncompleteJsonTail } from "@/lib/streaming-chat-content";
 import { mergeAssistantResumeIntoCurrent, extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
 import type { ResumeData } from "@/lib/types";
+import { tryLocalStorageGet, tryLocalStorageSet, tryLocalStorageRemove } from "@/lib/safe-local-storage";
+import { chatTextareaHeightPx } from "@/lib/chat-textarea";
+import { ChatOnboarding } from "./chat-onboarding";
+import { ShineBorder } from "@/components/ui/shine-border";
+import { ModelProviderIcon } from "@/lib/model-provider-icon";
 
 // ── Welcome Screen ─────────────────────────────────────────────────────────
 
@@ -47,6 +69,8 @@ const ACTION_PILLS = [
     { label: "Code", icon: Code, prompt: "Give me a coding challenge" },
     { label: "Learn", icon: BookOpen, prompt: "Recommend learning resources for me" },
 ];
+
+const CHAT_INPUT_SHINE_LS = "ai-chat-input-shine-seen";
 
 const SUGGESTED_PROMPTS = [
     "Show me my resume",
@@ -130,6 +154,8 @@ function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>
     if (t === "mockinterview" || t === "mock-interview") return "mock-interview";
     if (t === "course" || t === "learning-resources") return "learning-resources";
     if (t === "codingchallenge" || t === "coding-challenge") return "coding-challenge";
+    if (t === "emailhr" || t === "email-hr" || t === "hr-email") return "email-hr";
+    if (t === "linkedindm" || t === "linkedin-dm" || t === "linkedin") return "linkedin-dm";
     return null;
 }
 
@@ -203,6 +229,25 @@ function extractComponents(text: string) {
     return { cleanText: cleanText.trim(), components };
 }
 
+/** Latest *renderable* resume block: merges with shared storage only for this instance. */
+function computeCanonicalResumeInstanceKey(messages: UIMessage[], isStreamingLastAssistant: boolean): string | null {
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const m = messages[i];
+        if (m.role !== "assistant") continue;
+        const text = getTextContent(m) ?? "";
+        const { components } = extractComponents(text);
+        const streamingThis = isStreamingLastAssistant && i === messages.length - 1;
+        for (let j = components.length - 1; j >= 0; j--) {
+            const c = components[j];
+            if (c?.type !== "resume") continue;
+            if (!streamingThis || c.isComplete) {
+                return `${m.id ?? "m"}-${j}`;
+            }
+        }
+    }
+    return null;
+}
+
 // ── Message Bubble ─────────────────────────────────────────────────────────
 
 function MessageBubble({
@@ -210,18 +255,27 @@ function MessageBubble({
     isStreaming,
     onReply,
     onToast,
+    chatApiKey,
+    chatModel,
+    canonicalResumeKey,
 }: {
     message: UIMessage;
     isStreaming?: boolean;
     onReply: (text: string) => void;
     onToast: (variant: "default" | "success" | "error" | "warning", msg: string) => void;
+    chatApiKey?: string;
+    chatModel?: string;
+    canonicalResumeKey: string | null;
 }) {
     const isUser = message.role === "user";
     const [hovering, setHovering] = useState(false);
     const content = getTextContent(message) ?? "";
 
-    // Extract dynamic components and clean text
-    const extracted = !isUser ? extractComponents(content) : { cleanText: content, components: [] };
+    /** Stable reference when message text unchanged — avoids ResumeViewer re-running merge on every parent render. */
+    const extracted = useMemo(
+        () => (!isUser ? extractComponents(content) : { cleanText: content, components: [] }),
+        [isUser, content],
+    );
 
     const copy = () => {
         navigator.clipboard.writeText(content);
@@ -269,13 +323,23 @@ function MessageBubble({
                                 exit={{ opacity: 0, scale: 0.85 }}
                                 className={`absolute top-2 flex gap-1 ${isUser ? "-left-16" : "-right-16"}`}
                             >
-                                <button onClick={copy} className="p-1.5 bg-background border border-border rounded-lg text-muted-foreground hover:text-foreground shadow-sm">
-                                    <Copy className="w-3 h-3" />
-                                </button>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <button type="button" onClick={copy} aria-label="Copy message" className="p-1.5 bg-background border border-border rounded-lg text-muted-foreground hover:text-foreground shadow-sm">
+                                            <Copy className="w-3 h-3" />
+                                        </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="text-xs">Copy</TooltipContent>
+                                </Tooltip>
                                 {!isUser && (
-                                    <button onClick={() => onReply(content)} className="p-1.5 bg-background border border-border rounded-lg text-muted-foreground hover:text-foreground shadow-sm">
-                                        <RotateCcw className="w-3 h-3" />
-                                    </button>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <button type="button" onClick={() => onReply(content)} aria-label="Quote in reply" className="p-1.5 bg-background border border-border rounded-lg text-muted-foreground hover:text-foreground shadow-sm">
+                                                <RotateCcw className="w-3 h-3" />
+                                            </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="bottom" className="text-xs">Quote in input</TooltipContent>
+                                    </Tooltip>
                                 )}
                             </motion.div>
                         )}
@@ -284,8 +348,18 @@ function MessageBubble({
 
                 {/* Inline dynamic components */}
                 {extracted.components.map((c, idx) => c.type && (!isStreaming || c.isComplete) && (
-                    <div key={idx} className="w-full mt-2">
-                        <ComponentRenderer type={c.type} data={c.data} />
+                    <div key={`${message.id ?? "m"}-${idx}-${c.type}`} className="w-full mt-2">
+                        <ComponentRenderer
+                            type={c.type}
+                            data={c.data}
+                            chatApiKey={chatApiKey}
+                            chatModel={chatModel}
+                            resumeSyncsWithGlobal={
+                                c.type === "resume"
+                                    ? `${message.id ?? "m"}-${idx}` === canonicalResumeKey
+                                    : undefined
+                            }
+                        />
                     </div>
                 ))}
             </div>
@@ -301,14 +375,34 @@ function MessageBubble({
 
 // ── Input Bar ──────────────────────────────────────────────────────────────
 
-const QUICK_PROMPTS = [
+const QUICK_PROMPTS: {
+    emoji: string;
+    label: string;
+    prompt: string;
+    disabled?: boolean;
+    tooltip?: string;
+}[] = [
     { emoji: "📄", label: "Resume", prompt: "Show me and edit my resume" },
+    { emoji: "✉️", label: "Email HR", prompt: "Help me email HR about a job application and show the email composer" },
+    {
+        emoji: "💼",
+        label: "LinkedIn",
+        prompt:
+            "Write a LinkedIn connection or job-poster message under 200 characters and show the linkedinDm component so I can copy it",
+    },
     { emoji: "⚡", label: "CV Score", prompt: "Analyze my CV score" },
     { emoji: "🔍", label: "Jobs", prompt: "Find jobs for me" },
     { emoji: "🤖", label: "Auto-apply", prompt: "Start auto-applying to jobs" },
     { emoji: "💻", label: "Code", prompt: "Give me a coding challenge" },
     { emoji: "🎤", label: "Interview", prompt: "Practice interview questions" },
     { emoji: "📚", label: "Learn", prompt: "Recommend learning resources" },
+    {
+        emoji: "🌐",
+        label: "Web search",
+        prompt: "",
+        disabled: true,
+        tooltip: "Search over the web — coming soon",
+    },
 ];
 
 function ChatInput({
@@ -323,6 +417,12 @@ function ChatInput({
     disabled,
     useProfileContext,
     onToggleProfileContext,
+    composerShine,
+    onClearComposerShine,
+    settings,
+    onSettingsChange,
+    raiseForOnboarding,
+    showToast,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -335,9 +435,30 @@ function ChatInput({
     disabled: boolean;
     useProfileContext: boolean;
     onToggleProfileContext: () => void;
+    composerShine?: boolean;
+    onClearComposerShine?: () => void;
+    settings: ChatSettings;
+    onSettingsChange: (patch: Partial<ChatSettings>) => void;
+    raiseForOnboarding?: boolean;
+    showToast: (variant: "default" | "success" | "error" | "warning", msg: string) => void;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [modelMenuOpen, setModelMenuOpen] = useState(false);
+    const [modelQuery, setModelQuery] = useState("");
+    const [extrasSheet, setExtrasSheet] = useState<null | "openai" | "hf" | "apikey">(null);
+    const [apiKeySheetDraft, setApiKeySheetDraft] = useState("");
+
+    useEffect(() => {
+        if (extrasSheet === "apikey") setApiKeySheetDraft(settings.apiKey || "");
+    }, [extrasSheet, settings.apiKey]);
+
+    useLayoutEffect(() => {
+        const ta = textareaRef.current;
+        if (!ta) return;
+        ta.style.height = "0px";
+        ta.style.height = `${chatTextareaHeightPx(ta.scrollHeight, value)}px`;
+    }, [value]);
 
     const handleKey = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -346,30 +467,104 @@ function ChatInput({
         }
     };
 
-    const autoResize = () => {
-        const ta = textareaRef.current;
-        if (!ta) return;
-        ta.style.height = "auto";
-        ta.style.height = `${Math.min(ta.scrollHeight, 180)}px`;
-    };
-
     const selectedModel = AVAILABLE_MODELS.find((m) => m.value === model);
 
+    const filteredModels = useMemo(() => {
+        const q = modelQuery.trim().toLowerCase();
+        if (!q) return AVAILABLE_MODELS;
+        return AVAILABLE_MODELS.filter(
+            (m) =>
+                m.label.toLowerCase().includes(q) ||
+                m.provider.toLowerCase().includes(q) ||
+                m.value.toLowerCase().includes(q),
+        );
+    }, [modelQuery]);
+
+    const groupedModels = useMemo(() => {
+        const map = new Map<string, typeof AVAILABLE_MODELS>();
+        for (const m of filteredModels) {
+            if (!map.has(m.provider)) map.set(m.provider, []);
+            map.get(m.provider)!.push(m);
+        }
+        return map;
+    }, [filteredModels]);
+
+    const pickModel = (next: string, prev: string) => {
+        onModelChange(next);
+        setModelMenuOpen(false);
+        setModelQuery("");
+        if (next === OPENAI_COMPAT_CHAT_MODEL_ID && prev !== OPENAI_COMPAT_CHAT_MODEL_ID) {
+            setExtrasSheet("openai");
+        }
+        if (next === HF_CUSTOM_HUB_MODEL_ID && prev !== HF_CUSTOM_HUB_MODEL_ID) {
+            setExtrasSheet("hf");
+        }
+    };
+
+    const inputShell = (child: React.ReactNode) =>
+        composerShine ? (
+            <ShineBorder borderRadius={16} borderWidth={2} duration={12} color={["#a855f7", "#6366f1", "#22d3ee"]} className="w-full">
+                {child}
+            </ShineBorder>
+        ) : (
+            child
+        );
+
     return (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4 z-30">
+        <>
+        <div
+            className={cn(
+                "fixed bottom-5 left-1/2 z-30 w-full max-w-4xl -translate-x-1/2 px-4",
+                raiseForOnboarding && "z-[70]",
+            )}
+        >
             {/* Quick prompt chips */}
             {attachedFiles.length === 0 && (
-                <div className="flex gap-2 mb-2 overflow-x-auto pb-1" style={{ scrollbarWidth: "none" }}>
-                    {QUICK_PROMPTS.map((q) => (
-                        <button
-                            key={q.label}
-                            onClick={() => onChange(q.prompt)}
-                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/90 backdrop-blur border border-border/60 text-xs hover:border-foreground/30 hover:bg-muted transition-all shadow-sm"
-                        >
-                            <span>{q.emoji}</span>
-                            <span className="text-muted-foreground">{q.label}</span>
-                        </button>
-                    ))}
+                <div
+                    data-chat-tour="quick-prompts"
+                    className="flex gap-2 mb-2 overflow-x-auto pb-1"
+                    style={{ scrollbarWidth: "none" }}
+                >
+                    {QUICK_PROMPTS.map((q) => {
+                        const chip = (
+                            <button
+                                type="button"
+                                key={q.label}
+                                disabled={q.disabled}
+                                onClick={() => {
+                                    if (!q.disabled && q.prompt) onChange(q.prompt);
+                                }}
+                                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all shadow-sm ${
+                                    q.disabled
+                                        ? "opacity-50 cursor-not-allowed bg-muted/40 border-border/40"
+                                        : "bg-background/90 backdrop-blur border-border/60 hover:border-foreground/30 hover:bg-muted"
+                                }`}
+                            >
+                                <span>{q.emoji}</span>
+                                <span className="text-muted-foreground">{q.label}</span>
+                            </button>
+                        );
+                        if (q.disabled && q.tooltip) {
+                            return (
+                                <Tooltip key={q.label}>
+                                    <TooltipTrigger asChild>
+                                        <span className="inline-flex">{chip}</span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-[220px] text-xs">
+                                        {q.tooltip}
+                                    </TooltipContent>
+                                </Tooltip>
+                            );
+                        }
+                        return (
+                            <Tooltip key={q.label}>
+                                <TooltipTrigger asChild>{chip}</TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-[260px] text-xs">
+                                    {q.prompt || q.label}
+                                </TooltipContent>
+                            </Tooltip>
+                        );
+                    })}
                 </div>
             )}
 
@@ -389,72 +584,224 @@ function ChatInput({
             )}
 
             {/* Input container */}
-            <div className="flex items-end gap-2 bg-background/95 backdrop-blur-xl border-2 border-border/60 focus-within:border-foreground/30 rounded-2xl px-3 py-2 shadow-xl transition-all">
-                {/* Model selector */}
-                <Select value={model} onValueChange={onModelChange}>
-                    <SelectTrigger className="w-auto h-8 min-w-0 border-0 bg-muted/60 rounded-xl px-2.5 focus:ring-0 text-xs flex-shrink-0 gap-1 shadow-none max-w-[140px]">
-                        <SelectValue>
-                            <span className="truncate">{selectedModel?.label ?? model}</span>
-                        </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="max-h-60">
-                        {AVAILABLE_MODELS.reduce<React.ReactNode[]>((nodes, m, i, arr) => {
-                            const prevProvider = i > 0 ? arr[i - 1].provider : null;
-                            if (m.provider !== prevProvider) {
-                                nodes.push(
-                                    <div key={`h-${m.provider}`} className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                                        {m.provider}
-                                    </div>
-                                );
-                            }
-                            nodes.push(
-                                <SelectItem key={m.value} value={m.value} className="text-xs pl-4">
-                                    {m.label}
-                                </SelectItem>
-                            );
-                            return nodes;
-                        }, [])}
-                    </SelectContent>
-                </Select>
+            {inputShell(
+                <div className="flex items-end gap-1.5 sm:gap-2 bg-background/95 backdrop-blur-xl border-2 border-border/60 focus-within:border-foreground/30 rounded-2xl px-2 py-2 sm:px-3 shadow-xl transition-all">
+                {/* Model: compact provider logo → popover (models + API key) + side sheets */}
+                <Popover
+                    open={modelMenuOpen}
+                    onOpenChange={(o) => {
+                        setModelMenuOpen(o);
+                        if (!o) setModelQuery("");
+                    }}
+                >
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <span className="relative inline-flex shrink-0">
+                                <PopoverTrigger asChild>
+                                    <button
+                                        type="button"
+                                        data-chat-tour="model-select"
+                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-muted/70 text-foreground ring-offset-background transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-2"
+                                        aria-label={`Model: ${selectedModel?.label ?? model}. Open model list. ${settings.apiKey?.trim() ? "API key set for this session." : "API key missing — use API key in the model menu."}`}
+                                        aria-expanded={modelMenuOpen}
+                                    >
+                                        {selectedModel?.provider ? (
+                                            <ModelProviderIcon provider={selectedModel.provider} size={18} className="opacity-95" />
+                                        ) : (
+                                            <span className="text-[10px] font-medium text-muted-foreground">?</span>
+                                        )}
+                                    </button>
+                                </PopoverTrigger>
+                                <span
+                                    className={cn(
+                                        "pointer-events-none absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-2 border-background shadow-sm",
+                                        settings.apiKey?.trim() ? "bg-emerald-500" : "bg-red-500",
+                                    )}
+                                    aria-hidden
+                                />
+                            </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                            side="top"
+                            className="max-w-[min(92vw,280px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
+                        >
+                            Tap the logo to choose a model and set your API key from the menu (session only, not saved). Green dot = key set; red = add a key.
+                        </TooltipContent>
+                    </Tooltip>
+                    <PopoverContent
+                        align="start"
+                        side="top"
+                        sideOffset={10}
+                        collisionPadding={12}
+                        className="z-[85] w-[min(94vw,22rem)] border-border/80 bg-popover p-0 shadow-xl"
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
+                        <div className="space-y-2 border-b border-border/60 p-2.5">
+                            <div className="relative">
+                                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    value={modelQuery}
+                                    onChange={(e) => setModelQuery(e.target.value)}
+                                    placeholder="Search models…"
+                                    className="h-9 rounded-lg border-border/60 bg-background/80 pl-8 text-xs"
+                                />
+                            </div>
+                            {isOpenAiCompatibleChatModel(model) ? (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="h-8 w-full justify-start gap-2 text-xs"
+                                    onClick={() => {
+                                        setExtrasSheet("openai");
+                                        setModelMenuOpen(false);
+                                    }}
+                                >
+                                    <Settings2 className="h-3.5 w-3.5 shrink-0" />
+                                    Endpoint &amp; model
+                                </Button>
+                            ) : null}
+                            {needsHuggingFaceCustomModelField(model) ? (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="h-8 w-full justify-start gap-2 text-xs"
+                                    onClick={() => {
+                                        setExtrasSheet("hf");
+                                        setModelMenuOpen(false);
+                                    }}
+                                >
+                                    <Settings2 className="h-3.5 w-3.5 shrink-0" />
+                                    {isHuggingFaceCustomHubModel(model) ? "Hub model id" : "Hub model override"}
+                                </Button>
+                            ) : null}
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-8 w-full justify-start gap-2 text-xs"
+                                onClick={() => {
+                                    setExtrasSheet("apikey");
+                                    setModelMenuOpen(false);
+                                }}
+                            >
+                                <Lock className="h-3.5 w-3.5 shrink-0" />
+                                <span className="min-w-0 flex-1 text-left">API key (this session)</span>
+                                <span
+                                    className={cn(
+                                        "h-2 w-2 shrink-0 rounded-full",
+                                        settings.apiKey?.trim() ? "bg-emerald-500" : "bg-red-500",
+                                    )}
+                                    aria-hidden
+                                />
+                            </Button>
+                        </div>
+                        <ScrollArea className="h-[min(50vh,300px)]">
+                            <div className="p-1.5">
+                                {filteredModels.length === 0 ? (
+                                    <p className="px-2 py-6 text-center text-xs text-muted-foreground">No models match.</p>
+                                ) : (
+                                    Array.from(groupedModels.entries()).map(([provider, models]) => (
+                                        <div key={provider} className="mb-2 last:mb-0">
+                                            <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                                {provider}
+                                            </p>
+                                            <div className="space-y-0.5">
+                                                {models.map((m) => (
+                                                    <button
+                                                        key={m.value}
+                                                        type="button"
+                                                        onClick={() => pickModel(m.value, model)}
+                                                        className={cn(
+                                                            "flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors hover:bg-muted/80",
+                                                            m.value === model ? "bg-muted font-medium" : "",
+                                                        )}
+                                                    >
+                                                        <ModelProviderIcon
+                                                            provider={m.provider}
+                                                            size={14}
+                                                            className="mt-0.5 shrink-0 opacity-90"
+                                                        />
+                                                        <span className="min-w-0 flex-1 leading-snug">{m.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </PopoverContent>
+                </Popover>
 
-                {/* Text input */}
-                <textarea
-                    ref={textareaRef}
-                    value={value}
-                    onChange={(e) => { onChange(e.target.value); autoResize(); }}
-                    onKeyDown={handleKey}
-                    placeholder="Ask me anything about your career…"
-                    rows={1}
-                    className="flex-1 bg-transparent resize-none outline-none text-sm placeholder:text-muted-foreground py-1.5 leading-relaxed max-h-[180px] overflow-y-auto"
-                    style={{ scrollbarWidth: "none" }}
-                />
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <textarea
+                            data-chat-tour="composer"
+                            ref={textareaRef}
+                            value={value}
+                            onChange={(e) => onChange(e.target.value)}
+                            onKeyDown={handleKey}
+                            onFocus={() => onClearComposerShine?.()}
+                            placeholder="Ask me anything about your career…"
+                            rows={1}
+                            aria-label="Chat message"
+                            className="flex-1 bg-transparent resize-none outline-none text-sm placeholder:text-muted-foreground py-1.5 leading-relaxed max-h-[180px] overflow-y-auto min-h-[40px]"
+                            style={{ scrollbarWidth: "none" }}
+                        />
+                    </TooltipTrigger>
+                    <TooltipContent
+                        side="top"
+                        className="max-w-[min(92vw,300px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
+                    >
+                        Type a message. Enter sends; Shift+Enter for a new line. The box grows while you type and returns to one line after you send.
+                    </TooltipContent>
+                </Tooltip>
 
                 {/* Attach + send */}
                 <div className="flex items-center gap-1 flex-shrink-0">
-                    <button
-                        type="button"
-                        onClick={onToggleProfileContext}
-                        className={`p-2 rounded-xl transition-all ${
-                            useProfileContext
-                                ? "text-foreground bg-muted"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                        }`}
-                        title={
-                            useProfileContext
-                                ? "Profile & knowledge ON — global profile, career notes, and RAG-style resume chunks are sent with each message"
-                                : "Profile & knowledge OFF — only your typed context (sidebar) is sent"
-                        }
-                        aria-pressed={useProfileContext}
-                        aria-label="Toggle global profile and knowledge context"
-                    >
-                        <User className="w-4 h-4" />
-                    </button>
-                    <button
-                        onClick={() => fileRef.current?.click()}
-                        className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-                    >
-                        <Paperclip className="w-4 h-4" />
-                    </button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                data-chat-tour="profile-toggle"
+                                type="button"
+                                onClick={onToggleProfileContext}
+                                className={`p-2 rounded-xl transition-all ${
+                                    useProfileContext
+                                        ? "text-foreground bg-muted"
+                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                                }`}
+                                aria-pressed={useProfileContext}
+                                aria-label="Toggle global profile and knowledge context"
+                            >
+                                <User className="w-4 h-4" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                            side="top"
+                            className="max-w-[min(92vw,320px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
+                        >
+                            {useProfileContext
+                                ? "Global profile is ON. Your name, email, career notes, and saved resume chunks are included in what the model sees."
+                                : "Global profile is OFF. Only the context text from Profile & Settings is sent—your stored profile fields are not added automatically."}
+                        </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                onClick={() => fileRef.current?.click()}
+                                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                                aria-label="Attach files"
+                            >
+                                <Paperclip className="w-4 h-4" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                            Attach PDF, DOCX, images, or text (max per browser limits).
+                        </TooltipContent>
+                    </Tooltip>
                     <input
                         ref={fileRef}
                         type="file"
@@ -463,16 +810,123 @@ function ChatInput({
                         onChange={onFileAttach}
                         accept=".pdf,.doc,.docx,.txt,.png,.jpg,.json,.csv"
                     />
-                    <button
-                        onClick={onSend}
-                        disabled={(!value.trim() && attachedFiles.length === 0) || disabled}
-                        className="p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-80 disabled:opacity-30 transition-all"
-                    >
-                        <Send className="w-4 h-4" />
-                    </button>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <button
+                                type="button"
+                                onClick={onSend}
+                                disabled={(!value.trim() && attachedFiles.length === 0) || disabled}
+                                className="p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-80 disabled:opacity-30 transition-all"
+                                aria-label="Send message"
+                            >
+                                <Send className="w-4 h-4" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="text-xs">
+                            Send message to the assistant
+                        </TooltipContent>
+                    </Tooltip>
                 </div>
-            </div>
+                </div>,
+            )}
         </div>
+
+        <Sheet open={extrasSheet !== null} onOpenChange={(o) => !o && setExtrasSheet(null)}>
+            <SheetContent side="right" className="flex w-full flex-col border-l border-border/60 bg-background sm:max-w-[380px]">
+                <SheetHeader className="space-y-1 text-left">
+                    <SheetTitle className="text-base">
+                        {extrasSheet === "openai"
+                            ? "OpenAI-compatible API"
+                            : extrasSheet === "hf"
+                              ? "Hugging Face Hub model"
+                              : "API key"}
+                    </SheetTitle>
+                    <SheetDescription className="text-xs leading-relaxed">
+                        {extrasSheet === "openai"
+                            ? "Same fields as Profile & Settings. Values sync automatically when you change them here or in the profile dialog."
+                            : extrasSheet === "hf"
+                              ? isHuggingFaceCustomHubModel(model)
+                                  ? "Required for “HF custom (Hub id)”. Enter the full Hugging Face model id (org/model)."
+                                  : "Optional: override the Hub model id for curated Hugging Face (AI SDK) picks. Leave blank to use the list selection."
+                              : "Used for providers that need a key (OpenAI, Anthropic, Hugging Face, etc.). Kept in memory only for this tab — closing or refreshing clears it. Never written to profile storage."}
+                    </SheetDescription>
+                </SheetHeader>
+                <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto pb-4">
+                    {extrasSheet === "openai" ? (
+                        <>
+                            <div className="space-y-2">
+                                <Label className="text-xs">Base URL</Label>
+                                <Input
+                                    value={settings.openAiCompatBaseUrl}
+                                    onChange={(e) => onSettingsChange({ openAiCompatBaseUrl: e.target.value })}
+                                    placeholder="https://api.openai.com/v1"
+                                    className="h-10 rounded-xl text-sm"
+                                    autoComplete="off"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs">Model id</Label>
+                                <Input
+                                    value={settings.openAiCompatModel}
+                                    onChange={(e) => onSettingsChange({ openAiCompatModel: e.target.value })}
+                                    placeholder="gpt-4o-mini"
+                                    className="h-10 rounded-xl text-sm"
+                                    autoComplete="off"
+                                />
+                            </div>
+                        </>
+                    ) : null}
+                    {extrasSheet === "hf" ? (
+                        <div className="space-y-2">
+                            <Label className="text-xs">
+                                {isHuggingFaceCustomHubModel(model) ? "Hub model id (required)" : "Hub model id (optional)"}
+                            </Label>
+                            <Input
+                                value={settings.huggingFaceCustomModel}
+                                onChange={(e) => onSettingsChange({ huggingFaceCustomModel: e.target.value })}
+                                placeholder="e.g. meta-llama/Llama-3.1-8B-Instruct"
+                                className="h-10 rounded-xl font-mono text-xs"
+                                autoComplete="off"
+                            />
+                            <p className="text-[11px] leading-snug text-muted-foreground">
+                                {isHuggingFaceCustomHubModel(model)
+                                    ? "This value is sent as the router model. It must be a valid Hub id."
+                                    : "When empty, the app uses the model you picked in the list. When set, this id is sent to the Hugging Face router instead."}
+                            </p>
+                        </div>
+                    ) : null}
+                    {extrasSheet === "apikey" ? (
+                        <div className="space-y-2">
+                            <Label className="text-xs">API key</Label>
+                            <Input
+                                type="password"
+                                value={apiKeySheetDraft}
+                                onChange={(e) => setApiKeySheetDraft(e.target.value)}
+                                placeholder="Paste key — not saved to disk"
+                                className="h-10 rounded-xl text-sm"
+                                autoComplete="off"
+                            />
+                        </div>
+                    ) : null}
+                </div>
+                {extrasSheet === "apikey" ? (
+                    <SheetFooter className="gap-2 sm:flex-col sm:space-x-0">
+                        <Button
+                            type="button"
+                            className="w-full"
+                            onClick={() => {
+                                onSettingsChange({ apiKey: apiKeySheetDraft.trim() });
+                                showToast("success", "API key applied for this session. It will clear when you refresh.");
+                                setExtrasSheet(null);
+                            }}
+                        >
+                            Save
+                        </Button>
+                    </SheetFooter>
+                ) : null}
+            </SheetContent>
+        </Sheet>
+        </>
     );
 }
 
@@ -481,6 +935,8 @@ function ChatInput({
 export default function AICareerAssistantChat() {
     const { settings, updateSettings } = useChatSettings();
     const [input, setInput] = useState("");
+    const [onboardingOpen, setOnboardingOpen] = useState(false);
+    const [composerShine, setComposerShine] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const [jobPanelOpen, setJobPanelOpen] = useState(false);
@@ -497,19 +953,33 @@ export default function AICareerAssistantChat() {
 
     useEffect(() => {
         if (typeof window === "undefined") return;
-        const raw = localStorage.getItem(PROFILE_CONTEXT_TOGGLE_ID);
+        if (tryLocalStorageGet(CHAT_INPUT_SHINE_LS) === "1") return;
+        setComposerShine(true);
+    }, []);
+
+    const clearComposerShine = useCallback(() => {
+        setComposerShine((v) => {
+            if (!v) return v;
+            tryLocalStorageSet(CHAT_INPUT_SHINE_LS, "1");
+            return false;
+        });
+    }, []);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const raw = tryLocalStorageGet(PROFILE_CONTEXT_TOGGLE_ID);
         if (raw === "false") setUseProfileContext(false);
     }, []);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
-        localStorage.setItem(PROFILE_CONTEXT_TOGGLE_ID, useProfileContext ? "true" : "false");
+        tryLocalStorageSet(PROFILE_CONTEXT_TOGGLE_ID, useProfileContext ? "true" : "false");
     }, [useProfileContext]);
 
     const buildProfileContextText = () => {
         if (typeof window === "undefined") return "";
         try {
-            const raw = localStorage.getItem("ai-chat-profile");
+            const raw = tryLocalStorageGet("ai-chat-profile");
             if (!raw) return "";
             const p = JSON.parse(raw) as any;
             const bits = [
@@ -535,7 +1005,7 @@ export default function AICareerAssistantChat() {
     function loadFullResumeFromStorage(): ResumeData {
         if (typeof window === "undefined") return mergeResumeDataWithDefault(null);
         try {
-            const raw = localStorage.getItem("resumeData");
+            const raw = tryLocalStorageGet("resumeData");
             return mergeResumeDataWithDefault(raw ? JSON.parse(raw) : null);
         } catch {
             return mergeResumeDataWithDefault(null);
@@ -545,7 +1015,7 @@ export default function AICareerAssistantChat() {
     const readChatGlobalProfile = (): Record<string, unknown> | null => {
         if (typeof window === "undefined") return null;
         try {
-            const raw = localStorage.getItem("ai-chat-profile");
+            const raw = tryLocalStorageGet("ai-chat-profile");
             if (!raw) return null;
             const p = JSON.parse(raw) as unknown;
             return p && typeof p === "object" && !Array.isArray(p) ? (p as Record<string, unknown>) : null;
@@ -578,7 +1048,7 @@ export default function AICareerAssistantChat() {
     const getResumeData = () => {
         if (typeof window === "undefined") return null;
         try {
-            const raw = localStorage.getItem("resumeData");
+            const raw = tryLocalStorageGet("resumeData");
             const parsed = raw ? JSON.parse(raw) : null;
             return stripProfilePictureFromResumeData(parsed);
         } catch { return null; }
@@ -598,12 +1068,29 @@ export default function AICareerAssistantChat() {
     const { messages, sendMessage, status, error, stop, setMessages } = useChat({
         transport: new DefaultChatTransport({
             api: "/api/chat",
-            prepareSendMessagesRequest: ({ messages, id }) => ({
+            prepareSendMessagesRequest: ({ messages, id }) => {
+                const mid = settingsRef.current.model;
+                const openAiCompat = mid === OPENAI_COMPAT_CHAT_MODEL_ID;
+                const hfCustom = !openAiCompat && mid === HF_CUSTOM_HUB_MODEL_ID;
+                const hfHub = openAiCompat
+                    ? {}
+                    : hfCustom
+                      ? { customModel: settingsRef.current.huggingFaceCustomModel?.trim() || undefined }
+                      : needsHuggingFaceCustomModelField(mid) && settingsRef.current.huggingFaceCustomModel?.trim()
+                        ? { customModel: settingsRef.current.huggingFaceCustomModel.trim() }
+                        : {};
+                return {
                 body: {
                     messages,
                     id,
-                    model: settingsRef.current.model,
+                    model: mid,
                     apiKey: settingsRef.current.apiKey,
+                    ...(openAiCompat
+                        ? {
+                              customEndpoint: settingsRef.current.openAiCompatBaseUrl || undefined,
+                              customModel: settingsRef.current.openAiCompatModel || undefined,
+                          }
+                        : hfHub),
                     contextText: useProfileContextRef.current
                         ? [settingsRef.current.contextWindow, buildProfileContextText()].filter(Boolean).join("\n\n")
                         : "",
@@ -612,7 +1099,8 @@ export default function AICareerAssistantChat() {
                     aiMode: true,
                     mode: "career-assistant",
                 },
-            }),
+            };
+            },
         }),
         onError: (err) => {
             console.error("Chat error:", err);
@@ -629,7 +1117,7 @@ export default function AICareerAssistantChat() {
     const [currentSessionId, setCurrentSessionId] = useState<string>("");
 
     useEffect(() => {
-        const saved = localStorage.getItem("chat_sessions");
+        const saved = tryLocalStorageGet("chat_sessions");
         if (saved) {
             setSessions(JSON.parse(saved));
             // If there are saved sessions, set the current session to the most recently updated one
@@ -640,13 +1128,13 @@ export default function AICareerAssistantChat() {
                 // If no sessions, create a default one
                 const defaultSession = { id: "default", title: "New Chat", createdAt: Date.now(), updatedAt: Date.now() };
                 setSessions([defaultSession]);
-                localStorage.setItem("chat_sessions", JSON.stringify([defaultSession]));
+                tryLocalStorageSet("chat_sessions", JSON.stringify([defaultSession]));
                 setCurrentSessionId("default");
             }
         } else {
             const defaultSession = { id: "default", title: "New Chat", createdAt: Date.now(), updatedAt: Date.now() };
             setSessions([defaultSession]);
-            localStorage.setItem("chat_sessions", JSON.stringify([defaultSession]));
+            tryLocalStorageSet("chat_sessions", JSON.stringify([defaultSession]));
             setCurrentSessionId("default");
         }
     }, []);
@@ -654,7 +1142,7 @@ export default function AICareerAssistantChat() {
     // When currentSessionId changes, load its messages
     useEffect(() => {
         if (!currentSessionId) return;
-        const savedMsg = localStorage.getItem(`chat_messages_${currentSessionId}`);
+        const savedMsg = tryLocalStorageGet(`chat_messages_${currentSessionId}`);
         if (savedMsg) {
             setMessages(JSON.parse(savedMsg));
         } else {
@@ -666,7 +1154,7 @@ export default function AICareerAssistantChat() {
     useEffect(() => {
         if (!currentSessionId) return;
         if (messages.length > 0) {
-            localStorage.setItem(`chat_messages_${currentSessionId}`, JSON.stringify(messages));
+            tryLocalStorageSet(`chat_messages_${currentSessionId}`, JSON.stringify(messages));
 
             setSessions((prev) => {
                 const next = [...prev];
@@ -674,7 +1162,7 @@ export default function AICareerAssistantChat() {
                 if (idx !== -1) {
                     const firstMsg = getTextContent(messages[0] || messages[1])?.slice(0, 30);
                     next[idx] = { ...next[idx], title: firstMsg || "Chat", updatedAt: Date.now() };
-                    localStorage.setItem("chat_sessions", JSON.stringify(next));
+                    tryLocalStorageSet("chat_sessions", JSON.stringify(next));
                 }
                 return next;
             });
@@ -702,8 +1190,8 @@ export default function AICareerAssistantChat() {
 
         if (settings.autoMergeAssistantResume !== false) {
             lastMergedAssistantIdRef.current = last.id;
-            localStorage.setItem("resumeData", JSON.stringify(merged));
-            if (template) localStorage.setItem("resumeTemplate", template);
+            tryLocalStorageSet("resumeData", JSON.stringify(merged));
+            if (template) tryLocalStorageSet("resumeTemplate", template);
             showToast("success", "Resume merged from the assistant’s latest reply.");
             window.dispatchEvent(new CustomEvent("resume-storage-updated"));
             setResumeApplyOfferId(null);
@@ -726,8 +1214,8 @@ export default function AICareerAssistantChat() {
             return;
         }
         lastMergedAssistantIdRef.current = last.id ?? null;
-        localStorage.setItem("resumeData", JSON.stringify(merged));
-        if (template) localStorage.setItem("resumeTemplate", template);
+        tryLocalStorageSet("resumeData", JSON.stringify(merged));
+        if (template) tryLocalStorageSet("resumeTemplate", template);
         setResumeApplyOfferId(null);
         showToast("success", "Resume saved. Your stored resume and exports use this data.");
         window.dispatchEvent(new CustomEvent("resume-storage-updated"));
@@ -744,15 +1232,15 @@ export default function AICareerAssistantChat() {
         const newSession = { id, title: "New Chat", createdAt: Date.now(), updatedAt: Date.now() };
         const nextSessions = [newSession, ...sessions];
         setSessions(nextSessions);
-        localStorage.setItem("chat_sessions", JSON.stringify(nextSessions));
+        tryLocalStorageSet("chat_sessions", JSON.stringify(nextSessions));
         setCurrentSessionId(id);
     };
 
     const handleDeleteSession = (id: string) => {
         const nextSessions = sessions.filter((s) => s.id !== id);
         setSessions(nextSessions);
-        localStorage.setItem("chat_sessions", JSON.stringify(nextSessions));
-        localStorage.removeItem(`chat_messages_${id}`);
+        tryLocalStorageSet("chat_sessions", JSON.stringify(nextSessions));
+        tryLocalStorageRemove(`chat_messages_${id}`);
         if (currentSessionId === id) {
             if (nextSessions.length > 0) {
                 setCurrentSessionId(nextSessions[0].id);
@@ -764,6 +1252,13 @@ export default function AICareerAssistantChat() {
 
 
     const isLoading = status === "streaming" || status === "submitted";
+
+    const canonicalResumeKey = React.useMemo(() => {
+        const streamingLast =
+            isLoading && messages.length > 0 && messages[messages.length - 1]?.role === "assistant";
+        return computeCanonicalResumeInstanceKey(messages, streamingLast);
+    }, [messages, isLoading]);
+
     const showWelcome = messages.length === 0;
 
     // Scroll to bottom on new messages
@@ -782,7 +1277,7 @@ export default function AICareerAssistantChat() {
         location: string;
     } | null => {
         try {
-            const raw = localStorage.getItem(JOB_PROFILE_STORE_ID);
+            const raw = tryLocalStorageGet(JOB_PROFILE_STORE_ID);
             if (!raw) return null;
             return JSON.parse(raw) as {
                 name: string;
@@ -920,7 +1415,7 @@ export default function AICareerAssistantChat() {
     const handleJobProfileSaved = useCallback(
         (profile: { name: string; email: string; phone: string; location: string }) => {
             try {
-                const raw = localStorage.getItem("resumeData");
+                const raw = tryLocalStorageGet("resumeData");
                 const current = raw ? JSON.parse(raw) : {};
                 const next = {
                     ...current,
@@ -932,7 +1427,7 @@ export default function AICareerAssistantChat() {
                         location: profile.location,
                     },
                 };
-                localStorage.setItem("resumeData", JSON.stringify(next));
+                tryLocalStorageSet("resumeData", JSON.stringify(next));
             } catch {
                 // ignore
             }
@@ -1006,14 +1501,14 @@ export default function AICareerAssistantChat() {
             try { return JSON.parse(raw); } catch { return null; }
         };
 
-        const storedSessions = safeJsonParse(typeof window !== "undefined" ? localStorage.getItem("chat_sessions") : null);
+        const storedSessions = safeJsonParse(typeof window !== "undefined" ? tryLocalStorageGet("chat_sessions") : null);
         const sessionsToExport: any[] = Array.isArray(storedSessions) ? storedSessions : (Array.isArray(sessions) ? sessions : []);
 
         const messagesBySessionId: Record<string, unknown> = {};
         for (const s of sessionsToExport) {
             const sid = String((s as any)?.id ?? "");
             if (!sid) continue;
-            const storedMsgs = safeJsonParse(localStorage.getItem(`chat_messages_${sid}`));
+            const storedMsgs = safeJsonParse(tryLocalStorageGet(`chat_messages_${sid}`));
             if (Array.isArray(storedMsgs)) {
                 messagesBySessionId[sid] = storedMsgs;
             } else if (sid === currentSessionId) {
@@ -1021,17 +1516,24 @@ export default function AICareerAssistantChat() {
             }
         }
 
-        const profile = safeJsonParse(localStorage.getItem("ai-chat-profile"));
-        const storedSettings = safeJsonParse(localStorage.getItem("ai-chat-settings"));
+        const profile = safeJsonParse(tryLocalStorageGet("ai-chat-profile"));
+        const storedSettings = safeJsonParse(tryLocalStorageGet("ai-chat-settings"));
         const settingsToExport =
             storedSettings && typeof storedSettings === "object"
                 ? (() => {
                     const { apiKey: _apiKey, ...rest } = storedSettings as any;
                     return rest;
                 })()
-                : { model: settings.model, contextWindow: settings.contextWindow };
+                : {
+                      model: settings.model,
+                      contextWindow: settings.contextWindow,
+                      autoMergeAssistantResume: settings.autoMergeAssistantResume,
+                      openAiCompatBaseUrl: settings.openAiCompatBaseUrl,
+                      openAiCompatModel: settings.openAiCompatModel,
+                      huggingFaceCustomModel: settings.huggingFaceCustomModel,
+                  };
 
-        const resumeData = safeJsonParse(localStorage.getItem("resumeData"));
+        const resumeData = safeJsonParse(tryLocalStorageGet("resumeData"));
 
         const payload = {
             schema: "ai-career-assistant-export",
@@ -1069,7 +1571,7 @@ export default function AICareerAssistantChat() {
                     if (Array.isArray(imported) && (imported.length === 0 || imported[0]?.role)) {
                         setMessages(imported);
                         if (currentSessionId) {
-                            localStorage.setItem(`chat_messages_${currentSessionId}`, JSON.stringify(imported));
+                            tryLocalStorageSet(`chat_messages_${currentSessionId}`, JSON.stringify(imported));
                         }
                         showToast("success", "Imported current chat messages");
                         return;
@@ -1087,28 +1589,28 @@ export default function AICareerAssistantChat() {
                     const importedSettings = (parsed as any).settings;
                     const importedResumeData = (parsed as any).resumeData;
 
-                    localStorage.setItem("chat_sessions", JSON.stringify(importedSessions));
+                    tryLocalStorageSet("chat_sessions", JSON.stringify(importedSessions));
                     for (const s of importedSessions) {
                         const sid = String((s as any)?.id ?? "");
                         if (!sid) continue;
                         const msgs = (importedMessagesById as any)[sid];
                         if (Array.isArray(msgs)) {
-                            localStorage.setItem(`chat_messages_${sid}`, JSON.stringify(msgs));
+                            tryLocalStorageSet(`chat_messages_${sid}`, JSON.stringify(msgs));
                         }
                     }
 
                     if (importedProfile && typeof importedProfile === "object") {
-                        localStorage.setItem("ai-chat-profile", JSON.stringify(importedProfile));
+                        tryLocalStorageSet("ai-chat-profile", JSON.stringify(importedProfile));
                     }
 
                     if (importedSettings && typeof importedSettings === "object") {
                         const { apiKey: _apiKey, ...rest } = importedSettings as any;
-                        localStorage.setItem("ai-chat-settings", JSON.stringify(rest));
+                        tryLocalStorageSet("ai-chat-settings", JSON.stringify(rest));
                         updateSettings({ ...rest, apiKey: "" });
                     }
 
                     if (importedResumeData && typeof importedResumeData === "object") {
-                        localStorage.setItem("resumeData", JSON.stringify(importedResumeData));
+                        tryLocalStorageSet("resumeData", JSON.stringify(importedResumeData));
                     }
 
                     setSessions(importedSessions);
@@ -1118,7 +1620,7 @@ export default function AICareerAssistantChat() {
                             : importedSessions[0]?.id || "default";
                     setCurrentSessionId(nextCurrentId);
 
-                    const nextMsgs = localStorage.getItem(`chat_messages_${nextCurrentId}`);
+                    const nextMsgs = tryLocalStorageGet(`chat_messages_${nextCurrentId}`);
                     if (nextMsgs) {
                         try { setMessages(JSON.parse(nextMsgs)); } catch { setMessages([]); }
                     } else {
@@ -1145,12 +1647,15 @@ export default function AICareerAssistantChat() {
     };
 
     return (
+        <TooltipProvider delayDuration={350}>
         <InfiniteGridBackground className="fixed inset-0 h-[100dvh] max-h-[100dvh]">
             <div className="relative z-[1] flex h-full min-h-0 w-full flex-col">
+            <ChatOnboarding open={onboardingOpen} onOpenChange={setOnboardingOpen} setSidebarOpen={setSidebarOpen} />
             <Toaster ref={toasterRef} />
 
             {/* Sidebar */}
             <ChatSidebar
+                elevateForOnboarding={onboardingOpen}
                 isOpen={sidebarOpen}
                 onClose={() => setSidebarOpen(false)}
                 sessions={sessions}
@@ -1165,27 +1670,72 @@ export default function AICareerAssistantChat() {
             />
 
             {/* Menu button */}
-            <motion.button
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.3, type: "spring" }}
-                onClick={() => setSidebarOpen(true)}
-                className="fixed top-5 left-5 z-30 w-10 h-10 rounded-full bg-neutral-900 dark:bg-neutral-800 border border-white/10 flex items-center justify-center shadow-lg hover:opacity-80 transition-opacity"
-            >
-                <Menu className="w-4 h-4 text-white" />
-            </motion.button>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <motion.button
+                        data-chat-tour="menu"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.3, type: "spring" }}
+                        onClick={() => setSidebarOpen(true)}
+                        className={cn(
+                            "fixed top-5 left-5 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-neutral-900 shadow-lg transition-opacity hover:opacity-80 dark:bg-neutral-800",
+                            onboardingOpen && "z-[70]",
+                        )}
+                        aria-label="Open sidebar"
+                        type="button"
+                    >
+                        <Menu className="w-4 h-4 text-white" />
+                    </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">
+                    Chats, export, import, global profile, navigation
+                </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <motion.button
+                        type="button"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.38, type: "spring" }}
+                        onClick={() => setOnboardingOpen(true)}
+                        className={cn(
+                            "fixed top-[4.75rem] left-5 z-30 flex h-9 w-10 items-center justify-center rounded-full border border-white/10 bg-neutral-900/95 shadow-lg backdrop-blur-sm transition-opacity hover:opacity-90 dark:bg-neutral-800/95",
+                            onboardingOpen && "z-[70]",
+                        )}
+                        aria-label="Open chat guide"
+                    >
+                        <BookMarked className="h-4 w-4 text-white" />
+                    </motion.button>
+                </TooltipTrigger>
+                <TooltipContent
+                    side="right"
+                    className="max-w-[min(88vw,260px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-md"
+                >
+                    Step-by-step guide: sidebar, models, profile context, and composer (with optional video).
+                </TooltipContent>
+            </Tooltip>
 
             {/* Stop button when streaming */}
             {isLoading && (
-                <motion.button
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="fixed top-5 right-5 z-30 flex items-center gap-2 px-3 py-2 rounded-full bg-neutral-900 text-white text-xs shadow-lg hover:opacity-80 transition-opacity border border-white/10"
-                    onClick={stop}
-                >
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                    Stop
-                </motion.button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <motion.button
+                            type="button"
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            className="fixed top-5 right-5 z-30 flex items-center gap-2 px-3 py-2 rounded-full bg-neutral-900 text-white text-xs shadow-lg hover:opacity-80 transition-opacity border border-white/10"
+                            onClick={stop}
+                            aria-label="Stop generating"
+                        >
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Stop
+                        </motion.button>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="text-xs">Stop the current reply</TooltipContent>
+                </Tooltip>
             )}
 
             {/* Error banner */}
@@ -1220,6 +1770,9 @@ export default function AICareerAssistantChat() {
                                         isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
                                         onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
                                         onToast={showToast}
+                                        chatApiKey={settings.apiKey}
+                                        chatModel={settings.model}
+                                        canonicalResumeKey={canonicalResumeKey}
                                     />
                                 ))}
 
@@ -1297,9 +1850,16 @@ export default function AICareerAssistantChat() {
                     disabled={isLoading}
                     useProfileContext={useProfileContext}
                     onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                    composerShine={composerShine}
+                    onClearComposerShine={clearComposerShine}
+                    settings={settings}
+                    onSettingsChange={updateSettings}
+                    raiseForOnboarding={onboardingOpen}
+                    showToast={showToast}
                 />
             )}
             </div>
         </InfiniteGridBackground>
+        </TooltipProvider>
     );
 }

@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { GraduationCap, Clock, ChevronLeft, ChevronRight, Mic } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { ChatArtifactWindow } from "@/components/chat/chat-artifact-chrome";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -73,14 +74,18 @@ export function MockInterview({ data }: MockInterviewProps) {
   const q = activeQuestions[current];
 
   return (
-    <Card className="w-full border-border/60">
-      <CardHeader className="pb-3">
+    <ChatArtifactWindow
+      variant="light"
+      cardClassName="w-full border-border/60 shadow-sm"
+      headerClassName="border-b border-border/50 pb-3 !flex-row !items-center"
+      contentClassName="space-y-4 pt-4"
+      title={
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
           <GraduationCap className="w-4 h-4 text-purple-500" />
           Mock Interview Practice
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      }
+    >
         {/* Progress */}
         <div>
           <div className="flex justify-between text-xs mb-1.5">
@@ -155,7 +160,6 @@ export function MockInterview({ data }: MockInterviewProps) {
             </Button>
           </div>
         </div>
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }

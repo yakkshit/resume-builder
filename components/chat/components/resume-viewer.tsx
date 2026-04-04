@@ -4,26 +4,25 @@
  * ResumeViewer — Chat inline component that embeds the REAL resume builder
  * (ResumeEditor + PDF Preview) from the homepage, sharing the same
  * localStorage "resumeData" key so changes are immediately reflected.
+ * Use syncWithGlobalResume=false for older chat bubbles so each stays a snapshot.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import type { SetStateAction } from "react";
 import dynamic from "next/dynamic";
-import { FileText, Download, Eye, Edit, RefreshCw } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FileText, Eye, Edit, Undo2, Redo2 } from "lucide-react";
+import { ArtifactTrafficLights, type ArtifactPanelMode } from "@/components/chat/chat-artifact-chrome";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import Toaster, { ToasterRef } from "@/components/ui/toast";
-import { useRef } from "react";
-
 import ResumeEditor from "@/components/resume-coverletter/resume-editor";
 import { defaultResumeData } from "@/lib/default-resume-data";
 import type { ResumeData, Template } from "@/lib/types";
-import { generatePDF } from "@/lib/pdf-generator";
 import { resumeTemplates } from "@/components/pdf-templates";
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data";
+import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
+import { deepMerge } from "@/lib/utils";
 
 // PDF viewer loaded dynamically (client-only, heavy)
 const PdfPreviewClient = dynamic(
@@ -35,31 +34,6 @@ const TEMPLATE_OPTIONS = (Object.keys(resumeTemplates) as Template[]).map((t) =>
   value: t,
   label: t.charAt(0).toUpperCase() + t.slice(1),
 }));
-
-// Deep merge function to handle partial AI updates without destroying existing arrays
-function deepMerge<T>(target: T, source: any): T {
-  if (!source || typeof source !== "object") return source !== undefined ? source : target;
-  if (!target || typeof target !== "object") return source;
-
-  if (Array.isArray(source)) {
-    return source as unknown as T;
-  }
-
-  const result: any = { ...target };
-  
-  for (const key in source) {
-    if (Object.prototype.hasOwnProperty.call(source, key)) {
-      if (Array.isArray(source[key])) {
-        result[key] = source[key];
-      } else if (typeof source[key] === "object" && source[key] !== null) {
-        result[key] = deepMerge(result[key] || {}, source[key]);
-      } else {
-        result[key] = source[key];
-      }
-    }
-  }
-  return result;
-}
 
 function stripBoldMarkersDeep(input: any): any {
   if (typeof input === "string") return input.replace(/\*\*/g, "");
@@ -127,36 +101,58 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
   if (!out.basicInfo || typeof out.basicInfo !== "object") out.basicInfo = {};
   const currentBasic = currentResume?.basicInfo && typeof currentResume.basicInfo === "object" ? currentResume.basicInfo : {};
 
-  const toggleRaw = typeof window !== "undefined" ? localStorage.getItem(PROFILE_CONTEXT_TOGGLE_ID) : null;
+  const toggleRaw = tryLocalStorageGet(PROFILE_CONTEXT_TOGGLE_ID);
   const useProfile = toggleRaw !== "false";
 
   const fields = ["name", "email", "phone", "location", "linkedin", "website"] as const;
+  /** Values already merged from assistant JSON — must not be replaced by pre-merge state alone. */
+  const pick = (fromMerged: string, profileVal: string, previous: string) =>
+    profileVal || fromMerged || previous || "";
+
   if (useProfile) {
     let profile: any = {};
     try {
-      const raw = typeof window !== "undefined" ? localStorage.getItem(PROFILE_STORE_ID) : null;
+      const raw = tryLocalStorageGet(PROFILE_STORE_ID);
       profile = raw ? JSON.parse(raw) : {};
     } catch {
       profile = {};
     }
     for (const f of fields) {
       const pv = typeof profile?.[f] === "string" ? profile[f].trim() : "";
-      (out.basicInfo as any)[f] = pv || (currentBasic as any)?.[f] || "";
+      const fromMerged =
+        typeof (out.basicInfo as any)[f] === "string" ? String((out.basicInfo as any)[f]).trim() : "";
+      const previous = typeof (currentBasic as any)?.[f] === "string" ? String((currentBasic as any)[f]).trim() : "";
+      (out.basicInfo as any)[f] = pick(fromMerged, pv, previous);
     }
     const gh = typeof profile?.github === "string" ? profile.github.trim() : "";
-    setGithubOnBasicInfo(out.basicInfo, gh || getGithubFromBasicInfo(currentBasic));
+    setGithubOnBasicInfo(
+      out.basicInfo,
+      gh || getGithubFromBasicInfo(out.basicInfo) || getGithubFromBasicInfo(currentBasic),
+    );
   } else {
     for (const f of fields) {
-      (out.basicInfo as any)[f] = (currentBasic as any)?.[f] || "";
+      const fromMerged =
+        typeof (out.basicInfo as any)[f] === "string" ? String((out.basicInfo as any)[f]).trim() : "";
+      const previous = typeof (currentBasic as any)?.[f] === "string" ? String((currentBasic as any)[f]).trim() : "";
+      (out.basicInfo as any)[f] = fromMerged || previous || "";
     }
-    setGithubOnBasicInfo(out.basicInfo, getGithubFromBasicInfo(currentBasic));
+    setGithubOnBasicInfo(
+      out.basicInfo,
+      getGithubFromBasicInfo(out.basicInfo) || getGithubFromBasicInfo(currentBasic),
+    );
   }
   return out;
 }
 
-export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
+export function ResumeViewer({
+  data = {},
+  syncWithGlobalResume = true,
+}: {
+  data?: Record<string, any>;
+  /** When false, show only this message’s resume JSON; do not read/write shared storage or follow global events. */
+  syncWithGlobalResume?: boolean;
+}) {
   const toasterRef = useRef<ToasterRef>(null);
-  const lastAppliedPayloadRef = useRef<string>("");
 
   const showToast = (variant: 'success' | 'error', msg: string) => {
     toasterRef.current?.show({
@@ -167,15 +163,19 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
     });
   };
 
-  const [resumeData, setResumeData] = useState<ResumeData>(() => {
-    let current = defaultResumeData;
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("resumeData");
+  const [resumeData, setResumeDataState] = useState<ResumeData>(() => {
+    let current: ResumeData = defaultResumeData as ResumeData;
+    if (syncWithGlobalResume && typeof window !== "undefined") {
+      const saved = tryLocalStorageGet("resumeData");
       if (saved) {
-        try { current = JSON.parse(saved); } catch { /* ignore */ }
+        try {
+          current = JSON.parse(saved);
+        } catch {
+          /* ignore */
+        }
       }
     }
-    
+
     // Deep merge AI generated payload into current state
     if (data) {
       const payload = data.resumeData ? data.resumeData : (Object.keys(data).length > 0 && !data.template ? data : null);
@@ -187,14 +187,14 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
             ? (current as any).basicInfo.profilePicture
             : undefined;
         const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(payload));
-        current = deepMerge(current, cleanedPayload);
+        current = deepMerge(current, cleanedPayload) as ResumeData;
         current = applyIdentitySourceRule(current, beforeMerge);
         if (existingPicture && (current as any)?.basicInfo && typeof (current as any).basicInfo === "object") {
           (current as any).basicInfo.profilePicture = existingPicture;
         }
         current = sanitizeResumeData(current);
-        if (typeof window !== "undefined") {
-          localStorage.setItem("resumeData", JSON.stringify(current));
+        if (syncWithGlobalResume && typeof window !== "undefined") {
+          tryLocalStorageSet("resumeData", JSON.stringify(current));
         }
       }
     }
@@ -202,72 +202,144 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
   });
 
   const [template, setTemplate] = useState<Template>(() => {
-    if (data?.template && typeof data.template === 'string' && Object.keys(resumeTemplates).includes(data.template)) {
+    if (data?.template && typeof data.template === "string" && Object.keys(resumeTemplates).includes(data.template)) {
       return data.template as Template;
     }
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("resumeTemplate");
+    if (syncWithGlobalResume && typeof window !== "undefined") {
+      const saved = tryLocalStorageGet("resumeTemplate");
       if (saved) return saved as Template;
     }
     return "modern";
   });
 
   const [activeTab, setActiveTab] = useState("preview");
-  const [downloading, setDownloading] = useState(false);
+  /** macOS-style chrome: expanded = full editor; compact = slim strip; hidden = title bar only */
+  const [panelMode, setPanelMode] = useState<ArtifactPanelMode>("expanded");
 
-  // Apply new assistant payloads even after initial mount.
-  useEffect(() => {
-    if (!data || typeof data !== "object") return;
-    const payload = (data as any).resumeData
+  /** Local undo/redo for editor + merged assistant updates (not for cross-tab reload). */
+  const resumeHistRef = useRef<{ list: ResumeData[]; i: number }>({ list: [], i: 0 });
+  const [undoRedoTick, setUndoRedoTick] = useState(0);
+
+  const pushResumeHistory = useCallback((prev: ResumeData, safe: ResumeData) => {
+    let h = resumeHistRef.current;
+    if (h.list.length === 0) {
+      resumeHistRef.current = { list: [sanitizeResumeData(prev)], i: 0 };
+      h = resumeHistRef.current;
+    }
+    const newList = [...h.list.slice(0, h.i + 1), safe].slice(-50);
+    resumeHistRef.current = { list: newList, i: newList.length - 1 };
+  }, []);
+
+  const setResumeData = useCallback((action: SetStateAction<ResumeData>) => {
+    setResumeDataState((prev) => {
+      const next = typeof action === "function" ? (action as (p: ResumeData) => ResumeData)(prev) : action;
+      const safe = sanitizeResumeData(next);
+      pushResumeHistory(prev, safe);
+      return safe;
+    });
+  }, [pushResumeHistory]);
+
+  void undoRedoTick;
+  const canUndo = resumeHistRef.current.i > 0;
+  const canRedo = resumeHistRef.current.i < resumeHistRef.current.list.length - 1;
+
+  const undoResume = () => {
+    const h = resumeHistRef.current;
+    if (h.i <= 0) return;
+    const newI = h.i - 1;
+    resumeHistRef.current = { ...h, i: newI };
+    setResumeDataState(h.list[newI]);
+    setUndoRedoTick((t) => t + 1);
+  };
+
+  const redoResume = () => {
+    const h = resumeHistRef.current;
+    if (h.i >= h.list.length - 1) return;
+    const newI = h.i + 1;
+    resumeHistRef.current = { ...h, i: newI };
+    setResumeDataState(h.list[newI]);
+    setUndoRedoTick((t) => t + 1);
+  };
+
+  /** Only re-apply assistant JSON when it actually changes — new object refs from extractComponents used to retrigger every render and overwrite edits (incl. profile identity merge). */
+  const lastAppliedPayloadJson = useRef<string | null>(null);
+
+  /** String identity of assistant resume payload — effect deps on this, not `data` ref, so parent re-renders do not re-merge. */
+  let assistantPayloadSignature = "";
+  if (data && typeof data === "object") {
+    const raw = (data as any).resumeData
       ? (data as any).resumeData
       : Object.keys(data).length > 0 && !(data as any).template
         ? data
         : null;
-    if (!payload || typeof payload !== "object") return;
+    if (raw && typeof raw === "object") assistantPayloadSignature = JSON.stringify(raw);
+  }
 
-    let signature = "";
-    try {
-      signature = JSON.stringify(payload);
-    } catch {
-      signature = String(Date.now());
-    }
-    if (signature && lastAppliedPayloadRef.current === signature) return;
-    lastAppliedPayloadRef.current = signature;
-
-    setResumeData((prev) => {
-      const beforeMerge = sanitizeResumeData(prev);
-      const existingPicture =
-        (beforeMerge as any)?.basicInfo && typeof (beforeMerge as any).basicInfo === "object"
-          ? (beforeMerge as any).basicInfo.profilePicture
-          : undefined;
-
-      const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(payload));
-      let next = deepMerge(beforeMerge, cleanedPayload);
-      next = applyIdentitySourceRule(next, beforeMerge);
-      if (existingPicture && (next as any)?.basicInfo && typeof (next as any).basicInfo === "object") {
-        (next as any).basicInfo.profilePicture = existingPicture;
-      }
-      const safe = sanitizeResumeData(next);
-      try {
-        localStorage.setItem("resumeData", JSON.stringify(safe));
-      } catch {
-        // ignore
-      }
-      return safe;
-    });
-  }, [data]);
-
-  // Sync logic if another window updates it
+  // Apply new assistant payloads even after initial mount. Always merge onto the latest
+  // disk snapshot so manual editor edits are preserved when the model returns a CV block.
+  // Important: do not dispatchCustomEvent from inside a setState updater — listeners call
+  // setState on other ResumeViewer instances and React forbids that during reconciliation.
   useEffect(() => {
+    if (!syncWithGlobalResume) return;
+    if (!assistantPayloadSignature) return;
+
+    const payloadJson = assistantPayloadSignature;
+    if (lastAppliedPayloadJson.current === payloadJson) return;
+    lastAppliedPayloadJson.current = payloadJson;
+
+    const payload = JSON.parse(payloadJson) as Record<string, unknown>;
+
+    let base: ResumeData = defaultResumeData as ResumeData;
+    try {
+      const stored = tryLocalStorageGet("resumeData");
+      if (stored) base = sanitizeResumeData(JSON.parse(stored));
+    } catch {
+      /* keep default */
+    }
+
+    const beforeMerge = sanitizeResumeData(base);
+    const existingPicture =
+      (beforeMerge as any)?.basicInfo && typeof (beforeMerge as any).basicInfo === "object"
+        ? (beforeMerge as any).basicInfo.profilePicture
+        : undefined;
+
+    const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(payload));
+    let next = deepMerge(beforeMerge, cleanedPayload) as ResumeData;
+    next = applyIdentitySourceRule(next, beforeMerge);
+    if (existingPicture && (next as any)?.basicInfo && typeof (next as any).basicInfo === "object") {
+      (next as any).basicInfo.profilePicture = existingPicture;
+    }
+    const safe = sanitizeResumeData(next);
+
+    setResumeData(safe);
+    try {
+      tryLocalStorageSet("resumeData", JSON.stringify(safe));
+    } catch {
+      // ignore
+    }
+    queueMicrotask(() => {
+      window.dispatchEvent(new CustomEvent("resume-storage-updated"));
+    });
+  }, [assistantPayloadSignature, syncWithGlobalResume]);
+
+  // Sync logic if another window updates it (canonical chat resume only)
+  useEffect(() => {
+    if (!syncWithGlobalResume) return;
+
     const reloadFromDisk = () => {
       try {
-        const stored = localStorage.getItem("resumeData");
-        if (stored) setResumeData(sanitizeResumeData(JSON.parse(stored)));
+        const stored = tryLocalStorageGet("resumeData");
+        if (stored) {
+          const parsed = sanitizeResumeData(JSON.parse(stored));
+          resumeHistRef.current = { list: [parsed], i: 0 };
+          setResumeDataState(parsed);
+          setUndoRedoTick((t) => t + 1);
+        }
       } catch {
         /* ignore */
       }
       try {
-        const savedTpl = localStorage.getItem("resumeTemplate");
+        const savedTpl = tryLocalStorageGet("resumeTemplate");
         if (savedTpl && Object.keys(resumeTemplates).includes(savedTpl)) {
           setTemplate(savedTpl as Template);
         }
@@ -286,133 +358,125 @@ export function ResumeViewer({ data = {} }: { data?: Record<string, any> }) {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("resume-storage-updated", onResumeUpdated as EventListener);
     };
-  }, []);
+  }, [syncWithGlobalResume]);
 
   useEffect(() => {
-    localStorage.setItem("resumeData", JSON.stringify(resumeData));
-  }, [resumeData]);
+    if (!syncWithGlobalResume) return;
+    tryLocalStorageSet("resumeData", JSON.stringify(resumeData));
+  }, [resumeData, syncWithGlobalResume]);
 
   useEffect(() => {
-    localStorage.setItem("resumeTemplate", template);
-  }, [template]);
-
-  const handleDownloadPDF = async () => {
-    setDownloading(true);
-    try {
-      await generatePDF(resumeData, template);
-      showToast("success", "PDF downloaded successfully");
-    } catch {
-      showToast("error", "Failed to generate PDF");
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const handleReload = () => {
-    const stored = localStorage.getItem("resumeData");
-    if (stored) {
-      try {
-        setResumeData(JSON.parse(stored));
-        showToast("success", "Reloaded latest resume data");
-      } catch {
-        showToast("error", "Could not reload resume data");
-      }
-    }
-  };
+    if (!syncWithGlobalResume) return;
+    tryLocalStorageSet("resumeTemplate", template);
+  }, [template, syncWithGlobalResume]);
 
   return (
     <div className="w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all">
       <Toaster ref={toasterRef} />
-      {/* Header bar resembling macOS window */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-border/50 bg-white/80 dark:bg-neutral-950/80 gap-3 sm:gap-0">
-        <div className="flex items-center gap-4">
-          <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-400 shadow-sm" />
-            <div className="w-3 h-3 rounded-full bg-amber-400 shadow-sm" />
-            <div className="w-3 h-3 rounded-full bg-emerald-400 shadow-sm" />
-          </div>
-          <span className="text-xs font-medium text-foreground flex items-center gap-1.5 opacity-80">
-            <FileText className="w-4 h-4 text-indigo-500" />
+        <div className="flex items-center gap-4 min-w-0">
+          <ArtifactTrafficLights variant="light" panelMode={panelMode} setPanelMode={setPanelMode} />
+          <span className="text-xs font-medium text-foreground flex items-center gap-1.5 opacity-80 truncate">
+            <FileText className="w-4 h-4 shrink-0 text-indigo-500" />
             CV Document Editor
           </span>
         </div>
         
-        <div className="flex items-center gap-2 self-end sm:self-auto">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+        {panelMode !== "hidden" ? (
+          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto justify-end">
             <TabsList className="h-8 rounded-full bg-black/5 dark:bg-white/10 p-0.5 border border-black/5 dark:border-white/5 shadow-inner">
-                <TabsTrigger value="preview" className="text-[11px] h-7 px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
-                  <Eye className="w-3 h-3" /> Preview
-                </TabsTrigger>
-                <TabsTrigger value="editor" className="text-[11px] h-7 px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
-                  <Edit className="w-3 h-3" /> Editor
-                </TabsTrigger>
-              </TabsList>
-          </Tabs>
-          <Select value={template} onValueChange={(v) => setTemplate(v as Template)}>
-            <SelectTrigger className="h-7 w-[110px] text-[11px] bg-background/50 border-border/60 focus:ring-0 rounded-md">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TEMPLATE_OPTIONS.map((t) => (
-                <SelectItem key={t.value} value={t.value} className="text-[11px]">
-                  {t.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
-            onClick={handleReload}
-            title="Reload disk data"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </Button>
-
-          {/* <Button
-            size="sm"
-            className="h-7 text-[11px] gap-1.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-md shadow-md"
-            onClick={handleDownloadPDF}
-            disabled={downloading}
-          >
-            <Download className="w-3 h-3" />
-            {downloading ? "Building…" : "Export"}
-          </Button> */}
-        </div>
-      </div>
-
-      <div className="p-3 bg-white/40 dark:bg-black/20">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          {/* <div className="flex justify-center mb-3">
-            <TabsList className="h-8 rounded-full bg-black/5 dark:bg-white/10 p-0.5 border border-black/5 dark:border-white/5 shadow-inner">
-              <TabsTrigger value="preview" className="text-[11px] h-7 px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
+              <TabsTrigger value="preview" className="text-[11px] h-7 px-3 sm:px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
                 <Eye className="w-3 h-3" /> Preview
               </TabsTrigger>
-              <TabsTrigger value="editor" className="text-[11px] h-7 px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
+              <TabsTrigger value="editor" className="text-[11px] h-7 px-3 sm:px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
                 <Edit className="w-3 h-3" /> Editor
               </TabsTrigger>
             </TabsList>
-          </div> */}
+            {panelMode === "expanded" ? (
+              <>
+                <Select value={template} onValueChange={(v) => setTemplate(v as Template)}>
+                  <SelectTrigger className="h-7 w-[110px] text-[11px] bg-background/50 border-border/60 focus:ring-0 rounded-md">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TEMPLATE_OPTIONS.map((t) => (
+                      <SelectItem key={t.value} value={t.value} className="text-[11px]">
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30"
+                  onClick={undoResume}
+                  disabled={!canUndo}
+                  title="Undo"
+                  aria-label="Undo resume edit"
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30"
+                  onClick={redoResume}
+                  disabled={!canRedo}
+                  title="Redo"
+                  aria-label="Redo resume edit"
+                >
+                  <Redo2 className="w-3.5 h-3.5" />
+                </Button>
+              </>
+            ) : (
+              <span className="text-[10px] text-muted-foreground">Green expands · Yellow shrinks</span>
+            )}
+          </div>
+        ) : (
+          <p className="text-[10px] text-muted-foreground sm:ml-auto">Green dot restores the editor</p>
+        )}
+      </div>
 
-          <TabsContent value="preview" className="m-0">
+      {panelMode !== "hidden" ? (
+        <div className="p-3 bg-white/40 dark:bg-black/20">
+          <TabsContent
+            value="preview"
+            className="m-0 mt-0 data-[state=inactive]:hidden"
+            forceMount
+          >
             <div className="rounded-xl overflow-hidden border border-border/40 bg-white/80 dark:bg-neutral-950/80 shadow-inner">
-              <div className="max-h-[500px] sm:max-h-[600px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
+              <div
+                className={
+                  panelMode === "expanded"
+                    ? "max-h-[500px] sm:max-h-[600px] overflow-y-auto"
+                    : "max-h-[160px] sm:max-h-[200px] overflow-y-auto"
+                }
+                style={{ scrollbarWidth: "thin" }}
+              >
                 <PdfPreviewClient resumeData={resumeData} template={template} />
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="editor" className="m-0">
+          <TabsContent value="editor" className="m-0 mt-0">
             <div className="rounded-xl overflow-hidden border border-border/40 bg-white dark:bg-neutral-950 shadow-inner">
-              <div className="max-h-[500px] sm:max-h-[600px] overflow-y-auto p-2 sm:p-4" style={{ scrollbarWidth: "thin" }}>
+              <div
+                className={
+                  panelMode === "expanded"
+                    ? "max-h-[500px] sm:max-h-[600px] overflow-y-auto p-2 sm:p-4"
+                    : "max-h-[160px] sm:max-h-[200px] overflow-y-auto p-2 sm:p-4"
+                }
+                style={{ scrollbarWidth: "thin" }}
+              >
                 <ResumeEditor resumeData={resumeData} setResumeData={setResumeData} />
               </div>
             </div>
           </TabsContent>
-        </Tabs>
-      </div>
+        </div>
+      ) : null}
+      </Tabs>
     </div>
   );
 }

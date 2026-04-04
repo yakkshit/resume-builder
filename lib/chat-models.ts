@@ -21,6 +21,16 @@ export const CHAT_MODELS_BY_PROVIDER: Record<string, readonly string[]> = {
   "Groq": ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
   "Mistral": ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"],
   "Hugging Face": ["huggingface-endpoint", "huggingface-model", "huggingface-streaming", "huggingface-provider"],
+  /** [Hugging Face Inference router](https://ai-sdk.dev/providers/ai-sdk-providers/huggingface) via @ai-sdk/huggingface */
+  "Hugging Face (AI SDK)": [
+    "meta-llama/Llama-3.1-8B-Instruct",
+    "deepseek-ai/DeepSeek-V3-0324",
+    "Qwen/Qwen2.5-72B-Instruct",
+    /** User-provided Hub id only (same router as other HF AI SDK models) */
+    "hf-custom-hub-aisdk",
+  ],
+  /** [OpenAI-compatible](https://ai-sdk.dev/providers/openai-compatible-providers) — set base URL + model in chat settings */
+  "OpenAI Compatible": ["openai-compatible-aisdk"],
   "Local / Custom": ["local-custom", "ollama-local", "lmstudio-local", "openai-like-local"],
 } as const
 

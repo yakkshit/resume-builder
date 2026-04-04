@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { Code, Play, CheckCircle2, RotateCcw, Clock } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { ChatArtifactWindow } from "@/components/chat/chat-artifact-chrome";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -99,14 +100,18 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
   };
 
   return (
-    <Card className="w-full border-border/60">
-      <CardHeader className="pb-3">
+    <ChatArtifactWindow
+      variant="light"
+      cardClassName="w-full border-border/60 shadow-sm"
+      headerClassName="border-b border-border/50 pb-3 !flex-row !items-center"
+      contentClassName="space-y-4 pt-4"
+      title={
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
           <Code className="w-4 h-4 text-orange-500" />
           Coding Challenge
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      }
+    >
         {/* Problem header */}
         <div className="flex items-start justify-between">
           <div>
@@ -225,7 +230,6 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
             {status === "running" ? "Running…" : "Run Tests"}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }

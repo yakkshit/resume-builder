@@ -1,7 +1,8 @@
 "use client";
 
 import { Briefcase, MapPin, DollarSign, Clock, Bookmark, ExternalLink, Link2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { ChatArtifactWindow } from "@/components/chat/chat-artifact-chrome";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -78,14 +79,18 @@ export function JobRecommendations({ data }: { data?: unknown }) {
   };
 
   return (
-    <Card className="w-full border-border/60">
-      <CardHeader className="pb-3">
+    <ChatArtifactWindow
+      variant="light"
+      cardClassName="w-full border-border/60 shadow-sm"
+      headerClassName="border-b border-border/50 pb-3 !flex-row !items-center"
+      contentClassName="space-y-3 pt-4"
+      title={
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
           <Briefcase className="w-4 h-4 text-blue-500" />
           Job Recommendations
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      }
+    >
         {jobs.map((job) => (
           <div
             key={job.id}
@@ -118,7 +123,6 @@ export function JobRecommendations({ data }: { data?: unknown }) {
             </div>
           </div>
         ))}
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }
