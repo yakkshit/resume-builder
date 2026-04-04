@@ -105,6 +105,10 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
   const useProfile = toggleRaw !== "false";
 
   const fields = ["name", "email", "phone", "location", "linkedin", "website"] as const;
+  /** Values already merged from assistant JSON — must not be replaced by pre-merge state alone. */
+  const pick = (fromMerged: string, profileVal: string, previous: string) =>
+    profileVal || fromMerged || previous || "";
+
   if (useProfile) {
     let profile: any = {};
     try {
@@ -115,15 +119,27 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
     }
     for (const f of fields) {
       const pv = typeof profile?.[f] === "string" ? profile[f].trim() : "";
-      (out.basicInfo as any)[f] = pv || (currentBasic as any)?.[f] || "";
+      const fromMerged =
+        typeof (out.basicInfo as any)[f] === "string" ? String((out.basicInfo as any)[f]).trim() : "";
+      const previous = typeof (currentBasic as any)?.[f] === "string" ? String((currentBasic as any)[f]).trim() : "";
+      (out.basicInfo as any)[f] = pick(fromMerged, pv, previous);
     }
     const gh = typeof profile?.github === "string" ? profile.github.trim() : "";
-    setGithubOnBasicInfo(out.basicInfo, gh || getGithubFromBasicInfo(currentBasic));
+    setGithubOnBasicInfo(
+      out.basicInfo,
+      gh || getGithubFromBasicInfo(out.basicInfo) || getGithubFromBasicInfo(currentBasic),
+    );
   } else {
     for (const f of fields) {
-      (out.basicInfo as any)[f] = (currentBasic as any)?.[f] || "";
+      const fromMerged =
+        typeof (out.basicInfo as any)[f] === "string" ? String((out.basicInfo as any)[f]).trim() : "";
+      const previous = typeof (currentBasic as any)?.[f] === "string" ? String((currentBasic as any)[f]).trim() : "";
+      (out.basicInfo as any)[f] = fromMerged || previous || "";
     }
-    setGithubOnBasicInfo(out.basicInfo, getGithubFromBasicInfo(currentBasic));
+    setGithubOnBasicInfo(
+      out.basicInfo,
+      getGithubFromBasicInfo(out.basicInfo) || getGithubFromBasicInfo(currentBasic),
+    );
   }
   return out;
 }
