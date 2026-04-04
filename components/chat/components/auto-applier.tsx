@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Play, Pause, CheckCircle2, XCircle, Loader2, Clock, Globe } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { ChatArtifactWindow } from "@/components/chat/chat-artifact-chrome";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -62,14 +63,18 @@ export function AutoApplier() {
   const isFinished = completedCount === steps.length;
 
   return (
-    <Card className="w-full border-border/60">
-      <CardHeader className="pb-3">
+    <ChatArtifactWindow
+      variant="light"
+      cardClassName="w-full border-border/60 shadow-sm"
+      headerClassName="border-b border-border/50 pb-3 !flex-row !items-center"
+      contentClassName="space-y-4 pt-4"
+      title={
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
           <Play className="w-4 h-4 text-emerald-500" />
           Auto Job Applier
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      }
+    >
         {/* Mini browser simulation */}
         <div className="rounded-xl overflow-hidden border border-border/60">
           <div className="flex items-center gap-2 bg-muted/60 px-3 py-2 border-b border-border/40">
@@ -159,7 +164,6 @@ export function AutoApplier() {
             </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }

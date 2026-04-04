@@ -29,7 +29,7 @@ body {
     --accent: 0 0% 96.1%;
     --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: oklch(1 0 0);
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
@@ -64,7 +64,7 @@ body {
     --accent: 0 0% 14.9%;
     --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: oklch(1 0 0);
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
@@ -81,6 +81,9 @@ body {
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  .theme {
+    --color-destructive-foreground: var(--destructive-foreground);
   }
 }
 
@@ -155,4 +158,16 @@ body {
   .bg-primary\/10 {
     background-color: rgba(var(--primary), 0.1) !important;
   }
+}
+
+/* Chat onboarding: highlight above dim overlay (overlay is z-[60]) */
+[data-chat-tour-active="true"] {
+  position: relative;
+  z-index: 72;
+  outline: 2px solid rgb(165 180 252);
+  outline-offset: 3px;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 0 0 3px rgba(99, 102, 241, 0.35),
+    0 12px 40px rgba(0, 0, 0, 0.45);
 }

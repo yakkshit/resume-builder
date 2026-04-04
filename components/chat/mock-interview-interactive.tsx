@@ -17,6 +17,7 @@ import {
   ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ArtifactTrafficLights, type ArtifactPanelMode } from "@/components/chat/chat-artifact-chrome";
 import { copyToClipboard } from "@/lib/clipboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -207,6 +208,7 @@ export function MockInterviewInteractive({
   const [review, setReview] = useState<Record<string, { score: number; feedback: string; correction: string }>>({});
   const [fallbackRole, setFallbackRole] = useState(role || "General Software Engineer");
   const [fallbackType, setFallbackType] = useState<"mixed" | "hr" | "technical">("mixed");
+  const [artifactPanelMode, setArtifactPanelMode] = useState<ArtifactPanelMode>("expanded");
 
   const inputQ = Array.isArray(questions) ? questions : [];
   const inputT = Array.isArray(technicalQuestions) ? technicalQuestions : [];
@@ -365,23 +367,37 @@ export function MockInterviewInteractive({
 
   return (
     <Card className={shell} data-no-selection-popover="true">
-      <CardHeader className="flex flex-row items-center gap-3 border-b border-border bg-muted/30 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
-        <CardTitle className="flex flex-1 flex-wrap items-center gap-2 text-sm text-foreground dark:text-white">
-          <MessageSquare className="h-4 w-4 shrink-0 text-primary dark:text-[#4da5fc]" />
-          <span>
-            Mock interview
-            {role ? <span className="font-normal text-muted-foreground dark:text-[#8a8a8f]"> — {role}</span> : null}
-          </span>
+      <CardHeader className="flex flex-col gap-2 border-b border-border bg-muted/30 px-4 py-3 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="flex flex-row flex-wrap items-center gap-2">
+          <ArtifactTrafficLights variant="dark" panelMode={artifactPanelMode} setPanelMode={setArtifactPanelMode} />
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm text-foreground dark:text-white">
+            <MessageSquare className="h-4 w-4 shrink-0 text-primary dark:text-[#4da5fc]" />
+            <span className="font-medium">
+              Mock interview
+              {role ? <span className="font-normal text-muted-foreground dark:text-[#8a8a8f]"> — {role}</span> : null}
+            </span>
+          </div>
           <Badge
             variant="outline"
-            className="ml-auto border-primary/30 bg-primary/10 text-[10px] font-normal text-primary dark:border-[#4da5fc]/30 dark:bg-[#4da5fc]/10 dark:text-[#9cc8fc]"
+            className="ml-auto shrink-0 border-primary/30 bg-primary/10 text-[10px] font-normal text-primary dark:border-[#4da5fc]/30 dark:bg-[#4da5fc]/10 dark:text-[#9cc8fc]"
           >
             <Timer className="mr-1 h-3 w-3" />
             Interactive
           </Badge>
-        </CardTitle>
+        </div>
+        {artifactPanelMode === "hidden" ? (
+          <p className="text-[10px] text-muted-foreground dark:text-[#8a8a8f]">Green dot restores the panel</p>
+        ) : artifactPanelMode === "compact" ? (
+          <span className="text-[10px] text-muted-foreground dark:text-[#8a8a8f]">Green expands · Yellow shrinks</span>
+        ) : null}
       </CardHeader>
-      <CardContent className="p-0">
+      {artifactPanelMode !== "hidden" ? (
+      <CardContent
+        className={cn(
+          "p-0",
+          artifactPanelMode === "compact" && "max-h-[min(320px,48vh)] overflow-y-auto overflow-x-hidden",
+        )}
+      >
         {!hasProvidedContent && (
           <div className="border-b border-border p-3 dark:border-white/10">
             <p className="mb-2 text-xs text-muted-foreground">
@@ -635,6 +651,7 @@ export function MockInterviewInteractive({
           )}
         </div>
       </CardContent>
+      ) : null}
     </Card>
   );
 }

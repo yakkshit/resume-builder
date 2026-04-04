@@ -1,10 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { InferenceClient } from "@huggingface/inference"
 import { GoogleGenAI } from "@google/genai"
-import { createUIMessageStream, createUIMessageStreamResponse, generateId } from 'ai'
+import { createAnthropic } from "@ai-sdk/anthropic"
+import { createHuggingFace } from "@ai-sdk/huggingface"
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
+import { createUIMessageStream, createUIMessageStreamResponse, generateId, streamText } from "ai"
 import mime from "mime"
 import type { NextRequest } from "next/server"
 import { DEFAULT_CHAT_MODEL, CHAT_MODELS_BY_PROVIDER } from "@/lib/chat-models"
+import { HF_CUSTOM_HUB_MODEL_ID } from "@/lib/chat-provider-settings"
 import { redactResumePII, redactTextPII } from "@/lib/redact-resume-pii"
 import { buildUserKnowledgeStoreChunks } from "@/lib/user-knowledge-context"
 import { ensureMemoryFilesystem, readCoreMemory, recallFromConversations, appendConversation, overwriteCoreMemory, appendNotes } from "@/lib/memory-store"
@@ -47,6 +51,8 @@ const AVAILABLE_MODELS = Object.entries(CHAT_MODELS_BY_PROVIDER).reduce((acc, [p
   else if (providerName === "Groq") internalProvider = "groq"
   else if (providerName === "Mistral") internalProvider = "mistral"
   else if (providerName === "Hugging Face") internalProvider = "huggingface"
+  else if (providerName === "Hugging Face (AI SDK)") internalProvider = "hf-aisdk"
+  else if (providerName === "OpenAI Compatible") internalProvider = "openai-compat-aisdk"
   else if (providerName === "Local / Custom") internalProvider = "local" // Will be overridden in specific handlers
 
   for (const modelId of modelIds) {
@@ -185,7 +191,7 @@ IMPORTANT: You MUST embed interactive components using this exact format. The UI
 {"prop": "value"}
 \`\`\`
 
-Valid component types: cv, coverLetter, jobLinks, cvScorer, course, mockInterview, codingChallenge, hrNote, jobApplySimulator
+Valid component types: cv, coverLetter, jobLinks, cvScorer, course, mockInterview, codingChallenge, hrNote, emailHr, linkedinDm, jobApplySimulator
 
 For resume/CV requests: ALWAYS include a \`\`\`component:cv\`\`\` block with resumeData.
 For cover letter requests: ALWAYS include a \`\`\`component:coverLetter\`\`\` block.
@@ -202,6 +208,8 @@ Examples:
 - Coding challenge: \`\`\`component:codingChallenge\n{"codingProblems":["..."]}\n\`\`\`
 - Course: \`\`\`component:course\n{"title":"...","provider":"...","skills":[...]}\n\`\`\`
 - HR note: \`\`\`component:hrNote\n{"subject":"...","body":"...","to":"..."}\n\`\`\`
+- Email HR (compose in Gmail/Yahoo/Outlook): \`\`\`component:emailHr\n{"to":"recruiter@company.com","subject":"...","body":"...","company":"...","jobTitle":"..."}\n\`\`\` Use when the user wants to email HR or a recruiter; include \`to\` when known.
+- LinkedIn DM (max 200 chars, user copies into LinkedIn): \`\`\`component:linkedinDm\n{"message":"..."}\n\`\`\` Use for short notes to hiring managers / job posters—plain text only, under 200 characters.
 - Job apply simulator: \`\`\`component:jobApplySimulator\n{"steps":[{"action":"...","status":"done"},...]}\n\`\`\`
 
 Always include helpful markdown text before/after components. Use components when the response benefits from interactive UI.
@@ -583,6 +591,33 @@ Resume data: ${resumeJson}`
           throw error
         }
 
+      case "hf-aisdk":
+        try {
+          return await handleWithHuggingFaceAISDK(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey,
+            customModel,
+            messagesList,
+          )
+        } catch (error: any) {
+          console.error("Error with Hugging Face AI SDK model:", error)
+          throw error
+        }
+
+      case "openai-compat-aisdk":
+        try {
+          return await handleWithOpenAICompatibleAISDK(
+            formattedMessages,
+            apiKey,
+            customEndpoint,
+            customModel,
+            messagesList,
+          )
+        } catch (error: any) {
+          console.error("Error with OpenAI-compatible (AI SDK) model:", error)
+          throw error
+        }
 
       case "local":
         try {
@@ -924,9 +959,6 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
   }
 }
 
-import { createAnthropic } from '@ai-sdk/anthropic'
-import { streamText } from 'ai'
-
 // Anthropic handler (Messages API with streaming)
 async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
@@ -950,13 +982,120 @@ async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: st
     })
 
     return result.toTextStreamResponse()
-    } catch (error) {
-      console.error("Error with Anthropic model:", error)
-      throw error
-    }
+  } catch (error) {
+    console.error("Error with Anthropic model:", error)
+    throw error
   }
-  
-  // DeepSeek handler
+}
+
+/** Hugging Face [Inference router](https://ai-sdk.dev/providers/ai-sdk-providers/huggingface) via @ai-sdk/huggingface */
+async function handleWithHuggingFaceAISDK(
+  messages: any[],
+  hubModelId: string,
+  apiKey?: string,
+  customHubOverride?: string,
+  _clientMessages?: unknown[],
+) {
+  try {
+    const key = apiKey || process.env.HUGGINGFACE_API_KEY
+    if (!key) {
+      throw new Error(
+        "Hugging Face API key is required. Tap the lock icon next to the model selector in chat, or set HUGGINGFACE_API_KEY.",
+      )
+    }
+
+    const trimmedOverride = typeof customHubOverride === "string" ? customHubOverride.trim() : ""
+    const hub =
+      hubModelId === HF_CUSTOM_HUB_MODEL_ID
+        ? trimmedOverride
+        : trimmedOverride || hubModelId
+
+    if (!hub) {
+      throw new Error(
+        "Hugging Face Hub model id is required. Open “Hub model” from the model menu and enter org/model (e.g. meta-llama/Llama-3.1-8B-Instruct).",
+      )
+    }
+
+    const systemContent = (() => {
+      const m = messages.find((x) => x.role === "system")
+      return m ? getMsgText(m) : undefined
+    })()
+    const chatMessages = messages
+      .filter((m) => m.role !== "system")
+      .map((msg) => ({
+        role: msg.role === "assistant" ? "assistant" : "user",
+        content: getMsgText(msg),
+      })) as import("ai").ModelMessage[]
+
+    const hf = createHuggingFace({ apiKey: key })
+    const result = await streamText({
+      model: hf(hub),
+      system: systemContent,
+      messages: chatMessages,
+    })
+
+    return result.toTextStreamResponse()
+  } catch (error) {
+    console.error("Error with Hugging Face AI SDK:", error)
+    throw error
+  }
+}
+
+/** Generic OpenAI-compatible servers via [@ai-sdk/openai-compatible](https://ai-sdk.dev/providers/openai-compatible-providers) */
+async function handleWithOpenAICompatibleAISDK(
+  messages: any[],
+  apiKey: string | undefined,
+  customEndpoint: string | undefined,
+  customModel: string | undefined,
+  _clientMessages?: unknown[],
+) {
+  try {
+    const rawBase = (customEndpoint || "").trim()
+    if (!rawBase) {
+      throw new Error(
+        "OpenAI-compatible base URL is required. In Profile & Settings, set the API base URL (e.g. https://api.example.com/v1).",
+      )
+    }
+
+    let base = rawBase.replace(/\/$/, "")
+    if (!base.endsWith("/v1")) {
+      base = `${base}/v1`
+    }
+
+    const model = (customModel || "").trim() || "gpt-4o-mini"
+    const key = (apiKey || "").trim()
+
+    const provider = createOpenAICompatible({
+      name: "openaiCompatible",
+      ...(key ? { apiKey: key } : {}),
+      baseURL: base,
+    })
+
+    const systemContent = (() => {
+      const m = messages.find((x) => x.role === "system")
+      return m ? getMsgText(m) : undefined
+    })()
+    const chatMessages = messages
+      .filter((m) => m.role !== "system")
+      .map((msg) => ({
+        role: msg.role === "assistant" ? "assistant" : "user",
+        content: getMsgText(msg),
+      })) as import("ai").ModelMessage[]
+
+    const result = await streamText({
+      model: provider(model),
+      system: systemContent,
+      messages: chatMessages,
+    })
+
+    return result.toTextStreamResponse()
+  } catch (error) {
+    console.error("Error with OpenAI-compatible AI SDK:", error)
+    throw error
+  }
+}
+
+// DeepSeek handler
 async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key = apiKey || process.env.DEEPSEEK_API_KEY

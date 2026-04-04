@@ -2,7 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { ChatArtifactWindow } from "@/components/chat/chat-artifact-chrome";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -91,17 +92,23 @@ function CvComponent({
 
   if (isEditable) {
     return (
-      <Card className={cn(CHAT_ARTIFACT, "border-white/10")}>
-        <CardHeader className={cn(CHAT_ARTIFACT_HEADER, "flex-col items-stretch gap-1 py-2 sm:flex-row sm:items-center")}>
-          <CardTitle className="text-sm flex items-center gap-2 text-white">
-            <FileText className="h-4 w-4 text-[#4da5fc]" />
-            CV Builder
-          </CardTitle>
-          <p className="text-[11px] text-[#8a8a8f] sm:ml-auto sm:max-w-[55%] sm:text-right">
-            Use the <span className="text-white/80">Editor</span> tab to edit fields; changes save to your chat resume.
-          </p>
-        </CardHeader>
-        <CardContent className="p-3">
+      <ChatArtifactWindow
+        variant="dark"
+        cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+        headerClassName={cn(CHAT_ARTIFACT_HEADER, "!flex-row !items-center flex-wrap gap-2 py-2")}
+        contentClassName="space-y-0 p-3 pt-0"
+        title={
+          <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <CardTitle className="text-sm flex items-center gap-2 text-white">
+              <FileText className="h-4 w-4 text-[#4da5fc]" />
+              CV Builder
+            </CardTitle>
+            <p className="text-[11px] text-[#8a8a8f] sm:max-w-[55%] sm:text-right">
+              Use the <span className="text-white/80">Editor</span> tab to edit fields; changes save to your chat resume.
+            </p>
+          </div>
+        }
+      >
           <Tabs defaultValue="pdf" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="pdf" className="flex items-center gap-2">
@@ -154,23 +161,27 @@ function CvComponent({
               </div>
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+      </ChatArtifactWindow>
     );
   }
 
   return (
-    <Card className={cn(CHAT_ARTIFACT, "border-white/10")}>
-      <CardHeader className={cn(CHAT_ARTIFACT_HEADER, "py-2")}>
+    <ChatArtifactWindow
+      variant="dark"
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+      headerClassName={cn(CHAT_ARTIFACT_HEADER, "py-2")}
+      contentClassName="p-0"
+      title={
         <CardTitle className="text-sm flex items-center gap-2 text-white">
           <FileText className="h-4 w-4 text-[#4da5fc]" />
           CV Preview
         </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0 h-[400px]">
+      }
+    >
+      <div className="h-[400px]">
         <PdfPreviewClient resumeData={resumeData} template={template} />
-      </CardContent>
-    </Card>
+      </div>
+    </ChatArtifactWindow>
   );
 }
 
@@ -179,12 +190,18 @@ function CoverLetterComponent({ head, body, footer }: ComponentPropsMap["coverLe
   const fullLetter = [safeStr(head), safeStr(body), safeStr(footer)].filter(Boolean).join("\n\n");
 
   return (
-    <Card className={cn(CHAT_ARTIFACT, "border-white/10")}>
-      <CardHeader className={cn(CHAT_ARTIFACT_HEADER, "justify-between gap-2")}>
+    <ChatArtifactWindow
+      variant="dark"
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+      headerClassName={cn(CHAT_ARTIFACT_HEADER, "justify-between gap-2")}
+      contentClassName="p-0"
+      title={
         <CardTitle className="text-sm flex items-center gap-2 text-white">
           <Sparkles className="h-4 w-4 text-[#4da5fc]" />
           Cover letter
         </CardTitle>
+      }
+      trailing={
         <Button
           type="button"
           variant="secondary"
@@ -195,8 +212,8 @@ function CoverLetterComponent({ head, body, footer }: ComponentPropsMap["coverLe
           <Copy className="h-3.5 w-3.5" />
           Copy all
         </Button>
-      </CardHeader>
-      <CardContent className="p-0">
+      }
+    >
         <div className="space-y-0 px-4 py-3 text-[#e8e8ed]">
           <p className="whitespace-pre-wrap text-sm font-medium leading-relaxed border-l-2 border-[#4da5fc]/50 pl-3">
             {safeStr(head)}
@@ -223,25 +240,28 @@ function CoverLetterComponent({ head, body, footer }: ComponentPropsMap["coverLe
           </Collapsible>
           <p className="whitespace-pre-wrap pt-3 text-sm text-[#8a8a8f]">{safeStr(footer)}</p>
         </div>
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }
 
 function JobLinksComponent({ links }: ComponentPropsMap["jobLinks"]) {
   const linksList = Array.isArray(links) ? links : [];
   return (
-    <Card className={cn(CHAT_ARTIFACT, "border-white/10")}>
-      <CardHeader className={CHAT_ARTIFACT_HEADER}>
-        <CardTitle className="text-sm flex items-center gap-2 text-white">
+    <ChatArtifactWindow
+      variant="dark"
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+      headerClassName={CHAT_ARTIFACT_HEADER}
+      contentClassName="space-y-2 p-4 pt-0"
+      title={
+        <CardTitle className="text-sm flex flex-wrap items-center gap-2 text-white">
           <Briefcase className="h-4 w-4 text-[#4da5fc]" />
           Job matches
-          <Badge variant="outline" className="ml-auto border-white/15 bg-white/5 text-[10px] text-[#a0a0a5]">
+          <Badge variant="outline" className="border-white/15 bg-white/5 text-[10px] text-[#a0a0a5]">
             {linksList.length} roles
           </Badge>
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 p-4">
+      }
+    >
         {linksList.length === 0 ? (
           <p className="py-6 text-center text-sm text-[#8a8a8f]">No links in this response.</p>
         ) : (
@@ -302,8 +322,7 @@ function JobLinksComponent({ links }: ComponentPropsMap["jobLinks"]) {
             );
           })
         )}
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }
 
@@ -331,14 +350,18 @@ function CvScorerComponent({ score, feedback, jobDescription }: ComponentPropsMa
   const [jdOpen, setJdOpen] = useState(false);
 
   return (
-    <Card className={cn(CHAT_ARTIFACT, "border-white/10")}>
-      <CardHeader className={CHAT_ARTIFACT_HEADER}>
+    <ChatArtifactWindow
+      variant="dark"
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+      headerClassName={CHAT_ARTIFACT_HEADER}
+      contentClassName="space-y-5 p-4 pt-0"
+      title={
         <CardTitle className="text-sm flex items-center gap-2 text-white">
           <Target className="h-4 w-4 text-[#4da5fc]" />
           CV vs. job description
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5 p-4">
+      }
+    >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <div
             className={cn(
@@ -407,22 +430,25 @@ function CvScorerComponent({ score, feedback, jobDescription }: ComponentPropsMa
             )}
           </ul>
         </div>
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }
 
 function CourseComponent({ title, provider, url, skills }: ComponentPropsMap["course"]) {
   const skillsList = Array.isArray(skills) ? skills : [];
   return (
-    <Card className={cn(CHAT_ARTIFACT, "border-white/10")}>
-      <CardHeader className={CHAT_ARTIFACT_HEADER}>
+    <ChatArtifactWindow
+      variant="dark"
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+      headerClassName={CHAT_ARTIFACT_HEADER}
+      contentClassName="space-y-4 p-4 pt-0"
+      title={
         <CardTitle className="text-sm flex items-center gap-2 text-white">
           <GraduationCap className="h-4 w-4 text-[#4da5fc]" />
           Learning pick
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4 p-4">
+      }
+    >
         <div>
           <h3 className="text-base font-semibold text-white leading-snug">{safeStr(title)}</h3>
           <p className="mt-1 text-sm text-[#8a8a8f]">{safeStr(provider)}</p>
@@ -468,8 +494,7 @@ function CourseComponent({ title, provider, url, skills }: ComponentPropsMap["co
             Copy details
           </Button>
         </div>
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }
 
@@ -518,13 +543,19 @@ function HRNoteComponent({ subject, body, to }: ComponentPropsMap["hrNote"]) {
     .join("\n");
 
   return (
-    <Card className={cn(CHAT_ARTIFACT, "border-white/10")}>
-      <CardHeader className={cn(CHAT_ARTIFACT_HEADER, "justify-between gap-2")}>
+    <ChatArtifactWindow
+      variant="dark"
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+      headerClassName={cn(CHAT_ARTIFACT_HEADER, "justify-between gap-2")}
+      contentClassName="space-y-3 p-4 pt-0"
+      title={
         <CardTitle className="text-sm flex items-center gap-2 text-white">
           <Mail className="h-4 w-4 text-[#4da5fc]" />
           HR email draft
         </CardTitle>
-        <div className="flex shrink-0 gap-1">
+      }
+      trailing={
+        <div className="flex shrink-0 flex-wrap gap-1">
           <Button
             type="button"
             size="sm"
@@ -544,8 +575,8 @@ function HRNoteComponent({ subject, body, to }: ComponentPropsMap["hrNote"]) {
             </Button>
           ) : null}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3 p-4">
+      }
+    >
         {to ? (
           <p className="text-xs font-medium text-[#8a8a8f]">
             To: <span className="text-[#cfcfd3]">{safeStr(to)}</span>
@@ -557,8 +588,7 @@ function HRNoteComponent({ subject, body, to }: ComponentPropsMap["hrNote"]) {
         <div className="rounded-xl border border-white/5 bg-white/[0.02] p-3 text-sm leading-relaxed whitespace-pre-wrap text-[#e0e0e5]">
           {safeStr(body)}
         </div>
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }
 
@@ -633,22 +663,19 @@ function JobApplySimulatorComponent({ steps }: ComponentPropsMap["jobApplySimula
           : "Ready to apply";
 
   return (
-    <Card className={cn(CHAT_ARTIFACT, "border-white/10")}>
-      <CardHeader className={cn(CHAT_ARTIFACT_HEADER, "flex-wrap py-2")}>
-        <div className="flex gap-1">
-          <div className="w-3 h-3 rounded-full bg-red-500/80" />
-          <div className="w-3 h-3 rounded-full bg-amber-500/80" />
-          <div className="w-3 h-3 rounded-full bg-green-500/80" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <CardTitle className="text-sm flex items-center gap-2">
-            Job Application Simulator
-            <span className="text-[11px] text-muted-foreground font-normal truncate">
-              {headline}
-            </span>
-          </CardTitle>
-        </div>
-        <div className="flex items-center gap-2">
+    <ChatArtifactWindow
+      variant="dark"
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+      headerClassName={cn(CHAT_ARTIFACT_HEADER, "flex-wrap py-2")}
+      contentClassName="p-4 pt-0"
+      title={
+        <CardTitle className="text-sm flex flex-wrap items-center gap-2 text-white">
+          Job Application Simulator
+          <span className="text-[11px] font-normal text-[#8a8a8f] truncate">{headline}</span>
+        </CardTitle>
+      }
+      trailing={
+        <div className="flex flex-wrap items-center gap-2">
           {mode !== "running" ? (
             <Button
               size="sm"
@@ -660,12 +687,7 @@ function JobApplySimulatorComponent({ steps }: ComponentPropsMap["jobApplySimula
               Start
             </Button>
           ) : (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="h-8"
-              onClick={() => setMode("idle")}
-            >
+            <Button size="sm" variant="secondary" className="h-8" onClick={() => setMode("idle")}>
               Pause
             </Button>
           )}
@@ -682,8 +704,8 @@ function JobApplySimulatorComponent({ steps }: ComponentPropsMap["jobApplySimula
             Reset
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="p-4 pt-2">
+      }
+    >
         <div className="space-y-2 overflow-x-auto rounded-xl border border-white/10 bg-[#0a0a0e] p-3 font-mono text-xs text-emerald-400/95">
           {stepsList.map((step, i) => {
             const s =
@@ -719,8 +741,7 @@ function JobApplySimulatorComponent({ steps }: ComponentPropsMap["jobApplySimula
         <p className="mt-3 text-xs text-[#6a6a75]">
           Simulation only — real auto-apply needs a browser extension or automation you control.
         </p>
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }
 

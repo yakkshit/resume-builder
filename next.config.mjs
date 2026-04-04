@@ -11,6 +11,9 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Do NOT set `allowedDevOrigins` unless you list every dev hostname you use.
+  // When set, Next switches from "warn" to **block** for unknown origins and breaks /_next/* loads.
+  // For tunnel hosts, either omit this key (warn-only) or add e.g. '*.trycloudflare.com' patterns.
   typescript: {
     ignoreBuildErrors: true,
   },

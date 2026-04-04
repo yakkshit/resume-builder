@@ -1,7 +1,8 @@
 "use client";
 
 import { BookOpen, Clock, ExternalLink, Star } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { ChatArtifactWindow } from "@/components/chat/chat-artifact-chrome";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -32,14 +33,18 @@ export function LearningResources({ data = [] }: { data?: Resource[] }) {
   const resources = data.length > 0 ? data : DEFAULT;
 
   return (
-    <Card className="w-full border-border/60">
-      <CardHeader className="pb-3">
+    <ChatArtifactWindow
+      variant="light"
+      cardClassName="w-full border-border/60 shadow-sm"
+      headerClassName="border-b border-border/50 pb-3 !flex-row !items-center"
+      contentClassName="space-y-3 pt-4"
+      title={
         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
           <BookOpen className="w-4 h-4 text-blue-500" />
           Recommended Learning
         </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      }
+    >
         {resources.map((r) => (
           <div
             key={r.id}
@@ -67,7 +72,6 @@ export function LearningResources({ data = [] }: { data?: Resource[] }) {
             </div>
           </div>
         ))}
-      </CardContent>
-    </Card>
+    </ChatArtifactWindow>
   );
 }

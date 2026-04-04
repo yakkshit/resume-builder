@@ -44,7 +44,7 @@ export default function RootLayout({
           <main className="h-full w-full pt-2">{children}</main>
           <Toaster />
           {/* <CookieBanner /> */}
-          <Analytics />
+          {process.env.NODE_ENV === 'production' ? <Analytics /> : null}
         </ThemeProvider>
       </body>
     </html>

@@ -8,6 +8,8 @@ import { MockInterview } from "./components/mock-interview";
 import { CodingChallenge } from "./components/coding-challenge";
 import { LearningResources } from "./components/learning-resources";
 import { CoverLetterViewer } from "./components/cover-letter-viewer";
+import { EmailHrPanel } from "./components/email-hr-panel";
+import { LinkedinDmPanel } from "./components/linkedin-dm-panel";
 
 export type ComponentType =
   | "resume"
@@ -17,16 +19,28 @@ export type ComponentType =
   | "auto-applier"
   | "mock-interview"
   | "coding-challenge"
-  | "learning-resources";
+  | "learning-resources"
+  | "email-hr"
+  | "linkedin-dm";
 
 interface ComponentRendererProps {
   type: ComponentType;
   data?: Record<string, unknown>;
+  /** Used by embedded tools (e.g. HR email AI draft) — not persisted */
+  chatApiKey?: string;
+  /** Same model as chat selector — passed to /api/email-draft */
+  chatModel?: string;
+  /**
+   * When false, the resume card is a frozen snapshot for that message only (no shared localStorage).
+   * Only the latest resume block in the chat should pass true.
+   */
+  resumeSyncsWithGlobal?: boolean;
 }
 
-export function ComponentRenderer({ type, data }: ComponentRendererProps) {
+export function ComponentRenderer({ type, data, chatApiKey, chatModel, resumeSyncsWithGlobal }: ComponentRendererProps) {
   switch (type) {
-    case "resume":             return <ResumeViewer data={data} />;
+    case "resume":
+      return <ResumeViewer data={data} syncWithGlobalResume={resumeSyncsWithGlobal !== false} />;
     case "cover-letter":       return <CoverLetterViewer data={data as any} />;
     case "cv-score":           return <CVScore data={data as any} />;
     case "job-recommendations": {
@@ -39,6 +53,8 @@ export function ComponentRenderer({ type, data }: ComponentRendererProps) {
     case "mock-interview":     return <MockInterview data={data as any} />;
     case "coding-challenge":   return <CodingChallenge data={data as any} />;
     case "learning-resources": return <LearningResources data={(data as any)?.resources} />;
+    case "email-hr":           return <EmailHrPanel data={data} chatApiKey={chatApiKey} chatModel={chatModel} />;
+    case "linkedin-dm":        return <LinkedinDmPanel data={data} />;
     default:                   return null;
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +35,12 @@ export interface ChatSettings {
   contextWindow: string; // context text/instructions passed with each request
   /** When true, assistant replies that include resume JSON are merged into stored resumeData */
   autoMergeAssistantResume: boolean;
+  /** Base URL for OpenAI-compatible provider (e.g. https://api.openai.com/v1 or proxy root) */
+  openAiCompatBaseUrl: string;
+  /** Model id sent to the OpenAI-compatible /v1/chat/completions endpoint */
+  openAiCompatModel: string;
+  /** Optional Hugging Face Hub model id override (legacy HF + HF AI SDK curated picks) */
+  huggingFaceCustomModel: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -65,6 +72,11 @@ export const AVAILABLE_MODELS = [
   // Mistral
   { value: "mistral-large-latest", label: "Mistral Large", provider: "Mistral" },
   { value: "mistral-small-latest", label: "Mistral Small", provider: "Mistral" },
+  { value: "meta-llama/Llama-3.1-8B-Instruct", label: "Llama 3.1 8B", provider: "Hugging Face (AI SDK)" },
+  { value: "deepseek-ai/DeepSeek-V3-0324", label: "DeepSeek V3", provider: "Hugging Face (AI SDK)" },
+  { value: "Qwen/Qwen2.5-72B-Instruct", label: "Qwen2.5 72B", provider: "Hugging Face (AI SDK)" },
+  { value: "hf-custom-hub-aisdk", label: "HF custom (Hub id)", provider: "Hugging Face (AI SDK)" },
+  { value: "openai-compatible-aisdk", label: "OpenAI-compatible", provider: "OpenAI Compatible" },
 ];
 
 const DEFAULT_SETTINGS: ChatSettings = {
@@ -72,6 +84,9 @@ const DEFAULT_SETTINGS: ChatSettings = {
   model: "gemini-2.5-flash",
   contextWindow: "",
   autoMergeAssistantResume: true,
+  openAiCompatBaseUrl: "",
+  openAiCompatModel: "gpt-4o-mini",
+  huggingFaceCustomModel: "",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -83,7 +98,7 @@ function generateId() {
 function loadFromStorage<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
-    const raw = localStorage.getItem(key);
+    const raw = tryLocalStorageGet(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
   } catch {
     return fallback;
@@ -91,11 +106,7 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 }
 
 function saveToStorage<T>(key: string, value: T) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* quota exceeded, ignore */
-  }
+  tryLocalStorageSet(key, JSON.stringify(value));
 }
 
 // ── Hooks ──────────────────────────────────────────────────────────────────
