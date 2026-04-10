@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { getVercelOidcToken } from "@/lib/session-secrets";
 
 const STARTER_CODE: Record<string, string> = {
   typescript: `function twoSum(nums: number[], target: number): number[] {
@@ -61,35 +62,82 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
   const [status, setStatus] = useState<null | "running" | "pass" | "fail">(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [runDetails, setRunDetails] = useState<string | null>(null);
+  const [execMode, setExecMode] = useState<"vercel-sandbox" | "local-vm" | null>(null);
+  const [execMs, setExecMs] = useState<number | null>(null);
 
   const handleRun = async () => {
     setRunError(null);
     setRunDetails(null);
     setStatus("running");
+    setExecMode(null);
+    setExecMs(null);
     try {
+      const token = getVercelOidcToken().trim();
+      const startedAt = performance.now();
+
+      // Prefer sandbox for TS/JS/Python when token exists.
+      if (token && (lang === "typescript" || lang === "javascript" || lang === "python")) {
+        const res = await fetch("/api/interview-lab/sandbox-run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oidcToken: token, language: lang, code }),
+        });
+        const j = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          passed?: boolean;
+          output?: string;
+          error?: string;
+          hint?: string;
+          ms?: number;
+        };
+        setExecMode("vercel-sandbox");
+        setExecMs(typeof j.ms === "number" ? Math.round(j.ms) : Math.round(performance.now() - startedAt));
+
+        if (res.ok && j.ok) {
+          const passed = Boolean(j.passed);
+          setStatus(passed ? "pass" : "fail");
+          if (!passed && j.error) setRunError(j.error);
+          if (j.output?.trim()) setRunDetails(j.output.trim());
+          return;
+        }
+        // fall back
+        setRunError(j.hint || j.error || "Sandbox run failed; falling back to local VM.");
+      }
+
       const res = await fetch("/api/code-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ language: lang, code }),
       });
-      const data = (await res.json().catch(() => null)) as any;
+      const data = (await res.json().catch(() => null)) as unknown;
+      setExecMode("local-vm");
+      setExecMs(Math.round(performance.now() - startedAt));
+
       if (!res.ok) {
+        const err = (data as { error?: unknown } | null)?.error;
         setStatus("fail");
-        setRunError(data?.error || `Run failed (${res.status})`);
+        setRunError(typeof err === "string" ? err : `Run failed (${res.status})`);
         return;
       }
-      const passed = Boolean(data?.passed);
+
+      const passed = Boolean((data as { passed?: unknown } | null)?.passed);
       setStatus(passed ? "pass" : "fail");
-      if (typeof data?.error === "string") setRunError(data.error);
-      if (typeof data?.stdout === "string" && data.stdout.trim()) setRunDetails(data.stdout.trim());
-      if (typeof data?.stderr === "string" && data.stderr.trim()) setRunDetails(data.stderr.trim());
-      if (data?.feedback && typeof data.feedback === "object") {
-        const fb = data.feedback;
+      const error = (data as { error?: unknown } | null)?.error;
+      if (typeof error === "string") setRunError(error);
+
+      const stdout = (data as { stdout?: unknown } | null)?.stdout;
+      const stderr = (data as { stderr?: unknown } | null)?.stderr;
+      if (typeof stdout === "string" && stdout.trim()) setRunDetails(stdout.trim());
+      if (typeof stderr === "string" && stderr.trim()) setRunDetails(stderr.trim());
+
+      const feedback = (data as { feedback?: unknown } | null)?.feedback;
+      if (feedback && typeof feedback === "object") {
+        const fb = feedback as { summary?: unknown; strengths?: unknown; improvements?: unknown; suggestedNextStep?: unknown };
         const lines = [
-          fb.summary ? `Summary: ${fb.summary}` : "",
+          typeof fb.summary === "string" && fb.summary ? `Summary: ${fb.summary}` : "",
           Array.isArray(fb.strengths) && fb.strengths.length ? `Strengths:\n- ${fb.strengths.join("\n- ")}` : "",
           Array.isArray(fb.improvements) && fb.improvements.length ? `Improvements:\n- ${fb.improvements.join("\n- ")}` : "",
-          fb.suggestedNextStep ? `Next step: ${fb.suggestedNextStep}` : "",
+          typeof fb.suggestedNextStep === "string" && fb.suggestedNextStep ? `Next step: ${fb.suggestedNextStep}` : "",
         ].filter(Boolean);
         if (lines.length) setRunDetails(lines.join("\n\n"));
       }
@@ -194,6 +242,14 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
             Running tests…
           </div>
         )}
+        {execMode ? (
+          <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+            <Badge variant="secondary" className="h-5 rounded-md text-[10px]">
+              {execMode === "vercel-sandbox" ? "Vercel Sandbox" : "Local VM"}
+            </Badge>
+            {typeof execMs === "number" ? <span>{execMs}ms</span> : null}
+          </div>
+        ) : null}
         {status === "fail" && (
           <div className="text-rose-400 text-xs">
             {runError ? runError : "Some tests failed."}

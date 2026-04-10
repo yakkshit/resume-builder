@@ -25,6 +25,7 @@ import { ChatSession, ChatSettings } from "./chat-store";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { ProfileSettingsDialog, getStoredProfile } from "./profile-settings-dialog";
+import { SidebarIntegrationsAccordion } from "./sidebar-integrations-accordion";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -41,6 +42,7 @@ interface SidebarProps {
   onExport: () => void;
   onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSettingsChange: (patch: Partial<ChatSettings>) => void;
+  onIntegrationsToast?: (variant: "default" | "success" | "error" | "warning", message: string) => void;
 }
 
 export function ChatSidebar({
@@ -56,6 +58,7 @@ export function ChatSidebar({
   onExport,
   onImport,
   onSettingsChange,
+  onIntegrationsToast,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -217,6 +220,12 @@ export function ChatSidebar({
                   </Link>
                 </div>
               </div>
+
+              <SidebarIntegrationsAccordion
+                settings={settings}
+                onSettingsChange={onSettingsChange}
+                onToast={onIntegrationsToast}
+              />
 
             {/* Settings moved to profile popup */}
 

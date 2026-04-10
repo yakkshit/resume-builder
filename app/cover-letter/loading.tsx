@@ -3,6 +3,15 @@
 import { motion } from "framer-motion"
 import { Mail, CheckCircle, Clock, Sparkles } from "lucide-react"
 
+const PARTICLES = Array.from({ length: 6 }).map(() => ({
+  x: Math.random() * 300 - 150,
+  y: Math.random() * 300 - 150,
+  duration: 2 + Math.random() * 2,
+  delay: Math.random() * 2,
+  left: `${50 + (Math.random() * 40 - 20)}%`,
+  top: `${50 + (Math.random() * 40 - 20)}%`,
+}))
+
 export default function CoverLetterLoading() {
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
@@ -120,13 +129,13 @@ export default function CoverLetterLoading() {
           </motion.div>
 
           {/* Floating particles */}
-          {[...Array(6)].map((_, i) => (
+          {PARTICLES.map((p, i) => (
             <motion.div
               key={i}
               className="absolute w-2 h-2 rounded-full bg-primary/30"
               initial={{
-                x: Math.random() * 300 - 150,
-                y: Math.random() * 300 - 150,
+                x: p.x,
+                y: p.y,
                 opacity: 0,
               }}
               animate={{
@@ -134,13 +143,13 @@ export default function CoverLetterLoading() {
                 opacity: [0, 1, 0],
               }}
               transition={{
-                duration: 2 + Math.random() * 2,
+                duration: p.duration,
                 repeat: Number.POSITIVE_INFINITY,
-                delay: Math.random() * 2,
+                delay: p.delay,
               }}
               style={{
-                left: `${50 + (Math.random() * 40 - 20)}%`,
-                top: `${50 + (Math.random() * 40 - 20)}%`,
+                left: p.left,
+                top: p.top,
               }}
             />
           ))}

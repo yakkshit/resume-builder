@@ -341,7 +341,7 @@ export default function FeedbackPage() {
               </CardContent>
               <CardFooter className="border-t bg-muted/10 flex justify-center py-4">
                 <p className="text-sm text-muted-foreground text-center">
-                  Can't find what you're looking for? <br />
+                  Can&apos;t find what you&apos;re looking for? <br />
                   Submit your question using the feedback form.
                 </p>
               </CardFooter>

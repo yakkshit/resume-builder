@@ -23,6 +23,7 @@ import {
     Search,
     Settings2,
     Lock,
+    Clapperboard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,8 +59,10 @@ import type { ResumeData } from "@/lib/types";
 import { tryLocalStorageGet, tryLocalStorageSet, tryLocalStorageRemove } from "@/lib/safe-local-storage";
 import { chatTextareaHeightPx } from "@/lib/chat-textarea";
 import { ChatOnboarding } from "./chat-onboarding";
+import { InterviewLabPanel } from "./interview-lab-panel";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { ModelProviderIcon } from "@/lib/model-provider-icon";
+import { getDefaultInterviewLabModelId, isInterviewLabCompatibleModel } from "@/lib/interview-lab-model-support";
 
 // ── Welcome Screen ─────────────────────────────────────────────────────────
 
@@ -71,6 +74,7 @@ const ACTION_PILLS = [
 ];
 
 const CHAT_INPUT_SHINE_LS = "ai-chat-input-shine-seen";
+const HAS_SEEN_INTERVIEW_LAB_LS = "hasSeenInterviewLab";
 
 const SUGGESTED_PROMPTS = [
     "Show me my resume",
@@ -423,6 +427,7 @@ function ChatInput({
     onSettingsChange,
     raiseForOnboarding,
     showToast,
+    onOpenInterviewLab,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -441,6 +446,7 @@ function ChatInput({
     onSettingsChange: (patch: Partial<ChatSettings>) => void;
     raiseForOnboarding?: boolean;
     showToast: (variant: "default" | "success" | "error" | "warning", msg: string) => void;
+    onOpenInterviewLab: () => void;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -448,6 +454,14 @@ function ChatInput({
     const [modelQuery, setModelQuery] = useState("");
     const [extrasSheet, setExtrasSheet] = useState<null | "openai" | "hf" | "apikey">(null);
     const [apiKeySheetDraft, setApiKeySheetDraft] = useState("");
+    const [showInterviewLabChip, setShowInterviewLabChip] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (tryLocalStorageGet(HAS_SEEN_INTERVIEW_LAB_LS) === "1") return;
+        const t = window.setTimeout(() => setShowInterviewLabChip(true), 650);
+        return () => window.clearTimeout(t);
+    }, []);
 
     useEffect(() => {
         if (extrasSheet === "apikey") setApiKeySheetDraft(settings.apiKey || "");
@@ -525,6 +539,28 @@ function ChatInput({
                     className="flex gap-2 mb-2 overflow-x-auto pb-1"
                     style={{ scrollbarWidth: "none" }}
                 >
+                    <AnimatePresence>
+                        {showInterviewLabChip ? (
+                            <motion.button
+                                type="button"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                transition={{ duration: 0.22, ease: "easeOut" }}
+                                onClick={() => {
+                                    tryLocalStorageSet(HAS_SEEN_INTERVIEW_LAB_LS, "1");
+                                    setShowInterviewLabChip(false);
+                                    onOpenInterviewLab();
+                                    showToast("success", "Opened Interview Lab");
+                                }}
+                                className="flex-shrink-0 flex min-h-[44px] items-center gap-1.5 rounded-full border border-violet-500/40 bg-gradient-to-r from-violet-600/20 to-indigo-600/10 px-3 py-1.5 text-xs font-semibold text-violet-100 shadow-sm transition-colors hover:bg-violet-500/20"
+                                aria-label="Try Interview Lab"
+                            >
+                                <span className="text-sm">🎬</span>
+                                <span>Try Interview Lab</span>
+                            </motion.button>
+                        ) : null}
+                    </AnimatePresence>
                     {QUICK_PROMPTS.map((q) => {
                         const chip = (
                             <button
@@ -938,6 +974,7 @@ export default function AICareerAssistantChat() {
     const [onboardingOpen, setOnboardingOpen] = useState(false);
     const [composerShine, setComposerShine] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [interviewLabOpen, setInterviewLabOpen] = useState(false);
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const [jobPanelOpen, setJobPanelOpen] = useState(false);
     const [jobPanelLoading, setJobPanelLoading] = useState(false);
@@ -1063,6 +1100,29 @@ export default function AICareerAssistantChat() {
             position: 'bottom-right',
         });
     };
+
+    const interviewLabToast = useCallback(
+        (
+            variant: 'default' | 'success' | 'error' | 'warning',
+            msg: string,
+            meta?: { docsUrl?: string },
+        ) => {
+            toasterRef.current?.show({
+                title: meta?.docsUrl ? 'Switch model' : variant.charAt(0).toUpperCase() + variant.slice(1),
+                message: msg,
+                variant: meta?.docsUrl ? 'warning' : variant,
+                duration: meta?.docsUrl ? 10000 : 4000,
+                position: 'bottom-right',
+                actions: meta?.docsUrl
+                    ? {
+                          label: 'Open docs',
+                          onClick: () => window.open(meta.docsUrl!, '_blank', 'noopener,noreferrer'),
+                      }
+                    : undefined,
+            });
+        },
+        [],
+    );
 
     // Wire up real AI SDK → /api/chat
     const { messages, sendMessage, status, error, stop, setMessages } = useChat({
@@ -1521,7 +1581,12 @@ export default function AICareerAssistantChat() {
         const settingsToExport =
             storedSettings && typeof storedSettings === "object"
                 ? (() => {
-                    const { apiKey: _apiKey, ...rest } = storedSettings as any;
+                    const {
+                        apiKey: _apiKey,
+                        vercelOidcToken: _vercel,
+                        openaiTranscriptionApiKey: _openaiTx,
+                        ...rest
+                    } = storedSettings as Record<string, unknown>;
                     return rest;
                 })()
                 : {
@@ -1531,6 +1596,7 @@ export default function AICareerAssistantChat() {
                       openAiCompatBaseUrl: settings.openAiCompatBaseUrl,
                       openAiCompatModel: settings.openAiCompatModel,
                       huggingFaceCustomModel: settings.huggingFaceCustomModel,
+                      integrationsDocsUrlOverride: settings.integrationsDocsUrlOverride,
                   };
 
         const resumeData = safeJsonParse(tryLocalStorageGet("resumeData"));
@@ -1604,9 +1670,19 @@ export default function AICareerAssistantChat() {
                     }
 
                     if (importedSettings && typeof importedSettings === "object") {
-                        const { apiKey: _apiKey, ...rest } = importedSettings as any;
+                        const {
+                            apiKey: _apiKey,
+                            vercelOidcToken: _vercel,
+                            openaiTranscriptionApiKey: _openaiTx,
+                            ...rest
+                        } = importedSettings as Record<string, unknown>;
                         tryLocalStorageSet("ai-chat-settings", JSON.stringify(rest));
-                        updateSettings({ ...rest, apiKey: "" });
+                        updateSettings({
+                            ...(rest as Partial<ChatSettings>),
+                            apiKey: "",
+                            vercelOidcToken: "",
+                            openaiTranscriptionApiKey: "",
+                        });
                     }
 
                     if (importedResumeData && typeof importedResumeData === "object") {
@@ -1651,6 +1727,16 @@ export default function AICareerAssistantChat() {
         <InfiniteGridBackground className="fixed inset-0 h-[100dvh] max-h-[100dvh]">
             <div className="relative z-[1] flex h-full min-h-0 w-full flex-col">
             <ChatOnboarding open={onboardingOpen} onOpenChange={setOnboardingOpen} setSidebarOpen={setSidebarOpen} />
+            <InterviewLabPanel
+                open={interviewLabOpen}
+                onOpenChange={setInterviewLabOpen}
+                apiKey={settings.apiKey}
+                model={settings.model}
+                openaiTranscriptionApiKey={settings.openaiTranscriptionApiKey}
+                vercelOidcToken={settings.vercelOidcToken}
+                onSwitchToGemini={() => updateSettings({ model: getDefaultInterviewLabModelId() })}
+                onToast={interviewLabToast}
+            />
             <Toaster ref={toasterRef} />
 
             {/* Sidebar */}
@@ -1667,6 +1753,7 @@ export default function AICareerAssistantChat() {
                 onExport={handleExport}
                 onImport={handleImport}
                 onSettingsChange={updateSettings}
+                onIntegrationsToast={showToast}
             />
 
             {/* Menu button */}
@@ -1717,6 +1804,31 @@ export default function AICareerAssistantChat() {
                     Step-by-step guide: sidebar, models, profile context, and composer (with optional video).
                 </TooltipContent>
             </Tooltip>
+
+            <TooltipProvider delayDuration={500}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <motion.button
+                            data-chat-tour="interview-lab"
+                            type="button"
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ delay: 0.44, type: "spring" }}
+                            onClick={() => setInterviewLabOpen(true)}
+                            className={cn(
+                                "fixed top-[7.25rem] left-5 z-30 flex h-9 w-10 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-violet-600/90 to-indigo-700/90 shadow-lg backdrop-blur-sm transition-opacity hover:opacity-95",
+                                onboardingOpen && "z-[70]",
+                            )}
+                            aria-label="Open Interview Lab"
+                        >
+                            <Clapperboard className="h-4 w-4 text-white" />
+                        </motion.button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-[min(92vw,280px)] text-xs leading-snug">
+                        Interview Lab — Practice coding interviews with AI (interview rounds, code tests, live coaching).
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
 
             {/* Stop button when streaming */}
             {isLoading && (
@@ -1856,6 +1968,7 @@ export default function AICareerAssistantChat() {
                     onSettingsChange={updateSettings}
                     raiseForOnboarding={onboardingOpen}
                     showToast={showToast}
+                    onOpenInterviewLab={() => setInterviewLabOpen(true)}
                 />
             )}
             </div>

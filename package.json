@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "2.6.1",
+  "version": "2.7.0",
   "private": true,
   "pnpm": {
     "overrides": {
@@ -12,7 +12,7 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint . --max-warnings=999",
     "generate-pdf": "tsx scripts/generate-pdf.ts",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -66,6 +66,7 @@
     "@react-pdf/renderer": "^4.3.2",
     "@tailwindcss/typography": "^0.5.16",
     "@vercel/analytics": "^1.5.0",
+    "@vercel/sandbox": "^1.9.2",
     "ai": "^6.0.116",
     "ai-legacy": "npm:ai@^4.3.2",
     "autoprefixer": "^10.4.20",
@@ -113,6 +114,8 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.2",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",

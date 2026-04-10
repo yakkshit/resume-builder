@@ -226,7 +226,7 @@ export default function ResumePage() {
     if (modelErrorBanner) {
       setModelErrorBanner("");
     }
-  }, [selectedModel]);
+  }, [selectedModel, modelErrorBanner]);
 
   // Save custom configuration to localStorage
   useEffect(() => {
