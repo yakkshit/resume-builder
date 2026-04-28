@@ -40,7 +40,7 @@ import { InfiniteGridBackground } from "@/components/ui/the-infinite-grid";
 
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ChatSidebar } from "./sidebar";
-import { ComponentRenderer } from "./component-renderer";
+import { ComponentRenderer, type InterviewLabRenderContext } from "./component-renderer";
 import { useChatSettings, ChatMessage, AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
 import {
     HF_CUSTOM_HUB_MODEL_ID,
@@ -49,12 +49,16 @@ import {
     isOpenAiCompatibleChatModel,
     needsHuggingFaceCustomModelField,
 } from "@/lib/chat-provider-settings";
-import { getTextContent } from "@/lib/message-utils";
+import { getTextContent, getReasoningContent, isReasoningStreaming } from "@/lib/message-utils";
+import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ai-elements/reasoning";
 import type { JobSuggestion } from "@/lib/job-scraper/google-jobs";
 import { JobSuggestionsPanel } from "./job-suggestions-panel";
 import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import { stripIncompleteJsonTail } from "@/lib/streaming-chat-content";
 import { mergeAssistantResumeIntoCurrent, extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
+import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume";
+import { buildResumeDataForChatRequest, messagesForResumeContext } from "@/lib/chat-resume-context";
+import { buildUserKnowledgeStoreChunks } from "@/lib/user-knowledge-context";
 import type { ResumeData } from "@/lib/types";
 import { tryLocalStorageGet, tryLocalStorageSet, tryLocalStorageRemove } from "@/lib/safe-local-storage";
 import { chatTextareaHeightPx } from "@/lib/chat-textarea";
@@ -160,12 +164,16 @@ function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>
     if (t === "codingchallenge" || t === "coding-challenge") return "coding-challenge";
     if (t === "emailhr" || t === "email-hr" || t === "hr-email") return "email-hr";
     if (t === "linkedindm" || t === "linkedin-dm" || t === "linkedin") return "linkedin-dm";
+    if (t === "interviewlab" || t === "interview-lab") return "interview-lab";
+    if (t === "resumelatex" || t === "resume-latex" || t === "latexcv") return "resume-latex";
+    if (t === "coverletterlatex" || t === "cover-letter-latex" || t === "latexcover") return "cover-letter-latex";
     return null;
 }
 
 function extractComponents(text: string) {
     const componentRegex = /```component:([a-zA-Z0-9-]+)\s*([\s\S]*?)(?:```|$)/g;
     const components: { type: Parameters<typeof ComponentRenderer>[0]["type"] | null, data: any, isComplete: boolean }[] = [];
+    let usedResumeJsonFallback = false;
 
     let cleanText = text;
     let match;
@@ -207,7 +215,16 @@ function extractComponents(text: string) {
             // Normalize flat resume JSON or odd envelopes into { resumeData } for ResumeViewer
             if (mapComponentType(typeStr) === "resume" && parsedData && typeof parsedData === "object") {
                 const rec = parsedData as Record<string, unknown>;
-                if (!rec.resumeData) {
+                if (rec.resumeData && typeof rec.resumeData === "object") {
+                    const rd = rec.resumeData as Record<string, unknown>;
+                    const flat = normalizeResumePayloadToFlat(rd);
+                    if (flat) {
+                        parsedData = {
+                            ...rec,
+                            resumeData: flat,
+                        };
+                    }
+                } else if (!rec.resumeData) {
                     const unwrapped = extractResumeJsonFromMessage(
                         "```component:cv\n" + JSON.stringify(parsedData) + "\n```"
                     );
@@ -230,7 +247,22 @@ function extractComponents(text: string) {
         cleanText = cleanText.replace(rawMatch, "");
     }
 
-    return { cleanText: cleanText.trim(), components };
+    // Fallback: if model returned resume JSON (no component fence), still render Resume tool/PDF.
+    const hasExplicitResumeComponent = components.some((c) => c.type === "resume");
+    if (!hasExplicitResumeComponent) {
+        const fallbackResume = extractResumeJsonFromMessage(text);
+        if (fallbackResume) {
+            const flat = normalizeResumePayloadToFlat(fallbackResume) ?? fallbackResume;
+            usedResumeJsonFallback = true;
+            components.push({
+                type: "resume",
+                data: { resumeData: flat },
+                isComplete: true,
+            });
+        }
+    }
+
+    return { cleanText: cleanText.trim(), components, usedResumeJsonFallback };
 }
 
 /** Latest *renderable* resume block: merges with shared storage only for this instance. */
@@ -262,6 +294,7 @@ function MessageBubble({
     chatApiKey,
     chatModel,
     canonicalResumeKey,
+    interviewLabContext,
 }: {
     message: UIMessage;
     isStreaming?: boolean;
@@ -270,16 +303,32 @@ function MessageBubble({
     chatApiKey?: string;
     chatModel?: string;
     canonicalResumeKey: string | null;
+    interviewLabContext?: InterviewLabRenderContext;
 }) {
     const isUser = message.role === "user";
     const [hovering, setHovering] = useState(false);
     const content = getTextContent(message) ?? "";
+    const reasoningText = !isUser ? getReasoningContent(message) : "";
+    const showReasoning = !isUser && (reasoningText.trim().length > 0 || isReasoningStreaming(message));
 
     /** Stable reference when message text unchanged — avoids ResumeViewer re-running merge on every parent render. */
     const extracted = useMemo(
-        () => (!isUser ? extractComponents(content) : { cleanText: content, components: [] }),
+        () => (!isUser ? extractComponents(content) : { cleanText: content, components: [], usedResumeJsonFallback: false }),
         [isUser, content],
     );
+
+    const fallbackToastShownRef = useRef(false);
+    useEffect(() => {
+        if (isUser) return;
+        if (isStreaming) return;
+        if (!extracted.usedResumeJsonFallback) return;
+        if (fallbackToastShownRef.current) return;
+        fallbackToastShownRef.current = true;
+        onToast(
+            "warning",
+            "Assistant returned resume JSON without component:cv. A fallback rendered your resume/PDF, but this is format drift to monitor.",
+        );
+    }, [isUser, isStreaming, extracted.usedResumeJsonFallback, onToast]);
 
     const copy = () => {
         navigator.clipboard.writeText(content);
@@ -302,6 +351,15 @@ function MessageBubble({
             )}
 
             <div className={`flex flex-col gap-3 ${isUser ? "items-end" : "items-start"} ${isUser ? "max-w-[90%]" : "w-full max-w-[min(980px,calc(100%-3rem))]"}`}>
+                {showReasoning ? (
+                    <Reasoning
+                        className="w-full max-w-[min(720px,calc(100%-3rem))]"
+                        isStreaming={Boolean(isStreaming && isReasoningStreaming(message))}
+                    >
+                        <ReasoningTrigger />
+                        <ReasoningContent>{reasoningText || " "}</ReasoningContent>
+                    </Reasoning>
+                ) : null}
                 {/* Bubble */}
                 <div
                     className={`relative px-4 py-3 rounded-2xl text-sm ${isUser
@@ -358,6 +416,7 @@ function MessageBubble({
                             data={c.data}
                             chatApiKey={chatApiKey}
                             chatModel={chatModel}
+                            interviewLabContext={c.type === "interview-lab" ? interviewLabContext : undefined}
                             resumeSyncsWithGlobal={
                                 c.type === "resume"
                                     ? `${message.id ?? "m"}-${idx}` === canonicalResumeKey
@@ -398,6 +457,18 @@ const QUICK_PROMPTS: {
     { emoji: "🔍", label: "Jobs", prompt: "Find jobs for me" },
     { emoji: "🤖", label: "Auto-apply", prompt: "Start auto-applying to jobs" },
     { emoji: "💻", label: "Code", prompt: "Give me a coding challenge" },
+    {
+        emoji: "🎬",
+        label: "Interview Lab",
+        prompt:
+            'Open the full Interview Lab in chat: respond with ```component:interviewLab\n{}\n``` plus a short intro, and mention it uses Gemini.',
+    },
+    {
+        emoji: "📐",
+        label: "LaTeX CV",
+        prompt:
+            'I want a specific print style: give me both JSON resume updates if needed AND ```component:resumeLatex\n{"latex":"..."}\n``` with a full compilable LaTeX CV. If I also need a cover letter in LaTeX, add ```component:coverLetterLatex\n{"latex":"..."}\n```. Keep JSON valid.',
+    },
     { emoji: "🎤", label: "Interview", prompt: "Practice interview questions" },
     { emoji: "📚", label: "Learn", prompt: "Recommend learning resources" },
     {
@@ -984,6 +1055,13 @@ export default function AICareerAssistantChat() {
     const [jobProfileDialogOpen, setJobProfileDialogOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const PROFILE_CONTEXT_TOGGLE_ID = "ai-chat-use-profile-context";
+    const MAX_RETRIEVAL_MESSAGES = 80;
+    const MAX_RETRIEVAL_SNIPPETS = 6;
+    const MAX_RETRIEVAL_SNIPPET_CHARS = 500;
+    const MAX_MEMORY_PROFILE_LINES = 12;
+    const MAX_MEMORY_PROFILE_VALUE_CHARS = 240;
+    const MAX_MEMORY_USER_TURNS = 8;
+    const MAX_MEMORY_USER_TURN_CHARS = 360;
     const [useProfileContext, setUseProfileContext] = useState(true);
     const useProfileContextRef = useRef(true);
     useProfileContextRef.current = useProfileContext;
@@ -1034,6 +1112,77 @@ export default function AICareerAssistantChat() {
         } catch {
             return "";
         }
+    };
+
+    const tokenizeForRetrieval = (text: string): string[] => {
+        return text
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, " ")
+            .split(/\s+/)
+            .filter((t) => t.length >= 3);
+    };
+
+    const trimForPrompt = (text: string, maxChars: number): string => {
+        const t = (text || "").trim();
+        if (!t) return "";
+        return t.length > maxChars ? `${t.slice(0, maxChars)}…` : t;
+    };
+
+    const buildRetrievalContextFromMessages = (messages: UIMessage[]): string => {
+        if (!messages.length) return "";
+        const latestUser = [...messages].reverse().find((m) => m.role === "user");
+        const latestText = latestUser ? (getTextContent(latestUser) ?? "") : "";
+        const queryTokens = new Set(tokenizeForRetrieval(latestText));
+        if (!queryTokens.size) return "";
+
+        // Keep retrieval fast on long histories.
+        const candidates = messages.slice(-MAX_RETRIEVAL_MESSAGES);
+        const scored = candidates
+            .map((m, index) => {
+                const text = (getTextContent(m) ?? "").trim();
+                if (!text) return null;
+                const tokens = tokenizeForRetrieval(text);
+                if (!tokens.length) return null;
+                let score = 0;
+                for (const t of tokens) {
+                    if (queryTokens.has(t)) score += 1;
+                }
+                if (score === 0) return null;
+                return { score, index, role: m.role, text };
+            })
+            .filter((x): x is { score: number; index: number; role: string; text: string } => Boolean(x))
+            .sort((a, b) => (b.score - a.score) || (b.index - a.index))
+            .slice(0, MAX_RETRIEVAL_SNIPPETS)
+            .sort((a, b) => a.index - b.index);
+
+        if (!scored.length) return "";
+        return scored
+            .map((s, i) => `${i + 1}. [${s.role}] ${trimForPrompt(s.text, MAX_RETRIEVAL_SNIPPET_CHARS)}`)
+            .join("\n");
+    };
+
+    const buildMemoryContextText = (messages: UIMessage[]): string => {
+        const profile = readChatGlobalProfile();
+        const profileLines = profile
+            ? Object.entries(profile)
+                  .map(([k, v]) => {
+                      if (typeof v !== "string") return "";
+                      const trimmed = trimForPrompt(v, MAX_MEMORY_PROFILE_VALUE_CHARS);
+                      return trimmed ? `${k}: ${trimmed}` : "";
+                  })
+                  .filter(Boolean)
+                  .slice(0, MAX_MEMORY_PROFILE_LINES)
+            : [];
+
+        const recentUserTurns = [...messages]
+            .filter((m) => m.role === "user")
+            .slice(-MAX_MEMORY_USER_TURNS)
+            .map((m, i) => `${i + 1}. ${trimForPrompt(getTextContent(m) ?? "", MAX_MEMORY_USER_TURN_CHARS)}`);
+
+        const memoryBlocks: string[] = [];
+        if (profileLines.length) memoryBlocks.push(`Profile memory:\n${profileLines.join("\n")}`);
+        if (recentUserTurns.length) memoryBlocks.push(`Recent user intents:\n${recentUserTurns.join("\n")}`);
+        return memoryBlocks.join("\n\n");
     };
 
     const makeAssistantMessageId = () =>
@@ -1091,6 +1240,28 @@ export default function AICareerAssistantChat() {
         } catch { return null; }
     };
 
+    const getResumeLatexForChat = () => {
+        if (typeof window === "undefined") return "";
+        try {
+            const raw = tryLocalStorageGet("chatResumeLatex")?.trim();
+            if (!raw) return "";
+            return raw.length > 200_000 ? raw.slice(0, 200_000) : raw;
+        } catch {
+            return "";
+        }
+    };
+
+    const getCoverLetterLatexForChat = () => {
+        if (typeof window === "undefined") return "";
+        try {
+            const raw = tryLocalStorageGet("chatCoverLetterLatex")?.trim();
+            if (!raw) return "";
+            return raw.length > 200_000 ? raw.slice(0, 200_000) : raw;
+        } catch {
+            return "";
+        }
+    };
+
     const toasterRef = useRef<ToasterRef>(null);
     const showToast = (variant: 'default' | 'success' | 'error' | 'warning', msg: string) => {
         toasterRef.current?.show({
@@ -1139,6 +1310,13 @@ export default function AICareerAssistantChat() {
                       : needsHuggingFaceCustomModelField(mid) && settingsRef.current.huggingFaceCustomModel?.trim()
                         ? { customModel: settingsRef.current.huggingFaceCustomModel.trim() }
                         : {};
+                const chatProfile = useProfileContextRef.current ? readChatGlobalProfile() : null;
+                const requestResumeData = stripProfilePictureFromResumeData(
+                    buildResumeDataForChatRequest(messagesForResumeContext(messages), getResumeData()),
+                );
+                const knowledgeContext = useProfileContextRef.current
+                    ? buildUserKnowledgeStoreChunks(requestResumeData, chatProfile)
+                    : "";
                 return {
                 body: {
                     messages,
@@ -1154,8 +1332,12 @@ export default function AICareerAssistantChat() {
                     contextText: useProfileContextRef.current
                         ? [settingsRef.current.contextWindow, buildProfileContextText()].filter(Boolean).join("\n\n")
                         : "",
-                    resumeData: getResumeData(),
-                    chatGlobalProfile: readChatGlobalProfile(),
+                    memoryContext: useProfileContextRef.current ? buildMemoryContextText(messages) : "",
+                    retrievalContext: [knowledgeContext, buildRetrievalContextFromMessages(messages)].filter(Boolean).join("\n\n"),
+                    resumeData: requestResumeData,
+                    resumeLatex: getResumeLatexForChat(),
+                    coverLetterLatex: getCoverLetterLatexForChat(),
+                    chatGlobalProfile: chatProfile,
                     aiMode: true,
                     mode: "career-assistant",
                 },
@@ -1164,11 +1346,29 @@ export default function AICareerAssistantChat() {
         }),
         onError: (err) => {
             console.error("Chat error:", err);
+            const msg = (err?.message ?? "").toLowerCase();
+            if (msg.includes("invalid model") || msg.includes("not configured")) {
+                showToast("warning", "This chat model is not supported or is misconfigured. Pick another model in the composer.");
+                return;
+            }
+            if (
+                msg.includes("422") ||
+                msg.includes("incompatible") ||
+                msg.includes("unsupported") ||
+                msg.includes("model_not_found")
+            ) {
+                showToast(
+                    "warning",
+                    "The provider rejected this model or request. Switch to Google Gemini (or another supported model) and try again.",
+                );
+                return;
+            }
             showToast("error", `AI error: ${err.message?.slice(0, 80) ?? "Unknown error"}`);
         },
     });
 
     const lastMergedAssistantIdRef = useRef<string | null>(null);
+    const resumeCvHintShownForAssistantIdRef = useRef<string | null>(null);
     const prevChatStatusRef = useRef<typeof status>("ready");
     const [resumeApplyOfferId, setResumeApplyOfferId] = useState<string | null>(null);
 
@@ -1231,6 +1431,7 @@ export default function AICareerAssistantChat() {
 
     useEffect(() => {
         lastMergedAssistantIdRef.current = null;
+        resumeCvHintShownForAssistantIdRef.current = null;
         setResumeApplyOfferId(null);
     }, [currentSessionId]);
 
@@ -1244,6 +1445,31 @@ export default function AICareerAssistantChat() {
         const last = messages[messages.length - 1];
         if (!last || last.role !== "assistant" || !last.id) return;
         const text = getTextContent(last) ?? "";
+
+        if (resumeCvHintShownForAssistantIdRef.current !== last.id) {
+            let lastUser = "";
+            for (let i = messages.length - 2; i >= 0; i--) {
+                if (messages[i]?.role === "user") {
+                    lastUser = getTextContent(messages[i]!) ?? "";
+                    break;
+                }
+            }
+            const resumeIntent =
+                /\b(resume|cv|curriculum|latex cv|cover letter|cover-letter|experience|summary|skills)\b/i.test(
+                    lastUser,
+                );
+            const hasCvFence = /```\s*component\s*:\s*(cv|resume)\b/i.test(text);
+            const modelId = settingsRef.current.model ?? "";
+            const gemini = modelId.startsWith("gemini-");
+            if (resumeIntent && lastUser.length > 12 && !hasCvFence && !gemini) {
+                resumeCvHintShownForAssistantIdRef.current = last.id;
+                showToast(
+                    "warning",
+                    "This reply did not include structured resume JSON (```component:cv```). Google Gemini usually follows this format most reliably — try switching models.",
+                );
+            }
+        }
+
         const { merged, template } = mergeAssistantResumeIntoCurrent(loadFullResumeFromStorage(), text);
         if (!merged) return;
         if (lastMergedAssistantIdRef.current === last.id) return;
@@ -1885,6 +2111,14 @@ export default function AICareerAssistantChat() {
                                         chatApiKey={settings.apiKey}
                                         chatModel={settings.model}
                                         canonicalResumeKey={canonicalResumeKey}
+                                        interviewLabContext={{
+                                            apiKey: settings.apiKey,
+                                            model: settings.model,
+                                            openaiTranscriptionApiKey: settings.openaiTranscriptionApiKey,
+                                            vercelOidcToken: settings.vercelOidcToken,
+                                            onSwitchToGemini: () => updateSettings({ model: getDefaultInterviewLabModelId() }),
+                                            onToast: interviewLabToast,
+                                        }}
                                     />
                                 ))}
 

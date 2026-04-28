@@ -9,6 +9,7 @@
 
 import { deepMerge } from "@/lib/utils"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
+import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume"
 import type { ResumeData, Template } from "@/lib/types"
 
 /** Keep in sync with `resumeTemplates` keys in components/pdf-templates — avoids pulling PDF bundle into lib */
@@ -60,29 +61,29 @@ export function unwrapResumeEnvelope(obj: Record<string, unknown> | null): {
 
   const topTemplate = typeof obj.template === "string" ? obj.template : undefined
 
-  if (isResumeUpdateShape(obj)) {
-    return { resume: obj, template: topTemplate }
+  const tryFlat = (candidate: Record<string, unknown>): Record<string, unknown> | null => {
+    const flat = normalizeResumePayloadToFlat(candidate)
+    if (flat && isResumeUpdateShape(flat)) return flat
+    if (isResumeUpdateShape(candidate)) return candidate
+    return null
   }
 
-  const rd = obj.resumeData
-  if (rd && typeof rd === "object" && !Array.isArray(rd) && isResumeUpdateShape(rd as Record<string, unknown>)) {
-    return { resume: rd as Record<string, unknown>, template: topTemplate }
-  }
-
-  if (typeof obj.component === "string" && obj.resumeData && typeof obj.resumeData === "object" && !Array.isArray(obj.resumeData)) {
-    const inner = obj.resumeData as Record<string, unknown>
-    if (isResumeUpdateShape(inner)) {
-      return { resume: inner, template: topTemplate }
-    }
-  }
+  const fromTop = tryFlat(obj)
+  if (fromTop) return { resume: fromTop, template: topTemplate }
 
   const props = obj.props
   if (props && typeof props === "object" && !Array.isArray(props)) {
     const p = props as Record<string, unknown>
-    if (isResumeUpdateShape(p)) return { resume: p, template: typeof p.template === "string" ? p.template : topTemplate }
+    const pt = typeof p.template === "string" ? p.template : topTemplate
+    const fromProps = tryFlat(p, pt)
+    if (fromProps) return { resume: fromProps, template: pt }
     const prd = p.resumeData
-    if (prd && typeof prd === "object" && !Array.isArray(prd) && isResumeUpdateShape(prd as Record<string, unknown>)) {
-      return { resume: prd as Record<string, unknown>, template: typeof p.template === "string" ? p.template : topTemplate }
+    if (prd && typeof prd === "object" && !Array.isArray(prd)) {
+      const flatPrd = normalizeResumePayloadToFlat(prd as Record<string, unknown>) ??
+        (isResumeUpdateShape(prd as Record<string, unknown>) ? (prd as Record<string, unknown>) : null)
+      if (flatPrd && isResumeUpdateShape(flatPrd)) {
+        return { resume: flatPrd, template: pt }
+      }
     }
   }
 

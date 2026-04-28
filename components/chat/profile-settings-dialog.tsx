@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Camera, UserRound } from "lucide-react";
 import { AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
 import { useToast } from "@/hooks/use-toast";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
+import { ProfilePhotoCropDialog } from "@/components/chat/profile-photo-crop-dialog";
 import { EMAIL_PROVIDER_LABELS, normalizeDefaultEmailProvider, type EmailProviderId } from "@/lib/email-compose-urls";
 import {
   isOpenAiCompatibleChatModel,
@@ -26,6 +28,8 @@ export type UserProfile = {
   linkedin: string;
   website: string;
   github: string;
+  /** data URL or https — used on resume / PDF when global profile context is on */
+  profilePicture?: string;
   /** Preferred provider when opening “Email HR” compose links */
   defaultEmailProvider: string;
   /** Comma-separated or free-text target roles for RAG-style context */
@@ -44,10 +48,46 @@ const EMPTY_PROFILE: UserProfile = {
   linkedin: "",
   website: "",
   github: "",
+  profilePicture: "",
   defaultEmailProvider: "gmail",
   targetRoles: "",
   careerNotes: "",
 };
+
+function safeStoredProfilePicture(v: unknown): string {
+  if (typeof v !== "string") return "";
+  const s = v.trim();
+  if (!s) return "";
+  if (s.startsWith("data:image/") || s.startsWith("https://") || s.startsWith("http://")) return s;
+  return "";
+}
+
+/** Keep resume builder localStorage in sync so PDF preview matches the global profile photo */
+function syncResumeProfilePicture(picture: string | undefined) {
+  try {
+    const raw = tryLocalStorageGet("resumeData");
+    let base: Record<string, unknown> = {};
+    if (raw) {
+      try {
+        base = JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        base = {};
+      }
+    }
+    const prev =
+      base.basicInfo && typeof base.basicInfo === "object" && !Array.isArray(base.basicInfo)
+        ? (base.basicInfo as Record<string, unknown>)
+        : {};
+    base.basicInfo = { ...prev };
+    const pic = safeStoredProfilePicture(picture ?? "");
+    if (pic) (base.basicInfo as Record<string, unknown>).profilePicture = pic;
+    else delete (base.basicInfo as Record<string, unknown>).profilePicture;
+    tryLocalStorageSet("resumeData", JSON.stringify(base));
+    window.dispatchEvent(new CustomEvent("resume-storage-updated"));
+  } catch {
+    // quota / private mode
+  }
+}
 
 function loadProfile(): UserProfile {
   if (typeof window === "undefined") return { ...EMPTY_PROFILE };
@@ -63,6 +103,7 @@ function loadProfile(): UserProfile {
       linkedin: typeof p.linkedin === "string" ? p.linkedin : "",
       website: typeof p.website === "string" ? p.website : "",
       github: typeof p.github === "string" ? p.github : "",
+      profilePicture: safeStoredProfilePicture(p.profilePicture),
       defaultEmailProvider:
         typeof p.defaultEmailProvider === "string" && p.defaultEmailProvider.trim()
           ? p.defaultEmailProvider.trim()
@@ -75,12 +116,13 @@ function loadProfile(): UserProfile {
   }
 }
 
-function saveProfile(p: UserProfile) {
+function saveProfile(p: UserProfile): boolean {
   try {
     tryLocalStorageSet(PROFILE_STORE_ID, JSON.stringify(p));
     window.dispatchEvent(new CustomEvent("ai-chat-profile-updated"));
+    return true;
   } catch {
-    // ignore quota errors
+    return false;
   }
 }
 
@@ -96,6 +138,9 @@ export function ProfileSettingsDialog({
   onSettingsChange: (patch: Partial<ChatSettings>) => void;
 }) {
   const [profile, setProfile] = useState<UserProfile>({ ...EMPTY_PROFILE });
+  const [cropOpen, setCropOpen] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -112,7 +157,16 @@ export function ProfileSettingsDialog({
   }, []);
 
   const handleSave = () => {
-    saveProfile(profile);
+    const ok = saveProfile(profile);
+    if (!ok) {
+      toast({
+        variant: "destructive",
+        title: "Could not save profile",
+        description: "Your browser storage may be full. Try removing the profile photo or clearing site data.",
+      });
+      return;
+    }
+    syncResumeProfilePicture(profile.profilePicture);
     onSettingsChange({
       model: settings.model,
       contextWindow: settings.contextWindow,
@@ -122,9 +176,67 @@ export function ProfileSettingsDialog({
     });
     toast({
       title: "Profile saved",
-      description: "Global profile, RAG context, and chat settings have been updated.",
+      description: "Global profile, photo on your resume, RAG context, and chat settings are updated.",
     });
     onOpenChange(false);
+  };
+
+  const onPickPhoto: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !file.type.startsWith("image/")) {
+      toast({
+        variant: "destructive",
+        title: "Invalid file",
+        description: "Please choose an image file (JPEG, PNG, or WebP).",
+      });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = typeof reader.result === "string" ? reader.result : "";
+      if (!url) return;
+      setImageToCrop(url);
+      setCropOpen(true);
+    };
+    reader.onerror = () => {
+      toast({ variant: "destructive", title: "Could not read image", description: "Try another file." });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onCropDone = (dataUrl: string) => {
+    const prevPic = profile.profilePicture;
+    const next = { ...profile, profilePicture: dataUrl };
+    setProfile(next);
+    const ok = saveProfile(next);
+    if (!ok) {
+      toast({
+        variant: "destructive",
+        title: "Could not save photo",
+        description: "Storage may be full. Try a smaller image or clear site data.",
+      });
+      setProfile((p) => ({ ...p, profilePicture: prevPic }));
+      return;
+    }
+    syncResumeProfilePicture(dataUrl);
+    setImageToCrop(null);
+    toast({
+      title: "Photo saved",
+      description: "Cropped image is stored in your profile and synced to your resume.",
+    });
+  };
+
+  const clearPhoto = () => {
+    const next = { ...profile, profilePicture: "" };
+    setProfile(next);
+    const ok = saveProfile(next);
+    if (!ok) {
+      toast({ variant: "destructive", title: "Could not update profile", description: "Try again in a moment." });
+      return;
+    }
+    syncResumeProfilePicture(undefined);
+    toast({ title: "Photo removed", description: "Profile photo cleared from your resume and saved settings." });
   };
 
   return (
@@ -135,6 +247,59 @@ export function ProfileSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-5 pb-1">
+          <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-background">
+                {profile.profilePicture ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.profilePicture} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <UserRound className="h-8 w-8 text-muted-foreground" aria-hidden />
+                )}
+              </div>
+              <div className="min-w-0 space-y-0.5">
+                <Label className="text-xs font-medium">Profile photo</Label>
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  Crop a square headshot. The same image appears on your resume and PDF exports when profile context is on.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:ml-auto sm:justify-end">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={onPickPhoto}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-xl gap-1.5"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Camera className="h-3.5 w-3.5" />
+                Upload & crop
+              </Button>
+              {profile.profilePicture ? (
+                <Button type="button" variant="ghost" size="sm" className="rounded-xl text-destructive" onClick={clearPhoto}>
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <ProfilePhotoCropDialog
+            open={cropOpen}
+            onOpenChange={(v) => {
+              setCropOpen(v);
+              if (!v) setImageToCrop(null);
+            }}
+            imageSrc={imageToCrop}
+            onCropComplete={onCropDone}
+          />
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label className="text-xs">Name</Label>

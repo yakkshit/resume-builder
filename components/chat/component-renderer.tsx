@@ -10,6 +10,8 @@ import { LearningResources } from "./components/learning-resources";
 import { CoverLetterViewer } from "./components/cover-letter-viewer";
 import { EmailHrPanel } from "./components/email-hr-panel";
 import { LinkedinDmPanel } from "./components/linkedin-dm-panel";
+import { InterviewLabPanel } from "./interview-lab-panel";
+import { ResumeLatexArtifact } from "./resume-latex-artifact";
 
 export type ComponentType =
   | "resume"
@@ -21,7 +23,23 @@ export type ComponentType =
   | "coding-challenge"
   | "learning-resources"
   | "email-hr"
-  | "linkedin-dm";
+  | "linkedin-dm"
+  | "interview-lab"
+  | "resume-latex"
+  | "cover-letter-latex";
+
+export type InterviewLabRenderContext = {
+  apiKey: string;
+  model: string;
+  openaiTranscriptionApiKey: string;
+  vercelOidcToken: string;
+  onSwitchToGemini?: () => void;
+  onToast?: (
+    variant: "default" | "success" | "error" | "warning",
+    message: string,
+    meta?: { docsUrl?: string },
+  ) => void;
+};
 
 interface ComponentRendererProps {
   type: ComponentType;
@@ -35,13 +53,27 @@ interface ComponentRendererProps {
    * Only the latest resume block in the chat should pass true.
    */
   resumeSyncsWithGlobal?: boolean;
+  /** Required when rendering `interview-lab` inline in chat */
+  interviewLabContext?: InterviewLabRenderContext;
 }
 
-export function ComponentRenderer({ type, data, chatApiKey, chatModel, resumeSyncsWithGlobal }: ComponentRendererProps) {
+export function ComponentRenderer({
+  type,
+  data,
+  chatApiKey,
+  chatModel,
+  resumeSyncsWithGlobal,
+  interviewLabContext,
+}: ComponentRendererProps) {
   switch (type) {
     case "resume":
       return <ResumeViewer data={data} syncWithGlobalResume={resumeSyncsWithGlobal !== false} />;
     case "cover-letter":       return <CoverLetterViewer data={data as any} />;
+    case "cover-letter-latex": {
+      const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+      const latex = typeof rec?.latex === "string" ? rec.latex : undefined;
+      return <ResumeLatexArtifact initialLatex={latex} kind="cover-letter" />;
+    }
     case "cv-score":           return <CVScore data={data as any} />;
     case "job-recommendations": {
       const d = data as any;
@@ -55,6 +87,34 @@ export function ComponentRenderer({ type, data, chatApiKey, chatModel, resumeSyn
     case "learning-resources": return <LearningResources data={(data as any)?.resources} />;
     case "email-hr":           return <EmailHrPanel data={data} chatApiKey={chatApiKey} chatModel={chatModel} />;
     case "linkedin-dm":        return <LinkedinDmPanel data={data} />;
+    case "interview-lab": {
+      const ctx = interviewLabContext;
+      if (!ctx) {
+        return (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+            Interview Lab needs chat settings (API keys). Open Interview Lab from the toolbar instead.
+          </p>
+        );
+      }
+      return (
+        <InterviewLabPanel
+          variant="embedded"
+          open
+          onOpenChange={() => {}}
+          apiKey={ctx.apiKey}
+          model={ctx.model}
+          openaiTranscriptionApiKey={ctx.openaiTranscriptionApiKey}
+          vercelOidcToken={ctx.vercelOidcToken}
+          onSwitchToGemini={ctx.onSwitchToGemini}
+          onToast={ctx.onToast}
+        />
+      );
+    }
+    case "resume-latex": {
+      const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+      const latex = typeof rec?.latex === "string" ? rec.latex : undefined;
+      return <ResumeLatexArtifact initialLatex={latex} kind="resume" />;
+    }
     default:                   return null;
   }
 }

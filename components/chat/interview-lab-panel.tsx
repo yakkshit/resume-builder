@@ -78,6 +78,9 @@ const PY_START = `def two_sum(nums, target):
 type ToastMeta = { docsUrl?: string };
 
 type Props = {
+  /** Dialog mode: controlled by parent. Embedded: always mounted as an inline card (e.g. chat artifact). */
+  variant?: "dialog" | "embedded";
+  className?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   apiKey: string;
@@ -108,6 +111,8 @@ async function readTextStream(res: Response, onDelta: (t: string) => void): Prom
 }
 
 export function InterviewLabPanel({
+  variant = "dialog",
+  className,
   open,
   onOpenChange,
   apiKey,
@@ -117,6 +122,8 @@ export function InterviewLabPanel({
   onSwitchToGemini,
   onToast,
 }: Props) {
+  const embedded = variant === "embedded";
+  const active = embedded || open;
   const [fullscreen, setFullscreen] = useState(false);
   const [tab, setTab] = useState("conversation");
   const [srStatus, setSrStatus] = useState("");
@@ -170,13 +177,13 @@ export function InterviewLabPanel({
   }, [lang]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!active) return;
     // default on if token exists (Task 6 requirement)
     setUseSandbox(Boolean(vercelOidcToken.trim()));
-  }, [open, vercelOidcToken]);
+  }, [active, vercelOidcToken]);
 
   useEffect(() => {
-    if (!open) {
+    if (!active) {
       incompatibleWarnedRef.current = false;
       setListening(false);
       setRecording(false);
@@ -189,26 +196,26 @@ export function InterviewLabPanel({
       mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
       mediaStreamRef.current = null;
     }
-  }, [open]);
+  }, [active]);
 
   useEffect(() => {
-    if (!open) return;
+    if (embedded || !open) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onOpenChange(false);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onOpenChange]);
+  }, [embedded, open, onOpenChange]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!active) return;
     if (tab !== "conversation") return;
     // Focus input for quick start.
     window.setTimeout(() => convInputRef.current?.focus(), 50);
-  }, [open, tab, compatible]);
+  }, [active, tab, compatible]);
 
   useEffect(() => {
-    if (!open || incompatibleWarnedRef.current) return;
+    if (!active || incompatibleWarnedRef.current) return;
     if (!compatible) {
       incompatibleWarnedRef.current = true;
       toast(
@@ -217,7 +224,7 @@ export function InterviewLabPanel({
         { docsUrl },
       );
     }
-  }, [open, compatible, docsUrl, toast]);
+  }, [active, compatible, docsUrl, toast]);
 
   useEffect(() => {
     return () => {
@@ -619,52 +626,74 @@ export function InterviewLabPanel({
     }
   };
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          "flex flex-col gap-0 overflow-hidden border-border/60 bg-gradient-to-b from-background via-background to-muted/20 p-0 shadow-2xl duration-300",
-          // Mobile: always full-screen. Desktop/tablet: honor fullscreen toggle.
-          "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:z-[60] max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-screen max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none",
-          fullscreen
-            ? "fixed inset-0 left-0 top-0 z-[60] h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none sm:rounded-none"
-            : "h-[min(88dvh,820px)] max-h-[100dvh] w-[min(96vw,920px)] max-w-[96vw] sm:max-w-[920px]",
-        )}
-      >
-        <p className="sr-only" role="status" aria-live="polite">
-          {srStatus}
-        </p>
-        <DialogHeader className="shrink-0 space-y-1 border-b border-border/50 bg-muted/20 px-4 py-3 pr-14 text-left sm:px-6">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 shadow-lg">
-              <Clapperboard className="h-4 w-4 text-white" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <DialogTitle className="text-base font-semibold tracking-tight sm:text-lg">
-                Interview Lab
-              </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground sm:text-sm">
-                AI rounds, code checks (Node-style JS/TS + Python feedback), and live voice + screen practice.
-              </DialogDescription>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5 rounded-full border-border/60"
-              onClick={() => setFullscreen((f) => !f)}
-            >
-              {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-              {fullscreen ? "Exit" : "Fullscreen"}
-            </Button>
-          </div>
-        </DialogHeader>
-
-        <Tabs
-          value={tab}
-          onValueChange={setTab}
-          className="flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2 max-sm:pb-[5.25rem] sm:px-5"
+  const header = embedded ? (
+    <div className="shrink-0 space-y-1 border-b border-border/50 bg-muted/20 px-4 py-3 text-left sm:px-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 shadow-lg">
+          <Clapperboard className="h-4 w-4 text-white" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-base font-semibold tracking-tight sm:text-lg">Interview Lab</h2>
+          <p className="text-xs text-muted-foreground sm:text-sm">
+            AI rounds, code checks (Node-style JS/TS + Python feedback), and live voice + screen practice.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5 rounded-full border-border/60"
+          onClick={() => setFullscreen((f) => !f)}
         >
+          {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          {fullscreen ? "Exit" : "Fullscreen"}
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <DialogHeader className="shrink-0 space-y-1 border-b border-border/50 bg-muted/20 px-4 py-3 pr-14 text-left sm:px-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 shadow-lg">
+          <Clapperboard className="h-4 w-4 text-white" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <DialogTitle className="text-base font-semibold tracking-tight sm:text-lg">Interview Lab</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground sm:text-sm">
+            AI rounds, code checks (Node-style JS/TS + Python feedback), and live voice + screen practice.
+          </DialogDescription>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5 rounded-full border-border/60"
+          onClick={() => setFullscreen((f) => !f)}
+        >
+          {fullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+          {fullscreen ? "Exit" : "Fullscreen"}
+        </Button>
+      </div>
+    </DialogHeader>
+  );
+
+  const tabShellClass = cn(
+    "flex min-h-0 flex-1 flex-col px-3 pb-3 pt-2 sm:px-5",
+    !embedded && "max-sm:pb-[5.25rem]",
+  );
+  const tabListClass = cn(
+    "mb-3 grid h-auto w-full shrink-0 grid-cols-3 gap-1 rounded-xl bg-muted/40 p-1",
+    !embedded &&
+      "max-sm:fixed max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:z-[80] max-sm:mb-0 max-sm:rounded-none max-sm:border-t max-sm:border-border/50 max-sm:bg-background/90 max-sm:p-2 max-sm:backdrop-blur",
+  );
+
+  const inner = (
+    <>
+      <p className="sr-only" role="status" aria-live="polite">
+        {srStatus}
+      </p>
+      {header}
+
+      <Tabs value={tab} onValueChange={setTab} className={tabShellClass}>
           {!compatible ? (
             <div className="mb-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-xs text-amber-100/95">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -697,12 +726,7 @@ export function InterviewLabPanel({
               </p>
             </div>
           ) : null}
-          <TabsList
-            className={cn(
-              "mb-3 grid h-auto w-full shrink-0 grid-cols-3 gap-1 rounded-xl bg-muted/40 p-1",
-              "max-sm:fixed max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:z-[80] max-sm:mb-0 max-sm:rounded-none max-sm:border-t max-sm:border-border/50 max-sm:bg-background/90 max-sm:p-2 max-sm:backdrop-blur",
-            )}
-          >
+          <TabsList className={tabListClass}>
             <TabsTrigger value="conversation" className="gap-1.5 rounded-lg text-xs sm:text-sm">
               <MessageCircle className="h-3.5 w-3.5" />
               Interview
@@ -981,6 +1005,37 @@ export function InterviewLabPanel({
             ) : null}
           </TabsContent>
         </Tabs>
+    </>
+  );
+
+  if (embedded) {
+    return (
+      <div
+        className={cn(
+          "flex w-full max-w-[min(980px,100%)] flex-col overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-b from-background via-background to-muted/20 shadow-inner",
+          fullscreen
+            ? "fixed inset-0 z-[55] h-[100dvh] max-h-[100dvh] rounded-none"
+            : "min-h-[min(480px,70vh)] max-h-[min(76vh,820px)]",
+          className,
+        )}
+      >
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className={cn(
+          "flex flex-col gap-0 overflow-hidden border-border/60 bg-gradient-to-b from-background via-background to-muted/20 p-0 shadow-2xl duration-300",
+          "max-sm:fixed max-sm:inset-0 max-sm:left-0 max-sm:top-0 max-sm:z-[60] max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-screen max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none",
+          fullscreen
+            ? "fixed inset-0 left-0 top-0 z-[60] h-[100dvh] max-h-[100dvh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none sm:rounded-none"
+            : "h-[min(88dvh,820px)] max-h-[100dvh] w-[min(96vw,920px)] max-w-[96vw] sm:max-w-[920px]",
+        )}
+      >
+        {inner}
       </DialogContent>
     </Dialog>
   );

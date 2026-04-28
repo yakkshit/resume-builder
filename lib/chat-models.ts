@@ -1,10 +1,9 @@
 /**
  * Curated AI model IDs supported by this project (stable APIs).
  * Grouped by provider for the UI.
- * Cedz: single "cedz" option - user provides URL + model in the Cedz panel.
  */
 export const CHAT_MODELS_BY_PROVIDER: Record<string, readonly string[]> = {
-  "Cedz": ["cedz"],
+  "Cedz": ["cedz-qwen3-8b", "cedz-llama3-8b", "cedz-custom"],
   "Lingo AI": ["lingo-ai"],
   // Core text/multimodal Gemini chat models only (no TTS / audio-only / embeddings here)
   "Google Gemini": [
@@ -21,16 +20,13 @@ export const CHAT_MODELS_BY_PROVIDER: Record<string, readonly string[]> = {
   "Groq": ["llama-3.1-8b-instant", "llama-3.1-70b-versatile", "mixtral-8x7b-32768"],
   "Mistral": ["mistral-large-latest", "mistral-medium-latest", "mistral-small-latest"],
   "Hugging Face": ["huggingface-endpoint", "huggingface-model", "huggingface-streaming", "huggingface-provider"],
-  /** [Hugging Face Inference router](https://ai-sdk.dev/providers/ai-sdk-providers/huggingface) via @ai-sdk/huggingface */
+  /** Preset Hub models in career chat (components/chat/chat-store.tsx) — drives customModel / server Hub id */
   "Hugging Face (AI SDK)": [
     "meta-llama/Llama-3.1-8B-Instruct",
     "deepseek-ai/DeepSeek-V3-0324",
     "Qwen/Qwen2.5-72B-Instruct",
-    /** User-provided Hub id only (same router as other HF AI SDK models) */
     "hf-custom-hub-aisdk",
   ],
-  /** [OpenAI-compatible](https://ai-sdk.dev/providers/openai-compatible-providers) — set base URL + model in chat settings */
-  "OpenAI Compatible": ["openai-compatible-aisdk"],
   "Local / Custom": ["local-custom", "ollama-local", "lmstudio-local", "openai-like-local"],
 } as const
 

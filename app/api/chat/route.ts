@@ -1,21 +1,25 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { InferenceClient } from "@huggingface/inference"
 import { GoogleGenAI } from "@google/genai"
-import { createAnthropic } from "@ai-sdk/anthropic"
-import { createHuggingFace } from "@ai-sdk/huggingface"
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible"
-import { createUIMessageStream, createUIMessageStreamResponse, generateId, streamText } from "ai"
+import { createUIMessageStream, createUIMessageStreamResponse, generateId } from 'ai'
 import mime from "mime"
 import type { NextRequest } from "next/server"
-import { DEFAULT_CHAT_MODEL, CHAT_MODELS_BY_PROVIDER } from "@/lib/chat-models"
-import { HF_CUSTOM_HUB_MODEL_ID } from "@/lib/chat-provider-settings"
-import { redactResumePII, redactTextPII } from "@/lib/redact-resume-pii"
-import { buildUserKnowledgeStoreChunks } from "@/lib/user-knowledge-context"
-import { ensureMemoryFilesystem, readCoreMemory, recallFromConversations, appendConversation, overwriteCoreMemory, appendNotes } from "@/lib/memory-store"
+import { DEFAULT_CHAT_MODEL } from "@/lib/chat-models"
 
 /** Extract text from message (supports v4 content and v5 parts) */
 const getMsgText = (m: { content?: string; parts?: Array<{ type: string; text?: string }> }) =>
   m.parts?.filter((p): p is { type: "text"; text: string } => p.type === "text").map((p) => p.text).join("") ?? m.content ?? ""
+
+const MAX_CONTEXT_TEXT_CHARS = 12_000
+const MAX_MEMORY_CONTEXT_CHARS = 10_000
+const MAX_RETRIEVAL_CONTEXT_CHARS = 8_000
+const MAX_PROFILE_JSON_CHARS = 4_000
+
+function clipForPrompt(value: string | undefined, maxChars: number): string {
+  const text = (value ?? "").trim()
+  if (!text) return ""
+  return text.length > maxChars ? `${text.slice(0, maxChars)}\n…[truncated]` : text
+}
 
 /** Helper: stream text chunks to AI SDK v5 UIMessage format. Pass originalMessages so useChat can display the response. */
 function streamTextToResponse(
@@ -36,54 +40,186 @@ function streamTextToResponse(
 
 import { writeFile } from "fs"
 
-// Allow streaming + PDF text extraction for attachments
-export const maxDuration = 120
+// Allow streaming responses up to 30 seconds
+export const maxDuration = 30
 
 // Define available models with their providers and configurations (aligned with UI selector)
-const AVAILABLE_MODELS = Object.entries(CHAT_MODELS_BY_PROVIDER).reduce((acc, [providerName, modelIds]) => {
-  // Provider mapping for internal handling
-  let internalProvider = "google"
-  if (providerName === "Cedz") internalProvider = "cedz"
-  else if (providerName === "Lingo AI") internalProvider = "lingo-ai"
-  else if (providerName === "OpenAI") internalProvider = "openai"
-  else if (providerName === "Anthropic Claude") internalProvider = "anthropic"
-  else if (providerName === "DeepSeek") internalProvider = "deepseek"
-  else if (providerName === "Groq") internalProvider = "groq"
-  else if (providerName === "Mistral") internalProvider = "mistral"
-  else if (providerName === "Hugging Face") internalProvider = "huggingface"
-  else if (providerName === "Hugging Face (AI SDK)") internalProvider = "hf-aisdk"
-  else if (providerName === "OpenAI Compatible") internalProvider = "openai-compat-aisdk"
-  else if (providerName === "Local / Custom") internalProvider = "local" // Will be overridden in specific handlers
+const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiKey?: string }> = {
+  // Specialized
+  "lingo-ai": { provider: "lingo-ai", modelId: "resume-model-v1" },
 
-  for (const modelId of modelIds) {
-    // Basic local overrides
-    let mappedProvider = internalProvider
-    if (modelId === "ollama-local") mappedProvider = "ollama"
-    if (modelId === "lmstudio-local") mappedProvider = "lmstudio"
-    if (modelId === "openai-like-local") mappedProvider = "openai-like"
+  // Google Gemini — core chat / multimodal models (no TTS-only, embeddings, etc.)
+  "gemini-3.1-pro-preview": { provider: "google", modelId: "gemini-3.1-pro-preview" },
+  "gemini-3-flash-preview": { provider: "google", modelId: "gemini-3-flash-preview" },
+  "gemini-3.1-flash-lite-preview": { provider: "google", modelId: "gemini-3.1-flash-lite-preview" },
+  "gemini-3.1-flash-image-preview": { provider: "google", modelId: "gemini-3.1-flash-image-preview" },
+  "gemini-3-pro-image-preview": { provider: "google", modelId: "gemini-3-pro-image-preview" },
+  "gemini-2.5-flash": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-image": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-live": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-native-audio-preview-12-2025": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-native-audio-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-preview-tts": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-lite": { provider: "google", modelId: "gemini-2.5-flash-lite" },
+  "gemini-2.5-flash-lite-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash-lite" },
+  "gemini-2.5-pro": { provider: "google", modelId: "gemini-2.5-pro" },
+  "gemini-2.5-pro-preview-tts": { provider: "google", modelId: "gemini-2.5-pro" },
+  "gemini-2.0-flash-exp": { provider: "google", modelId: "gemini-2.0-flash-exp" },
+  "gemini-2.0-flash": { provider: "google", modelId: "gemini-2.0-flash" },
+  "gemini-2.0-flash-001": { provider: "google", modelId: "gemini-2.0-flash" },
+  "gemini-2.0-flash-lite": { provider: "google", modelId: "gemini-2.0-flash-lite" },
+  "gemini-2.0-flash-lite-001": { provider: "google", modelId: "gemini-2.0-flash-lite" },
+  "gemini-2.0-pro": { provider: "google", modelId: "gemini-2.0-pro" },
 
-    acc[modelId] = {
-      provider: mappedProvider,
-      modelId: modelId,
-    }
-  }
-  return acc
-}, {} as Record<string, { provider: string; modelId: string }>)
+  // OpenAI (core + 2026 roadmap IDs; newer may resolve to latest)
+  "gpt-5": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.2": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.2-instant": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.3-codex": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.3-codex-spark": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4o": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4o-mini": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4-turbo": { provider: "openai", modelId: "gpt-4-turbo", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4": { provider: "openai", modelId: "gpt-4-turbo", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-3.5-turbo": { provider: "openai", modelId: "gpt-3.5-turbo", apiKey: process.env.OPENAI_API_KEY },
 
+  // Anthropic Claude (4.x/5 + legacy; newer slugs may need API model IDs)
+  "claude-opus-4.6": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-opus-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-sonnet-5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-sonnet-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-haiku-4.5": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-5-sonnet": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-5-haiku": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-opus": { provider: "anthropic", modelId: "claude-3-opus-20240229", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-sonnet": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-haiku": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-2.1": { provider: "anthropic", modelId: "claude-2.1", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-2.0": { provider: "anthropic", modelId: "claude-2.0", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-instant-1.2": { provider: "anthropic", modelId: "claude-instant-1.2", apiKey: process.env.ANTHROPIC_API_KEY },
+
+  // DeepSeek
+  "deepseek-chat": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-reasoner": { provider: "deepseek", modelId: "deepseek-reasoner", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-coder": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-coder-v2": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-coder-v2-lite": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+
+  // Groq
+  "llama-3.1-8b-instant": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.1-70b-versatile": { provider: "groq", modelId: "llama-3.1-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.3-70b-versatile": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "mixtral-8x7b-32768": { provider: "groq", modelId: "mixtral-8x7b-32768", apiKey: process.env.GROQ_API_KEY },
+  "gemma2-9b-it": { provider: "groq", modelId: "gemma2-9b-it", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.1-8b": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.1-70b": { provider: "groq", modelId: "llama-3.1-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "llama-3.3-70b": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "llama3-70b-8192": { provider: "groq", modelId: "llama3-70b-8192", apiKey: process.env.GROQ_API_KEY },
+
+  // Mistral (3.x + mini/magistral/devstral)
+  "mistral-large-3": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-3.1": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-small-3.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-3": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-small-3.1": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-14b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-8b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-3b": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
+  "magistral-medium-1.2": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "magistral-small-1.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "devstral-2": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "devstral-medium-1.0": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "devstral-small-2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-large-latest": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-latest": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-small-latest": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-7b-instruct": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
+
+  // Together.ai
+  "meta-llama/llama-3.1-8b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.1-8B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
+  "meta-llama/llama-3.1-70b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.1-70B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
+  "meta-llama/llama-3.3-70b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.3-70B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
+
+  // Cohere
+  "command-r-plus": { provider: "cohere", modelId: "command-r-plus", apiKey: process.env.COHERE_API_KEY },
+  "command-r": { provider: "cohere", modelId: "command-r", apiKey: process.env.COHERE_API_KEY },
+  "command-light": { provider: "cohere", modelId: "command-light", apiKey: process.env.COHERE_API_KEY },
+
+  // Perplexity
+  "llama-3.1-sonar-large-128k-online": { provider: "perplexity", modelId: "llama-3.1-sonar-large-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
+  "llama-3.1-8b-instruct": { provider: "perplexity", modelId: "llama-3.1-sonar-small-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
+  "llama-3.1-70b-instruct": { provider: "perplexity", modelId: "llama-3.1-sonar-large-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
+  "mixtral-8x7b-instruct": { provider: "perplexity", modelId: "mixtral-8x7b-instruct", apiKey: process.env.PERPLEXITY_API_KEY },
+
+  // Fireworks
+  "fireworks-llama-3.1-8b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/llama-v3p1-8b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
+  "fireworks-llama-3.1-70b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/llama-v3p1-70b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
+  "fireworks-mixtral-8x7b-instruct": { provider: "fireworks", modelId: "accounts/fireworks/models/mixtral-8x7b-instruct", apiKey: process.env.FIREWORKS_API_KEY },
+
+  // Hugging Face
+  "huggingface-endpoint": { provider: "huggingface", modelId: "endpoint", apiKey: process.env.HUGGINGFACE_API_KEY },
+  "huggingface-model": { provider: "huggingface", modelId: "model", apiKey: process.env.HUGGINGFACE_API_KEY },
+  "huggingface-streaming": { provider: "huggingface", modelId: "streaming", apiKey: process.env.HUGGINGFACE_API_KEY },
+  "huggingface-provider": { provider: "huggingface", modelId: "provider", apiKey: process.env.HUGGINGFACE_API_KEY },
+
+  // Local / Custom
+  "local-custom": { provider: "local", modelId: "local-custom" },
+  "ollama-local": { provider: "ollama", modelId: "ollama" },
+  "lmstudio-local": { provider: "lmstudio", modelId: "lmstudio" },
+  "openai-like-local": { provider: "openai-like", modelId: "openai-like" },
+}
+
+/** Cedz / Ollama-style UI models (not in AVAILABLE_MODELS). */
+const CEDZ_UI_MODELS: Record<string, { provider: string; modelId: string; apiKey?: string }> = {
+  "cedz-qwen3-8b": { provider: "cedz", modelId: "qwen3:8b" },
+  "cedz-llama3-8b": { provider: "cedz", modelId: "llama3:8b" },
+  "cedz-custom": { provider: "cedz", modelId: "custom" },
+}
+
+/**
+ * Full routing table: all server-supported model ids + Cedz + career chat sidebar ids
+ * (components/chat/chat-store.tsx) that are not spelled the same as AVAILABLE_MODELS keys.
+ * Previously a short duplicate list omitted gemini-2.5-flash etc. → 400 Invalid model.
+ */
+const HF_STREAMING = { provider: "huggingface" as const, modelId: "streaming" as const, apiKey: process.env.HUGGINGFACE_API_KEY }
+const AVAILABLE_MAP: Record<string, { provider: string; modelId: string; apiKey?: string }> = {
+  ...AVAILABLE_MODELS,
+  ...CEDZ_UI_MODELS,
+  // Career chat: Hub-style ids → HF streaming (customModel carries hub id from client)
+  "meta-llama/Llama-3.1-8B-Instruct": HF_STREAMING,
+  "deepseek-ai/DeepSeek-V3-0324": HF_STREAMING,
+  "Qwen/Qwen2.5-72B-Instruct": HF_STREAMING,
+  "hf-custom-hub-aisdk": HF_STREAMING,
+  "openai-compatible-aisdk": { provider: "openai-like", modelId: "openai-compatible", apiKey: undefined },
+}
+
+/** Same Hub id as chat-store / HF UI, different casing than Together.ai entry */
+const MODEL_ID_ALIASES: Record<string, string> = {
+  "meta-llama/llama-3.1-8b-instruct": "meta-llama/Llama-3.1-8B-Instruct",
+  "gemini-1.5-pro": "gemini-2.5-flash",
+  "gemini-1.5-flash": "gemini-2.5-flash",
+}
 
 // Default model if none specified (efficient for resume/cover letter)
 const DEFAULT_MODEL = DEFAULT_CHAT_MODEL
 
-// Map our UI model IDs to provider-specific API model IDs where they differ
-const API_MODEL_IDS: Record<string, string> = {
-  "claude-3-5-sonnet": "claude-3-5-sonnet-20241022",
-  "claude-3-5-haiku": "claude-3-5-haiku-20241022",
-  "mistral-large-latest": "mistral-large-2411",
-  "mistral-medium-latest": "mistral-medium-latest",
-  "mistral-small-latest": "mistral-small-latest",
-  "llama-3.1-8b-instant": "llama-3.1-8b-instant",
-  "llama-3.1-70b-versatile": "llama-3.1-70b-versatile",
-  "mixtral-8x7b-32768": "mixtral-8x7b-32768",
+function resolveModelRouting(model: unknown): { id: string; config: { provider: string; modelId: string; apiKey?: string } } {
+  const fallback = AVAILABLE_MAP[DEFAULT_MODEL] ? DEFAULT_MODEL : "gemini-2.5-flash"
+  const raw = typeof model === "string" ? model.trim() : ""
+  const tryDirect = (id: string) => {
+    const c = AVAILABLE_MAP[id]
+    return c ? { id, config: c } : null
+  }
+  if (raw) {
+    const direct = tryDirect(raw) ?? tryDirect(MODEL_ID_ALIASES[raw] ?? MODEL_ID_ALIASES[raw.toLowerCase()] ?? "")
+    if (direct) return direct
+    const lower = raw.toLowerCase()
+    for (const key of Object.keys(AVAILABLE_MAP)) {
+      if (key.toLowerCase() === lower) return { id: key, config: AVAILABLE_MAP[key] }
+    }
+  }
+  return { id: fallback, config: AVAILABLE_MAP[fallback] }
 }
 
 // Mock response for when API quota is exceeded
@@ -93,157 +229,23 @@ const MOCK_RESPONSES = [
   "API quota exceeded. While I can't analyze your specific resume right now, here are universal resume tips:\n\n- Use a clean, professional layout with consistent formatting\n- Place the most relevant information at the top\n- Use bullet points for better readability\n- Include metrics and specific results when possible\n- Remove outdated or irrelevant information",
 ]
 
-function stripProfilePictureForModel(resume: any): any {
-  if (!resume || typeof resume !== "object") return resume
-  try {
-    const cloned = structuredClone(resume)
-    if (cloned?.basicInfo && typeof cloned.basicInfo === "object") {
-      delete cloned.basicInfo.profilePicture
-    }
-    return cloned
-  } catch {
-    const basicInfo = resume?.basicInfo && typeof resume.basicInfo === "object" ? { ...resume.basicInfo } : resume?.basicInfo
-    if (basicInfo && typeof basicInfo === "object") delete (basicInfo as any).profilePicture
-    return { ...(resume as any), basicInfo }
-  }
-}
-
-function tryApplyDeterministicExperienceReplace(userText: string, resume: any): { nextResume: any; applied: boolean; replacements: number; from: string; to: string } | null {
-  const m = userText.match(/replace\s+(.+?)\s+(?:to|with)\s+(.+?)\s+in\s+experience\b/i)
-  if (!m) return null
-  const from = (m[1] || "").trim()
-  const to = (m[2] || "").trim()
-  if (!from || !to || !resume || typeof resume !== "object") return null
-
-  const next = stripProfilePictureForModel(resume)
-  const exp = Array.isArray(next?.experience) ? next.experience : []
-  let replacements = 0
-
-  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-  const replaceCi = (input: string, needle: string, value: string) => {
-    const rgx = new RegExp(esc(needle), "gi")
-    let changed = false
-    const out = input.replace(rgx, () => {
-      changed = true
-      return value
-    })
-    if (changed) replacements += 1
-    return { out, changed }
-  }
-
-  const tokens = from.split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length)
-  const fallbackToken = tokens.find((t) => t.length >= 4) || ""
-
-  for (const item of exp) {
-    if (!item || typeof item !== "object") continue
-    const stringKeys = ["company", "position", "description"] as const
-    for (const key of stringKeys) {
-      const raw = typeof (item as any)[key] === "string" ? (item as any)[key] : ""
-      if (!raw) continue
-      let out = raw
-      let changed = false
-      const full = replaceCi(out, from, to)
-      out = full.out
-      changed = full.changed
-      if (!changed && fallbackToken) {
-        const fb = replaceCi(out, fallbackToken, to)
-        out = fb.out
-        changed = fb.changed
-      }
-      if (changed) (item as any)[key] = out
-    }
-
-    if (Array.isArray((item as any).highlights)) {
-      (item as any).highlights = (item as any).highlights.map((h: unknown) => {
-        if (typeof h !== "string") return h
-        let out = h
-        let changed = false
-        const full = replaceCi(out, from, to)
-        out = full.out
-        changed = full.changed
-        if (!changed && fallbackToken) {
-          const fb = replaceCi(out, fallbackToken, to)
-          out = fb.out
-          changed = fb.changed
-        }
-        return out
-      })
-    }
-  }
-
-  return { nextResume: next, applied: replacements > 0, replacements, from, to }
-}
-
 // Update the POST function to handle attachedData (no app-level API key required; users provide provider keys in UI)
-function buildCareerAssistantSystemPrompt(resumeJson: string): string {
-  return `You are an AI Career Assistant for resumes and job applications. You help users with:
-- CV/resume generation and tailoring
-- Cover letters
-- Job applications and job matching
-- CV scoring against job descriptions
-- Course recommendations for roles
-- Mock interview questions (behavioral + coding)
-- HR email notes
-
-IMPORTANT: You MUST embed interactive components using this exact format. The UI renders these as cards (CV editor, cover letter, job links, etc.):
-
-\`\`\`component:componentType
-{"prop": "value"}
-\`\`\`
-
-Valid component types: cv, coverLetter, jobLinks, cvScorer, course, mockInterview, codingChallenge, hrNote, emailHr, linkedinDm, jobApplySimulator
-
-For resume/CV requests: ALWAYS include a \`\`\`component:cv\`\`\` block with resumeData.
-For cover letter requests: ALWAYS include a \`\`\`component:coverLetter\`\`\` block.
-For job suggestions: ALWAYS include \`\`\`component:jobLinks\`\`\`.
-For mock interviews: ALWAYS include \`\`\`component:mockInterview\`\`\`.
-For coding challenges: ALWAYS include \`\`\`component:codingChallenge\`\`\` with at least one problem in \`codingProblems\`.
-
-Examples:
-- Cover letter: \`\`\`component:coverLetter\n{"head":"Dear...","body":"...","footer":"Sincerely"}\n\`\`\`
-- CV scorer: \`\`\`component:cvScorer\n{"score":78,"feedback":["..."],"jobDescription":"..."}\n\`\`\`
-- Job links: \`\`\`component:jobLinks\n{"links":[{"title":"...","url":"...","company":"..."}]}\n\`\`\`
-- CV: \`\`\`component:cv\n{"resumeData":{...},"template":"modern"}\n\`\`\`
-- Mock interview: \`\`\`component:mockInterview\n{"questions":["..."],"codingProblems":["..."],"role":"..."}\n\`\`\`
-- Coding challenge: \`\`\`component:codingChallenge\n{"codingProblems":["..."]}\n\`\`\`
-- Course: \`\`\`component:course\n{"title":"...","provider":"...","skills":[...]}\n\`\`\`
-- HR note: \`\`\`component:hrNote\n{"subject":"...","body":"...","to":"..."}\n\`\`\`
-- Email HR (compose in Gmail/Yahoo/Outlook): \`\`\`component:emailHr\n{"to":"recruiter@company.com","subject":"...","body":"...","company":"...","jobTitle":"..."}\n\`\`\` Use when the user wants to email HR or a recruiter; include \`to\` when known.
-- LinkedIn DM (max 200 chars, user copies into LinkedIn): \`\`\`component:linkedinDm\n{"message":"..."}\n\`\`\` Use for short notes to hiring managers / job posters—plain text only, under 200 characters.
-- Job apply simulator: \`\`\`component:jobApplySimulator\n{"steps":[{"action":"...","status":"done"},...]}\n\`\`\`
-
-Always include helpful markdown text before/after components. Use components when the response benefits from interactive UI.
-
-When the user asks for a coding challenge, do NOT respond with only plain markdown. You MUST include a \`component:codingChallenge\` block so the UI can run tests.
-
-When the user asks for a mock interview, include \`component:mockInterview\` and tailor the questions to the user's role/skills from Resume data.
-
-When the user attaches a resume PDF, DOCX, or text file, the extracted text appears under "The user has attached the following files". Parse it carefully and produce a complete \`\`\`component:cv\`\`\` block with resumeData that reflects their real experience (names may be redacted in the prompt — still map sections to experience, education, skills, projects).
-
-For cover letters:
-- Always return \`\`\`component:coverLetter\`\`\` with \`head\`, \`body\`, \`footer\`.
-- If user says "for the job mentioned earlier", infer job context from recent conversation and tailor accordingly.
-- Keep writing professional, concise, and editable (plain text fields only).
-
-CRITICAL RESUME UPDATE RULES:
-- If the user asks to UPDATE/REPLACE/EDIT something in the resume (e.g. "replace Netnedge AI to QuantomAI in experience"), you MUST output a \`\`\`component:cv\`\`\` block whose resumeData reflects that exact change.
-- Output VALID JSON only (no trailing commas, no comments). The UI parses this strictly.
-- NEVER include \`basicInfo.profilePicture\` in the JSON (it is large base64 and will break streaming / waste tokens). The app will preserve the existing picture automatically.
-- Do not use markdown formatting inside resume strings (no \`**bold**\`, no headings). Plain text only inside resumeData fields.
-- For \`skills\`, prefer a compact flat array of strings (e.g. \`["Java","Spring Boot","TypeScript"]\`) to save tokens. Categorized objects like \`{"name":"Backend","keywords":["Java"]}\` are also accepted, but strings are smaller.
-
-Resume data: ${resumeJson}`
-}
-
 export async function POST(req: NextRequest) {
+  let body: Record<string, unknown>
   try {
-    await ensureMemoryFilesystem()
+    body = (await req.json()) as Record<string, unknown>
   } catch {
-    // Keep chat working even if memory backend is unavailable.
+    return new Response(JSON.stringify({ error: "Invalid JSON", message: "Request body must be valid JSON." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    })
   }
+
   const {
     messages,
     resumeData,
+    resumeLatex,
+    coverLetterLatex,
     aiMode,
     model,
     apiKey,
@@ -254,38 +256,35 @@ export async function POST(req: NextRequest) {
     customEndpoint,
     customHeaders,
     customAuth,
-    mode,
     chatGlobalProfile,
-  } = await req.json()
-
-  // Create a system message based on the mode
-  let systemMessage = ""
-
-  // Redact PII (name, email, phone, location) before sending to AI - protects user privacy
-  const redactedResume = redactResumePII(resumeData)
-  const resumeJson = JSON.stringify(redactedResume)
-
-  // Update core memory deterministically from global profile (stable facts only).
-  // This avoids trusting model-generated memory writes.
-  if (chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)) {
-    const p = chatGlobalProfile as Record<string, unknown>
-    const safe = (v: unknown) => (typeof v === "string" ? v.trim() : "")
-    const lines = [
-      "# Core Memory",
-      "- This file is generated from the user's global profile (do not store secrets).",
-      safe(p.targetRoles) ? `- Target roles: ${safe(p.targetRoles)}` : "",
-      safe(p.careerNotes) ? `- Career notes: ${safe(p.careerNotes)}` : "",
-    ].filter(Boolean)
-    try {
-      await overwriteCoreMemory(lines.join("\n") + "\n")
-    } catch {
-      /* ignore */
-    }
+    memoryContext,
+    retrievalContext,
+  } = body as {
+    messages?: any[]
+    resumeData?: any
+    resumeLatex?: string
+    coverLetterLatex?: string
+    aiMode?: boolean | string
+    model?: string
+    apiKey?: string
+    attachedData?: any
+    attachedFiles?: any[]
+    contextText?: string
+    customModel?: string
+    customEndpoint?: string
+    customHeaders?: string
+    customAuth?: string
+    chatGlobalProfile?: Record<string, unknown> | null
+    memoryContext?: string
+    retrievalContext?: string
   }
 
-  if (mode === "career-assistant") {
-    systemMessage = buildCareerAssistantSystemPrompt(resumeJson)
-  } else if (aiMode) {
+  // Create a system message based on the mode
+  let systemMessage = "";
+
+  const resumeJson = JSON.stringify(resumeData ?? {})
+
+  if (aiMode) {
     systemMessage = `You are an AI Resume Assistant. The user will give you their resume data and often a job description or request (e.g. "tailor my resume to this job", "update my summary").
 
 Your response must follow this structure every time you suggest resume changes:
@@ -305,10 +304,10 @@ Your response must follow this structure every time you suggest resume changes:
 Rules:
 - Output ONLY the keys and values you are modifying. Omit any section you are not changing.
 - Never include "profilePicture" in the JSON.
-- Never include "name", "email", "phone", or "location" in basicInfo - these are privacy-protected; the user's values are preserved.
 - For partial updates (e.g. only summary), output only: \`\`\`json\n{"basicInfo":{"summary":"Your new summary text."}}\n\`\`\`
 - Keep JSON valid: no trailing commas, no comments, use double quotes for strings.
 - For "update my summary" or similar: return \`\`\`json\n{"basicInfo":{"summary":"<improved summary>"}}\n\`\`\` and a brief explanation.
+- If user asks to create/build/tailor a resume for a job description, you MUST include \`\`\`component:cv ...\`\`\` with resumeData so the app can render the resume tool and PDF preview immediately.
 
 Provided resume data (for context; suggest only changes): ${resumeJson}`
   } else {
@@ -320,7 +319,7 @@ When you suggest specific text or structure changes, you MUST include exactly on
 {"basicInfo":{"summary":"..."},"skills":[],"experience":[],"education":[],"projects":[],"achievements":[]}
 \`\`\`
 
-- Include only keys you are modifying. Never include profilePicture. Never include name, email, phone, or location (privacy-protected).
+- Include only keys you are modifying. Never include profilePicture.
 - Write a short explanation outside the JSON block.
 - Keep JSON valid (no trailing commas, double quotes only).
 - while writing descriptions make sure there is no **bold** or ## heading or any other markdown formatting. just write the plain text.
@@ -328,15 +327,38 @@ When you suggest specific text or structure changes, you MUST include exactly on
 Resume data: ${resumeJson}`
   }
 
+  systemMessage += `\n\nImportant: The resume JSON in this system message is the user’s latest snapshot for this request (their saved editor state plus structured resume content from this chat thread). Treat it as the source of truth when suggesting edits unless they paste new material.
 
-  // If there's attached data, add it to the system message (redact PII)
+Structured UI (use when appropriate; always close fenced blocks with \`\`\`):
+- Interactive resume card — use **flat** \`resumeData\` (same keys as the editor / PDF). For \`component:cv\`, emit a complete, tailored snapshot (all sections the user should see on the card). Partial edits alone stay in \`\`\`json\`\`\` blocks as already described above. Example skeleton:
+  \`\`\`component:cv\n{"resumeData":{"basicInfo":{"name":"","title":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":"","languages":[]},"experience":[{"company":"","position":"","startDate":"","endDate":"","description":"","highlights":[]}],"education":[{"institution":"","degree":"","field":"","startDate":"","endDate":"","gpa":""}],"skills":[],"projects":[{"name":"","description":"","technologies":[]}],"achievements":[{"title":"","description":"","date":""}]},"template":"modern"}\n\`\`\`
+  **Rules:** Top-level keys inside \`resumeData\` must be \`basicInfo\`, \`experience\`, \`education\`, \`skills\`, \`projects\`, \`achievements\` — not \`sections\` / \`items\` trees. Use \`experience[].highlights\` for keyword bullets; \`projects[].technologies\` for stacks; \`basicInfo.summary\` for the summary. **Avoid** \`resumeData.sections\`; the app can normalize it if you slip, but the flat schema is what you should emit. Never include \`profilePicture\`. \`template\` (optional): modern, classic, minimal, professional, elegant, dark, gradient, two-column, gradient-gray, german-cv, multi-colour.
+- For requests like "create resume as per job description", prefer \`component:cv\` as the primary structured output (you may include a short explanation outside the fence).
+- Cover letter viewer: \`\`\`component:coverLetter\n{"head":"...","body":"...","footer":"..."}\n\`\`\`
+
+LaTeX components — use ONLY when the user clearly asks for LaTeX, academic / print-specific layout, fine typography, or an explicit custom style (e.g. moderncv, two-column LaTeX, European CV). Do NOT add LaTeX for routine “improve my resume” or generic bullet edits; use JSON + \`component:cv\` instead.
+- LaTeX CV: \`\`\`component:resumeLatex\n{"latex":"...one JSON string, full compilable .tex..."}\n\`\`\`
+- LaTeX cover letter: \`\`\`component:coverLetterLatex\n{"latex":"...full compilable .tex..."}\n\`\`\`
+Escape backslashes and newlines inside JSON strings so the fence stays valid.`
+
+  if (typeof resumeLatex === "string" && resumeLatex.trim()) {
+    const clip = resumeLatex.length > 200_000 ? resumeLatex.slice(0, 200_000) + "\n% …truncated" : resumeLatex
+    systemMessage += `\n\nThe user’s current résumé LaTeX (from the chat editor; revise when they ask):\n\n\`\`\`tex\n${clip}\n\`\`\``
+  }
+  if (typeof coverLetterLatex === "string" && coverLetterLatex.trim()) {
+    const clip = coverLetterLatex.length > 200_000 ? coverLetterLatex.slice(0, 200_000) + "\n% …truncated" : coverLetterLatex
+    systemMessage += `\n\nThe user’s current cover letter LaTeX (from the chat editor):\n\n\`\`\`tex\n${clip}\n\`\`\``
+  }
+
+  // If there's attached data, add it to the system message
   if (attachedData) {
     try {
+      // If attachedData is a string that contains JSON, parse it
       const parsedData = typeof attachedData === "string" ? JSON.parse(attachedData) : attachedData
-      const dataToSend = parsedData && typeof parsedData === "object" ? redactResumePII(parsedData) : parsedData
-      systemMessage += `\n\nThe user has also attached additional data: ${JSON.stringify(dataToSend)}`
-    } catch {
-      systemMessage += `\n\nThe user has also attached additional data: ${redactTextPII(String(attachedData))}`
+      systemMessage += `\n\nThe user has also attached additional data: ${JSON.stringify(parsedData)}`
+    } catch (error) {
+      // If it's not valid JSON, just use it as is
+      systemMessage += `\n\nThe user has also attached additional data: ${attachedData}`
     }
   }
 
@@ -345,139 +367,70 @@ Resume data: ${resumeJson}`
     systemMessage += `\n\nThe user has attached the following files:\n`
 
     for (const file of attachedFiles) {
-      const safeContent = typeof file.content === "string" ? redactTextPII(file.content) : String(file.content ?? "")
       if (file.contentType === 'pdf') {
-        const pages = typeof file.pages === "number" ? file.pages : "?"
-        systemMessage += `\nPDF File: ${file.name} (${pages} pages)\nContent: ${safeContent}\n`
-      } else if (file.contentType === 'pdf-error') {
-        systemMessage += `\nPDF File: ${file.name}\nExtraction issue: ${safeContent}\n`
+        systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${file.content}\n`
       } else if (file.contentType === 'document') {
-        systemMessage += `\nDocument File: ${file.name}\nContent: ${safeContent}\n`
+        systemMessage += `\nDocument File: ${file.name}\nContent: ${file.content}\n`
       } else if (file.contentType === 'image') {
-        systemMessage += `\nImage File: ${file.name}\nDescription: ${safeContent}\n`
+        systemMessage += `\nImage File: ${file.name}\nDescription: ${file.content}\n`
       } else if (file.contentType === 'json') {
-        let jsonContent = file.content
-        if (typeof jsonContent === "string") {
-          try {
-            jsonContent = redactResumePII(JSON.parse(jsonContent))
-          } catch {
-            jsonContent = redactTextPII(jsonContent)
-          }
-        } else if (jsonContent && typeof jsonContent === "object") {
-          jsonContent = redactResumePII(jsonContent)
-        }
-        systemMessage += `\nJSON File: ${file.name}\nData: ${JSON.stringify(jsonContent)}\n`
+        systemMessage += `\nJSON File: ${file.name}\nData: ${JSON.stringify(file.content)}\n`
       } else if (file.contentType === 'text' || file.contentType === 'csv') {
-        systemMessage += `\nText/CSV File: ${file.name}\nContent: ${safeContent}\n`
+        systemMessage += `\nText/CSV File: ${file.name}\nContent: ${file.content}\n`
       } else if (file.contentType === 'excel') {
-        systemMessage += `\nExcel File: ${file.name}\nInfo: ${safeContent}\n`
+        systemMessage += `\nExcel File: ${file.name}\nInfo: ${file.content}\n`
       } else {
-        systemMessage += `\nFile: ${file.name}\nContent: ${safeContent}\n`
+        systemMessage += `\nFile: ${file.name}\nContent: ${file.content}\n`
       }
     }
 
     systemMessage += `\nPlease analyze these files and use their content to provide relevant assistance.`
   }
 
-  // If there's context text, add it to the system message (redact PII)
-  if (contextText && contextText.trim()) {
-    systemMessage += `\n\nUser Context: ${redactTextPII(contextText.trim())}`
+  // If there's context text, add it to the system message
+  const clippedContextText = clipForPrompt(contextText, MAX_CONTEXT_TEXT_CHARS)
+  if (clippedContextText) {
+    systemMessage += `\n\nUser Context: ${clippedContextText}`
   }
 
-  // Inject core memory + recall snippets
-  const core = await readCoreMemory()
-  if (core.trim()) {
-    systemMessage += `\n\n## Core memory (persistent)\n${redactTextPII(core)}`
+  if (chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)) {
+    const profileJson = clipForPrompt(JSON.stringify(chatGlobalProfile), MAX_PROFILE_JSON_CHARS)
+    if (profileJson) {
+      systemMessage += `\n\nGlobal profile context (profile icon is enabled in chat): ${profileJson}`
+    }
   }
 
-  // RAG-style knowledge: structured chunks from global profile + resume (deterministic, no vector DB)
-  const profileObj =
-    chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)
-      ? (chatGlobalProfile as Record<string, unknown>)
-      : null
-  const knowledgeChunks = buildUserKnowledgeStoreChunks(resumeData, profileObj)
-  if (knowledgeChunks.trim()) {
-    systemMessage += `\n\n## User knowledge store (retrieved memory — use for personalization; full resume JSON above is the edit source of truth)\n${redactTextPII(knowledgeChunks)}`
+  const clippedMemoryContext = clipForPrompt(memoryContext, MAX_MEMORY_CONTEXT_CHARS)
+  if (clippedMemoryContext) {
+    systemMessage += `\n\nLong-term memory context (AI SDK app memory):\n${clippedMemoryContext}`
   }
 
+  const clippedRetrievalContext = clipForPrompt(retrievalContext, MAX_RETRIEVAL_CONTEXT_CHARS)
+  if (clippedRetrievalContext) {
+    systemMessage += `\n\nRetrieved conversation/context snippets (RAG-style):\n${clippedRetrievalContext}`
+  }
+
+  systemMessage += `\n\nBehavior requirements:
+- Use the full conversation history provided in this request as the primary source of user intent.
+- Use the latest resume snapshot in this request (already merged from editor + chat changes) when tailoring resumes.
+- If user manually edited resume content earlier in this chat flow, preserve and build on those edits unless the user asks to replace them.
+- When user asks to customize for a job description, prioritize direct job requirements and measurable relevance in bullets/skills/summary.`
 
 
 
 
-  // Format the conversation for the AI (redact PII from user messages)
+
+  // Format the conversation for the AI
   const messagesList = Array.isArray(messages) ? messages : []
-  const lastUserTextRaw = (() => {
-    for (let i = messagesList.length - 1; i >= 0; i -= 1) {
-      const m = messagesList[i]
-      if (m?.role === "user") return getMsgText(m)
-    }
-    return ""
-  })()
+  const formattedMessages = [{ role: "system", content: systemMessage }, ...messagesList]
 
-  // Recall: pull relevant prior conversation lines and inject (redacted).
-  const recallQuery = [lastUserTextRaw || "", contextText || ""].filter(Boolean).join(" ")
-  const recall = await recallFromConversations(recallQuery, 10)
-  if (recall.trim()) {
-    systemMessage += `\n\n## Recall memory (matching past conversation)\n${redactTextPII(recall)}`
-  }
-
-  // Log the most recent user turn (best-effort; assistant logging is harder with streaming provider responses).
-  try {
-    if (lastUserTextRaw && lastUserTextRaw.trim()) {
-      await appendConversation({
-        sessionId: (req as any)?.headers?.get?.("x-chat-session-id") ?? undefined,
-        role: "user",
-        content: redactTextPII(lastUserTextRaw.trim()),
-        timestamp: new Date().toISOString(),
-      })
-    }
-    if (contextText && contextText.trim()) {
-      await appendNotes(
-        `[${new Date().toISOString()}] context-window: ${redactTextPII(contextText.trim())}`
-      )
-    }
-  } catch {
-    /* ignore */
-  }
-
-  // Deterministic edit path for explicit "replace ... in experience" commands.
-  // This guarantees the resume updates even when model output is malformed.
-  const deterministicReplace = tryApplyDeterministicExperienceReplace(lastUserTextRaw || "", resumeData)
-  if (deterministicReplace) {
-    const { nextResume, applied, from, to } = deterministicReplace
-    const note = applied
-      ? `Applied your update: replaced "${from}" with "${to}" in experience.`
-      : `I could not find "${from}" in experience fields, so no change was applied.`
-    const payload = `${note}\n\n\`\`\`component:cv\n${JSON.stringify({ resumeData: nextResume, template: "modern" })}\n\`\`\``
-    return streamTextToResponse(async (write) => write(payload), messagesList)
-  }
-
-  const redactedMessages = messagesList.map((m: { role?: string; content?: string; parts?: Array<{ type: string; text?: string }> }) => {
-    if (m?.role !== "user") return m
-    const text = getMsgText(m)
-    if (!text) return m
-    const redacted = redactTextPII(text)
-    const parts = Array.isArray(m.parts) ? m.parts : []
-    const fileParts = parts.filter((p) => p && typeof p === "object" && (p as { type?: string }).type === "file")
-    return { ...m, content: redacted, parts: [{ type: "text", text: redacted }, ...fileParts] }
-  })
-  const formattedMessages = [{ role: "system", content: systemMessage }, ...redactedMessages]
-
-  // Resolve model: use curated list, then allow known provider prefixes, then custom endpoint fallback
-  let modelConfig = (model && AVAILABLE_MODELS[model]) ? AVAILABLE_MODELS[model] : AVAILABLE_MODELS[DEFAULT_MODEL]
+  const { id: resolvedModelId, config: modelConfig } = resolveModelRouting(model)
   if (!modelConfig) {
-    // When using custom endpoint, route to local handler with customModel
-    if (customEndpoint && customEndpoint.trim()) {
-      modelConfig = { provider: "local", modelId: (customModel && customModel.trim()) || "local-model" }
-    } else if (model && typeof model === "string") {
-      // Allow Gemini model IDs from the API (e.g. gemini-2.5-flash-lite) even if not in curated list
-      if (model.startsWith("gemini-")) {
-        modelConfig = { provider: "google", modelId: model }
-      }
-    }
-  }
-  if (!modelConfig) {
-    return new Response(JSON.stringify({ error: "Invalid model", message: "Selected model is not configured." }), { status: 400, headers: { "Content-Type": "application/json" } })
+    console.error("[api/chat] Model map missing fallback", { model, resolvedModelId })
+    return new Response(JSON.stringify({ error: "Invalid model", message: "Selected model is not configured." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    })
   }
 
   try {
@@ -503,7 +456,7 @@ Resume data: ${resumeJson}`
 
       case "openai":
         try {
-          return await handleWithOpenAI(formattedMessages, API_MODEL_IDS[modelConfig.modelId] ?? modelConfig.modelId, apiKey, messagesList)
+          return await handleWithOpenAI(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with OpenAI model:", error)
           if (error.message && error.message.includes("429") && error.message.includes("quota")) {
@@ -514,7 +467,7 @@ Resume data: ${resumeJson}`
 
       case "anthropic":
         try {
-          return await handleWithAnthropic(formattedMessages, API_MODEL_IDS[modelConfig.modelId] ?? modelConfig.modelId, apiKey, messagesList)
+          return await handleWithAnthropic(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Anthropic model:", error)
           throw error
@@ -522,7 +475,7 @@ Resume data: ${resumeJson}`
 
       case "deepseek":
         try {
-          return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey, messagesList)
+          return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with DeepSeek model:", error)
           throw error
@@ -530,7 +483,7 @@ Resume data: ${resumeJson}`
 
       case "groq":
         try {
-          return await handleWithGroq(formattedMessages, API_MODEL_IDS[modelConfig.modelId] ?? modelConfig.modelId, apiKey, messagesList)
+          return await handleWithGroq(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Groq model:", error)
           throw error
@@ -538,7 +491,7 @@ Resume data: ${resumeJson}`
 
       case "mistral":
         try {
-          return await handleWithMistral(formattedMessages, API_MODEL_IDS[modelConfig.modelId] ?? modelConfig.modelId, apiKey, messagesList)
+          return await handleWithMistral(formattedMessages, modelConfig.modelId, apiKey)
         } catch (error: any) {
           console.error("Error with Mistral model:", error)
           throw error
@@ -578,46 +531,27 @@ Resume data: ${resumeJson}`
 
       case "huggingface":
         try {
+          // Career chat sends Hub id as `model` (e.g. Qwen/...) without separate customModel
+          const effectiveHfCustomModel =
+            typeof customModel === "string" && customModel.trim()
+              ? customModel.trim()
+              : resolvedModelId.includes("/")
+                ? resolvedModelId
+                : undefined
           return await handleWithHuggingFace(
             formattedMessages,
             modelConfig.modelId,
             apiKey,
-            customModel,
-            customEndpoint,
-            customHeaders,
+            effectiveHfCustomModel,
+            typeof customEndpoint === "string" ? customEndpoint : undefined,
+            typeof customHeaders === "string" ? customHeaders : undefined,
+            resolvedModelId,
           )
         } catch (error: any) {
           console.error("Error with Hugging Face model:", error)
           throw error
         }
 
-      case "hf-aisdk":
-        try {
-          return await handleWithHuggingFaceAISDK(
-            formattedMessages,
-            modelConfig.modelId,
-            apiKey,
-            customModel,
-            messagesList,
-          )
-        } catch (error: any) {
-          console.error("Error with Hugging Face AI SDK model:", error)
-          throw error
-        }
-
-      case "openai-compat-aisdk":
-        try {
-          return await handleWithOpenAICompatibleAISDK(
-            formattedMessages,
-            apiKey,
-            customEndpoint,
-            customModel,
-            messagesList,
-          )
-        } catch (error: any) {
-          console.error("Error with OpenAI-compatible (AI SDK) model:", error)
-          throw error
-        }
 
       case "local":
         try {
@@ -628,7 +562,7 @@ Resume data: ${resumeJson}`
             customEndpoint,
             customModel,
             customHeaders,
-            customAuth,
+            customAuth as "custom" | "bearer" | "api-key" | "none" | undefined  ,
           )
         } catch (error: any) {
           console.error("Error with Local model:", error)
@@ -694,7 +628,7 @@ Resume data: ${resumeJson}`
         try {
           return await handleWithCedz(
             formattedMessages,
-            (modelConfig.modelId === "cedz" && customModel?.trim()) ? customModel.trim() : modelConfig.modelId === "cedz" ? "qwen3:8b" : modelConfig.modelId,
+            modelConfig.modelId === "custom" ? customModel || "qwen3:8b" : modelConfig.modelId,
             customEndpoint,
             messagesList,
           )
@@ -781,27 +715,8 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
           }
           writer.write({ type: "text-end", id: textId })
         } catch (error) {
-          const msg = error instanceof Error ? error.message : String(error)
-          if (msg.toLowerCase().includes("recitation")) {
-            // Gemini may block outputs that look like verbatim copyrighted text.
-            // Recover by ending the stream with a paraphrase-only guidance message.
-            writer.write({
-              type: "text-delta",
-              id: textId,
-              delta:
-                "\n\nI couldn’t complete that response because the model flagged it as *recitation* (too close to verbatim text). " +
-                "Try again with: “Paraphrase and summarize; do not quote the attachment; rewrite in your own words.”",
-            })
-            writer.write({ type: "text-end", id: textId })
-            return
-          }
           console.error("Error streaming from Gemini:", error)
-          writer.write({
-            type: "text-delta",
-            id: textId,
-            delta: "\n\nSorry—something went wrong while streaming the response. Please try again.",
-          })
-          writer.write({ type: "text-end", id: textId })
+          throw error
         }
       },
     })
@@ -866,25 +781,8 @@ async function handleNewGemini(
           }
           writer.write({ type: "text-end", id: textId })
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
-          if (msg.toLowerCase().includes("recitation")) {
-            writer.write({
-              type: "text-delta",
-              id: textId,
-              delta:
-                "\n\nI couldn’t complete that response because the model flagged it as *recitation* (too close to verbatim text). " +
-                "Please ask me to paraphrase/summarize instead of quoting the attachment.",
-            })
-            writer.write({ type: "text-end", id: textId })
-            return
-          }
           console.error("Error streaming from New Gemini:", err)
-          writer.write({
-            type: "text-delta",
-            id: textId,
-            delta: "\n\nSorry—something went wrong while streaming the response. Please try again.",
-          })
-          writer.write({ type: "text-end", id: textId })
+          throw err
         }
       },
     })
@@ -900,7 +798,7 @@ async function handleNewGemini(
 }
 
 // OpenAI handler
-async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
+async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: string) {
   try {
     const key = apiKey || process.env.OPENAI_API_KEY
     if (!key) {
@@ -952,7 +850,7 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
           }
         }
       }
-    }, clientMessages)
+    })
   } catch (error) {
     console.error("Error with OpenAI model:", error)
     throw error
@@ -960,143 +858,71 @@ async function handleWithOpenAI(messages: any[], modelId: string, apiKey?: strin
 }
 
 // Anthropic handler (Messages API with streaming)
-async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
+async function handleWithAnthropic(messages: any[], modelId: string, apiKey?: string) {
   try {
     const key = apiKey || process.env.ANTHROPIC_API_KEY
     if (!key) {
       throw new Error("Anthropic API key is required. Please provide it in the UI or set ANTHROPIC_API_KEY environment variable.")
     }
 
-    const systemContent = (() => { const m = messages.find((x) => x.role === "system"); return m ? getMsgText(m) : undefined })()
+    const systemContent = (() => { const m = messages.find((x) => x.role === "system"); return m ? getMsgText(m) : "" })()
     const chatMessages = messages.filter((m) => m.role !== "system").map((msg) => ({
       role: msg.role === "assistant" ? "assistant" : "user",
       content: getMsgText(msg),
-    })) as import('ai').ModelMessage[]
+    }))
 
-    const anthropicProvider = createAnthropic({ apiKey: key })
-
-    const result = await streamText({
-      model: anthropicProvider(modelId),
-      system: systemContent,
-      messages: chatMessages,
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": key,
+        "anthropic-version": "2023-06-01",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: 8192,
+        system: systemContent,
+        messages: chatMessages,
+        stream: true,
+      }),
     })
 
-    return result.toTextStreamResponse()
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "")
+      throw new Error(`Anthropic API error: ${response.status} - ${errorText}`)
+    }
+
+    return streamTextToResponse(async (write) => {
+      const reader = response.body?.getReader()
+      if (!reader) return
+      let partial = ""
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = new TextDecoder().decode(value)
+        const lines = (partial + chunk).split("\n")
+        partial = lines.pop() || ""
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6).trim()
+            try {
+              const json = JSON.parse(data)
+              if (json.type === "content_block_delta" && json.delta?.text) write(json.delta.text)
+            } catch {
+              // Ignore parse errors for event types like message_start
+            }
+          }
+        }
+      }
+    })
   } catch (error) {
     console.error("Error with Anthropic model:", error)
     throw error
   }
 }
 
-/** Hugging Face [Inference router](https://ai-sdk.dev/providers/ai-sdk-providers/huggingface) via @ai-sdk/huggingface */
-async function handleWithHuggingFaceAISDK(
-  messages: any[],
-  hubModelId: string,
-  apiKey?: string,
-  customHubOverride?: string,
-  _clientMessages?: unknown[],
-) {
-  try {
-    const key = apiKey || process.env.HUGGINGFACE_API_KEY
-    if (!key) {
-      throw new Error(
-        "Hugging Face API key is required. Tap the lock icon next to the model selector in chat, or set HUGGINGFACE_API_KEY.",
-      )
-    }
-
-    const trimmedOverride = typeof customHubOverride === "string" ? customHubOverride.trim() : ""
-    const hub =
-      hubModelId === HF_CUSTOM_HUB_MODEL_ID
-        ? trimmedOverride
-        : trimmedOverride || hubModelId
-
-    if (!hub) {
-      throw new Error(
-        "Hugging Face Hub model id is required. Open “Hub model” from the model menu and enter org/model (e.g. meta-llama/Llama-3.1-8B-Instruct).",
-      )
-    }
-
-    const systemContent = (() => {
-      const m = messages.find((x) => x.role === "system")
-      return m ? getMsgText(m) : undefined
-    })()
-    const chatMessages = messages
-      .filter((m) => m.role !== "system")
-      .map((msg) => ({
-        role: msg.role === "assistant" ? "assistant" : "user",
-        content: getMsgText(msg),
-      })) as import("ai").ModelMessage[]
-
-    const hf = createHuggingFace({ apiKey: key })
-    const result = await streamText({
-      model: hf(hub),
-      system: systemContent,
-      messages: chatMessages,
-    })
-
-    return result.toTextStreamResponse()
-  } catch (error) {
-    console.error("Error with Hugging Face AI SDK:", error)
-    throw error
-  }
-}
-
-/** Generic OpenAI-compatible servers via [@ai-sdk/openai-compatible](https://ai-sdk.dev/providers/openai-compatible-providers) */
-async function handleWithOpenAICompatibleAISDK(
-  messages: any[],
-  apiKey: string | undefined,
-  customEndpoint: string | undefined,
-  customModel: string | undefined,
-  _clientMessages?: unknown[],
-) {
-  try {
-    const rawBase = (customEndpoint || "").trim()
-    if (!rawBase) {
-      throw new Error(
-        "OpenAI-compatible base URL is required. In Profile & Settings, set the API base URL (e.g. https://api.example.com/v1).",
-      )
-    }
-
-    let base = rawBase.replace(/\/$/, "")
-    if (!base.endsWith("/v1")) {
-      base = `${base}/v1`
-    }
-
-    const model = (customModel || "").trim() || "gpt-4o-mini"
-    const key = (apiKey || "").trim()
-
-    const provider = createOpenAICompatible({
-      name: "openaiCompatible",
-      ...(key ? { apiKey: key } : {}),
-      baseURL: base,
-    })
-
-    const systemContent = (() => {
-      const m = messages.find((x) => x.role === "system")
-      return m ? getMsgText(m) : undefined
-    })()
-    const chatMessages = messages
-      .filter((m) => m.role !== "system")
-      .map((msg) => ({
-        role: msg.role === "assistant" ? "assistant" : "user",
-        content: getMsgText(msg),
-      })) as import("ai").ModelMessage[]
-
-    const result = await streamText({
-      model: provider(model),
-      system: systemContent,
-      messages: chatMessages,
-    })
-
-    return result.toTextStreamResponse()
-  } catch (error) {
-    console.error("Error with OpenAI-compatible AI SDK:", error)
-    throw error
-  }
-}
-
 // DeepSeek handler
-async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
+async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: string) {
   try {
     const key = apiKey || process.env.DEEPSEEK_API_KEY
     if (!key) {
@@ -1148,7 +974,7 @@ async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: str
           }
         }
       }
-    }, clientMessages)
+    })
   } catch (error) {
     console.error("Error with DeepSeek model:", error)
     throw error
@@ -1156,7 +982,7 @@ async function handleWithDeepSeek(messages: any[], modelId: string, apiKey?: str
 }
 
 // Groq handler
-async function handleWithGroq(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
+async function handleWithGroq(messages: any[], modelId: string, apiKey?: string) {
   try {
     const key = apiKey || process.env.GROQ_API_KEY
     if (!key) {
@@ -1208,7 +1034,7 @@ async function handleWithGroq(messages: any[], modelId: string, apiKey?: string,
           }
         }
       }
-    }, clientMessages)
+    })
   } catch (error) {
     console.error("Error with Groq model:", error)
     throw error
@@ -1216,7 +1042,7 @@ async function handleWithGroq(messages: any[], modelId: string, apiKey?: string,
 }
 
 // Mistral handler
-async function handleWithMistral(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
+async function handleWithMistral(messages: any[], modelId: string, apiKey?: string) {
   try {
     const key = apiKey || process.env.MISTRAL_API_KEY
     if (!key) {
@@ -1268,7 +1094,7 @@ async function handleWithMistral(messages: any[], modelId: string, apiKey?: stri
           }
         }
       }
-    }, clientMessages)
+    })
   } catch (error) {
     console.error("Error with Mistral model:", error)
     throw error
@@ -1490,10 +1316,17 @@ async function handleWithHuggingFace(
   customModel?: string,
   customEndpoint?: string,
   customHeaders?: string,
+  /** UI model id from /api/chat body (e.g. Hub preset `Qwen/...`) when `modelId` is `streaming`. */
+  uiResolvedModelId?: string,
 ) {
   try {
-    // Get the model name from UI configuration or use default
-    const model = customModel || "meta-llama/Llama-3.1-8B-Instruct"
+    const hubFromUi =
+      typeof uiResolvedModelId === "string" &&
+      uiResolvedModelId.includes("/") &&
+      !["hf-custom-hub-aisdk", "openai-compatible-aisdk"].includes(uiResolvedModelId)
+        ? uiResolvedModelId
+        : undefined
+    const model = (typeof customModel === "string" && customModel.trim()) || hubFromUi || "meta-llama/Llama-3.1-8B-Instruct"
 
     // Get API key from UI or environment
     const hfToken = apiKey || process.env.HUGGINGFACE_API_KEY
@@ -1900,42 +1733,14 @@ async function handleWithCedz(
     promptParts.push(`${role}: ${getMsgText(msg)}`)
   }
   const prompt = promptParts.join("\n\n")
-  const CEDZ_TIMEOUT_MS = 180000 // 3 min - avoid long hangs and ECONNRESET from ngrok
-  const doFetch = (signal?: AbortSignal) =>
-    fetch(generateUrl, {
-      method: "POST",
-      signal,
-      headers: {
-        "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
-      },
-      body: JSON.stringify({ model: modelId, prompt, stream: true }),
-    })
-  let response: Response
-  try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), CEDZ_TIMEOUT_MS)
-    response = await doFetch(controller.signal)
-    clearTimeout(timeout)
-  } catch (err: any) {
-    const isConnReset = err?.cause?.code === "ECONNRESET" || err?.message?.includes("ECONNRESET")
-    const isTimeout = err?.name === "AbortError"
-    if (isConnReset || isTimeout) {
-      try {
-        const ctrl = new AbortController()
-        const t = setTimeout(() => ctrl.abort(), CEDZ_TIMEOUT_MS)
-        response = await doFetch(ctrl.signal)
-        clearTimeout(t)
-      } catch (retryErr: any) {
-        const msg = isTimeout
-          ? "Cedz API request timed out. Check that your Cedz URL is reachable and the model is responsive."
-          : "Cedz API connection was reset. If using ngrok, try refreshing the tunnel or check the URL."
-        throw new Error(`${msg} (${err?.message || err})`)
-      }
-    } else {
-      throw err
-    }
-  }
+  const response = await fetch(generateUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
+    },
+    body: JSON.stringify({ model: modelId, prompt, stream: true }),
+  })
   if (!response.ok) {
     const errText = await response.text().catch(() => "")
     console.error("Cedz API error", {
@@ -1947,19 +1752,14 @@ async function handleWithCedz(
     throw new Error(`Cedz API error: ${response.status} - ${errText}`)
   }
   const textId = generateId()
-  const reasoningId = generateId()
   const stream = createUIMessageStream({
     originalMessages: (clientMessages ?? []) as Parameters<typeof createUIMessageStream>[0]["originalMessages"],
     execute: async ({ writer }) => {
+      writer.write({ type: "text-start", id: textId })
       const reader = response.body?.getReader()
       if (reader) {
         const dec = new TextDecoder()
         let buf = ""
-        let reasoningStarted = false
-        let hadThinkingContent = false
-        let textStarted = false
-        let emittedFallback = false
-        const TAILOR_FALLBACK = "We are tailoring the resume."
         try {
           while (true) {
             const { done, value } = await reader.read()
@@ -1972,78 +1772,28 @@ async function handleWithCedz(
               if (!t) continue
               try {
                 const j = JSON.parse(t)
-                const thinking = typeof j.thinking === "string" ? j.thinking : ""
-                const resp = typeof j.response === "string" ? j.response : ""
-                const token = typeof j.token === "string" ? j.token : ""
-                if (thinking) {
-                  if (reasoningStarted && emittedFallback && !hadThinkingContent) {
-                    writer.write({ type: "reasoning-end", id: reasoningId })
-                    reasoningStarted = false
-                    emittedFallback = false
-                  }
-                  if (!reasoningStarted) {
-                    writer.write({ type: "reasoning-start", id: reasoningId })
-                    reasoningStarted = true
-                  }
-                  hadThinkingContent = true
-                  writer.write({ type: "reasoning-delta", id: reasoningId, delta: thinking })
-                } else if (resp || token) {
-                  if (reasoningStarted) {
-                    writer.write({ type: "reasoning-end", id: reasoningId })
-                    reasoningStarted = false
-                  } else if (!hadThinkingContent && !textStarted && !emittedFallback) {
-                    writer.write({ type: "reasoning-start", id: reasoningId })
-                    writer.write({ type: "reasoning-delta", id: reasoningId, delta: TAILOR_FALLBACK })
-                    writer.write({ type: "reasoning-end", id: reasoningId })
-                    emittedFallback = true
-                  }
-                  const delta = resp || token
-                  if (!textStarted) {
-                    writer.write({ type: "text-start", id: textId })
-                    textStarted = true
-                  }
-                  if (delta) writer.write({ type: "text-delta", id: textId, delta })
-                } else if (!reasoningStarted && !emittedFallback && !textStarted) {
-                  writer.write({ type: "reasoning-start", id: reasoningId })
-                  writer.write({ type: "reasoning-delta", id: reasoningId, delta: TAILOR_FALLBACK })
-                  reasoningStarted = true
-                  emittedFallback = true
-                }
+                // Cedz/Ollama NDJSON: emit only response (visible reply); skip thinking
+                if (typeof j.response === "string" && j.response) writer.write({ type: "text-delta", id: textId, delta: j.response })
+                else if (typeof j.token === "string" && j.token) writer.write({ type: "text-delta", id: textId, delta: j.token })
               } catch (_err) {
-                if (!t.startsWith("data:") && !t.startsWith("{")) {
-                  if (!textStarted) {
-                    writer.write({ type: "text-start", id: textId })
-                    textStarted = true
-                  }
-                  writer.write({ type: "text-delta", id: textId, delta: t + "\n" })
-                }
+                if (!t.startsWith("data:") && !t.startsWith("{")) writer.write({ type: "text-delta", id: textId, delta: t + "\n" })
               }
             }
           }
           if (buf.trim()) {
             try {
               const j = JSON.parse(buf)
-              const resp = typeof j.response === "string" ? j.response : ""
-              if (resp && !textStarted) writer.write({ type: "text-start", id: textId })
-              if (resp) writer.write({ type: "text-delta", id: textId, delta: resp })
+              if (typeof j.response === "string" && j.response) writer.write({ type: "text-delta", id: textId, delta: j.response })
             } catch (_err) {
-              if (!textStarted) writer.write({ type: "text-start", id: textId })
               writer.write({ type: "text-delta", id: textId, delta: buf })
             }
           }
-          if (reasoningStarted) writer.write({ type: "reasoning-end", id: reasoningId })
-          if (!textStarted) {
-            writer.write({ type: "text-start", id: textId })
-          }
-          writer.write({ type: "text-end", id: textId })
         } catch (e) {
           console.error("Cedz stream read error:", e)
           throw e
         }
-      } else {
-        writer.write({ type: "text-start", id: textId })
-        writer.write({ type: "text-end", id: textId })
       }
+      writer.write({ type: "text-end", id: textId })
     },
   })
   return createUIMessageStreamResponse({ stream })

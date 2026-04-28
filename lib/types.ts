@@ -170,8 +170,7 @@ export type AIModel =
   | "ollama-local"
   | "lmstudio-local"
   | "openai-like-local"
-  | "qwen3-8b"
-  | "cedz"
+  | "cedz-qwen3-8b"
   | "cedz-llama3-8b"
   | "cedz-custom";
 
