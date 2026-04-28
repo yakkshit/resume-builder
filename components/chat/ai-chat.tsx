@@ -1272,6 +1272,14 @@ export default function AICareerAssistantChat() {
         });
     };
 
+    useEffect(() => {
+        const onProfileUpdated = () => {
+            showToast("success", "Global profile saved. AI context refreshed for upcoming responses.");
+        };
+        window.addEventListener("ai-chat-profile-updated", onProfileUpdated as EventListener);
+        return () => window.removeEventListener("ai-chat-profile-updated", onProfileUpdated as EventListener);
+    }, []);
+
     const interviewLabToast = useCallback(
         (
             variant: 'default' | 'success' | 'error' | 'warning',

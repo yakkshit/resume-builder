@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, UserRound } from "lucide-react";
+import { Camera, Loader2, UserRound } from "lucide-react";
 import { AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
 import { useToast } from "@/hooks/use-toast";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
@@ -138,6 +138,7 @@ export function ProfileSettingsDialog({
   onSettingsChange: (patch: Partial<ChatSettings>) => void;
 }) {
   const [profile, setProfile] = useState<UserProfile>({ ...EMPTY_PROFILE });
+  const [saving, setSaving] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,8 +158,10 @@ export function ProfileSettingsDialog({
   }, []);
 
   const handleSave = () => {
+    setSaving(true);
     const ok = saveProfile(profile);
     if (!ok) {
+      setSaving(false);
       toast({
         variant: "destructive",
         title: "Could not save profile",
@@ -178,6 +181,11 @@ export function ProfileSettingsDialog({
       title: "Profile saved",
       description: "Global profile, photo on your resume, RAG context, and chat settings are updated.",
     });
+    toast({
+      title: "AI context refreshed",
+      description: "Your updated profile will be used in upcoming AI responses.",
+    });
+    setSaving(false);
     onOpenChange(false);
   };
 
@@ -247,6 +255,11 @@ export function ProfileSettingsDialog({
         </DialogHeader>
 
         <div className="space-y-5 pb-1">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              Changes here sync to your global profile, resume identity fields, and AI context memory for better responses.
+            </p>
+          </div>
           <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3 sm:flex-row sm:items-center">
             <div className="flex items-center gap-3">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-background">
@@ -498,11 +511,18 @@ export function ProfileSettingsDialog({
           ) : null}
 
           <div className="flex gap-2 pt-1">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button type="button" className="flex-1" onClick={handleSave}>
-              Save
+            <Button type="button" className="flex-1" onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </span>
+              ) : (
+                "Save"
+              )}
             </Button>
           </div>
         </div>
