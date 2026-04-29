@@ -1,0 +1,155 @@
+app/api/chat/route.ts(522,13): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type '"bearer" | "api-key" | "custom" | "none" | undefined'.
+  Type 'string' is not assignable to type '"bearer" | "api-key" | "custom" | "none" | undefined'.
+app/api/generate-pdf/route.tsx(101,38): error TS2345: Argument of type 'FunctionComponentElement<MinimalPDFTemplateProps>' is not assignable to parameter of type 'ReactElement<DocumentProps, string | JSXElementConstructor<any>>'.
+  Types of property 'props' are incompatible.
+    Type 'MinimalPDFTemplateProps' has no properties in common with type 'DocumentProps'.
+components/chat/chat-component-registry.tsx(752,3): error TS2322: Type '(p: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "...' is not assignable to type '(props: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((...'.
+  Types of parameters 'p' and 'props' are incompatible.
+    Type '{ resumeData: import("/Users/yakkshit/Downloads/project/resume/cv-main/lib/types").ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | ... 5 more ... | undefined; setResumeData?: ((data: import("/Users/yakkshit/Downloads/project/resume/cv-main/lib/types").ResumeData | ((pr...' is not assignable to type '{ resumeData: import("/Users/yakkshit/Downloads/project/resume/cv-main/lib/types").ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | ... 5 more ... | undefined; setResumeData?: ((data: import("/Users/yakkshit/Downloads/project/resume/cv-main/lib/types").ResumeData | ((pr...'. Two different types with this name exist, but they are unrelated.
+      Property 'resumeData' is missing in type '{ head: string; body: string; footer: string; }' but required in type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...'.
+components/chat/chat-component-registry.tsx(753,3): error TS2322: Type '({ head, body, footer }: { head: string; body: string; footer: string; }) => Element' is not assignable to type '(props: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((...'.
+  Types of parameters '__0' and 'props' are incompatible.
+    Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is not assignable to type '{ head: string; body: string; footer: string; }'.
+      Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is missing the following properties from type '{ head: string; body: string; footer: string; }': head, body, footer
+components/chat/chat-component-registry.tsx(754,3): error TS2322: Type '({ links }: { links: { title: string; url: string; company?: string | undefined; }[]; }) => Element' is not assignable to type '(props: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((...'.
+  Types of parameters '__0' and 'props' are incompatible.
+    Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is not assignable to type '{ links: { title: string; url: string; company?: string | undefined; }[]; }'.
+      Property 'links' is missing in type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' but required in type '{ links: { title: string; url: string; company?: string | undefined; }[]; }'.
+components/chat/chat-component-registry.tsx(755,3): error TS2322: Type '({ score, feedback, jobDescription }: { score: number; feedback: string[]; jobDescription?: string | undefined; }) => Element' is not assignable to type '(props: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((...'.
+  Types of parameters '__0' and 'props' are incompatible.
+    Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is not assignable to type '{ score: number; feedback: string[]; jobDescription?: string | undefined; }'.
+      Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is missing the following properties from type '{ score: number; feedback: string[]; jobDescription?: string | undefined; }': score, feedback
+components/chat/chat-component-registry.tsx(756,3): error TS2322: Type '({ title, provider, url, skills }: { title: string; provider: string; url?: string | undefined; skills: string[]; }) => Element' is not assignable to type '(props: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((...'.
+  Types of parameters '__0' and 'props' are incompatible.
+    Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is not assignable to type '{ title: string; provider: string; url?: string | undefined; skills: string[]; }'.
+      Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is missing the following properties from type '{ title: string; provider: string; url?: string | undefined; skills: string[]; }': title, provider, skills
+components/chat/chat-component-registry.tsx(757,3): error TS2322: Type '({ questions, behavioralQuestions, technicalQuestions, systemDesignQuestions, quizQuestions, codingProblems, role, }: { questions?: string[] | undefined; behavioralQuestions?: string[] | undefined; technicalQuestions?: string[] | undefined; systemDesignQuestions?: string[] | undefined; quizQuestions?: string[] | und...' is not assignable to type '(props: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((...'.
+  Types of parameters '__0' and 'props' are incompatible.
+    Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is not assignable to type '{ questions?: string[] | undefined; behavioralQuestions?: string[] | undefined; technicalQuestions?: string[] | undefined; systemDesignQuestions?: string[] | undefined; quizQuestions?: string[] | undefined; codingProblems?: string[] | undefined; role?: string | undefined; }'.
+      Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' has no properties in common with type '{ questions?: string[] | undefined; behavioralQuestions?: string[] | undefined; technicalQuestions?: string[] | undefined; systemDesignQuestions?: string[] | undefined; quizQuestions?: string[] | undefined; codingProblems?: string[] | undefined; role?: string | undefined; }'.
+components/chat/chat-component-registry.tsx(758,3): error TS2322: Type '({ subject, body, to }: { subject: string; body: string; to?: string | undefined; }) => Element' is not assignable to type '(props: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((...'.
+  Types of parameters '__0' and 'props' are incompatible.
+    Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is not assignable to type '{ subject: string; body: string; to?: string | undefined; }'.
+      Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is missing the following properties from type '{ subject: string; body: string; to?: string | undefined; }': subject, body
+components/chat/chat-component-registry.tsx(759,3): error TS2322: Type '({ steps }: { steps: { action: string; status: "done" | "current" | "pending" | "failed"; details?: string | undefined; }[]; }) => Element' is not assignable to type '(props: { resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((...'.
+  Types of parameters '__0' and 'props' are incompatible.
+    Type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' is not assignable to type '{ steps: { action: string; status: "done" | "current" | "pending" | "failed"; details?: string | undefined; }[]; }'.
+      Property 'steps' is missing in type '{ resumeData: ResumeData; template?: "modern" | "classic" | "minimal" | "professional" | "elegant" | "dark" | "gradient" | "two-column" | "gradient-gray" | "german-cv" | "multi-colour" | undefined; setResumeData?: ((data: ResumeData | ((prev: ResumeData) => ResumeData)) => void) | undefined; setTemplate?: ((t: "mode...' but required in type '{ steps: { action: string; status: "done" | "current" | "pending" | "failed"; details?: string | undefined; }[]; }'.
+components/resume-coverletter/cover-letter-pdf-viewer.tsx(5,15): error TS2300: Duplicate identifier 'CoverLetterData'.
+components/resume-coverletter/cover-letter-pdf-viewer.tsx(5,32): error TS2300: Duplicate identifier 'CoverLetterTemplate'.
+components/resume-coverletter/cover-letter-pdf-viewer.tsx(11,15): error TS2300: Duplicate identifier 'CoverLetterData'.
+components/resume-coverletter/cover-letter-pdf-viewer.tsx(11,32): error TS2300: Duplicate identifier 'CoverLetterTemplate'.
+lib/extract-resume-json.ts(78,34): error TS2554: Expected 1 arguments, but got 2.
+lib/extract-resume-json.ts(149,18): error TS2339: Property 'resume' does not exist on type 'never'.
+lib/model-provider-icon.tsx(36,42): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(37,52): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(38,41): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(39,68): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(40,65): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(41,43): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(42,39): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(43,42): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(44,62): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(45,64): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/model-provider-icon.tsx(46,15): error TS2345: Argument of type 'CompoundedIcon' is not assignable to parameter of type 'ComponentType<IconProps>'.
+  Type 'CompoundedIcon' is not assignable to type 'FunctionComponent<IconProps>'.
+    Types of property 'propTypes' are incompatible.
+      Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>> | undefined' is not assignable to type 'WeakValidationMap<IconProps> | undefined'.
+        Type 'WeakValidationMap<Pick<SVGProps<SVGSVGElement>, "string" | "media" | "spacing" | "order" | "height" | "width" | "rotate" | "scale" | "cursor" | "fill" | "stroke" | ... 456 more ... | "zoomAndPan"> & { ...; } & RefAttributes<...>>' is not assignable to type 'WeakValidationMap<IconProps>'.
+          Types of property 'size' are incompatible.
+            Type 'Validator<string | number | null | undefined> | undefined' is not assignable to type 'Validator<number | null | undefined> | undefined'.
+              Type 'Validator<string | number | null | undefined>' is not assignable to type 'Validator<number | null | undefined>'.
+                Type 'string | number | null | undefined' is not assignable to type 'number | null | undefined'.
+                  Type 'string' is not assignable to type 'number'.
+lib/normalize-attached-file.ts(1,10): error TS2305: Module '"pdf-parse"' has no exported member 'PDFParse'.
+lib/normalize-sections-resume.ts(27,54): error TS1501: This regular expression flag is only available when targeting 'es2018' or later.

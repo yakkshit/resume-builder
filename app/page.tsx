@@ -56,8 +56,7 @@ import { resumeTemplates } from "@/components/pdf-templates";
 import { CHAT_MODELS_BY_PROVIDER, CHAT_MODEL_IDS, DEFAULT_CHAT_MODEL } from "@/lib/chat-models";
 import Link from "next/link";
 import EnhancedChat from "@/components/resume-coverletter/enhanced-chat";
-import { mergeAssistantResumeIntoCurrent } from "@/lib/extract-resume-json";
-import { getTextContent } from "@/lib/message-utils";
+import { extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
 import LoadingScreen from "@/components/resume-coverletter/loading-screen";
 
 // Import the correct components
@@ -313,43 +312,104 @@ export default function ResumePage() {
   };
 
   const applyAiChanges = () => {
-    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
-    if (!lastAssistant) {
-      toast({
-        title: "No AI response",
-        description: "There is no assistant message to apply. Send a message first and wait for a response.",
-        variant: "destructive",
-      });
-      return;
-    }
-    const content = getTextContent(lastAssistant);
-    if (!content?.trim()) {
-      toast({
-        title: "No content found",
-        description: "Could not read the AI response. The message may still be loading or the format is unexpected. Try again after the response finishes.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant") as any;
+    if (!lastAssistant?.content) return;
 
-    const { merged, template } = mergeAssistantResumeIntoCurrent(resumeData, content);
+    const suggestedChanges = extractResumeJsonFromMessage(lastAssistant.content);
 
-    if (!merged) {
+    if (!suggestedChanges) {
       toast({
         title: "No changes found",
-        description:
-          "No applicable resume JSON was found in the last reply. The assistant should include a ```component:cv``` block or resume sections in JSON. Try asking to “output the full resume in the component:cv format.”",
+        description: "No applicable resume changes were found in the last message. Try asking e.g. “Update my summary” or “Tailor my resume to this job.”",
         variant: "destructive",
       });
       return;
     }
 
-    setResumeData(merged);
-    if (template) setTemplate(template);
+    setResumeData((current) => {
+      const next = { ...current };
+
+      if (suggestedChanges.basicInfo && typeof suggestedChanges.basicInfo === "object") {
+        const b = suggestedChanges.basicInfo as Record<string, unknown>;
+        next.basicInfo = { ...current.basicInfo };
+        if (typeof b.summary === "string") next.basicInfo.summary = b.summary;
+        if (typeof b.name === "string") next.basicInfo.name = b.name;
+        if (typeof b.title === "string") next.basicInfo.title = b.title;
+        if (typeof b.email === "string") next.basicInfo.email = b.email;
+        if (typeof b.phone === "string") next.basicInfo.phone = b.phone;
+        if (typeof b.location === "string") next.basicInfo.location = b.location;
+        if (typeof b.linkedin === "string") next.basicInfo.linkedin = b.linkedin;
+        if (typeof b.website === "string") next.basicInfo.website = b.website;
+        if (Array.isArray(b.languages)) next.basicInfo.languages = b.languages.map(String);
+      }
+
+      if (Array.isArray(suggestedChanges.skills)) {
+        next.skills = suggestedChanges.skills.map((s) => (typeof s === "string" ? s : String(s)));
+      }
+
+      if (Array.isArray(suggestedChanges.experience)) {
+        next.experience = suggestedChanges.experience.map((newExp: unknown, i: number) => {
+          const e = newExp as Record<string, unknown>;
+          const prev = current.experience[i];
+          return {
+            company: typeof e.company === "string" ? e.company : prev?.company ?? "",
+            position: typeof e.position === "string" ? e.position : prev?.position ?? "",
+            startDate: typeof e.startDate === "string" ? e.startDate : prev?.startDate ?? "",
+            endDate: typeof e.endDate === "string" ? e.endDate : prev?.endDate ?? "",
+            description: typeof e.description === "string" ? e.description : prev?.description ?? "",
+            highlights: Array.isArray(e.highlights) ? e.highlights.map(String) : prev?.highlights ?? [],
+          };
+        });
+      }
+
+      if (Array.isArray(suggestedChanges.education)) {
+        next.education = suggestedChanges.education.map((newEdu: unknown, i: number) => {
+          const e = newEdu as Record<string, unknown>;
+          const prev = current.education[i];
+          return {
+            institution: typeof e.institution === "string" ? e.institution : prev?.institution ?? "",
+            degree: typeof e.degree === "string" ? e.degree : prev?.degree ?? "",
+            field: typeof e.field === "string" ? e.field : prev?.field ?? "",
+            startDate: typeof e.startDate === "string" ? e.startDate : prev?.startDate ?? "",
+            endDate: typeof e.endDate === "string" ? e.endDate : prev?.endDate ?? "",
+            gpa: typeof e.gpa === "string" ? e.gpa : prev?.gpa ?? "",
+          };
+        });
+      }
+
+      if (Array.isArray(suggestedChanges.projects)) {
+        next.projects = suggestedChanges.projects.map((newP: unknown, i: number) => {
+          const p = newP as Record<string, unknown>;
+          const prev = current.projects?.[i];
+          return {
+            name: typeof p.name === "string" ? p.name : prev?.name ?? "",
+            description: typeof p.description === "string" ? p.description : prev?.description ?? "",
+            technologies: Array.isArray(p.technologies) ? p.technologies.map(String) : prev?.technologies ?? [],
+            link: typeof p.link === "string" ? p.link : prev?.link,
+            startDate: typeof p.startDate === "string" ? p.startDate : prev?.startDate,
+            endDate: typeof p.endDate === "string" ? p.endDate : prev?.endDate,
+          };
+        });
+      }
+
+      if (Array.isArray(suggestedChanges.achievements)) {
+        next.achievements = suggestedChanges.achievements.map((newA: unknown, i: number) => {
+          const a = newA as Record<string, unknown>;
+          const prev = current.achievements?.[i];
+          return {
+            title: typeof a.title === "string" ? a.title : prev?.title ?? "",
+            description: typeof a.description === "string" ? a.description : prev?.description ?? "",
+            date: typeof a.date === "string" ? a.date : prev?.date,
+          };
+        });
+      }
+
+      return next;
+    });
 
     toast({
       title: "AI changes applied",
-      description: "The suggested changes have been merged into your resume and PDF preview.",
+      description: "The suggested changes have been applied to your resume.",
     });
   };
 
@@ -838,7 +898,7 @@ export default function ResumePage() {
                               </div>
                               {(ids as readonly string[]).map((id) => (
                                 <SelectItem key={id} value={id}>
-                                  {id === "lingo-ai" ? "Lingo AI" : id === "cedz" ? "Cedz (URL + model below)" : id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                                  {id === "lingo-ai" ? "Lingo AI" : id === "cedz-qwen3-8b" ? "Qwen3 8B" : id === "cedz-llama3-8b" ? "Llama3 8B" : id === "cedz-custom" ? "Custom (set model below)" : id.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                                 </SelectItem>
                               ))}
                             </div>
@@ -916,39 +976,32 @@ export default function ResumePage() {
                       </p>
                     </div>
 
-                    {/* Cedz: URL + Model (no API key needed) */}
-                    {selectedModel === "cedz" && (
-                      <div className="mb-4 p-4 rounded-lg border border-primary/20 bg-primary/5 space-y-3">
-                        <p className="text-sm font-medium text-foreground">Cedz configuration</p>
-                        <div>
-                          <Label htmlFor="cedz-endpoint">API URL</Label>
-                          <Input
-                            id="cedz-endpoint"
-                            placeholder="https://xxx.ngrok-free.app or https://host/api/generate"
-                            value={customEndpoint}
-                            onChange={(e) => setCustomEndpoint(e.target.value)}
-                            className="mt-1"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Base URL (e.g. https://xxx.ngrok-free.app) or full /api/generate URL
-                          </p>
-                        </div>
-                        <div>
-                          <Label htmlFor="cedz-model">Model</Label>
-                          <Input
-                            id="cedz-model"
-                            placeholder="qwen3:8b"
-                            value={customModel}
-                            onChange={(e) => setCustomModel(e.target.value)}
-                            className="mt-1"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Model name (e.g. qwen3:8b, llama3.1:8b)
-                          </p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Cedz streams thinking when available; otherwise shows &quot;We are tailoring the resume.&quot;
+                    {/* Cedz API URL (for Cedz models) */}
+                    {selectedModel.startsWith("cedz") && (
+                      <div className="mb-4">
+                        <Label htmlFor="cedz-endpoint">Cedz API base URL</Label>
+                        <Input
+                          id="cedz-endpoint"
+                          placeholder="https://your-ngrok-url.ngrok-free.app"
+                          value={customEndpoint}
+                          onChange={(e) => setCustomEndpoint(e.target.value)}
+                          className="mt-1"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Set CEDZ_API_URL in .env or enter the base URL here (e.g. https://xxx.ngrok-free.app). No trailing slash.
                         </p>
+                        {selectedModel === "cedz-custom" && (
+                          <>
+                            <Label htmlFor="cedz-model" className="mt-2 block">Model name</Label>
+                            <Input
+                              id="cedz-model"
+                              placeholder="qwen3:8b"
+                              value={customModel}
+                              onChange={(e) => setCustomModel(e.target.value)}
+                              className="mt-1"
+                            />
+                          </>
+                        )}
                       </div>
                     )}
 

@@ -14,79 +14,38 @@ import { cn } from "@/lib/utils"
 import { useToast } from "@/hooks/use-toast"
 import type { UIMessage } from "ai"
 import { extractResumeJsonFromMessage, getSuggestedSectionsSummary } from "@/lib/extract-resume-json"
-import { getTextContent, getReasoningContent } from "@/lib/message-utils"
-import ReactMarkdown from "react-markdown"
+import { getTextContent } from "@/lib/message-utils"
 
-function MarkdownContent({ content, className }: { content: string; className?: string }) {
-  if (!content || typeof content !== "string") return null
-  return (
-    <div className={cn("prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-2 prose-li:my-0", className)}>
-      <ReactMarkdown
-        components={{
-          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-          ul: ({ children }) => <ul className="list-disc pl-5 space-y-0.5 my-2">{children}</ul>,
-          ol: ({ children }) => <ol className="list-decimal pl-5 space-y-0.5 my-2">{children}</ol>,
-          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-          strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  )
-}
-
-function AssistantMessageContent({ message, content, reasoning, isStreaming }: { message?: UIMessage; content: string; reasoning?: string; isStreaming?: boolean }) {
-  const safeContent = typeof content === "string" ? content : ""
-  const update = extractResumeJsonFromMessage(safeContent)
+function AssistantMessageContent({ content, isStreaming }: { content: string; isStreaming?: boolean }) {
+  const update = extractResumeJsonFromMessage(content)
   const sections = update ? getSuggestedSectionsSummary(update) : []
-  const hasSuggestedChanges = Array.isArray(sections) && sections.length > 0 && !isStreaming
-  const showReasoning = (reasoning ?? "").trim().length > 0
+  const hasSuggestedChanges = sections.length > 0 && !isStreaming
 
   if (!hasSuggestedChanges) {
     return (
-      <div className="space-y-2 relative">
-        {showReasoning && (
-          <div className="rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm">
-            <p className="font-medium text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5" aria-hidden />
-              {isStreaming ? "Thinking…" : "Thought process"}
-            </p>
-            <div className="whitespace-pre-wrap text-xs text-muted-foreground break-words leading-relaxed">
-              {reasoning}
-            </div>
-          </div>
+      <div className="relative">
+        <div className="whitespace-pre-wrap text-sm break-words overflow-hidden hyphens-auto leading-relaxed">
+          {content}
+        </div>
+        {isStreaming && (
+          <span className="inline-block w-2 h-4 ml-0.5 bg-primary animate-pulse align-middle" aria-hidden />
         )}
-        {safeContent ? (
-          <div className="text-sm break-words overflow-hidden leading-relaxed">
-            <MarkdownContent content={safeContent} className="text-foreground" />
-            {isStreaming && (
-              <span className="inline-block w-2 h-4 ml-0.5 bg-primary animate-pulse align-middle" aria-hidden />
-            )}
-          </div>
-        ) : isStreaming && !showReasoning && !safeContent ? (
-          <p className="text-sm text-muted-foreground italic flex items-center gap-2">
-            <span className="inline-block w-2 h-4 bg-primary animate-pulse rounded" aria-hidden />
-            We are tailoring the resume.
-          </p>
-        ) : null}
       </div>
     )
   }
 
-  const withoutJsonBlock = safeContent.replace(/```(?:json)?\s*[\s\S]*?```/g, "").trim()
+  const withoutJsonBlock = content.replace(/```(?:json)?\s*[\s\S]*?```/g, "").trim()
   return (
     <div className="space-y-2">
       {withoutJsonBlock && (
-        <div className="text-sm break-words overflow-hidden leading-relaxed">
-          <MarkdownContent content={withoutJsonBlock} className="text-foreground" />
+        <div className="whitespace-pre-wrap text-sm break-words overflow-hidden hyphens-auto leading-relaxed">
+          {withoutJsonBlock}
         </div>
       )}
       <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
         <p className="font-medium text-primary mb-1">Suggested resume updates</p>
         <p className="text-muted-foreground">
-          {sections.join(" · ")} — click <strong>Apply AI Changes</strong> below to merge this JSON into your editor and PDF (the assistant may use a{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">component:cv</code> block).
+          {sections.join(" · ")} — use <strong>Apply AI Changes</strong> below to update your resume.
         </p>
       </div>
     </div>
@@ -160,19 +119,12 @@ export default function EnhancedChat({
     const hadNewMessage = newCount > lastMessageCountRef.current
     lastMessageCountRef.current = newCount
 
-    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant")
-    const lastAssistantText = lastAssistant ? getTextContent(lastAssistant) ?? "" : ""
-    const hasResumePayload = extractResumeJsonFromMessage(lastAssistantText) !== null
-
-    if (messages.length > 0 && lastAssistant && !isLoading && hasResumePayload) {
+    if (messages.length > 0 && messages[messages.length - 1].role === "assistant") {
       setCanApplyChanges(true)
       setTypingIndicator(false)
     } else if (isLoading) {
       setTypingIndicator(true)
       setCanApplyChanges(false)
-    } else {
-      setCanApplyChanges(false)
-      setTypingIndicator(false)
     }
 
     if (hadNewMessage || isLoading) {
@@ -360,7 +312,7 @@ export default function EnhancedChat({
                   <Bot className="h-8 w-8 text-primary/60 dark:text-primary/70" />
                 </motion.div>
                 <h3 className="text-lg font-semibold mb-2 text-foreground">AI Assistant Ready</h3>
-                <div className="text-sm text-muted-foreground max-w-md leading-relaxed">
+                <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
                   Ask me anything about your resume or how to improve it.
                   {aiMode && " I can also tailor your resume to match job descriptions."}
                   <br /> Always add at least a basic prompt in chat to tailor the resume. <br />
@@ -376,7 +328,7 @@ export default function EnhancedChat({
                       </div>
                     </>
                   )}
-                </div>
+                </p>
               </motion.div>
             ) : (
               <AnimatePresence initial={false}>
@@ -449,9 +401,7 @@ export default function EnhancedChat({
                         </div>
                       ) : message.role === "assistant" ? (
                         <AssistantMessageContent
-                          message={message}
                           content={getTextContent(message)}
-                          reasoning={getReasoningContent(message)}
                           isStreaming={isStreaming && idx === messages.length - 1}
                         />
                       ) : (
@@ -704,38 +654,20 @@ export default function EnhancedChat({
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.99 }}
             >
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="block w-full" tabIndex={0}>
-                      <Button
-                        type="button"
-                        onClick={applyAiChanges}
-                        className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-lg disabled:opacity-50"
-                        disabled={!canApplyChanges}
-                        variant="default"
-                      >
-                        <motion.span
-                          animate={canApplyChanges ? { rotate: [0, 10, -10, 0] } : {}}
-                          transition={{ duration: 0.5, repeat: canApplyChanges ? Infinity : 0, repeatDelay: 2 }}
-                        >
-                          <Sparkles size={16} className="mr-2" />
-                        </motion.span>
-                        Apply AI Changes
-                      </Button>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs text-left">
-                    <p className="font-medium">Merge the latest assistant reply into your resume</p>
-                    <p className="text-muted-foreground text-xs mt-1">
-                      Parses resume JSON from the last assistant message — including fenced{" "}
-                      <code className="rounded bg-background/80 px-0.5">component:cv</code> blocks with{" "}
-                      <code className="rounded bg-background/80 px-0.5">resumeData</code> — then merges it into the
-                      editor and PDF. Your profile photo in the editor is kept unless the model sends a valid image URL.
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Button
+                onClick={applyAiChanges}
+                className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary transition-all duration-300 shadow-lg disabled:opacity-50"
+                disabled={!canApplyChanges}
+                variant="default"
+              >
+                <motion.span
+                  animate={canApplyChanges ? { rotate: [0, 10, -10, 0] } : {}}
+                  transition={{ duration: 0.5, repeat: canApplyChanges ? Infinity : 0, repeatDelay: 2 }}
+                >
+                  <Sparkles size={16} className="mr-2" />
+                </motion.span>
+                Apply AI Changes
+              </Button>
             </motion.div>
           </motion.div>
         )}

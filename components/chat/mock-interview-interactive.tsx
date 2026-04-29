@@ -22,6 +22,7 @@ import { copyToClipboard } from "@/lib/clipboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getVercelOidcToken } from "@/lib/session-secrets";
 
 export interface MockInterviewInteractiveProps {
   questions?: string[];
@@ -314,46 +315,86 @@ export function MockInterviewInteractive({
     }
     setCodeRunState((prev) => ({ ...prev, [key]: { status: "running" } }));
     try {
+      const token = getVercelOidcToken().trim();
+      if (token && (language === "typescript" || language === "javascript" || language === "python")) {
+        const res = await fetch("/api/interview-lab/sandbox-run", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oidcToken: token, language, code }),
+        });
+        const j = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          passed?: boolean;
+          output?: string;
+          error?: string;
+          hint?: string;
+        };
+        if (res.ok && j.ok) {
+          const passed = Boolean(j.passed);
+          setCodeRunState((prev) => ({
+            ...prev,
+            [key]: {
+              status: passed ? "pass" : "fail",
+              error: passed ? undefined : j.error || "Some tests failed.",
+              details: j.output?.trim() || undefined,
+            },
+          }));
+          return;
+        }
+        // fall back to local VM on failure/misconfig
+      }
+
       const res = await fetch("/api/code-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ language, code }),
       });
-      const data = (await res.json().catch(() => null)) as any;
+      const data = (await res.json().catch(() => null)) as unknown;
       if (!res.ok) {
+        const err = (data as { error?: unknown } | null)?.error;
         setCodeRunState((prev) => ({
           ...prev,
           [key]: {
             status: "fail",
-            error: data?.error || `Submission failed (${res.status})`,
+            error: typeof err === "string" ? err : `Submission failed (${res.status})`,
           },
         }));
         return;
       }
-      const passed = Boolean(data?.passed);
+      const passed = Boolean((data as { passed?: unknown } | null)?.passed);
+      const err = (data as { error?: unknown } | null)?.error;
+      const stdout = (data as { stdout?: unknown } | null)?.stdout;
+      const stderr = (data as { stderr?: unknown } | null)?.stderr;
+      const feedbackRaw = (data as { feedback?: unknown } | null)?.feedback;
       const feedbackText =
-        data?.feedback && typeof data.feedback === "object"
-          ? [
-              data.feedback.summary ? `Summary: ${data.feedback.summary}` : "",
-              Array.isArray(data.feedback.strengths) && data.feedback.strengths.length
-                ? `Strengths:\n- ${data.feedback.strengths.join("\n- ")}`
-                : "",
-              Array.isArray(data.feedback.improvements) && data.feedback.improvements.length
-                ? `Improvements:\n- ${data.feedback.improvements.join("\n- ")}`
-                : "",
-              data.feedback.suggestedNextStep ? `Next: ${data.feedback.suggestedNextStep}` : "",
-            ]
-              .filter(Boolean)
-              .join("\n\n")
+        feedbackRaw && typeof feedbackRaw === "object"
+          ? (() => {
+              const fb = feedbackRaw as {
+                summary?: unknown;
+                strengths?: unknown;
+                improvements?: unknown;
+                suggestedNextStep?: unknown;
+              };
+              return [
+                typeof fb.summary === "string" && fb.summary ? `Summary: ${fb.summary}` : "",
+                Array.isArray(fb.strengths) && fb.strengths.length ? `Strengths:\n- ${fb.strengths.join("\n- ")}` : "",
+                Array.isArray(fb.improvements) && fb.improvements.length
+                  ? `Improvements:\n- ${fb.improvements.join("\n- ")}`
+                  : "",
+                typeof fb.suggestedNextStep === "string" && fb.suggestedNextStep ? `Next: ${fb.suggestedNextStep}` : "",
+              ]
+                .filter(Boolean)
+                .join("\n\n");
+            })()
           : undefined;
       setCodeRunState((prev) => ({
         ...prev,
         [key]: {
           status: passed ? "pass" : "fail",
-          error: passed ? undefined : data?.error || "Some tests failed.",
+          error: passed ? undefined : (typeof err === "string" ? err : "Some tests failed."),
           details:
-            (typeof data?.stdout === "string" && data.stdout.trim() ? data.stdout : "") ||
-            (typeof data?.stderr === "string" && data.stderr.trim() ? data.stderr : "") ||
+            (typeof stdout === "string" && stdout.trim() ? stdout : "") ||
+            (typeof stderr === "string" && stderr.trim() ? stderr : "") ||
             feedbackText,
         },
       }));

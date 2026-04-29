@@ -38,6 +38,23 @@ describe("extractResumeJsonFromMessage", () => {
     expect((out as any).basicInfo?.name).toBe("Flat");
   });
 
+  it("normalizes nested sections.resumeData from component:cv (LLM shape)", () => {
+    const text = `\`\`\`component:cv
+{"resumeData":{"sections":{"profile":{"name":"Jane Doe","email":"j@ex.com","phone":"","linkedin":"in/jane","website":"jane.dev","github":"gh/jane"},"summary":"Builder.","experience":{"items":[{"title":"Dev","company":"Acme","dates":"01/2024 – Present","description":"Shipped features.","keywords":["React"]}]},"education":{"items":[{"title":"B.Sc. CS","institution":"State U","dates":"2018 – 2022"}]},"projects":{"items":[{"title":"Side","description":"App","keywords":["TS"]}]},"skills":{"items":["Python","Go"]},"languages":{"items":["English"]}},"summary":"Builder."},"template":"modern"}
+\`\`\``;
+    const out = extractResumeJsonFromMessage(text);
+    expect(out).not.toBeNull();
+    expect((out as any).basicInfo?.name).toBe("Jane Doe");
+    expect((out as any).basicInfo?.summary).toBe("Builder.");
+    expect((out as any).experience?.[0]?.company).toBe("Acme");
+    expect((out as any).experience?.[0]?.position).toBe("Dev");
+    expect((out as any).education?.[0]?.institution).toBe("State U");
+    expect((out as any).projects?.[0]?.name).toBe("Side");
+    expect((out as any).skills).toContain("Python");
+    const payload = extractResumePayloadFromMessage(text);
+    expect(payload.template).toBe("modern");
+  });
+
   it("mergeAssistantResumeIntoCurrent preserves profile picture", () => {
     const current: ResumeData = {
       ...defaultResumeData,

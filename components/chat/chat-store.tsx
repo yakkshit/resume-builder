@@ -41,6 +41,15 @@ export interface ChatSettings {
   openAiCompatModel: string;
   /** Optional Hugging Face Hub model id override (legacy HF + HF AI SDK curated picks) */
   huggingFaceCustomModel: string;
+  /** Optional override for “model docs” link in Integrations (else .env NEXT_PUBLIC_MULTI_MODEL_*) */
+  integrationsDocsUrlOverride: string;
+  /**
+   * Vercel OIDC / PAT for Sandbox “test” from the sidebar — session only, never persisted.
+   * Prefer `vercel env pull` → VERCEL_OIDC_TOKEN on the server.
+   */
+  vercelOidcToken: string;
+  /** Optional OpenAI key for server-side clip transcription (Whisper); session only, never persisted. */
+  openaiTranscriptionApiKey: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -87,6 +96,9 @@ const DEFAULT_SETTINGS: ChatSettings = {
   openAiCompatBaseUrl: "",
   openAiCompatModel: "gpt-4o-mini",
   huggingFaceCustomModel: "",
+  integrationsDocsUrlOverride: "",
+  vercelOidcToken: "",
+  openaiTranscriptionApiKey: "",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -127,7 +139,6 @@ export function useChatSessions() {
       setSessions([fresh]);
       setCurrentId(fresh.id);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Persist on change
@@ -234,15 +245,25 @@ export function useChatSettings() {
 
   useEffect(() => {
     const stored = loadFromStorage<Partial<ChatSettings>>(SETTINGS_STORAGE_ID, {});
-    // API key should NOT persist in browser storage; merge so new keys get defaults.
-    setSettings({ ...DEFAULT_SETTINGS, ...stored, apiKey: "" });
+    // Secrets must NOT persist in browser storage; merge so new keys get defaults.
+    setSettings({
+      ...DEFAULT_SETTINGS,
+      ...stored,
+      apiKey: "",
+      vercelOidcToken: "",
+      openaiTranscriptionApiKey: "",
+    });
   }, []);
 
   const updateSettings = useCallback((patch: Partial<ChatSettings>) => {
     setSettings((prev) => {
       const next = { ...prev, ...patch };
-      // Persist everything except API key.
-      const { apiKey: _apiKey, ...persistable } = next;
+      const {
+        apiKey: _apiKey,
+        vercelOidcToken: _vercel,
+        openaiTranscriptionApiKey: _openaiTx,
+        ...persistable
+      } = next;
       saveToStorage(SETTINGS_STORAGE_ID, persistable as ChatSettings);
       return next;
     });

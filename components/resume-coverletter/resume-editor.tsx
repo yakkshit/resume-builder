@@ -283,7 +283,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
   const addSkill = () => {
     setResumeData((prev) => ({
       ...prev,
-      skills: [...prev.skills, ""],
+      skills: [...prev.skills, "New skill"],
     }))
   }
 
@@ -311,7 +311,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
       ...prev,
       basicInfo: {
         ...prev.basicInfo,
-        languages: [...(prev.basicInfo.languages || []), ""],
+        languages: [...(prev.basicInfo.languages || []), "New language"],
       },
     }))
   }

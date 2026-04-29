@@ -23,6 +23,7 @@ import { resumeTemplates } from "@/components/pdf-templates";
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
 import { deepMerge } from "@/lib/utils";
+import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume";
 
 // PDF viewer loaded dynamically (client-only, heavy)
 const PdfPreviewClient = dynamic(
@@ -124,6 +125,13 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
       const previous = typeof (currentBasic as any)?.[f] === "string" ? String((currentBasic as any)[f]).trim() : "";
       (out.basicInfo as any)[f] = pick(fromMerged, pv, previous);
     }
+    const picRaw = typeof profile?.profilePicture === "string" ? profile.profilePicture.trim() : "";
+    if (
+      picRaw &&
+      (picRaw.startsWith("data:image/") || picRaw.startsWith("https://") || picRaw.startsWith("http://"))
+    ) {
+      (out.basicInfo as any).profilePicture = picRaw;
+    }
     const gh = typeof profile?.github === "string" ? profile.github.trim() : "";
     setGithubOnBasicInfo(
       out.basicInfo,
@@ -140,6 +148,19 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
       out.basicInfo,
       getGithubFromBasicInfo(out.basicInfo) || getGithubFromBasicInfo(currentBasic),
     );
+  }
+
+  const diskPic =
+    typeof (currentBasic as any)?.profilePicture === "string"
+      ? String((currentBasic as any).profilePicture).trim()
+      : "";
+  if (
+    diskPic &&
+    (!(out.basicInfo as any).profilePicture ||
+      typeof (out.basicInfo as any).profilePicture !== "string" ||
+      !(out.basicInfo as any).profilePicture.trim())
+  ) {
+    (out.basicInfo as any).profilePicture = diskPic;
   }
   return out;
 }
@@ -181,17 +202,10 @@ export function ResumeViewer({
       const payload = data.resumeData ? data.resumeData : (Object.keys(data).length > 0 && !data.template ? data : null);
       if (payload) {
         const beforeMerge = sanitizeResumeData(current);
-        // Keep existing profile picture locally; do not let large base64 re-enter storage.
-        const existingPicture =
-          (current as any)?.basicInfo && typeof (current as any).basicInfo === "object"
-            ? (current as any).basicInfo.profilePicture
-            : undefined;
-        const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(payload));
+        const flatPayload = normalizeResumePayloadToFlat(payload) ?? payload;
+        const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(flatPayload));
         current = deepMerge(current, cleanedPayload) as ResumeData;
         current = applyIdentitySourceRule(current, beforeMerge);
-        if (existingPicture && (current as any)?.basicInfo && typeof (current as any).basicInfo === "object") {
-          (current as any).basicInfo.profilePicture = existingPicture;
-        }
         current = sanitizeResumeData(current);
         if (syncWithGlobalResume && typeof window !== "undefined") {
           tryLocalStorageSet("resumeData", JSON.stringify(current));
@@ -272,7 +286,10 @@ export function ResumeViewer({
       : Object.keys(data).length > 0 && !(data as any).template
         ? data
         : null;
-    if (raw && typeof raw === "object") assistantPayloadSignature = JSON.stringify(raw);
+    if (raw && typeof raw === "object") {
+      const norm = normalizeResumePayloadToFlat(raw) ?? raw;
+      assistantPayloadSignature = JSON.stringify(norm);
+    }
   }
 
   // Apply new assistant payloads even after initial mount. Always merge onto the latest
@@ -298,17 +315,10 @@ export function ResumeViewer({
     }
 
     const beforeMerge = sanitizeResumeData(base);
-    const existingPicture =
-      (beforeMerge as any)?.basicInfo && typeof (beforeMerge as any).basicInfo === "object"
-        ? (beforeMerge as any).basicInfo.profilePicture
-        : undefined;
-
-    const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(payload));
+    const flatPayload = normalizeResumePayloadToFlat(payload) ?? payload;
+    const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(flatPayload));
     let next = deepMerge(beforeMerge, cleanedPayload) as ResumeData;
     next = applyIdentitySourceRule(next, beforeMerge);
-    if (existingPicture && (next as any)?.basicInfo && typeof (next as any).basicInfo === "object") {
-      (next as any).basicInfo.profilePicture = existingPicture;
-    }
     const safe = sanitizeResumeData(next);
 
     setResumeData(safe);

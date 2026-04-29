@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Lock, PanelLeft, Sparkles, User, Video, X, Zap } from "lucide-react";
+import { BookOpen, Clapperboard, Lock, PanelLeft, Sparkles, User, Video, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
 import { toVideoEmbedSrc } from "@/lib/chat-onboarding-video";
@@ -15,7 +15,7 @@ export type ChatOnboardingStep = {
   body: string;
   icon: typeof Sparkles;
   /** Highlight target; optional sidebar action */
-  tour?: "menu" | "composer" | "model-select" | "profile-toggle" | "quick-prompts" | "video";
+  tour?: "menu" | "composer" | "model-select" | "profile-toggle" | "quick-prompts" | "interview-lab" | "video";
   openSidebar?: boolean;
 };
 
@@ -60,6 +60,13 @@ const DEFAULT_STEPS: ChatOnboardingStep[] = [
     body: "Type here. Enter sends; Shift+Enter adds a new line. The box grows while you type.",
     icon: BookOpen,
     tour: "composer",
+    openSidebar: false,
+  },
+  {
+    title: "Interview Lab 🎬",
+    body: "Open Interview Lab (clapper icon) for AI interview rounds, code tests, and live coaching with screen + voice notes. If it says “requires Gemini”, switch your model to a Gemini option.",
+    icon: Clapperboard,
+    tour: "interview-lab",
     openSidebar: false,
   },
   {
@@ -126,6 +133,10 @@ export function ChatOnboarding({
       const el = document.querySelector(`[data-chat-tour="${s.tour}"]`);
       el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
       el?.setAttribute("data-chat-tour-active", "true");
+      if (s.tour === "interview-lab") {
+        // Optional click to open the panel if the element is a button.
+        (el as HTMLElement | null)?.click?.();
+      }
     }
     return () => clearTourHighlights();
   }, [open, step, steps, setSidebarOpen]);

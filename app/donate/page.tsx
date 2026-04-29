@@ -187,7 +187,7 @@ export default function DonationPage() {
               <div>
                 <h3 className="text-xl font-bold mb-4">About Us</h3>
                 <p className="text-slate-300">
-                  We're dedicated to making a positive impact through innovative solutions and community support.
+                  We&apos;re dedicated to making a positive impact through innovative solutions and community support.
                 </p>
               </div>
             </FadeIn>

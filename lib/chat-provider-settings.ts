@@ -5,9 +5,13 @@ export const OPENAI_COMPAT_CHAT_MODEL_ID = "openai-compatible-aisdk" as const;
 /** Hugging Face Inference router: user supplies full Hub model id (required) */
 export const HF_CUSTOM_HUB_MODEL_ID = "hf-custom-hub-aisdk" as const;
 
-const HF_AISDK_IDS = new Set(CHAT_MODELS_BY_PROVIDER["Hugging Face (AI SDK)"] as readonly string[]);
+const HF_AISDK_IDS = new Set(
+  (CHAT_MODELS_BY_PROVIDER["Hugging Face (AI SDK)"] ?? []) as readonly string[],
+)
 
-const LEGACY_HF_IDS = new Set(CHAT_MODELS_BY_PROVIDER["Hugging Face"] as readonly string[]);
+const LEGACY_HF_IDS = new Set(
+  (CHAT_MODELS_BY_PROVIDER["Hugging Face"] ?? []) as readonly string[],
+)
 
 export function isOpenAiCompatibleChatModel(model: string): boolean {
   return model === OPENAI_COMPAT_CHAT_MODEL_ID;
