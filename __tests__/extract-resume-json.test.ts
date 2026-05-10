@@ -8,6 +8,29 @@ import { defaultResumeData } from "@/lib/default-resume-data";
 import type { ResumeData } from "@/lib/types";
 
 describe("extractResumeJsonFromMessage", () => {
+  it("unwraps component:resume fence like component:cv", () => {
+    const text = `\`\`\`component:resume
+{"resumeData":{"basicInfo":{"name":"R","title":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":""},"experience":[],"education":[],"skills":["Rust"],"projects":[],"achievements":[]}}
+\`\`\``;
+    const out = extractResumeJsonFromMessage(text);
+    expect(out).not.toBeNull();
+    expect((out as any).basicInfo?.name).toBe("R");
+    expect((out as any).skills).toEqual(["Rust"]);
+  });
+
+  it("uses last successful component:cv block when multiple appear", () => {
+    const text = `
+\`\`\`component:cv
+{"resumeData":{"basicInfo":{"name":"First","title":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":""},"experience":[],"education":[],"skills":[],"projects":[],"achievements":[]}}
+\`\`\`
+\`\`\`component:cv
+{"resumeData":{"basicInfo":{"name":"Second","title":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":""},"experience":[],"education":[],"skills":[],"projects":[],"achievements":[]}}
+\`\`\`
+`;
+    const out = extractResumeJsonFromMessage(text);
+    expect((out as any).basicInfo?.name).toBe("Second");
+  });
+
   it("unwraps component:cv fence with resumeData envelope", () => {
     const text = `Here is your resume.
 

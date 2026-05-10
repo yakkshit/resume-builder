@@ -1468,35 +1468,41 @@ export default function AICareerAssistantChat() {
         const wasStreaming = prev === "streaming" || prev === "submitted";
         const nowIdle = status !== "streaming" && status !== "submitted";
         prevChatStatusRef.current = status;
-        if (!wasStreaming || !nowIdle) return;
 
         const last = messages[messages.length - 1];
         if (!last || last.role !== "assistant" || !last.id) return;
         const text = getTextContent(last) ?? "";
 
-        if (resumeCvHintShownForAssistantIdRef.current !== last.id) {
-            let lastUser = "";
-            for (let i = messages.length - 2; i >= 0; i--) {
-                if (messages[i]?.role === "user") {
-                    lastUser = getTextContent(messages[i]!) ?? "";
-                    break;
+        // Hint only once per assistant message, right when stream finishes
+        if (wasStreaming && nowIdle) {
+            if (resumeCvHintShownForAssistantIdRef.current !== last.id) {
+                let lastUser = "";
+                for (let i = messages.length - 2; i >= 0; i--) {
+                    if (messages[i]?.role === "user") {
+                        lastUser = getTextContent(messages[i]!) ?? "";
+                        break;
+                    }
+                }
+                const resumeIntent =
+                    /\b(resume|cv|curriculum|latex cv|cover letter|cover-letter|experience|summary|skills)\b/i.test(
+                        lastUser,
+                    );
+                const hasCvFence = /```\s*component\s*:\s*(cv|resume)\b/i.test(text);
+                const modelId = settingsRef.current.model ?? "";
+                const gemini = modelId.startsWith("gemini-");
+                if (resumeIntent && lastUser.length > 12 && !hasCvFence && !gemini) {
+                    resumeCvHintShownForAssistantIdRef.current = last.id;
+                    showToast(
+                        "warning",
+                        "This reply did not include structured resume JSON (```component:cv```). Google Gemini usually follows this format most reliably — try switching models.",
+                    );
                 }
             }
-            const resumeIntent =
-                /\b(resume|cv|curriculum|latex cv|cover letter|cover-letter|experience|summary|skills)\b/i.test(
-                    lastUser,
-                );
-            const hasCvFence = /```\s*component\s*:\s*(cv|resume)\b/i.test(text);
-            const modelId = settingsRef.current.model ?? "";
-            const gemini = modelId.startsWith("gemini-");
-            if (resumeIntent && lastUser.length > 12 && !hasCvFence && !gemini) {
-                resumeCvHintShownForAssistantIdRef.current = last.id;
-                showToast(
-                    "warning",
-                    "This reply did not include structured resume JSON (```component:cv```). Google Gemini usually follows this format most reliably — try switching models.",
-                );
-            }
         }
+
+        // Merge while idle whenever the last assistant message gains parseable resume JSON.
+        // Important: do NOT gate this only on streaming→idle — the final ``` fence often arrives on the next React commit after status flips, so a one-shot merge missed updates.
+        if (status === "streaming" || status === "submitted") return;
 
         const { merged, template } = mergeAssistantResumeIntoCurrent(loadFullResumeFromStorage(), text);
         if (!merged) return;
