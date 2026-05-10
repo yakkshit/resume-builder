@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { generateCoverLetterPDFBlob } from "@/lib/cover-letter-pdf-generator";
+import { generateCoverLetterPDFBuffer } from "@/lib/cover-letter-pdf-generator";
 import type { CoverLetterData, CoverLetterTemplate } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -15,10 +15,9 @@ export async function POST(req: NextRequest) {
 
   const template = (typeof body.template === "string" ? body.template : "standard") as CoverLetterTemplate;
 
-  const blob = await generateCoverLetterPDFBlob(body.coverLetterData, template);
-  const arrayBuffer = await blob.arrayBuffer();
+  const buffer = await generateCoverLetterPDFBuffer(body.coverLetterData, template);
 
-  return new Response(arrayBuffer, {
+  return new Response(buffer as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

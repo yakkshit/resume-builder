@@ -1,28 +1,37 @@
 "use client";
 
-import type { ComponentType, SVGProps } from "react";
 import {
-  Anthropic,
-  DeepSeek,
-  Gemini,
-  Google,
-  Groq,
-  HuggingFace,
-  Mistral,
-  OpenAI,
+  Anthropic as AnthropicIcon,
+  DeepSeek as DeepSeekIcon,
+  Gemini as GeminiIcon,
+  Google as GoogleIcon,
+  Groq as GroqIcon,
+  HuggingFace as HuggingFaceIcon,
+  Mistral as MistralIcon,
+  OpenAI as OpenAIIcon,
+  Meta as MetaIcon,
 } from "@lobehub/icons";
+import {
+  Bot,
+  Cpu,
+  Globe2,
+  HeartHandshake,
+  Waves,
+  Zap
+} from "lucide-react";
 
-type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
-function wrap(
-  Icon: ComponentType<IconProps>,
-  size: number,
-  className?: string,
-) {
+type IconWrapProps = {
+  Icon: any;
+  size: number;
+  className?: string | undefined;
+};
+
+function wrap({ Icon, size, className }: IconWrapProps) {
   return <Icon size={size} className={className} />;
 }
 
-/** Provider label from chat-store `AVAILABLE_MODELS[].provider` → LobeHub brand icon. */
+/** Provider label from chat-store → compact brand pictogram. */
 export function ModelProviderIcon({
   provider,
   className,
@@ -33,15 +42,17 @@ export function ModelProviderIcon({
   size?: number;
 }) {
   const p = provider.toLowerCase();
-  if (p.includes("hugging")) return wrap(HuggingFace, size, className);
-  if (p.includes("openai compatible")) return wrap(OpenAI, size, className);
-  if (p.includes("openai")) return wrap(OpenAI, size, className);
-  if (p.includes("anthropic") || p.includes("claude")) return wrap(Anthropic, size, className);
-  if (p.includes("google") || p.includes("gemini")) return wrap(Gemini, size, className);
-  if (p.includes("deepseek")) return wrap(DeepSeek, size, className);
-  if (p.includes("groq")) return wrap(Groq, size, className);
-  if (p.includes("mistral")) return wrap(Mistral, size, className);
-  if (p.includes("cedz") || p.includes("lingo")) return wrap(Google, size, className);
-  if (p.includes("local") || p.includes("custom")) return wrap(Google, size, className);
-  return wrap(Google, size, className);
+
+  if (p.includes("openai compatible")) return wrap({ Icon: Bot, size, className });
+  if (p.includes("openai")) return wrap({ Icon: OpenAIIcon, size, className });
+  if (p.includes("anthropic") || p.includes("claude")) return wrap({ Icon: AnthropicIcon, size, className });
+  if (p.includes("google") || p.includes("gemini")) return wrap({ Icon: GeminiIcon, size, className });
+  if (p.includes("meta") || p.includes("llama")) return wrap({ Icon: MetaIcon, size, className });
+  if (p.includes("deepseek")) return wrap({ Icon: DeepSeekIcon, size, className });
+  if (p.includes("groq")) return wrap({ Icon: GroqIcon, size, className });
+  if (p.includes("mistral")) return wrap({ Icon: MistralIcon, size, className });
+  if (p.includes("hugging")) return wrap({ Icon: HuggingFaceIcon, size, className });
+  if (p.includes("cedz") || p.includes("lingo")) return wrap({ Icon: Globe2, size, className });
+  if (p.includes("local") || p.includes("custom")) return wrap({ Icon: Cpu, size, className });
+  return wrap({ Icon: Globe2, size, className });
 }

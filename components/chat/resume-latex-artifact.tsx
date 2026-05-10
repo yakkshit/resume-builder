@@ -105,9 +105,12 @@ const CHAT_ARTIFACT_HEADER = "flex flex-row items-center gap-3 border-b border-w
 
 export function ResumeLatexArtifact({
   initialLatex,
+  translatedLatex,
   kind = "resume",
 }: {
   initialLatex?: string;
+  /** Optional translated view; does not persist or overwrite editor source. */
+  translatedLatex?: string;
   kind?: "resume" | "cover-letter";
 }) {
   const lsKey = kind === "cover-letter" ? LS_COVER : LS_RESUME;
@@ -143,16 +146,19 @@ export function ResumeLatexArtifact({
     [kind, lsKey],
   );
 
-  const previewHtml = useMemo(() => buildLatexPreviewHtml(latex), [latex]);
+  const displayLatex = translatedLatex && translatedLatex.trim() ? translatedLatex : latex;
+  const translatedMode = Boolean(translatedLatex && translatedLatex.trim());
+
+  const previewHtml = useMemo(() => buildLatexPreviewHtml(displayLatex), [displayLatex]);
 
   const copy = () => {
-    void navigator.clipboard.writeText(latex);
+    void navigator.clipboard.writeText(displayLatex);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2000);
   };
 
   const downloadTex = () => {
-    const blob = new Blob([latex], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([displayLatex], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -162,10 +168,8 @@ export function ResumeLatexArtifact({
   };
 
   const openPrintablePdf = () => {
-    const w = window.open("", "_blank", "noopener,noreferrer");
-    if (!w) return;
-    const safe = escapeHtml(latex);
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(titleLabel)}</title>
+    const safe = escapeHtml(displayLatex);
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(titleLabel)}</title>
       <style>
         body{font-family:ui-monospace,monospace;font-size:11px;padding:16px;color:#111}
         h1{font-size:14px;margin:0 0 12px;font-family:system-ui,sans-serif}
@@ -175,9 +179,29 @@ export function ResumeLatexArtifact({
       <h1>${escapeHtml(titleLabel)} — print to PDF</h1>
       <p style="font-family:system-ui,sans-serif;font-size:12px;margin:0 0 12px">Use your browser’s print dialog and choose “Save as PDF”.</p>
       <pre>${safe}</pre>
-      <script>window.onload=function(){window.print()}</script>
-      </body></html>`);
-    w.document.close();
+      </body></html>`;
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "absolute";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "none";
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 10000);
+      }, 250);
+    }
   };
 
   const downloadCompiledPdf = async () => {
@@ -186,7 +210,7 @@ export function ResumeLatexArtifact({
       const res = await fetch("/api/latex-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ latex }),
+        body: JSON.stringify({ latex: displayLatex }),
       });
       const ct = res.headers.get("content-type") || "";
       if (res.ok && ct.includes("application/pdf")) {
@@ -284,6 +308,11 @@ export function ResumeLatexArtifact({
         </a>{" "}
         service (URL compile; very large files may need Print → Save as PDF).
       </p>
+      {translatedMode ? (
+        <p className="mb-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-[11px] text-[#b8b8c0]">
+          You’re viewing a translated version. Switch language back to <span className="text-white/90">Original</span> to edit and save your LaTeX source.
+        </p>
+      ) : null}
       <Tabs defaultValue="edit" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="edit" className="gap-2 text-xs sm:text-sm">
@@ -297,8 +326,9 @@ export function ResumeLatexArtifact({
         </TabsList>
         <TabsContent value="edit" className="mt-3">
           <Textarea
-            value={latex}
-            onChange={(e) => persist(e.target.value)}
+            value={displayLatex}
+            onChange={(e) => (translatedMode ? undefined : persist(e.target.value))}
+            disabled={translatedMode}
             spellCheck={false}
             className="min-h-[280px] resize-y font-mono text-xs leading-relaxed text-[#e8e8ed] sm:min-h-[320px] sm:text-sm"
             placeholder="Paste or write LaTeX…"

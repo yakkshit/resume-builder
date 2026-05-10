@@ -19,6 +19,7 @@ import {
   isHuggingFaceCustomHubModel,
   needsHuggingFaceCustomModelField,
 } from "@/lib/chat-provider-settings";
+import { TRANSLATION_LANGUAGES } from "@/lib/translation";
 
 export type UserProfile = {
   name: string;
@@ -444,6 +445,25 @@ export function ProfileSettingsDialog({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-xs">Default language (AI responses)</Label>
+            <Select value={settings.defaultLanguage || "en"} onValueChange={(v) => onSettingsChange({ defaultLanguage: v })}>
+              <SelectTrigger className="h-10 rounded-xl">
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[280px]">
+                {TRANSLATION_LANGUAGES.map((lang) => (
+                  <SelectItem key={lang.code} value={lang.code} className="text-xs">
+                    {lang.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              The model is steered to answer in this language by default. Resume and tool cards translate in the browser with WASM (Bergamot); first use may download language models briefly.
+            </p>
           </div>
 
           <div className="space-y-2">
