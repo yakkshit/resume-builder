@@ -37,9 +37,9 @@ import Toaster, { ToasterRef } from '@/components/ui/toast';
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { InfiniteGridBackground } from "@/components/ui/the-infinite-grid";
+import dynamic from "next/dynamic";
 
 import { MarkdownRenderer } from "./markdown-renderer";
-import { ChatSidebar } from "./sidebar";
 import { ComponentRenderer, type InterviewLabRenderContext } from "./component-renderer";
 import { useChatSettings, ChatMessage, AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
 import {
@@ -52,21 +52,38 @@ import {
 import { getTextContent, getReasoningContent, isReasoningStreaming } from "@/lib/message-utils";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ai-elements/reasoning";
 import type { JobSuggestion } from "@/lib/job-scraper/google-jobs";
-import { JobSuggestionsPanel } from "./job-suggestions-panel";
 import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import { stripIncompleteJsonTail } from "@/lib/streaming-chat-content";
 import { mergeAssistantResumeIntoCurrent, extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
 import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume";
 import { buildResumeDataForChatRequest, messagesForResumeContext } from "@/lib/chat-resume-context";
 import { buildUserKnowledgeStoreChunks } from "@/lib/user-knowledge-context";
+import { DEFAULT_TRANSLATION_LANGUAGE } from "@/lib/translation";
 import type { ResumeData } from "@/lib/types";
 import { tryLocalStorageGet, tryLocalStorageSet, tryLocalStorageRemove } from "@/lib/safe-local-storage";
 import { chatTextareaHeightPx } from "@/lib/chat-textarea";
-import { ChatOnboarding } from "./chat-onboarding";
-import { InterviewLabPanel } from "./interview-lab-panel";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { ModelProviderIcon } from "@/lib/model-provider-icon";
 import { getDefaultInterviewLabModelId, isInterviewLabCompatibleModel } from "@/lib/interview-lab-model-support";
+
+const panelLoading = () => (
+    <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+        Loading...
+    </div>
+);
+
+const ChatSidebar = dynamic(() => import("./sidebar").then((m) => m.ChatSidebar), { loading: panelLoading });
+const JobSuggestionsPanel = dynamic(
+    () => import("./job-suggestions-panel").then((m) => m.JobSuggestionsPanel),
+    { loading: panelLoading },
+);
+const ChatOnboarding = dynamic(() => import("./chat-onboarding").then((m) => m.ChatOnboarding), {
+    loading: panelLoading,
+});
+const InterviewLabPanel = dynamic(
+    () => import("./interview-lab-panel").then((m) => m.InterviewLabPanel),
+    { loading: panelLoading },
+);
 
 // ── Welcome Screen ─────────────────────────────────────────────────────────
 
@@ -317,6 +334,8 @@ function MessageBubble({
         [isUser, content],
     );
 
+    const renderedText = isUser ? content : extracted.cleanText;
+
     const fallbackToastShownRef = useRef(false);
     useEffect(() => {
         if (isUser) return;
@@ -368,9 +387,9 @@ function MessageBubble({
                         }`}
                 >
                     {isUser ? (
-                        <p className="whitespace-pre-wrap leading-relaxed">{content}</p>
+                        <p className="whitespace-pre-wrap leading-relaxed">{renderedText}</p>
                     ) : (
-                        <MarkdownRenderer content={extracted.cleanText} />
+                        <MarkdownRenderer content={renderedText} />
                     )}
                     {isStreaming && (
                         <span className="inline-block w-2 h-4 ml-1 bg-current opacity-70 animate-pulse align-text-bottom" />
@@ -1342,6 +1361,7 @@ export default function AICareerAssistantChat() {
                         : "",
                     memoryContext: useProfileContextRef.current ? buildMemoryContextText(messages) : "",
                     retrievalContext: [knowledgeContext, buildRetrievalContextFromMessages(messages)].filter(Boolean).join("\n\n"),
+                    preferredLanguage: settingsRef.current.defaultLanguage || DEFAULT_TRANSLATION_LANGUAGE,
                     resumeData: requestResumeData,
                     resumeLatex: getResumeLatexForChat(),
                     coverLetterLatex: getCoverLetterLatexForChat(),
@@ -1448,35 +1468,41 @@ export default function AICareerAssistantChat() {
         const wasStreaming = prev === "streaming" || prev === "submitted";
         const nowIdle = status !== "streaming" && status !== "submitted";
         prevChatStatusRef.current = status;
-        if (!wasStreaming || !nowIdle) return;
 
         const last = messages[messages.length - 1];
         if (!last || last.role !== "assistant" || !last.id) return;
         const text = getTextContent(last) ?? "";
 
-        if (resumeCvHintShownForAssistantIdRef.current !== last.id) {
-            let lastUser = "";
-            for (let i = messages.length - 2; i >= 0; i--) {
-                if (messages[i]?.role === "user") {
-                    lastUser = getTextContent(messages[i]!) ?? "";
-                    break;
+        // Hint only once per assistant message, right when stream finishes
+        if (wasStreaming && nowIdle) {
+            if (resumeCvHintShownForAssistantIdRef.current !== last.id) {
+                let lastUser = "";
+                for (let i = messages.length - 2; i >= 0; i--) {
+                    if (messages[i]?.role === "user") {
+                        lastUser = getTextContent(messages[i]!) ?? "";
+                        break;
+                    }
+                }
+                const resumeIntent =
+                    /\b(resume|cv|curriculum|latex cv|cover letter|cover-letter|experience|summary|skills)\b/i.test(
+                        lastUser,
+                    );
+                const hasCvFence = /```\s*component\s*:\s*(cv|resume)\b/i.test(text);
+                const modelId = settingsRef.current.model ?? "";
+                const gemini = modelId.startsWith("gemini-");
+                if (resumeIntent && lastUser.length > 12 && !hasCvFence && !gemini) {
+                    resumeCvHintShownForAssistantIdRef.current = last.id;
+                    showToast(
+                        "warning",
+                        "This reply did not include structured resume JSON (```component:cv```). Google Gemini usually follows this format most reliably — try switching models.",
+                    );
                 }
             }
-            const resumeIntent =
-                /\b(resume|cv|curriculum|latex cv|cover letter|cover-letter|experience|summary|skills)\b/i.test(
-                    lastUser,
-                );
-            const hasCvFence = /```\s*component\s*:\s*(cv|resume)\b/i.test(text);
-            const modelId = settingsRef.current.model ?? "";
-            const gemini = modelId.startsWith("gemini-");
-            if (resumeIntent && lastUser.length > 12 && !hasCvFence && !gemini) {
-                resumeCvHintShownForAssistantIdRef.current = last.id;
-                showToast(
-                    "warning",
-                    "This reply did not include structured resume JSON (```component:cv```). Google Gemini usually follows this format most reliably — try switching models.",
-                );
-            }
         }
+
+        // Merge while idle whenever the last assistant message gains parseable resume JSON.
+        // Important: do NOT gate this only on streaming→idle — the final ``` fence often arrives on the next React commit after status flips, so a one-shot merge missed updates.
+        if (status === "streaming" || status === "submitted") return;
 
         const { merged, template } = mergeAssistantResumeIntoCurrent(loadFullResumeFromStorage(), text);
         if (!merged) return;

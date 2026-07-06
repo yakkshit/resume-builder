@@ -8,7 +8,6 @@ import { Download, RefreshCw } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card } from "@/components/ui/card"
 import { getCoverLetterTemplate } from "@/components/pdf-templates"
-import type { CoverLetterData, CoverLetterTemplate } from "@/lib/types";
 
 interface PDFViewerProps {
   coverLetterData: CoverLetterData
@@ -52,18 +51,14 @@ export default function CoverLetterPDFViewer({ coverLetterData, template }: PDFV
   }, [coverLetterData, template])
 
   const handleDownload = () => {
-    // Prefer real file download from a server endpoint (react-pdf -> PDF bytes).
-    // Fallback to print if something goes wrong.
+    // Generate PDF on the client side to avoid Next.js server React conflicts
     void (async () => {
       try {
         setIsLoading(true)
-        const res = await fetch("/api/cover-letter/pdf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ coverLetterData, template }),
-        })
-        if (!res.ok) throw new Error(`PDF generation failed (${res.status})`)
-        const blob = await res.blob()
+        const PDFTemplate = getCoverLetterTemplate(template as string)
+        const { pdf } = await import('@react-pdf/renderer')
+        const pdfDoc = pdf(<PDFTemplate coverLetterData={coverLetterData} />)
+        const blob = await pdfDoc.toBlob()
 
         const url = URL.createObjectURL(blob)
         const a = document.createElement("a")

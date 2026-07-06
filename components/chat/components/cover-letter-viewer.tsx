@@ -13,7 +13,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { CoverLetterSingleBlockEditor } from "./cover-letter-single-block-editor";
 
-export function CoverLetterViewer({ data = {} }: { data?: Record<string, any> }) {
+export function CoverLetterViewer({
+  data = {},
+  persistToLocalStorage = true,
+}: {
+  data?: Record<string, any>;
+  /** When false (e.g. translated view), do not overwrite saved originals. */
+  persistToLocalStorage?: boolean;
+}) {
   const [coverLetterData, setCoverLetterData] = useState<CoverLetterData>(() => {
     let current = defaultCoverLetterData;
     if (typeof window !== "undefined") {
@@ -48,12 +55,30 @@ export function CoverLetterViewer({ data = {} }: { data?: Record<string, any> })
   const [panelMode, setPanelMode] = useState<ArtifactPanelMode>("expanded");
 
   useEffect(() => {
+    if (!persistToLocalStorage) return;
     localStorage.setItem("coverLetterData", JSON.stringify(coverLetterData));
-  }, [coverLetterData]);
+  }, [coverLetterData, persistToLocalStorage]);
 
   useEffect(() => {
+    if (!persistToLocalStorage) return;
     localStorage.setItem("coverLetterTemplate", template);
-  }, [template]);
+  }, [template, persistToLocalStorage]);
+
+  // Sync state when parent supplies new data (e.g. translated view).
+  useEffect(() => {
+    const payload = data?.coverLetterData ?? data;
+    if (payload && typeof payload === "object") {
+      setCoverLetterData((prev) => ({
+        ...prev,
+        ...(typeof payload.head === "string" ? { head: payload.head } : {}),
+        ...(typeof payload.body === "string" ? { body: payload.body } : {}),
+        ...(typeof payload.footer === "string" ? { footer: payload.footer } : {}),
+      }));
+    }
+    if (typeof data?.template === "string" && data.template.trim()) {
+      setTemplate(data.template as CoverLetterTemplate);
+    }
+  }, [data]);
 
   const previewMax =
     panelMode === "expanded" ? "max-h-[560px] overflow-hidden" : "max-h-[160px] sm:max-h-[200px] overflow-y-auto";

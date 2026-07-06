@@ -259,6 +259,7 @@ export async function POST(req: NextRequest) {
     chatGlobalProfile,
     memoryContext,
     retrievalContext,
+    preferredLanguage,
   } = body as {
     messages?: any[]
     resumeData?: any
@@ -277,6 +278,7 @@ export async function POST(req: NextRequest) {
     chatGlobalProfile?: Record<string, unknown> | null
     memoryContext?: string
     retrievalContext?: string
+    preferredLanguage?: string
   }
 
   // Create a system message based on the mode
@@ -415,6 +417,12 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
 - Use the latest resume snapshot in this request (already merged from editor + chat changes) when tailoring resumes.
 - If user manually edited resume content earlier in this chat flow, preserve and build on those edits unless the user asks to replace them.
 - When user asks to customize for a job description, prioritize direct job requirements and measurable relevance in bullets/skills/summary.`
+
+  const normalizedPreferredLanguage =
+    typeof preferredLanguage === "string" ? preferredLanguage.trim().toLowerCase() : ""
+  if (normalizedPreferredLanguage && normalizedPreferredLanguage !== "en") {
+    systemMessage += `\n- Default response language: ${normalizedPreferredLanguage}. Unless the user asks otherwise, generate responses and suggested content in this language.`
+  }
 
 
 

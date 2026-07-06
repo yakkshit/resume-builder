@@ -1,6 +1,6 @@
 import React from "react"
 import type { CoverLetterData, CoverLetterTemplate } from "./types"
-import { pdf, Document } from "@react-pdf/renderer"
+import { pdf, Document, renderToStream } from "@react-pdf/renderer"
 import { getCoverLetterTemplate } from "@/components/pdf-templates"
 
 // Function to generate and download PDF
@@ -12,8 +12,9 @@ export async function generateCoverLetterPDF(
     // Get the appropriate template component
     const PDFTemplate = getCoverLetterTemplate(template as string)
 
-    // Generate the PDF document using React.createElement to avoid JSX issues
-    const pdfDoc = pdf(React.createElement(Document, null, React.createElement(PDFTemplate, { coverLetterData })))
+    // Generate the PDF document by evaluating the template directly
+    const documentElement = PDFTemplate({ coverLetterData });
+    const pdfDoc = pdf(documentElement)
     const blob = await pdfDoc.toBlob()
 
     // Create a URL for the blob
@@ -46,11 +47,33 @@ export async function generateCoverLetterPDFBlob(
     // Get the appropriate template component
     const PDFTemplate = getCoverLetterTemplate(template as string)
 
-    // Generate the PDF document
-    const pdfDoc = pdf(React.createElement(Document, null, React.createElement(PDFTemplate, { coverLetterData })))
+    // Generate the PDF document by evaluating the template directly
+    const documentElement = PDFTemplate({ coverLetterData });
+    const pdfDoc = pdf(documentElement)
     return await pdfDoc.toBlob()
   } catch (error) {
     console.error("Error generating PDF blob:", error)
+    throw error
+  }
+}
+
+// Function to generate a PDF buffer for server
+export async function generateCoverLetterPDFBuffer(
+  coverLetterData: CoverLetterData,
+  template: CoverLetterTemplate,
+) {
+  try {
+    // Get the appropriate template component
+    const PDFTemplate = getCoverLetterTemplate(template as string)
+
+    // Generate the PDF document by evaluating the template directly
+    // to pass a <Document> directly to renderToBuffer
+    const documentElement = PDFTemplate({ coverLetterData });
+    // @ts-ignore - renderToBuffer is available in node
+    const { renderToBuffer } = await import('@react-pdf/renderer');
+    return await renderToBuffer(documentElement);
+  } catch (error) {
+    console.error("Error generating PDF buffer:", error)
     throw error
   }
 }

@@ -96,7 +96,10 @@ async function generateInProcess(
     const jsonClone = JSON.parse(JSON.stringify(resumeData))
     const cleanData = stripReactElements(jsonClone) as ResumeData
 
-    const doc = React.createElement(PDFTemplate, { resumeData: cleanData })
+    // Evaluate the template component directly as a function.
+    // This avoids Next.js server-side React 19 and external React 18 reconciler mismatches on Vercel,
+    // and resolves the TypeScript TS2345 compiler assignment error.
+    const doc = PDFTemplate({ resumeData: cleanData }) as React.ReactElement
 
     const raw = await renderToBuffer(doc)
     

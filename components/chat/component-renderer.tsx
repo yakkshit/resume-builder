@@ -1,17 +1,49 @@
 "use client";
 
-import { ResumeViewer } from "./components/resume-viewer";
-import { CVScore } from "./components/cv-score";
-import { JobRecommendations } from "./components/job-recommendations";
-import { AutoApplier } from "./components/auto-applier";
-import { MockInterview } from "./components/mock-interview";
-import { CodingChallenge } from "./components/coding-challenge";
-import { LearningResources } from "./components/learning-resources";
-import { CoverLetterViewer } from "./components/cover-letter-viewer";
-import { EmailHrPanel } from "./components/email-hr-panel";
-import { LinkedinDmPanel } from "./components/linkedin-dm-panel";
-import { InterviewLabPanel } from "./interview-lab-panel";
-import { ResumeLatexArtifact } from "./resume-latex-artifact";
+import { useEffect, useMemo, useId, useState } from "react";
+import dynamic from "next/dynamic";
+import { TRANSLATION_ORIGINAL, translateDataDeep, translateLatexSmart } from "@/lib/translation";
+import { TranslationControls } from "@/components/chat/translation-controls";
+
+const loading = () => (
+  <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+    Loading component...
+  </div>
+);
+
+const ResumeViewer = dynamic(() => import("./components/resume-viewer").then((m) => m.ResumeViewer), { loading });
+const CVScore = dynamic(() => import("./components/cv-score").then((m) => m.CVScore), { loading });
+const JobRecommendations = dynamic(
+  () => import("./components/job-recommendations").then((m) => m.JobRecommendations),
+  { loading },
+);
+const AutoApplier = dynamic(() => import("./components/auto-applier").then((m) => m.AutoApplier), { loading });
+const MockInterview = dynamic(() => import("./components/mock-interview").then((m) => m.MockInterview), { loading });
+const CodingChallenge = dynamic(
+  () => import("./components/coding-challenge").then((m) => m.CodingChallenge),
+  { loading },
+);
+const LearningResources = dynamic(
+  () => import("./components/learning-resources").then((m) => m.LearningResources),
+  { loading },
+);
+const CoverLetterViewer = dynamic(
+  () => import("./components/cover-letter-viewer").then((m) => m.CoverLetterViewer),
+  { loading },
+);
+const EmailHrPanel = dynamic(() => import("./components/email-hr-panel").then((m) => m.EmailHrPanel), { loading });
+const LinkedinDmPanel = dynamic(
+  () => import("./components/linkedin-dm-panel").then((m) => m.LinkedinDmPanel),
+  { loading },
+);
+const InterviewLabPanel = dynamic(
+  () => import("./interview-lab-panel").then((m) => m.InterviewLabPanel),
+  { loading },
+);
+const ResumeLatexArtifact = dynamic(
+  () => import("./resume-latex-artifact").then((m) => m.ResumeLatexArtifact),
+  { loading },
+);
 
 export type ComponentType =
   | "resume"
@@ -65,28 +97,172 @@ export function ComponentRenderer({
   resumeSyncsWithGlobal,
   interviewLabContext,
 }: ComponentRendererProps) {
+  const translationFieldId = useId();
+  const [targetLanguage, setTargetLanguage] = useState(TRANSLATION_ORIGINAL);
+  const [translatedData, setTranslatedData] = useState<Record<string, unknown> | undefined>(
+    data,
+  );
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translatedLatex, setTranslatedLatex] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    setTranslatedData(data);
+  }, [data]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!data || targetLanguage === TRANSLATION_ORIGINAL) {
+        if (!cancelled) setTranslatedData(data);
+        return;
+      }
+      setIsTranslating(true);
+      try {
+        const next = await translateDataDeep(data, targetLanguage);
+        if (!cancelled) setTranslatedData(next as Record<string, unknown>);
+      } catch {
+        if (!cancelled) setTranslatedData(data);
+      } finally {
+        if (!cancelled) setIsTranslating(false);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [data, targetLanguage]);
+
+  // Special-case LaTeX: translate "plain text runs" without overwriting saved source.
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (targetLanguage === TRANSLATION_ORIGINAL) {
+        if (!cancelled) setTranslatedLatex(undefined);
+        return;
+      }
+      const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
+      const latex = typeof rec?.latex === "string" ? rec.latex : "";
+      if (!latex.trim()) {
+        if (!cancelled) setTranslatedLatex(undefined);
+        return;
+      }
+      try {
+        const next = await translateLatexSmart(latex, targetLanguage);
+        if (!cancelled) setTranslatedLatex(next);
+      } catch {
+        if (!cancelled) setTranslatedLatex(undefined);
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [data, targetLanguage]);
+
+  const activeData = useMemo(() => translatedData ?? data, [translatedData, data]);
+
+  const header = (
+    <div className="mb-2 flex justify-end sm:justify-end">
+      <TranslationControls
+        id={translationFieldId}
+        value={targetLanguage}
+        disabled={isTranslating}
+        isTranslating={isTranslating}
+        onChange={setTargetLanguage}
+      />
+    </div>
+  );
+
   switch (type) {
     case "resume":
-      return <ResumeViewer data={data} syncWithGlobalResume={resumeSyncsWithGlobal !== false} />;
-    case "cover-letter":       return <CoverLetterViewer data={data as any} />;
+      return (
+        <div>
+          {header}
+          <ResumeViewer
+            data={activeData}
+            syncWithGlobalResume={
+              resumeSyncsWithGlobal !== false && targetLanguage === TRANSLATION_ORIGINAL
+            }
+          />
+        </div>
+      );
+    case "cover-letter":
+      return (
+        <div>
+          {header}
+          <CoverLetterViewer data={activeData as any} persistToLocalStorage={targetLanguage === TRANSLATION_ORIGINAL} />
+        </div>
+      );
     case "cover-letter-latex": {
       const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
       const latex = typeof rec?.latex === "string" ? rec.latex : undefined;
-      return <ResumeLatexArtifact initialLatex={latex} kind="cover-letter" />;
+      return (
+        <div>
+          {header}
+          <ResumeLatexArtifact initialLatex={latex} translatedLatex={translatedLatex} kind="cover-letter" />
+        </div>
+      );
     }
-    case "cv-score":           return <CVScore data={data as any} />;
+    case "cv-score":
+      return (
+        <div>
+          {header}
+          <CVScore data={activeData as any} />
+        </div>
+      );
     case "job-recommendations": {
-      const d = data as any;
+      const d = activeData as any;
       // Server/UI typically emits jobLinks format: { links: [{ title, url, company }] }
       // Our in-chat component uses JobRecommendations; accept either `links` or `jobs`.
-      return <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />;
+      return (
+        <div>
+          {header}
+          <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />
+        </div>
+      );
     }
-    case "auto-applier":       return <AutoApplier />;
-    case "mock-interview":     return <MockInterview data={data as any} />;
-    case "coding-challenge":   return <CodingChallenge data={data as any} />;
-    case "learning-resources": return <LearningResources data={(data as any)?.resources} />;
-    case "email-hr":           return <EmailHrPanel data={data} chatApiKey={chatApiKey} chatModel={chatModel} />;
-    case "linkedin-dm":        return <LinkedinDmPanel data={data} />;
+    case "auto-applier":
+      return (
+        <div>
+          {header}
+          <AutoApplier />
+        </div>
+      );
+    case "mock-interview":
+      return (
+        <div>
+          {header}
+          <MockInterview data={activeData as any} />
+        </div>
+      );
+    case "coding-challenge":
+      return (
+        <div>
+          {header}
+          <CodingChallenge data={activeData as any} />
+        </div>
+      );
+    case "learning-resources":
+      return (
+        <div>
+          {header}
+          <LearningResources data={(activeData as any)?.resources} />
+        </div>
+      );
+    case "email-hr":
+      return (
+        <div>
+          {header}
+          <EmailHrPanel data={activeData} chatApiKey={chatApiKey} chatModel={chatModel} />
+        </div>
+      );
+    case "linkedin-dm":
+      return (
+        <div>
+          {header}
+          <LinkedinDmPanel data={activeData} />
+        </div>
+      );
     case "interview-lab": {
       const ctx = interviewLabContext;
       if (!ctx) {
@@ -97,23 +273,31 @@ export function ComponentRenderer({
         );
       }
       return (
-        <InterviewLabPanel
-          variant="embedded"
-          open
-          onOpenChange={() => {}}
-          apiKey={ctx.apiKey}
-          model={ctx.model}
-          openaiTranscriptionApiKey={ctx.openaiTranscriptionApiKey}
-          vercelOidcToken={ctx.vercelOidcToken}
-          onSwitchToGemini={ctx.onSwitchToGemini}
-          onToast={ctx.onToast}
-        />
+        <div>
+          {header}
+          <InterviewLabPanel
+            variant="embedded"
+            open
+            onOpenChange={() => {}}
+            apiKey={ctx.apiKey}
+            model={ctx.model}
+            openaiTranscriptionApiKey={ctx.openaiTranscriptionApiKey}
+            vercelOidcToken={ctx.vercelOidcToken}
+            onSwitchToGemini={ctx.onSwitchToGemini}
+            onToast={ctx.onToast}
+          />
+        </div>
       );
     }
     case "resume-latex": {
       const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
       const latex = typeof rec?.latex === "string" ? rec.latex : undefined;
-      return <ResumeLatexArtifact initialLatex={latex} kind="resume" />;
+      return (
+        <div>
+          {header}
+          <ResumeLatexArtifact initialLatex={latex} translatedLatex={translatedLatex} kind="resume" />
+        </div>
+      );
     }
     default:                   return null;
   }

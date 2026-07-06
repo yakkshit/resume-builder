@@ -11,21 +11,22 @@ try {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  transpilePackages: ["@browsermt/bergamot-translator", "franc-min", "trigram-utils"],
   // Do NOT set `allowedDevOrigins` unless you list every dev hostname you use.
   // When set, Next switches from "warn" to **block** for unknown origins and breaks /_next/* loads.
   // For tunnel hosts, either omit this key (warn-only) or add e.g. '*.trycloudflare.com' patterns.
   typescript: {
     ignoreBuildErrors: true,
   },
-  // async redirects() {
-  //   return [
-  //     {
-  //       source: '/',
-  //       destination: '/',
-  //       permanent: true,
-  //     },
-  //   ]
-  // },
+  async redirects() {
+    return [
+      {
+        source: '/',
+        destination: '/',
+        permanent: true,
+      },
+    ]
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -55,6 +56,12 @@ const nextConfig = {
   turbopack: {},
   webpack: (config, { isServer }) => {
     config.resolve.alias.canvas = false
+    if (!isServer) {
+      config.experiments = {
+        ...(config.experiments || {}),
+        asyncWebAssembly: true,
+      }
+    }
     // Production only: Force single React instance for @react-pdf (fixes Minified React #31 on Vercel).
     // Alias to package DIRECTORIES so react/jsx-dev-runtime etc. still resolve. Skip in dev to avoid resolution issues.
     if (isServer && process.env.NODE_ENV === "production") {

@@ -125,15 +125,18 @@ export function extractResumePayloadFromMessage(content: string): ExtractedResum
 
   const trimmed = content.trim()
 
-  // 0) Prefer explicit ```component:cv``` blocks first (system prompt format)
-  const cvFence = trimmed.match(/```\s*component\s*:\s*cv\s*([\s\S]*?)```/i)
-  if (cvFence?.[1]) {
-    const parsed = tryParseJsonRecord(cvFence[1].trim())
+  // 0) ```component:cv``` / ```component:resume``` (global — use LAST successful parse; models may emit drafts then fixes)
+  const componentCvRe = /```\s*component\s*:\s*(?:cv|resume)\s*([\s\S]*?)```/gi
+  let lastComponentCv: ExtractedResumePayload | null = null
+  let cm: RegExpExecArray | null
+  while ((cm = componentCvRe.exec(trimmed)) !== null) {
+    const parsed = tryParseJsonRecord((cm[1] ?? "").trim())
     const { resume, template } = tryUnwrapParsed(parsed)
     if (resume) {
-      return { resume, template: safeTemplate(template) }
+      lastComponentCv = { resume, template: safeTemplate(template) }
     }
   }
+  if (lastComponentCv?.resume) return lastComponentCv
 
   // 1) All fenced blocks, in order — try each JSON object
   let fromFence: ExtractedResumePayload | null = null

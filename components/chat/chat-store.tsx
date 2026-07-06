@@ -50,6 +50,8 @@ export interface ChatSettings {
   vercelOidcToken: string;
   /** Optional OpenAI key for server-side clip transcription (Whisper); session only, never persisted. */
   openaiTranscriptionApiKey: string;
+  /** Default language for AI generation and translation UI. */
+  defaultLanguage: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -99,6 +101,7 @@ const DEFAULT_SETTINGS: ChatSettings = {
   integrationsDocsUrlOverride: "",
   vercelOidcToken: "",
   openaiTranscriptionApiKey: "",
+  defaultLanguage: "en",
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
