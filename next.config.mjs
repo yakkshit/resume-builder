@@ -42,6 +42,8 @@ const nextConfig = {
     '@react-pdf/primitives',
     '@react-pdf/layout',
     '@react-pdf/pdfkit',
+    '@react-pdf/svg',
+    '@react-pdf/textkit',
     'yoga-layout',
     'pdfkit',
     'pdf-parse',
