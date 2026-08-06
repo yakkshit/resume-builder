@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "private": true,
   "pnpm": {
     "overrides": {
@@ -21,6 +21,7 @@
     "test-packages": "vitest run __tests__/dependency-check.test.ts",
     "stage": "pnpm run build && pnpm run test",
     "prod": "tsx scripts/workflow.ts",
+    "mcp": "tsx scripts/mcp-server.ts",
     "init": "git pull origin main && pnpm install"
   },
   "dependencies": {

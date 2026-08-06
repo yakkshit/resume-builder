@@ -1,14 +1,8 @@
-/**
- * Standalone PDF generation script - runs outside Next.js to avoid React conflicts.
- * Reads JSON from stdin, outputs PDF binary to stdout only.
- * Usage: echo '{"resumeData":{...},"template":"modern"}' | pnpm tsx scripts/generate-pdf.ts > output.pdf
- */
-
 import { renderToBuffer } from "@react-pdf/renderer"
 import React, { createElement } from "react"
-import { getResumeTemplate } from "../components/pdf-templates"
+import { getResumeTemplate, getCoverLetterTemplate } from "../components/pdf-templates"
 import { sanitizeResumeData } from "../lib/sanitize-resume-data"
-import type { ResumeData, Template } from "../lib/types"
+import type { ResumeData, CoverLetterData, Template, CoverLetterTemplate } from "../lib/types"
 
 const MIN_PDF_SIZE = 200
 
@@ -28,13 +22,33 @@ async function main(): Promise<void> {
     chunks.push(Buffer.from(chunk))
   }
   const input = Buffer.concat(chunks).toString("utf8")
-  const parsed = JSON.parse(input) as { resumeData: ResumeData; template?: Template }
-  const { resumeData, template } = parsed
+  const parsed = JSON.parse(input) as {
+    type?: "resume" | "coverletter"
+    resumeData?: ResumeData
+    coverLetterData?: CoverLetterData
+    template?: string
+  }
 
-  const sanitized = sanitizeResumeData(resumeData)
-  const templateName = (template as string) || "modern"
-  const PDFTemplate = getResumeTemplate(templateName)
-  const doc = createElement(PDFTemplate, { resumeData: sanitized })
+  const documentType = parsed.type || "resume"
+  let doc: React.ReactElement
+
+  if (documentType === "coverletter") {
+    if (!parsed.coverLetterData) {
+      throw new Error("Missing coverLetterData for coverletter type")
+    }
+    const templateName = (parsed.template as CoverLetterTemplate) || "standard"
+    const CoverLetterPDFTemplate = getCoverLetterTemplate(templateName)
+    doc = createElement(CoverLetterPDFTemplate, { coverLetterData: parsed.coverLetterData })
+  } else {
+    if (!parsed.resumeData) {
+      throw new Error("Missing resumeData for resume type")
+    }
+    const sanitized = sanitizeResumeData(parsed.resumeData)
+    const templateName = (parsed.template as Template) || "modern"
+    const PDFTemplate = getResumeTemplate(templateName)
+    doc = createElement(PDFTemplate, { resumeData: sanitized })
+  }
+
   const raw = await renderToBuffer(doc as any)
   const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer)
 

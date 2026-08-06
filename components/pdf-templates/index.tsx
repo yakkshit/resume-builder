@@ -16,7 +16,12 @@ import { ElegantCoverLetterTemplate } from "./coverletter/elegant-cover-letter-t
 import { DarkCoverLetterTemplate } from "./coverletter/dark-cover-letter-template"
 import { GradientCoverLetterTemplate } from "./coverletter/gradient-cover-letter-template"
 import { GermanLebenslaufTemplate } from "./cv/german-templates/GermanLebenslaufTemplate"
+import { GermanModernLebenslaufTemplate } from "./cv/german-templates/GermanModernLebenslaufTemplate"
 import { MultiColorfulGradientPDFTemplate } from "./cv/other-resume/RandomColourTemplate"
+import { MinimalCleanPDFTemplate } from "./cv/general-resumes/minimal-clean-pdf-template"
+import { TechModernPDFTemplate } from "./cv/general-resumes/tech-modern-pdf-template"
+import { MinimalCoverLetterPDFTemplate } from "./coverletter/minimal-cover-letter-template"
+import { GermanAnschreibenTemplate } from "./coverletter/german-anschreiben-template"
 
 // Cover Letter PDF Templates
 
@@ -33,6 +38,9 @@ export {
   TwoColumnPDFTemplate,
   GradientGrayPDFTemplate,
   GermanLebenslaufTemplate,
+  GermanModernLebenslaufTemplate,
+  MinimalCleanPDFTemplate,
+  TechModernPDFTemplate,
   // Cover letter templates
   StandardCoverLetterPDFTemplate,
   ModernCoverLetterPDFTemplate,
@@ -41,6 +49,8 @@ export {
   ElegantCoverLetterTemplate,
   DarkCoverLetterTemplate,
   GradientCoverLetterTemplate,
+  MinimalCoverLetterPDFTemplate,
+  GermanAnschreibenTemplate,
   MultiColorfulGradientPDFTemplate
 }
 
@@ -57,6 +67,9 @@ export const resumeTemplates = {
   "two-column": TwoColumnPDFTemplate,
   "gradient-gray": GradientGrayPDFTemplate,
   "german-cv": GermanLebenslaufTemplate,
+  "german-modern": GermanModernLebenslaufTemplate,
+  "minimal-clean": MinimalCleanPDFTemplate,
+  "tech-modern": TechModernPDFTemplate,
   "multi-colour" : MultiColorfulGradientPDFTemplate
 } as const
 
@@ -69,6 +82,8 @@ export const coverLetterTemplates = {
   elegant: ElegantCoverLetterTemplate,
   dark: DarkCoverLetterTemplate,
   gradient: GradientCoverLetterTemplate,
+  "minimal": MinimalCoverLetterPDFTemplate,
+  "german-anschreiben": GermanAnschreibenTemplate,
 } as const
 
 // Get resume template by name

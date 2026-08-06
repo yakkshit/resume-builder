@@ -45,3 +45,5 @@ issues.md
 
 # local agent memory (do not commit)
 /.memory/
+
+./ai-career-assistant*.json
