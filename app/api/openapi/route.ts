@@ -301,6 +301,45 @@ export async function GET(request: NextRequest) {
           },
         },
       },
+      "/api/mcp": {
+        get: {
+          summary: "MCP Health Check & Tool Manifest",
+          description:
+            "Returns status, server info, and supported Model Context Protocol (MCP) tools for remote AI agents.",
+          responses: {
+            "200": {
+              description: "Status and tool manifest.",
+            },
+          },
+        },
+        post: {
+          summary: "MCP JSON-RPC Endpoint",
+          description:
+            "Standard Model Context Protocol (MCP) JSON-RPC endpoint supporting `initialize`, `tools/list`, and `tools/call` for generating Resume & Cover Letter PDFs.",
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    jsonrpc: { type: "string", example: "2.0" },
+                    id: { type: "string", example: "1" },
+                    method: { type: "string", example: "tools/call" },
+                    params: { type: "object" },
+                  },
+                  required: ["jsonrpc", "method"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "JSON-RPC response containing tool results or initialization state.",
+            },
+          },
+        },
+      },
       "/api/feedback": {
         post: {
           summary: "Submit feedback",
