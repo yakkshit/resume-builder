@@ -297,7 +297,6 @@ export function ResumeViewer({
   // Important: do not dispatchCustomEvent from inside a setState updater — listeners call
   // setState on other ResumeViewer instances and React forbids that during reconciliation.
   useEffect(() => {
-    if (!syncWithGlobalResume) return;
     if (!assistantPayloadSignature) return;
 
     const payloadJson = assistantPayloadSignature;
@@ -307,29 +306,37 @@ export function ResumeViewer({
     const payload = JSON.parse(payloadJson) as Record<string, unknown>;
 
     let base: ResumeData = defaultResumeData as ResumeData;
-    try {
-      const stored = tryLocalStorageGet("resumeData");
-      if (stored) base = sanitizeResumeData(JSON.parse(stored));
-    } catch {
-      /* keep default */
+    if (syncWithGlobalResume) {
+      try {
+        const stored = tryLocalStorageGet("resumeData");
+        if (stored) base = sanitizeResumeData(JSON.parse(stored));
+      } catch {
+        /* keep default */
+      }
+    } else {
+      base = mergeResumeDataWithDefault(payload);
     }
 
     const beforeMerge = sanitizeResumeData(base);
     const flatPayload = normalizeResumePayloadToFlat(payload) ?? payload;
     const cleanedPayload = stripBoldMarkersDeep(stripProfilePictureDeep(flatPayload));
-    let next = deepMerge(beforeMerge, cleanedPayload) as ResumeData;
-    next = applyIdentitySourceRule(next, beforeMerge);
+    let next = syncWithGlobalResume ? (deepMerge(beforeMerge, cleanedPayload) as ResumeData) : mergeResumeDataWithDefault(cleanedPayload);
+    if (syncWithGlobalResume) {
+      next = applyIdentitySourceRule(next, beforeMerge);
+    }
     const safe = sanitizeResumeData(next);
 
     setResumeData(safe);
-    try {
-      tryLocalStorageSet("resumeData", JSON.stringify(safe));
-    } catch {
-      // ignore
+    if (syncWithGlobalResume) {
+      try {
+        tryLocalStorageSet("resumeData", JSON.stringify(safe));
+      } catch {
+        // ignore
+      }
+      queueMicrotask(() => {
+        window.dispatchEvent(new CustomEvent("resume-storage-updated"));
+      });
     }
-    queueMicrotask(() => {
-      window.dispatchEvent(new CustomEvent("resume-storage-updated"));
-    });
   }, [assistantPayloadSignature, syncWithGlobalResume]);
 
   // Sync logic if another window updates it (canonical chat resume only)

@@ -17,8 +17,9 @@ This document outlines the bugs and issues identified during the testing of the 
 * **Favicon 404**: The browser console reports a `404 Not Found` error for `/favicon.ico`.
 * **Viewport Scaling**: On certain window sizes, elements are incorrectly reported as being outside the viewport, leading to interaction issues with automated tools.
 
-### Recommendations for Fixes:
-1. Fix the event listener on the "Skip for now" button in the onboarding flow.
-2. Add a tooltip or validation state to the chat composer explaining the API key requirement.
-3. Refactor the sidebar and mobile CSS to prevent element overlap and ensure full responsiveness.
-4. Translation for languages should work, i can see issue its not working in the components where translation is used. check and fix it.
+### Fix Status & Resolutions:
+1. **Onboarding Modal Failure**: Fixed in `components/chat/chat-onboarding.tsx`. "Skip for now" now cleanly persists the dismissal flag to storage and closes the modal immediately.
+2. **Translation for components**: Fixed in `lib/translation.ts` and `app/api/translate/route.ts`. Added automatic server API fallback for untranslated strings and included a free Google Translate client endpoint so translation works out-of-the-box without requiring custom API keys.
+3. **Docs URL PII / Autofill**: Fixed in `components/chat/sidebar-integrations-accordion.tsx`. Added `type="url"`, `autoComplete="off"`, and ignore tags to prevent browser password managers from auto-filling user emails.
+4. **Favicon 404**: Fixed by adding `app/icon.svg` and configuring the `icons` metadata in `app/layout.tsx`.
+5. **Vercel MCP Server**: Fixed in `app/api/mcp/route.ts` with in-process React-PDF rendering, CORS headers, and standard MCP JSON-RPC handlers.

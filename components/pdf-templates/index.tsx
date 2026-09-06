@@ -86,9 +86,23 @@ export const coverLetterTemplates = {
   "german-anschreiben": GermanAnschreibenTemplate,
 } as const
 
+import React from "react"
+import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
+import type { ResumeData } from "@/lib/types"
+
+function createSafeResumeTemplate(RawTemplate: any) {
+  const SafeComponent = (props: { resumeData: ResumeData; [key: string]: any }) => {
+    const safeData = sanitizeResumeData(props?.resumeData)
+    return React.createElement(RawTemplate, { ...props, resumeData: safeData })
+  }
+  SafeComponent.displayName = `SafeTemplate(${RawTemplate.displayName || RawTemplate.name || "Template"})`
+  return SafeComponent
+}
+
 // Get resume template by name
 export function getResumeTemplate(templateName: string) {
-  return resumeTemplates[templateName as keyof typeof resumeTemplates] || ModernPDFTemplate
+  const raw = resumeTemplates[templateName as keyof typeof resumeTemplates] || ModernPDFTemplate
+  return createSafeResumeTemplate(raw)
 }
 
 // Get cover letter template by name

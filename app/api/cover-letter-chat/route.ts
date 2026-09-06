@@ -8,33 +8,41 @@ export const maxDuration = 30
 
 // Define available models
 const AVAILABLE_MODELS = {
+  "gemini-2.5-flash": {
+    provider: "google",
+    modelId: "gemini-2.5-flash",
+  },
+  "gemini-2.5-flash-lite": {
+    provider: "google",
+    modelId: "gemini-2.5-flash-lite",
+  },
+  "gemini-2.5-pro": {
+    provider: "google",
+    modelId: "gemini-2.5-pro",
+  },
   "gemini-1.5-pro": {
     provider: "google",
-    modelId: "gemini-1.5-pro",
+    modelId: "gemini-2.5-flash",
   },
   "gemini-1.5-flash": {
     provider: "google",
-    modelId: "gemini-1.5-flash",
+    modelId: "gemini-2.5-flash",
+  },
+  "gemini-2.0-flash": {
+    provider: "google",
+    modelId: "gemini-2.5-flash",
   },
   "gemini-2.0-flash-001": {
     provider: "google",
-    modelId: "gemini-2.0-flash-001",
+    modelId: "gemini-2.5-flash",
   },
   "gemini-2.0-flash-thinking-exp-01-21": {
     provider: "google",
-    modelId: "gemini-2.0-flash-thinking-exp-01-21",
+    modelId: "gemini-2.5-flash",
   },
-  "gemini-2.0-flash-exp-image-generation": {
+  "gemini-2.0-pro": {
     provider: "google",
-    modelId: "gemini-2.0-flash-exp-image-generation",
-  },
-  "gemini-2.0-flash-lite": {
-    provider: "google",
-    modelId: "gemini-2.0-flash-lite",
-  },
-  "gemini-2.0-pro-exp-02-05": {
-    provider: "google",
-    modelId: "gemini-2.0-pro-exp-02-05",
+    modelId: "gemini-2.5-flash",
   },
   
   // Hugging Face Models
@@ -91,7 +99,7 @@ const AVAILABLE_MODELS = {
 };
 
 // Default model if none specified
-const DEFAULT_MODEL = "gemini-1.5-pro"
+const DEFAULT_MODEL = "gemini-2.5-flash"
 
 // Mock response for when API quota is exceeded
 const MOCK_RESPONSES = [
@@ -122,7 +130,7 @@ IMPORTANT: When suggesting specific text changes, you MUST format them as JSON w
 Only include the fields that you're suggesting changes for. The user can apply these changes with a button.
 Make sure your JSON is valid and properly formatted with double quotes around property names.
 
-Current cover letter data: ${JSON.stringify(coverLetterData)}
+Current cover letter data: ${JSON.stringify(coverLetterData || {})}
 
 Job description: ${jobDescription || "Not provided"}`
 
@@ -200,9 +208,14 @@ Job description: ${jobDescription || "Not provided"}`
 
 async function handleWithGemini(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
-    const key = apiKey || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
+    const key =
+      apiKey ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_GENAI_API_KEY ||
+      process.env.GOOGLE_API_KEY
     if (!key) {
-      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
+      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY environment variable.")
     }
 
     // Initialize the Gemini API

@@ -23,6 +23,9 @@ export const metadata: Metadata = {
       },
     ],
   },
+  icons: {
+    icon: '/icon.svg',
+  },
   twitter: {
     card: 'summary_large_image',
     title: 'AI-Powered Resume Generator',

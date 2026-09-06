@@ -1169,7 +1169,7 @@ export default function AICareerAssistantChat() {
                 if (score === 0) return null;
                 return { score, index, role: m.role, text };
             })
-            .filter((x): x is { score: number; index: number; role: string; text: string } => Boolean(x))
+            .filter((x): x is NonNullable<typeof x> => Boolean(x))
             .sort((a, b) => (b.score - a.score) || (b.index - a.index))
             .slice(0, MAX_RETRIEVAL_SNIPPETS)
             .sort((a, b) => a.index - b.index);

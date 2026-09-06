@@ -55,10 +55,21 @@ export default function CoverLetterPDFViewer({ coverLetterData, template }: PDFV
     void (async () => {
       try {
         setIsLoading(true)
-        const PDFTemplate = getCoverLetterTemplate(template as string)
-        const { pdf } = await import('@react-pdf/renderer')
-        const pdfDoc = pdf(<PDFTemplate coverLetterData={coverLetterData} />)
-        const blob = await pdfDoc.toBlob()
+        let blob: Blob | null = null
+
+        try {
+          const PDFTemplate = getCoverLetterTemplate(template as string)
+          const pdfDoc = pdf(<PDFTemplate coverLetterData={coverLetterData} />)
+          blob = await pdfDoc.toBlob()
+        } catch (clientErr) {
+          console.warn("Client-side cover letter PDF rendering failed, using MCP server...", clientErr)
+          const { mcpGenerateCoverLetterPdf } = await import("@/lib/mcp-client")
+          blob = await mcpGenerateCoverLetterPdf(coverLetterData, template as any)
+        }
+
+        if (!blob) {
+          throw new Error("Unable to create cover letter PDF blob")
+        }
 
         const url = URL.createObjectURL(blob)
         const a = document.createElement("a")

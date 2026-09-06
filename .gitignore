@@ -47,3 +47,7 @@ issues.md
 /.memory/
 
 ./ai-career-assistant*.json
+# context-gen-cli security & secrets
+.env.*
+.context-gen-key
+mcp.md

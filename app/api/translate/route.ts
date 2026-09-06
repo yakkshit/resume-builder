@@ -91,6 +91,32 @@ async function translateLibre(parts: string[], target: string, source?: string):
   return out;
 }
 
+/** Free fallback Google Translate client endpoint */
+async function translateGoogleFree(parts: string[], target: string, source?: string): Promise<string[]> {
+  const src = source && source !== "auto" ? source : "auto";
+  const out: string[] = [];
+  for (const chunk of parts) {
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(src)}&tl=${encodeURIComponent(target)}&dt=t&q=${encodeURIComponent(chunk)}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        out.push(chunk);
+        continue;
+      }
+      const data = await res.json();
+      if (Array.isArray(data) && Array.isArray(data[0])) {
+        const translated = data[0].map((item: any) => item[0]).filter(Boolean).join("");
+        out.push(translated || chunk);
+      } else {
+        out.push(chunk);
+      }
+    } catch {
+      out.push(chunk);
+    }
+  }
+  return out;
+}
+
 export async function POST(req: NextRequest) {
   let body: Body;
   try {
@@ -158,25 +184,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    return new Response(
-      JSON.stringify({
-        error: "No server translation backends configured.",
-        hint: "Chat resumes use in-browser WASM (Bergamot). Configure GOOGLE_TRANSLATE_API_KEY or LIBRETRANSLATE_URL here only if you call this endpoint from tooling.",
-      }),
-      {
-        status: 501,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
+    // Default to free Google Translate client endpoint
+    const translations = await translateGoogleFree(parts, targetLanguage, sourceLanguage);
+    return Response.json({
+      translatedText: translations.length === 1 ? translations[0] : undefined,
+      translations,
+      engine: "google-free",
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Translation failed";
-    const hint = process.env.GOOGLE_TRANSLATE_API_KEY
-      ? "Check GOOGLE_TRANSLATE_API_KEY and billing / quotas."
-      : process.env.LIBRETRANSLATE_URL?.trim()
-        ? "Check LIBRETRANSLATE_URL and LIBRETRANSLATE_API_KEY if your server requires auth."
-        : "Set GOOGLE_TRANSLATE_API_KEY and/or LIBRETRANSLATE_URL to use POST /api/translate from scripts.";
-
-    return new Response(JSON.stringify({ error: message, hint }), {
+    return new Response(JSON.stringify({ error: message }), {
       status: 502,
       headers: { "Content-Type": "application/json" },
     });

@@ -194,11 +194,19 @@ const AVAILABLE_MAP: Record<string, { provider: string; modelId: string; apiKey?
   "openai-compatible-aisdk": { provider: "openai-like", modelId: "openai-compatible", apiKey: undefined },
 }
 
-/** Same Hub id as chat-store / HF UI, different casing than Together.ai entry */
+/** Same Hub id as chat-store / HF UI, different casing than Together.ai entry; map retired Gemini slugs to 2.5 flash */
 const MODEL_ID_ALIASES: Record<string, string> = {
   "meta-llama/llama-3.1-8b-instruct": "meta-llama/Llama-3.1-8B-Instruct",
   "gemini-1.5-pro": "gemini-2.5-flash",
   "gemini-1.5-flash": "gemini-2.5-flash",
+  "gemini-2.0-flash": "gemini-2.5-flash",
+  "gemini-2.0-flash-001": "gemini-2.5-flash",
+  "gemini-2.0-flash-exp": "gemini-2.5-flash",
+  "gemini-2.0-pro": "gemini-2.5-flash",
+  "gemini-2.0-pro-exp-02-05": "gemini-2.5-flash",
+  "gemini-2.0-flash-lite-001": "gemini-2.5-flash-lite",
+  "gemini-2.5-flash-preview-09-2025": "gemini-2.5-flash",
+  "gemini-2.5-flash-lite-preview-09-2025": "gemini-2.5-flash-lite",
 }
 
 // Default model if none specified (efficient for resume/cover letter)
@@ -676,9 +684,14 @@ function saveBinaryFile(fileName: string, content: Buffer) {
 
 async function handleWithGemini(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
-    const key = apiKey || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY
+    const key =
+      apiKey ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_GENAI_API_KEY ||
+      process.env.GOOGLE_API_KEY
     if (!key) {
-      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_API_KEY or GEMINI_API_KEY environment variable.")
+      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY environment variable.")
     }
 
     const systemMsg = messages.find((m) => m.role === "system")
@@ -746,9 +759,14 @@ async function handleNewGemini(
   clientMessages?: unknown[],
 ) {
   try {
-    const key = apiKey || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
+    const key =
+      apiKey ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_GENAI_API_KEY ||
+      process.env.GOOGLE_API_KEY
     if (!key) {
-      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.")
+      throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY environment variable.")
     }
 
     const systemMsg = messages.find((m) => m.role === "system")

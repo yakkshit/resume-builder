@@ -4,31 +4,44 @@ import type { CoverLetterData } from "@/lib/types"
 // Use only built-in fonts to avoid issues
 const styles = StyleSheet.create({
   page: {
-    padding: 50,
+    padding: 36,
     fontFamily: "Helvetica",
-    fontSize: 11,
+    fontSize: 10,
     color: "#333",
-    lineHeight: 1.5,
+    lineHeight: 1.45,
   },
   header: {
-    marginBottom: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 2,
+    marginBottom: 14,
+    paddingBottom: 8,
+    borderBottomWidth: 1.5,
     borderBottomColor: "#333",
     borderBottomStyle: "solid",
   },
+  headerText: {
+    fontSize: 9,
+    color: "#555",
+    marginBottom: 2,
+  },
+  headerName: {
+    fontSize: 14,
+    fontFamily: "Helvetica-Bold",
+    color: "#111",
+    marginBottom: 4,
+  },
   body: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   footer: {
-    marginTop: 20,
-    borderTopWidth: 2,
-    borderTopColor: "#333",
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#e2e8f0",
     borderTopStyle: "solid",
-    paddingTop: 15,
+    paddingTop: 10,
   },
   text: {
-    marginBottom: 10,
+    marginBottom: 8,
+    fontSize: 10,
+    color: "#222",
   },
 })
 
@@ -48,7 +61,10 @@ export const ModernCoverLetterPDFTemplate = ({ coverLetterData }: ModernCoverLet
         {/* Header Section */}
         <View style={styles.header}>
           {headParagraphs.map((paragraph, index) => (
-            <Text key={`head-${index}`} style={styles.text}>
+            <Text
+              key={`head-${index}`}
+              style={index === 0 ? styles.headerName : styles.headerText}
+            >
               {paragraph}
             </Text>
           ))}

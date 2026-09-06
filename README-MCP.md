@@ -53,12 +53,47 @@ Claude Desktop Configuration (`claude_desktop_config.json`):
 
 ---
 
-## 2. Hosted Cloud HTTP Endpoint
+## 2. Hosted Cloud HTTP Endpoint (Vercel / Production)
 
-When deployed (e.g. Vercel / Railway / Render / VPS), your hosted MCP endpoint is accessible at:
+When deployed to Vercel or any hosting platform, your MCP endpoint is available at:
 
-`https://<your-domain>/api/mcp`
+```
+https://<your-vercel-domain>.vercel.app/api/mcp
+```
 
-### Connecting remote agents / HTTP MCP client:
-- **`GET /api/mcp`**: Health check and supported tool list.
-- **`POST /api/mcp`**: JSON-RPC endpoint handling standard `initialize`, `tools/list`, and `tools/call`.
+### Endpoints & Methods Supported:
+- **`OPTIONS /api/mcp`**: CORS preflight support for web-based MCP clients and inspectors.
+- **`GET /api/mcp`**: Health check, MCP server capabilities, and tool schemas.
+- **`POST /api/mcp`**: Standard JSON-RPC 2.0 MCP endpoint (`initialize`, `ping`, `tools/list`, `tools/call`, `resources/list`, `prompts/list`).
+
+---
+
+## 3. How to Test Your Vercel MCP Endpoint
+
+### A. Quick Browser / Health Check
+Open in your browser or run:
+```bash
+curl https://<your-vercel-domain>.vercel.app/api/mcp
+```
+
+### B. Test `initialize` via cURL
+```bash
+curl -X POST https://<your-vercel-domain>.vercel.app/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}'
+```
+
+### C. Test `tools/list` via cURL
+```bash
+curl -X POST https://<your-vercel-domain>.vercel.app/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+```
+
+### D. Test `tools/call` for `list_templates`
+```bash
+curl -X POST https://<your-vercel-domain>.vercel.app/api/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_templates","arguments":{"category":"all"}}}'
+```
+

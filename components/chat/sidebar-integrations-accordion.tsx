@@ -167,6 +167,11 @@ export function SidebarIntegrationsAccordion({ settings, onSettingsChange, onToa
                 Docs URL
               </Label>
               <Input
+                type="url"
+                name="integrations-docs-url-override"
+                autoComplete="off"
+                data-1p-ignore="true"
+                data-lpignore="true"
                 value={settings.integrationsDocsUrlOverride}
                 onChange={(e) => onSettingsChange({ integrationsDocsUrlOverride: e.target.value })}
                 placeholder="Override (optional) — else .env NEXT_PUBLIC_MULTI_MODEL_*"

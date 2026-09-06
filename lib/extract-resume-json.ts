@@ -27,7 +27,27 @@ const RESUME_TEMPLATE_KEYS = new Set<string>([
   "multi-colour",
 ])
 
-const RESUME_KEYS = ["basicInfo", "experience", "education", "skills", "projects", "achievements"] as const
+const RESUME_KEYS = [
+  "basicInfo",
+  "personalInfo",
+  "personal_info",
+  "contactInfo",
+  "contact_info",
+  "profile",
+  "experience",
+  "workExperience",
+  "work_experience",
+  "work",
+  "employment",
+  "education",
+  "academics",
+  "degrees",
+  "skills",
+  "technicalSkills",
+  "projects",
+  "achievements",
+  "awards",
+] as const
 
 function isResumeUpdateShape(obj: unknown): obj is Record<string, unknown> {
   if (!obj || typeof obj !== "object" || Array.isArray(obj)) return false

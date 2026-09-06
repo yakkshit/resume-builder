@@ -1,0 +1,2470 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-08-31T05:55:27.277Z",
+  "projectPath": "/Users/yakkshit/Downloads/project/resume/cv-main",
+  "overview": "README-INTERVIEW-LAB.md: This repo is a Next.js application that combines: - Resume Builder (build and export a resume) - Career Assistant Chat (multi-model chat with session-only API keys) - Cover Letter workflow - Interview Lab (mock interview rounds, coding tests, and live coaching) This document is the “one stop” guide for running the app, configuring Integrations, and understanding Interview Lab architecture. README-MCP.md: This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor, ChatGPT, Custom Agents) to list templates and generate Resume & Cover Letter PDFs. It supports both: 1. Stdio mode (local CLI / desktop clients) 2. Hosted HTTP JSON-RPC Endpoint (/api/mcp for cloud/remote agent hosting) ---",
+  "techStack": [
+    "TypeScript",
+    "JSON",
+    "React (TSX)",
+    "CSS",
+    "JavaScript",
+    "Markdown",
+    "YAML",
+    "React",
+    "Next.js",
+    "Tailwind CSS",
+    "Vitest",
+    "Node.js"
+  ],
+  "directoryStructure": "└── cv-main/\n    ├── __tests__/\n    │   ├── chat-onboarding-video.test.ts\n    │   ├── chat-textarea.test.ts\n    │   ├── dependency-check.test.ts\n    │   ├── email-draft-errors.test.ts\n    │   ├── extract-resume-json.test.ts\n    │   ├── interview-lab-support.test.ts\n    │   ├── job-scraper.test.ts\n    │   ├── linkedin-outreach.test.ts\n    │   ├── normalize-attached-file.test.ts\n    │   ├── pdf-template-resilience.test.ts\n    │   ├── resume-skills-safety.test.ts\n    │   ├── sanitize-resume-data.test.ts\n    │   ├── security-audit.test.ts\n    │   ├── streaming-chat-content.test.ts\n    │   └── user-knowledge-context.test.ts\n    ├── .agents/\n    │   └── mcp_config.json\n    ├── .pnpm-store/\n    │   └── v10/\n    │       ├── files/\n    │       │   └── ...\n    │       └── index/\n    │           └── ...\n    ├── .vscode/\n    │   ├── launch.json\n    │   └── mcp.json\n    ├── app/\n    │   ├── api/\n    │   │   ├── chat/\n    │   │   │   └── ...\n    │   │   ├── chat-assistant/\n    │   │   │   └── ...\n    │   │   ├── code-run/\n    │   │   │   └── ...\n    │   │   ├── cover-letter/\n    │   │   │   └── ...\n    │   │   ├── cover-letter-chat/\n    │   │   │   └── ...\n    │   │   ├── doc/\n    │   │   │   └── ...\n    │   │   ├── email-draft/\n    │   │   │   └── ...\n    │   │   ├── feedback/\n    │   │   │   └── ...\n    │   │   ├── generate-pdf/\n    │   │   │   └── ...\n    │   │   ├── interview-lab/\n    │   │   │   └── ...\n    │   │   ├── job-search/\n    │   │   │   └── ...\n    │   │   ├── latex-pdf/\n    │   │   │   └── ...\n    │   │   ├── mcp/\n    │   │   │   └── ...\n    │   │   ├── openapi/\n    │   │   │   └── ...\n    │   │   ├── pdf/\n    │   │   │   └── ...\n    │   │   ├── translate/\n    │   │   │   └── ...\n    │   │   └── webhooks/\n    │   │       └── ...\n    │   ├── bg/\n    │   │   └── page.tsx\n    │   ├── chat/\n    │   │   ├── error.tsx\n    │   │   ├── layout.tsx\n    │   │   └── page.tsx\n    │   ├── cover-letter/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── donate/\n    │   │   └── page.tsx\n    │   ├── feedback/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── price/\n    │   │   ├── globals.css\n    │   │   ├── layout.tsx\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── globals.css\n    │   ├── icon.svg\n    │   ├── layout.tsx\n    │   ├── loading.tsx\n    │   └── page.tsx\n    ├── components/\n    │   ├── ai-elements/\n    │   │   ├── attachments.tsx\n    │   │   ├── reasoning.tsx\n    │   │   └── shimmer.tsx\n    │   ├── chat/\n    │   │   ├── components/\n    │   │   │   └── ...\n    │   │   ├── ai-chat-career.tsx\n    │   │   ├── ai-chat.tsx\n    │   │   ├── chat-ambient.tsx\n    │   │   ├── chat-artifact-chrome.tsx\n    │   │   ├── chat-component-registry.tsx\n    │   │   ├── chat-cv-tabs.tsx\n    │   │   ├── chat-input.tsx\n    │   │   ├── chat-message-renderer.tsx\n    │   │   ├── chat-onboarding.tsx\n    │   │   ├── chat-sidebar.tsx\n    │   │   ├── chat-store.tsx\n    │   │   ├── component-renderer.tsx\n    │   │   ├── context-window.tsx\n    │   │   ├── interview-lab-panel.tsx\n    │   │   ├── job-profile-dialog.tsx\n    │   │   ├── job-suggestions-panel.tsx\n    │   │   ├── markdown-renderer.tsx\n    │   │   ├── mock-interview-interactive.tsx\n    │   │   ├── profile-photo-crop-dialog.tsx\n    │   │   ├── profile-settings-dialog.tsx\n    │   │   ├── resume-latex-artifact.tsx\n    │   │   ├── sidebar-integrations-accordion.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── text-selection-popover.tsx\n    │   │   ├── thinking-indicator.tsx\n    │   │   └── translation-controls.tsx\n    │   ├── donation/\n    │   │   ├── animations/\n    │   │   │   └── ...\n    │   │   ├── donation-widget.tsx\n    │   │   ├── faq-section.tsx\n    │   │   ├── impact-section.tsx\n    │   │   └── testimonials-section.tsx\n    │   ├── logos/\n    │   │   └── logos.ts\n    │   ├── pdf-templates/\n    │   │   ├── coverletter/\n    │   │   │   └── ...\n    │   │   ├── cv/\n    │   │   │   └── ...\n    │   │   └── index.tsx\n    │   ├── resume-coverletter/\n    │   │   ├── cover-letter-chat.tsx\n    │   │   ├── cover-letter-editor.tsx\n    │   │   ├── cover-letter-pdf-viewer.tsx\n    │   │   ├── cover-letter-preview.tsx\n    │   │   ├── debug-profile-image.tsx\n    │   │   ├── enhanced-chat.tsx\n    │   │   ├── loading-screen.tsx\n    │   │   ├── pdf-renderer.tsx\n    │   │   ├── pdf-viewer.tsx\n    │   │   ├── resume-editor.tsx\n    │   │   └── theme-provider.tsx\n    │   ├── ui/\n    │   │   ├── accordion.tsx\n    │   │   ├── alert-dialog.tsx\n    │   │   ├── alert.tsx\n    │   │   ├── aspect-ratio.tsx\n    │   │   ├── avatar.tsx\n    │   │   ├── badge.tsx\n    │   │   ├── bolt-style-chat.tsx\n    │   │   ├── breadcrumb.tsx\n    │   │   ├── button-1.tsx\n    │   │   ├── button.tsx\n    │   │   ├── calendar.tsx\n    │   │   ├── card.tsx\n    │   │   ├── carousel.tsx\n    │   │   ├── chart.tsx\n    │   │   ├── checkbox.tsx\n    │   │   ├── collapsible.tsx\n    │   │   ├── command.tsx\n    │   │   ├── context-menu.tsx\n    │   │   ├── dialog.tsx\n    │   │   ├── drawer.tsx\n    │   │   ├── dropdown-menu.tsx\n    │   │   ├── enhanced-marquee.tsx\n    │   │   ├── form.tsx\n    │   │   ├── hover-card.tsx\n    │   │   ├── infinite-marquee.tsx\n    │   │   ├── input-otp.tsx\n    │   │   ├── input.tsx\n    │   │   ├── label.tsx\n    │   │   ├── menubar.tsx\n    │   │   ├── navigation-menu.tsx\n    │   │   ├── pagination.tsx\n    │   │   ├── particle-text-effect.tsx\n    │   │   ├── popover.tsx\n    │   │   ├── progress.tsx\n    │   │   ├── radio-group.tsx\n    │   │   ├── resizable.tsx\n    │   │   ├── scroll-area.tsx\n    │   │   ├── select.tsx\n    │   │   ├── separator.tsx\n    │   │   ├── sheet.tsx\n    │   │   ├── shine-border.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── skeleton.tsx\n    │   │   ├── slider.tsx\n    │   │   ├── sonner.tsx\n    │   │   ├── stepper.tsx\n    │   │   ├── switch.tsx\n    │   │   ├── table.tsx\n    │   │   ├── tabs.tsx\n    │   │   ├── textarea.tsx\n    │   │   ├── the-infinite-grid.tsx\n    │   │   ├── toast.tsx\n    │   │   ├── toaster.tsx\n    │   │   ├── toggle-group.tsx\n    │   │   ├── toggle.tsx\n    │   │   ├── tooltip.tsx\n    │   │   ├── use-mobile.tsx\n    │   │   └── use-toast.ts\n    │   ├── app-nav.tsx\n    │   ├── cookie-banner.tsx\n    │   └── package-manager-ui.tsx\n    ├── database/\n    │   └── migrations.ts\n    ├── hooks/\n    │   ├── use-mobile.tsx\n    │   └── use-toast.ts\n    ├── lib/\n    │   ├── job-scraper/\n    │   │   └── google-jobs.ts\n    │   ├── api-auth.ts\n    │   ├── bergamot-translator-client.ts\n    │   ├── bolt-models.tsx\n    │   ├── chat-history.ts\n    │   ├── chat-models.ts\n    │   ├── chat-onboarding-video.ts\n    │   ├── chat-provider-settings.ts\n    │   ├── chat-resume-context.ts\n    │   ├── chat-textarea.ts\n    │   ├── clipboard.ts\n    │   ├── cover-letter-pdf-generator.tsx\n    │   ├── default-cover-letter.ts\n    │   ├── default-resume-data.ts\n    │   ├── email-compose-urls.ts\n    │   ├── email-draft-errors.ts\n    │   ├── extract-resume-json.ts\n    │   ├── faq.ts\n    │   ├── gallery-data.ts\n    │   ├── interview-lab-model-support.ts\n    │   ├── linkedin-outreach.ts\n    │   ├── memory-store.ts\n    │   ├── message-utils.ts\n    │   ├── model-provider-icon.tsx\n    │   ├── multi-model-docs.ts\n    │   ├── normalize-attached-file.ts\n    │   ├── normalize-sections-resume.ts\n    │   ├── pdf-generator.ts\n    │   ├── pdf-generator.tsx\n    │   ├── redact-resume-pii.ts\n    │   ├── safe-local-storage.ts\n    │   ├── sanitize-resume-data.ts\n    │   ├── streaming-chat-content.ts\n    │   ├── translation.ts\n    │   ├── types.ts\n    │   ├── user-knowledge-context.ts\n    │   └── utils.ts\n    ├── public/\n    │   ├── bergamot/\n    │   │   ├── bergamot-translator-worker.js\n    │   │   ├── bergamot-translator-worker.wasm\n    │   │   └── translator-worker.js\n    │   ├── deepmind-picture-2.jpg\n    │   └── placeholder.svg\n    ├── scripts/\n    │   ├── build-application-packages.ts\n    │   ├── compile-applications.ts\n    │   ├── generate-pdf.ts\n    │   ├── mcp-server.ts\n    │   ├── test-pdf-endpoints.ts\n    │   └── workflow.ts\n    ├── styles/\n    │   └── globals.css\n    ├── .gitignore\n    ├── 1.4.9.pdf\n    ├── about.md\n    ├── AI_SDK_5_MIGRATION.md\n    ├── API_KEYS_SETUP.md\n    ├── bugs.md\n    ├── cjs-shim.ts\n    ├── components.json\n    ├── eslint.config.mjs\n    ├── next.config.mjs\n    ├── package-lock.json\n    ├── package.json\n    ├── pnpm-lock.yaml\n    ├── postcss.config.mjs\n    ├── README-INTERVIEW-LAB.md\n    ├── README-MCP.md\n    ├── tailwind.config.ts\n    ├── test-render.tsx\n    ├── TESTING.md\n    ├── ts_errors.txt\n    ├── tsconfig.json\n    └── vitest.config.ts",
+  "keyFiles": [
+    {
+      "path": ".agents/mcp_config.json",
+      "description": "Environment or tool configuration."
+    },
+    {
+      "path": "components/pdf-templates/index.tsx",
+      "description": "UI or modular structural component."
+    },
+    {
+      "path": "eslint.config.mjs",
+      "description": "ESLint code linting and formatting rules."
+    },
+    {
+      "path": "next.config.mjs",
+      "description": "Next.js framework runtime configuration and routing redirects."
+    },
+    {
+      "path": "package.json",
+      "description": "Project manifest, metadata, dependencies, and script definitions."
+    },
+    {
+      "path": "postcss.config.mjs",
+      "description": "PostCSS configuration for CSS transformations."
+    },
+    {
+      "path": "README-INTERVIEW-LAB.md",
+      "description": "Project documentation and overview."
+    },
+    {
+      "path": "README-MCP.md",
+      "description": "Project documentation and overview."
+    },
+    {
+      "path": "tailwind.config.ts",
+      "description": "Tailwind CSS theme tokens and layout styling configuration."
+    },
+    {
+      "path": "tsconfig.json",
+      "description": "TypeScript compiler options and path aliases configuration."
+    },
+    {
+      "path": "vitest.config.ts",
+      "description": "Vitest testing framework configuration."
+    },
+    {
+      "path": "__tests__/chat-onboarding-video.test.ts",
+      "description": "Automated test suite."
+    },
+    {
+      "path": "__tests__/chat-textarea.test.ts",
+      "description": "Automated test suite."
+    },
+    {
+      "path": "__tests__/dependency-check.test.ts",
+      "description": "Automated test suite."
+    },
+    {
+      "path": "__tests__/email-draft-errors.test.ts",
+      "description": "Automated test suite."
+    }
+  ],
+  "dependencies": {
+    "production": {
+      "@ai-sdk/anthropic": "^3.0.58",
+      "@ai-sdk/google": "^3.0.43",
+      "@ai-sdk/huggingface": "^1.0.40",
+      "@ai-sdk/openai-compatible": "^2.0.38",
+      "@ai-sdk/react": "^3.0.118",
+      "@ai-sdk/ui-utils": "^1.2.11",
+      "@browsermt/bergamot-translator": "^0.4.9",
+      "@dnd-kit/core": "^6.3.1",
+      "@dnd-kit/sortable": "^10.0.0",
+      "@dnd-kit/utilities": "^3.2.2",
+      "@google/genai": "^1.16.0",
+      "@google/generative-ai": "^0.21.0",
+      "@hookform/resolvers": "^3.9.1",
+      "@huggingface/inference": "^4.7.1",
+      "@lobehub/icons": "^5.8.0",
+      "@radix-ui/react-accordion": "^1.2.2",
+      "@radix-ui/react-alert-dialog": "^1.1.4",
+      "@radix-ui/react-aspect-ratio": "^1.1.1",
+      "@radix-ui/react-avatar": "^1.1.2",
+      "@radix-ui/react-checkbox": "^1.1.3",
+      "@radix-ui/react-collapsible": "^1.1.12",
+      "@radix-ui/react-context-menu": "^2.2.4",
+      "@radix-ui/react-dialog": "^1.1.4",
+      "@radix-ui/react-dropdown-menu": "^2.1.4",
+      "@radix-ui/react-hover-card": "^1.1.4",
+      "@radix-ui/react-label": "^2.1.1",
+      "@radix-ui/react-menubar": "^1.1.4",
+      "@radix-ui/react-navigation-menu": "^1.2.3",
+      "@radix-ui/react-popover": "^1.1.15",
+      "@radix-ui/react-progress": "^1.1.1",
+      "@radix-ui/react-radio-group": "^1.2.2",
+      "@radix-ui/react-scroll-area": "^1.2.2",
+      "@radix-ui/react-select": "^2.1.4",
+      "@radix-ui/react-separator": "^1.1.1",
+      "@radix-ui/react-slider": "^1.2.2",
+      "@radix-ui/react-slot": "^1.2.3",
+      "@radix-ui/react-switch": "^1.1.2",
+      "@radix-ui/react-tabs": "^1.1.2",
+      "@radix-ui/react-toast": "^1.2.4",
+      "@radix-ui/react-toggle": "^1.1.1",
+      "@radix-ui/react-toggle-group": "^1.1.1",
+      "@radix-ui/react-tooltip": "^1.1.6",
+      "@radix-ui/react-use-controllable-state": "^1.2.2",
+      "@react-pdf/renderer": "^4.3.2",
+      "@streamdown/cjk": "^1.0.3",
+      "@streamdown/code": "^1.1.1",
+      "@streamdown/math": "^1.0.2",
+      "@streamdown/mermaid": "^1.0.2",
+      "@tailwindcss/typography": "^0.5.16",
+      "@vercel/analytics": "^1.5.0",
+      "@vercel/sandbox": "^1.9.2",
+      "ai": "^6.0.116",
+      "ai-legacy": "npm:ai@^4.3.2",
+      "autoprefixer": "^10.4.20",
+      "class-variance-authority": "^0.7.1",
+      "clsx": "^2.1.1",
+      "cmdk": "^1.0.4",
+      "date-fns": "^4.1.0",
+      "embla-carousel-react": "^8.5.1",
+      "framer-motion": "^11.11.17",
+      "franc-min": "^6.2.0",
+      "google-auth-library": "^9.15.1",
+      "google-spreadsheet": "^4.1.4",
+      "html2canvas": "^1.4.1",
+      "input-otp": "^1.4.1",
+      "katex": "^0.16.45",
+      "lucide-react": "^0.454.0",
+      "mammoth": "^1.10.0",
+      "mime": "^4.0.7",
+      "motion": "^12.38.0",
+      "multer": "^2.0.2",
+      "next": "^16.1.6",
+      "next-themes": "^0.4.4",
+      "pdf-parse": "^1.1.1",
+      "pdfjs-dist": "^5.4.54",
+      "radix-ui": "^1.4.3",
+      "react": "^19.0.0",
+      "react-day-picker": "^9.4.4",
+      "react-dom": "^19.0.0",
+      "react-easy-crop": "^5.5.7",
+      "react-hook-form": "^7.54.1",
+      "react-markdown": "^10.1.0",
+      "react-resizable-panels": "^2.1.7",
+      "recharts": "^2.15.0",
+      "rehype-highlight": "^7.0.2",
+      "rehype-katex": "^7.0.1",
+      "rehype-raw": "^7.0.0",
+      "remark-gfm": "^4.0.1",
+      "remark-math": "^6.0.0",
+      "sonner": "^1.7.4",
+      "streamdown": "^2.5.0",
+      "tailwind-merge": "^2.5.5",
+      "tailwindcss-animate": "^1.0.7",
+      "tsx": "^4.21.0",
+      "vaul": "^1.1.1",
+      "zod": "^4.3.6"
+    },
+    "development": {
+      "@scalar/nextjs-api-reference": "0.4.106",
+      "@types/katex": "^0.16.8",
+      "@types/multer": "^2.0.0",
+      "@types/node": "^22.17.2",
+      "@types/pdf-parse": "^1.1.5",
+      "@types/react": "^19.0.0",
+      "@types/react-dom": "^19.0.0",
+      "eslint": "^9.39.4",
+      "eslint-config-next": "^16.2.2",
+      "postcss": "^8.4.47",
+      "tailwindcss": "^3.4.17",
+      "typescript": "^5.7.2",
+      "vitest": "^2.1.0"
+    }
+  },
+  "entryPoints": [
+    "components/chat/ai-chat.tsx",
+    "components/resume-coverletter/cover-letter-preview.tsx",
+    "lib/pdf-generator.tsx",
+    "scripts/build-application-packages.ts",
+    "scripts/compile-applications.ts",
+    "scripts/generate-pdf.ts",
+    "app/layout.tsx"
+  ],
+  "dependencyGraph": {
+    "nodes": [
+      {
+        "file": "__tests__/chat-onboarding-video.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/chat-textarea.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/dependency-check.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/email-draft-errors.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/extract-resume-json.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/interview-lab-support.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/job-scraper.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/linkedin-outreach.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/normalize-attached-file.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/pdf-template-resilience.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/resume-skills-safety.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/sanitize-resume-data.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/security-audit.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/streaming-chat-content.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/user-knowledge-context.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/chat/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/chat-assistant/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/code-run/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/cover-letter/generate/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/cover-letter/pdf/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/cover-letter-chat/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/doc/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/email-draft/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/feedback/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/generate-pdf/route.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/interview-lab/sandbox/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/interview-lab/sandbox-run/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/interview-lab/transcribe/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/interview-lab/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/job-search/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/latex-pdf/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/mcp/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/openapi/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/pdf/render/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/translate/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/webhooks/cover-letter-completed/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/webhooks/cover-letter-pdf-completed/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/webhooks/pdf-completed/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/bg/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/chat/error.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/chat/layout.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/chat/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/cover-letter/loading.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/cover-letter/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/donate/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/feedback/loading.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/feedback/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/price/layout.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/price/loading.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/price/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/layout.tsx",
+        "type": "entry",
+        "imports": [
+          "app/globals.css"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "app/loading.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ai-elements/attachments.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ai-elements/reasoning.tsx",
+        "type": "component",
+        "imports": [
+          "components/ai-elements/shimmer.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "components/ai-elements/shimmer.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/ai-elements/reasoning.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/auto-applier.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/coding-challenge.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/cover-letter-single-block-editor.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/components/cover-letter-viewer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/cover-letter-viewer.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/components/cover-letter-single-block-editor.tsx"
+        ],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/cv-score.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/email-hr-panel.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/job-recommendations.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/learning-resources.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/linkedin-dm-panel.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/mock-interview.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/resume-viewer.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/ai-chat-career.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/ai-chat.tsx",
+        "type": "entry",
+        "imports": [
+          "components/chat/markdown-renderer.tsx",
+          "components/chat/component-renderer.tsx",
+          "components/chat/chat-store.tsx",
+          "components/chat/sidebar.tsx",
+          "components/chat/job-suggestions-panel.tsx",
+          "components/chat/chat-onboarding.tsx",
+          "components/chat/interview-lab-panel.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/chat-ambient.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/chat-artifact-chrome.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/chat-component-registry.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/mock-interview-interactive.tsx"
+        ],
+        "importedBy": [
+          "components/chat/chat-message-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/chat-cv-tabs.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/chat-input.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/chat-message-renderer.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/chat-component-registry.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/chat-onboarding.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/ai-chat.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/chat-sidebar.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/context-window.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/chat-store.tsx",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/chat/ai-chat.tsx",
+          "components/chat/profile-settings-dialog.tsx",
+          "components/chat/sidebar-integrations-accordion.tsx",
+          "components/chat/sidebar.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/component-renderer.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/components/resume-viewer.tsx",
+          "components/chat/components/cv-score.tsx",
+          "components/chat/components/job-recommendations.tsx",
+          "components/chat/components/auto-applier.tsx",
+          "components/chat/components/mock-interview.tsx",
+          "components/chat/components/coding-challenge.tsx",
+          "components/chat/components/learning-resources.tsx",
+          "components/chat/components/cover-letter-viewer.tsx",
+          "components/chat/components/email-hr-panel.tsx",
+          "components/chat/components/linkedin-dm-panel.tsx",
+          "components/chat/interview-lab-panel.tsx",
+          "components/chat/resume-latex-artifact.tsx"
+        ],
+        "importedBy": [
+          "components/chat/ai-chat.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/context-window.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/chat-sidebar.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/interview-lab-panel.tsx",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/chat/ai-chat.tsx",
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/job-profile-dialog.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/job-suggestions-panel.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/job-suggestions-panel.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/job-profile-dialog.tsx"
+        ],
+        "importedBy": [
+          "components/chat/ai-chat.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/markdown-renderer.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/ai-chat.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/mock-interview-interactive.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/chat-component-registry.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/profile-photo-crop-dialog.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/profile-settings-dialog.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/chat-store.tsx"
+        ],
+        "importedBy": [
+          "components/chat/sidebar.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/resume-latex-artifact.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/sidebar-integrations-accordion.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/chat-store.tsx"
+        ],
+        "importedBy": [
+          "components/chat/sidebar.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/sidebar.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/chat-store.tsx",
+          "components/chat/profile-settings-dialog.tsx",
+          "components/chat/sidebar-integrations-accordion.tsx"
+        ],
+        "importedBy": [
+          "components/chat/ai-chat.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/text-selection-popover.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/thinking-indicator.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/chat/translation-controls.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/animations/count-up.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/animations/fade-in.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/animations/hover-card.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/animations/scroll-reveal.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/animations/stagger-children.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/donation-widget.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/faq-section.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/impact-section.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/donation/testimonials-section.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/logos/logos.ts",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/gradient-gray-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/gradient-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/creative-cover-letter-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/dark-cover-letter-template.tsx",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx",
+          "components/resume-coverletter/cover-letter-preview.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx",
+          "components/resume-coverletter/cover-letter-preview.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/german-anschreiben-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx",
+          "components/resume-coverletter/cover-letter-preview.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/minimal-cover-letter-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx",
+          "components/resume-coverletter/cover-letter-preview.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/coverletter/standard-cover-letter-template.tsx",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx",
+          "test-render.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/classic-pdf-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx",
+        "type": "component",
+        "imports": [
+          "components/logos/logos.ts"
+        ],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/elegant-pdf-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/gradient-gray-pdf-template.tsx",
+        "type": "component",
+        "imports": [
+          "components/logos/logos.ts"
+        ],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/gradient-pdf-template.tsx",
+        "type": "component",
+        "imports": [
+          "components/logos/logos.ts"
+        ],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/minimal-clean-pdf-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/minimal-pdf-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/professional-pdf-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/tech-modern-pdf-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx",
+        "type": "component",
+        "imports": [
+          "components/logos/logos.ts"
+        ],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/german-templates/GermanLebenslaufTemplate.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/german-templates/GermanModernLebenslaufTemplate.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/other-resume/RandomColourTemplate.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/index.tsx",
+        "type": "component",
+        "imports": [
+          "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/classic-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/minimal-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/professional-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/elegant-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/gradient-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/gradient-gray-pdf-template.tsx",
+          "components/pdf-templates/coverletter/standard-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/creative-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/dark-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
+          "components/pdf-templates/cv/german-templates/GermanLebenslaufTemplate.tsx",
+          "components/pdf-templates/cv/german-templates/GermanModernLebenslaufTemplate.tsx",
+          "components/pdf-templates/cv/other-resume/RandomColourTemplate.tsx",
+          "components/pdf-templates/cv/general-resumes/minimal-clean-pdf-template.tsx",
+          "components/pdf-templates/cv/general-resumes/tech-modern-pdf-template.tsx",
+          "components/pdf-templates/coverletter/minimal-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/german-anschreiben-template.tsx"
+        ],
+        "importedBy": [
+          "lib/pdf-generator.tsx",
+          "scripts/build-application-packages.ts",
+          "scripts/compile-applications.ts",
+          "scripts/generate-pdf.ts",
+          "scripts/mcp-server.ts"
+        ]
+      },
+      {
+        "file": "components/resume-coverletter/cover-letter-chat.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/cover-letter-editor.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/cover-letter-pdf-viewer.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/cover-letter-preview.tsx",
+        "type": "entry",
+        "imports": [
+          "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
+          "components/pdf-templates/coverletter/dark-cover-letter-template.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/debug-profile-image.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/resume-coverletter/resume-editor.tsx"
+        ]
+      },
+      {
+        "file": "components/resume-coverletter/enhanced-chat.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/loading-screen.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/pdf-renderer.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/pdf-viewer.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/resume-editor.tsx",
+        "type": "component",
+        "imports": [
+          "components/resume-coverletter/debug-profile-image.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "components/resume-coverletter/theme-provider.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/accordion.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/alert-dialog.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/alert.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/aspect-ratio.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/avatar.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/badge.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/bolt-style-chat.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/breadcrumb.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/button-1.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/button.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/calendar.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/card.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/carousel.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/chart.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/checkbox.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/collapsible.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/command.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/context-menu.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/dialog.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/drawer.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/dropdown-menu.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/enhanced-marquee.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/form.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/hover-card.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/infinite-marquee.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/input-otp.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/input.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/label.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/menubar.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/navigation-menu.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/pagination.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/particle-text-effect.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/popover.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/progress.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/radio-group.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/resizable.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/scroll-area.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/select.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/separator.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/sheet.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/shine-border.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/sidebar.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/skeleton.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/slider.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/sonner.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/stepper.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/switch.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/table.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/tabs.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/textarea.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/the-infinite-grid.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/toast.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/toaster.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/toggle-group.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/toggle.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/tooltip.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/use-mobile.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/ui/use-toast.ts",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/app-nav.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/cookie-banner.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/package-manager-ui.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "database/migrations.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "hooks/use-mobile.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "hooks/use-toast.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/job-scraper/google-jobs.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/api-auth.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/bergamot-translator-client.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/bolt-models.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/chat-history.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/chat-models.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/chat-onboarding-video.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/chat-provider-settings.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/chat-resume-context.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/chat-textarea.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/clipboard.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/cover-letter-pdf-generator.tsx",
+        "type": "util",
+        "imports": [
+          "lib/types.ts"
+        ],
+        "importedBy": [
+          "scripts/build-application-packages.ts",
+          "scripts/compile-applications.ts"
+        ]
+      },
+      {
+        "file": "lib/default-cover-letter.ts",
+        "type": "module",
+        "imports": [
+          "lib/types.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "lib/default-resume-data.ts",
+        "type": "module",
+        "imports": [
+          "lib/types.ts"
+        ],
+        "importedBy": [
+          "lib/sanitize-resume-data.ts"
+        ]
+      },
+      {
+        "file": "lib/email-compose-urls.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/email-draft-errors.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/extract-resume-json.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/faq.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/gallery-data.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/interview-lab-model-support.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/linkedin-outreach.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/memory-store.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/message-utils.ts",
+        "type": "util",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/model-provider-icon.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/multi-model-docs.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/normalize-attached-file.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/normalize-sections-resume.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/pdf-generator.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/pdf-generator.tsx",
+        "type": "entry",
+        "imports": [
+          "lib/types.ts",
+          "components/pdf-templates/index.tsx",
+          "lib/sanitize-resume-data.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "lib/redact-resume-pii.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/safe-local-storage.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/sanitize-resume-data.ts",
+        "type": "module",
+        "imports": [
+          "lib/types.ts",
+          "lib/default-resume-data.ts"
+        ],
+        "importedBy": [
+          "lib/pdf-generator.tsx",
+          "scripts/build-application-packages.ts",
+          "scripts/compile-applications.ts",
+          "scripts/generate-pdf.ts"
+        ]
+      },
+      {
+        "file": "lib/streaming-chat-content.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/translation.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/types.ts",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "lib/cover-letter-pdf-generator.tsx",
+          "lib/default-cover-letter.ts",
+          "lib/default-resume-data.ts",
+          "lib/pdf-generator.tsx",
+          "lib/sanitize-resume-data.ts",
+          "scripts/generate-pdf.ts"
+        ]
+      },
+      {
+        "file": "lib/user-knowledge-context.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/utils.ts",
+        "type": "util",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "public/bergamot/bergamot-translator-worker.js",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "public/bergamot/translator-worker.js",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/build-application-packages.ts",
+        "type": "entry",
+        "imports": [
+          "lib/cover-letter-pdf-generator.tsx",
+          "lib/sanitize-resume-data.ts",
+          "components/pdf-templates/index.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/compile-applications.ts",
+        "type": "entry",
+        "imports": [
+          "lib/sanitize-resume-data.ts",
+          "lib/cover-letter-pdf-generator.tsx",
+          "components/pdf-templates/index.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/generate-pdf.ts",
+        "type": "entry",
+        "imports": [
+          "components/pdf-templates/index.tsx",
+          "lib/sanitize-resume-data.ts",
+          "lib/types.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/mcp-server.ts",
+        "type": "module",
+        "imports": [
+          "components/pdf-templates/index.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/test-pdf-endpoints.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/workflow.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "cjs-shim.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "eslint.config.mjs",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "next.config.mjs",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "postcss.config.mjs",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "tailwind.config.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "test-render.tsx",
+        "type": "component",
+        "imports": [
+          "components/pdf-templates/coverletter/standard-cover-letter-template.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "vitest.config.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      }
+    ],
+    "edges": [
+      {
+        "from": "app/layout.tsx",
+        "to": "app/globals.css",
+        "type": "import"
+      },
+      {
+        "from": "components/ai-elements/reasoning.tsx",
+        "to": "components/ai-elements/shimmer.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/components/cover-letter-viewer.tsx",
+        "to": "components/chat/components/cover-letter-single-block-editor.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/markdown-renderer.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/component-renderer.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/chat-store.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/sidebar.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/job-suggestions-panel.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/chat-onboarding.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/interview-lab-panel.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/chat-component-registry.tsx",
+        "to": "components/chat/mock-interview-interactive.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/chat-message-renderer.tsx",
+        "to": "components/chat/chat-component-registry.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/chat-sidebar.tsx",
+        "to": "components/chat/context-window.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/resume-viewer.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/cv-score.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/job-recommendations.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/auto-applier.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/mock-interview.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/coding-challenge.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/learning-resources.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/cover-letter-viewer.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/email-hr-panel.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/linkedin-dm-panel.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/interview-lab-panel.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/resume-latex-artifact.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/job-suggestions-panel.tsx",
+        "to": "components/chat/job-profile-dialog.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/profile-settings-dialog.tsx",
+        "to": "components/chat/chat-store.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/sidebar-integrations-accordion.tsx",
+        "to": "components/chat/chat-store.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/sidebar.tsx",
+        "to": "components/chat/chat-store.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/sidebar.tsx",
+        "to": "components/chat/profile-settings-dialog.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/sidebar.tsx",
+        "to": "components/chat/sidebar-integrations-accordion.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx",
+        "to": "components/logos/logos.ts",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/cv/general-resumes/gradient-gray-pdf-template.tsx",
+        "to": "components/logos/logos.ts",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/cv/general-resumes/gradient-pdf-template.tsx",
+        "to": "components/logos/logos.ts",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx",
+        "to": "components/logos/logos.ts",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/classic-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/minimal-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/professional-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/elegant-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/gradient-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/gradient-gray-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/standard-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/creative-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/dark-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/german-templates/GermanLebenslaufTemplate.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/german-templates/GermanModernLebenslaufTemplate.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/other-resume/RandomColourTemplate.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/minimal-clean-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/tech-modern-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/minimal-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/coverletter/german-anschreiben-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/resume-coverletter/cover-letter-preview.tsx",
+        "to": "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/resume-coverletter/cover-letter-preview.tsx",
+        "to": "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/resume-coverletter/cover-letter-preview.tsx",
+        "to": "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/resume-coverletter/cover-letter-preview.tsx",
+        "to": "components/pdf-templates/coverletter/dark-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/resume-coverletter/resume-editor.tsx",
+        "to": "components/resume-coverletter/debug-profile-image.tsx",
+        "type": "import"
+      },
+      {
+        "from": "lib/cover-letter-pdf-generator.tsx",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/default-cover-letter.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/default-resume-data.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/pdf-generator.tsx",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/pdf-generator.tsx",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "lib/pdf-generator.tsx",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/sanitize-resume-data.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/sanitize-resume-data.ts",
+        "to": "lib/default-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-application-packages.ts",
+        "to": "lib/cover-letter-pdf-generator.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-application-packages.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-application-packages.ts",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/compile-applications.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/compile-applications.ts",
+        "to": "lib/cover-letter-pdf-generator.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/compile-applications.ts",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-pdf.ts",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-pdf.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-pdf.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/mcp-server.ts",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "test-render.tsx",
+        "to": "components/pdf-templates/coverletter/standard-cover-letter-template.tsx",
+        "type": "import"
+      }
+    ],
+    "coreModules": [
+      "components/chat/components/cover-letter-viewer.tsx",
+      "components/chat/chat-component-registry.tsx",
+      "components/chat/chat-store.tsx",
+      "components/chat/component-renderer.tsx",
+      "components/chat/interview-lab-panel.tsx",
+      "components/chat/job-suggestions-panel.tsx",
+      "components/chat/profile-settings-dialog.tsx",
+      "components/chat/sidebar-integrations-accordion.tsx",
+      "components/chat/sidebar.tsx",
+      "components/logos/logos.ts",
+      "components/pdf-templates/coverletter/dark-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/standard-cover-letter-template.tsx",
+      "components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx",
+      "components/pdf-templates/cv/general-resumes/gradient-gray-pdf-template.tsx",
+      "components/pdf-templates/cv/general-resumes/gradient-pdf-template.tsx",
+      "components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx",
+      "components/pdf-templates/index.tsx",
+      "lib/cover-letter-pdf-generator.tsx",
+      "lib/default-resume-data.ts",
+      "lib/sanitize-resume-data.ts",
+      "lib/types.ts"
+    ],
+    "utilities": [
+      "lib/types.ts",
+      "components/chat/chat-store.tsx",
+      "components/logos/logos.ts",
+      "components/chat/interview-lab-panel.tsx",
+      "components/pdf-templates/coverletter/dark-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/standard-cover-letter-template.tsx",
+      "lib/cover-letter-pdf-generator.tsx"
+    ]
+  },
+  "recentCommits": [
+    {
+      "hash": "9abc8e2",
+      "message": "feat: new feature update 2.9.0",
+      "date": "3 weeks ago",
+      "author": "yakkshit"
+    },
+    {
+      "hash": "08b229b",
+      "message": "feat: new feature update 2.8.0",
+      "date": "4 weeks ago",
+      "author": "yakkshit"
+    },
+    {
+      "hash": "af36e2d",
+      "message": "feat: new feature update 2.7.0",
+      "date": "8 weeks ago",
+      "author": "yakkshit"
+    },
+    {
+      "hash": "bb06e38",
+      "message": "fix: bugfix update to 2.6.7",
+      "date": "8 weeks ago",
+      "author": "yakkshit"
+    },
+    {
+      "hash": "e3c1dc0",
+      "message": "fix: bugfix update to 2.6.6",
+      "date": "8 weeks ago",
+      "author": "yakkshit"
+    }
+  ],
+  "quickNotes": [
+    "Execution Context: Refer to the entry points to understand application bootstrap.",
+    "Modularity: Check the Dependency Graph before refactoring to maintain module coupling.",
+    "Dependencies: Rely on the installed packages and runtimes listed under Tech Stack."
+  ]
+}

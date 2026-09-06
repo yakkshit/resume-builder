@@ -50,8 +50,32 @@ async function translateInBrowser(strings: string[], targetLanguage: string): Pr
   }
 }
 
+async function translateViaApi(strings: string[], targetLanguage: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const res = await fetch("/api/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texts: strings, targetLanguage }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.translations) && data.translations.length === strings.length) {
+        strings.forEach((str, i) => {
+          map.set(str, data.translations[i] || str);
+        });
+        return map;
+      }
+    }
+  } catch (err) {
+    console.warn("API translation fallback failed:", err);
+  }
+  for (const s of strings) map.set(s, s);
+  return map;
+}
+
 /**
- * Chat card translation: WASM Bergamot in the browser only (no GTX / `/api/translate` for this UI).
+ * Chat card translation: WASM Bergamot with seamless /api/translate fallback.
  */
 export async function translateStringListSmart(
   uniqueStrings: string[],
@@ -74,7 +98,17 @@ export async function translateStringListSmart(
     return map;
   }
 
-  const translated = await translateInBrowser(toSend, targetLanguage);
+  let translated = await translateInBrowser(toSend, targetLanguage);
+  
+  // If Bergamot was unable to translate (or returned identical strings), fallback to server translation
+  const untranslated = toSend.filter((s) => !translated.has(s) || translated.get(s) === s);
+  if (untranslated.length > 0) {
+    const apiMap = await translateViaApi(untranslated, targetLanguage);
+    for (const [k, v] of apiMap.entries()) {
+      translated.set(k, v);
+    }
+  }
+
   for (const s of toSend) {
     map.set(s, translated.get(s) ?? s);
   }

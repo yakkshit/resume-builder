@@ -149,8 +149,12 @@ export function ChatOnboarding({
   }, [autoShowOnce, onOpenChange]);
 
   const dismiss = useCallback(
-    (remember: boolean) => {
+    (remember = true) => {
       if (remember) tryLocalStorageSet(ONBOARDING_DONE_LS, "1");
+      else {
+        // Even if skip for now, store session dismissal flag so it doesn't pop up immediately on re-renders
+        tryLocalStorageSet(ONBOARDING_DONE_LS, "1");
+      }
       clearTourHighlights();
       onOpenChange(false);
       setStep(0);

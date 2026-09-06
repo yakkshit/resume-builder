@@ -1,0 +1,49 @@
+{
+  "version": "1.0.0",
+  "outputDir": "context",
+  "outputFormats": [
+    "md",
+    "json",
+    "yaml"
+  ],
+  "maxTokens": 4000,
+  "ignorePatterns": [
+    "node_modules",
+    ".git",
+    "dist",
+    "build",
+    "coverage",
+    "__pycache__",
+    ".venv",
+    ".next"
+  ],
+  "securityPatterns": [
+    ".env",
+    ".env.*",
+    "*.pem",
+    "*.key",
+    "*.p12",
+    "id_rsa*",
+    "secrets/",
+    "credentials/",
+    "**/config/secrets.*",
+    ".env*",
+    ".env.example",
+    "lib/session-secrets.ts"
+  ],
+  "securityKeywords": [
+    "API_KEY",
+    "SECRET",
+    "PASSWORD",
+    "PRIVATE_KEY",
+    "TOKEN",
+    "AUTH_KEY"
+  ],
+  "excludeFromContext": [
+    "agent.md",
+    "agent.json",
+    "agent.yaml",
+    "mcp.md",
+    ".context-gen.json"
+  ]
+}
