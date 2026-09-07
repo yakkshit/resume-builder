@@ -16,16 +16,10 @@ const nextConfig = {
   // When set, Next switches from "warn" to **block** for unknown origins and breaks /_next/* loads.
   // For tunnel hosts, either omit this key (warn-only) or add e.g. '*.trycloudflare.com' patterns.
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   async redirects() {
-    return [
-      {
-        source: '/',
-        destination: '/',
-        permanent: true,
-      },
-    ]
+    return []
   },
   images: {
     unoptimized: true,
@@ -64,14 +58,7 @@ const nextConfig = {
         asyncWebAssembly: true,
       }
     }
-    // Production only: Force single React instance for @react-pdf (fixes Minified React #31 on Vercel).
-    // Alias to package DIRECTORIES so react/jsx-dev-runtime etc. still resolve. Skip in dev to avoid resolution issues.
-    if (isServer && process.env.NODE_ENV === "production") {
-      const reactDir = path.dirname(require.resolve("react/package.json"))
-      const reactDomDir = path.dirname(require.resolve("react-dom/package.json"))
-      config.resolve.alias["react"] = reactDir
-      config.resolve.alias["react-dom"] = reactDomDir
-    }
+
     return config
   },
 }

@@ -1,4 +1,4 @@
-import { PDFParse } from "pdf-parse";
+import pdfParse from "pdf-parse";
 
 export type NormalizedAttachedFile = {
   name: string;
@@ -39,13 +39,21 @@ export async function normalizeAttachedFile(f: {
   name: string;
   type: string;
   data: string;
-  isImage?: boolean;
 }): Promise<NormalizedAttachedFile> {
   const name = f.name || "attachment";
-  const mime = f.type || "";
+  const mime = (f.type || "").toLowerCase();
   const b64 = rawBase64(f.data);
 
-  if (mime.startsWith("image/") || f.isImage) {
+  if (!b64) {
+    return {
+      name,
+      content: "(Empty file attachment)",
+      contentType: detectContentType(mime, name),
+      pages: 0,
+    };
+  }
+
+  if (mime.startsWith("image/")) {
     return {
       name,
       content:
@@ -58,17 +66,15 @@ export async function normalizeAttachedFile(f: {
   if (name.toLowerCase().endsWith(".pdf") || mime === "application/pdf") {
     try {
       const buffer = Buffer.from(b64, "base64");
-      const parser = new PDFParse({ data: buffer });
-      const result = await parser.getText();
-      await parser.destroy();
-      const text = result.text.trim();
+      const result = await pdfParse(buffer);
+      const text = (result?.text || "").trim();
       return {
         name,
         content:
           text ||
           "(No extractable text in this PDF — it may be scanned. Ask the user to paste text or use OCR.)",
         contentType: "pdf",
-        pages: result.total,
+        pages: result?.numpages ?? 0,
       };
     } catch (e) {
       return {

@@ -1369,7 +1369,7 @@ export default function ResumePage() {
                                   <div className="flex items-center gap-2 text-sm">
                                     <Youtube size={14} className="text-red-500" />
                                     <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
-                                      Job Recommendations & Mock Interviews
+                                      Job Scraper & Live Matching
                                     </a>
                                   </div>
                                   <div className="flex items-center gap-2 text-sm">

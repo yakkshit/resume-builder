@@ -1,25 +1,35 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Camera, Loader2, UserRound } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  Camera, 
+  Loader2, 
+  UserRound, 
+  Key, 
+  Github, 
+  Database, 
+  ShieldCheck, 
+  Check, 
+  Sparkles, 
+  Server,
+  RefreshCw,
+  ExternalLink
+} from "lucide-react";
 import { AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
 import { useToast } from "@/hooks/use-toast";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
 import { ProfilePhotoCropDialog } from "@/components/chat/profile-photo-crop-dialog";
 import { EMAIL_PROVIDER_LABELS, normalizeDefaultEmailProvider, type EmailProviderId } from "@/lib/email-compose-urls";
-import {
-  isOpenAiCompatibleChatModel,
-  isHuggingFaceCustomHubModel,
-  needsHuggingFaceCustomModelField,
-} from "@/lib/chat-provider-settings";
 import { TRANSLATION_LANGUAGES } from "@/lib/translation";
+import { GitHubSyncService, type GitHubSyncConfig } from "@/lib/github/sync";
 
 export type UserProfile = {
   name: string;
@@ -29,14 +39,21 @@ export type UserProfile = {
   linkedin: string;
   website: string;
   github: string;
-  /** data URL or https — used on resume / PDF when global profile context is on */
   profilePicture?: string;
-  /** Preferred provider when opening “Email HR” compose links */
   defaultEmailProvider: string;
-  /** Comma-separated or free-text target roles for RAG-style context */
   targetRoles: string;
-  /** Long-form career goals, constraints, preferences (chunked into knowledge store) */
   careerNotes: string;
+  // Complete Master Career Vault (RAG Profile)
+  masterSkills?: string;
+  masterExperience?: string;
+  masterProjects?: string;
+  masterEducation?: string;
+  masterCertifications?: string;
+  ragKnowledgeBase?: string;
+  // GitHub zero-knowledge settings
+  githubToken?: string;
+  githubRepo?: string;
+  autoSyncGithub?: boolean;
 };
 
 export const PROFILE_STORE_ID = "ai-chat-profile";
@@ -53,41 +70,41 @@ const EMPTY_PROFILE: UserProfile = {
   defaultEmailProvider: "gmail",
   targetRoles: "",
   careerNotes: "",
+  masterSkills: "",
+  masterExperience: "",
+  masterProjects: "",
+  masterEducation: "",
+  masterCertifications: "",
+  ragKnowledgeBase: "",
+  githubToken: "",
+  githubRepo: "career-agent-backup",
+  autoSyncGithub: false,
 };
 
-function safeStoredProfilePicture(v: unknown): string {
-  if (typeof v !== "string") return "";
-  const s = v.trim();
-  if (!s) return "";
-  if (s.startsWith("data:image/") || s.startsWith("https://") || s.startsWith("http://")) return s;
-  return "";
+export interface ProviderKeys {
+  openai?: string;
+  anthropic?: string;
+  google?: string;
+  deepseek?: string;
+  groq?: string;
+  openrouter?: string;
+  ollamaEndpoint?: string;
 }
 
-/** Keep resume builder localStorage in sync so PDF preview matches the global profile photo */
-function syncResumeProfilePicture(picture: string | undefined) {
+const AI_PROVIDER_CONFIG_STORAGE_ID = "ai-provider-configs";
+
+function loadProviderKeys(): ProviderKeys {
+  if (typeof window === "undefined") return {};
   try {
-    const raw = tryLocalStorageGet("resumeData");
-    let base: Record<string, unknown> = {};
-    if (raw) {
-      try {
-        base = JSON.parse(raw) as Record<string, unknown>;
-      } catch {
-        base = {};
-      }
-    }
-    const prev =
-      base.basicInfo && typeof base.basicInfo === "object" && !Array.isArray(base.basicInfo)
-        ? (base.basicInfo as Record<string, unknown>)
-        : {};
-    base.basicInfo = { ...prev };
-    const pic = safeStoredProfilePicture(picture ?? "");
-    if (pic) (base.basicInfo as Record<string, unknown>).profilePicture = pic;
-    else delete (base.basicInfo as Record<string, unknown>).profilePicture;
-    tryLocalStorageSet("resumeData", JSON.stringify(base));
-    window.dispatchEvent(new CustomEvent("resume-storage-updated"));
+    const raw = tryLocalStorageGet(AI_PROVIDER_CONFIG_STORAGE_ID);
+    return raw ? JSON.parse(raw) : {};
   } catch {
-    // quota / private mode
+    return {};
   }
+}
+
+function saveProviderKeys(keys: ProviderKeys) {
+  tryLocalStorageSet(AI_PROVIDER_CONFIG_STORAGE_ID, JSON.stringify(keys));
 }
 
 function loadProfile(): UserProfile {
@@ -97,20 +114,26 @@ function loadProfile(): UserProfile {
     if (!raw) return { ...EMPTY_PROFILE };
     const p = JSON.parse(raw) as Partial<UserProfile>;
     return {
-      name: typeof p.name === "string" ? p.name : "",
-      email: typeof p.email === "string" ? p.email : "",
-      phone: typeof p.phone === "string" ? p.phone : "",
-      location: typeof p.location === "string" ? p.location : "",
-      linkedin: typeof p.linkedin === "string" ? p.linkedin : "",
-      website: typeof p.website === "string" ? p.website : "",
-      github: typeof p.github === "string" ? p.github : "",
-      profilePicture: safeStoredProfilePicture(p.profilePicture),
-      defaultEmailProvider:
-        typeof p.defaultEmailProvider === "string" && p.defaultEmailProvider.trim()
-          ? p.defaultEmailProvider.trim()
-          : "gmail",
-      targetRoles: typeof p.targetRoles === "string" ? p.targetRoles : "",
-      careerNotes: typeof p.careerNotes === "string" ? p.careerNotes : "",
+      name: p.name || "",
+      email: p.email || "",
+      phone: p.phone || "",
+      location: p.location || "",
+      linkedin: p.linkedin || "",
+      website: p.website || "",
+      github: p.github || "",
+      profilePicture: p.profilePicture || "",
+      defaultEmailProvider: p.defaultEmailProvider || "gmail",
+      targetRoles: p.targetRoles || "",
+      careerNotes: p.careerNotes || "",
+      masterSkills: p.masterSkills || "",
+      masterExperience: p.masterExperience || "",
+      masterProjects: p.masterProjects || "",
+      masterEducation: p.masterEducation || "",
+      masterCertifications: p.masterCertifications || "",
+      ragKnowledgeBase: p.ragKnowledgeBase || "",
+      githubToken: p.githubToken || "",
+      githubRepo: p.githubRepo || "career-agent-backup",
+      autoSyncGithub: Boolean(p.autoSyncGithub),
     };
   } catch {
     return { ...EMPTY_PROFILE };
@@ -138,16 +161,41 @@ export function ProfileSettingsDialog({
   settings: ChatSettings;
   onSettingsChange: (patch: Partial<ChatSettings>) => void;
 }) {
+  const [activeTab, setActiveTab] = useState("profile");
   const [profile, setProfile] = useState<UserProfile>({ ...EMPTY_PROFILE });
+  const [keys, setKeys] = useState<ProviderKeys>({});
   const [saving, setSaving] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
+  const [githubTesting, setGithubTesting] = useState(false);
+  const [githubStatus, setGithubStatus] = useState<{ success?: boolean; message?: string } | null>(null);
+  const [dbStatus, setDbStatus] = useState<string>("Checking...");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     if (!open) return;
     setProfile(loadProfile());
+    setKeys(loadProviderKeys());
+
+    // Fetch cloud profile if logged in
+    fetch("/api/user/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.isAuthenticated && data.user) {
+          setDbStatus("Connected (PostgreSQL / Xata)");
+          setProfile((prev) => ({
+            ...prev,
+            name: data.user.name || prev.name,
+            email: data.user.email || prev.email,
+            githubUsername: data.user.githubUsername || prev.github,
+            githubRepo: data.user.githubRepo || prev.githubRepo,
+          }));
+        } else {
+          setDbStatus("Local Mode (Anonymous)");
+        }
+      })
+      .catch(() => setDbStatus("Local Mode"));
   }, [open]);
 
   const modelsByProvider = useMemo(() => {
@@ -158,393 +206,441 @@ export function ProfileSettingsDialog({
     }, {});
   }, []);
 
-  const handleSave = () => {
+  const handleSaveAll = async () => {
     setSaving(true);
-    const ok = saveProfile(profile);
-    if (!ok) {
-      setSaving(false);
-      toast({
-        variant: "destructive",
-        title: "Could not save profile",
-        description: "Your browser storage may be full. Try removing the profile photo or clearing site data.",
+    saveProfile(profile);
+    saveProviderKeys(keys);
+
+    // Sync with PostgreSQL backend if authenticated
+    try {
+      await fetch("/api/user/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: profile.name,
+          avatarUrl: profile.profilePicture,
+          githubUsername: profile.github,
+          githubRepo: profile.githubRepo,
+          githubToken: profile.githubToken,
+          bio: profile.careerNotes,
+        }),
       });
-      return;
+
+      // Save custom API keys to DB
+      for (const [provider, keyVal] of Object.entries(keys)) {
+        if (keyVal) {
+          await fetch("/api/user/keys", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              provider,
+              apiKey: keyVal,
+              modelName: provider === "ollama" ? "local" : "default",
+            }),
+          });
+        }
+      }
+    } catch {
+      // Local fallback
     }
-    syncResumeProfilePicture(profile.profilePicture);
+
     onSettingsChange({
       model: settings.model,
       contextWindow: settings.contextWindow,
-      openAiCompatBaseUrl: settings.openAiCompatBaseUrl,
-      openAiCompatModel: settings.openAiCompatModel,
-      huggingFaceCustomModel: settings.huggingFaceCustomModel,
+      defaultLanguage: settings.defaultLanguage,
     });
+
     toast({
-      title: "Profile saved",
-      description: "Global profile, photo on your resume, RAG context, and chat settings are updated.",
+      title: "Settings Saved",
+      description: "Profile, API keys, and cloud configurations updated successfully.",
     });
-    toast({
-      title: "AI context refreshed",
-      description: "Your updated profile will be used in upcoming AI responses.",
-    });
+
     setSaving(false);
     onOpenChange(false);
+  };
+
+  const handleTestGithub = async () => {
+    if (!profile.githubToken || !profile.github || !profile.githubRepo) {
+      setGithubStatus({ success: false, message: "Enter GitHub username, repository, and Personal Access Token." });
+      return;
+    }
+    setGithubTesting(true);
+    setGithubStatus(null);
+    const res = await GitHubSyncService.testConnection({
+      token: profile.githubToken,
+      owner: profile.github,
+      repo: profile.githubRepo,
+    });
+    setGithubTesting(false);
+    setGithubStatus(res);
   };
 
   const onPickPhoto: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !file.type.startsWith("image/")) {
-      toast({
-        variant: "destructive",
-        title: "Invalid file",
-        description: "Please choose an image file (JPEG, PNG, or WebP).",
-      });
+      toast({ variant: "destructive", title: "Invalid image", description: "Choose a JPEG, PNG, or WebP image." });
       return;
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const url = typeof reader.result === "string" ? reader.result : "";
-      if (!url) return;
-      setImageToCrop(url);
-      setCropOpen(true);
-    };
-    reader.onerror = () => {
-      toast({ variant: "destructive", title: "Could not read image", description: "Try another file." });
+      if (typeof reader.result === "string") {
+        setImageToCrop(reader.result);
+        setCropOpen(true);
+      }
     };
     reader.readAsDataURL(file);
   };
 
   const onCropDone = (dataUrl: string) => {
-    const prevPic = profile.profilePicture;
-    const next = { ...profile, profilePicture: dataUrl };
-    setProfile(next);
-    const ok = saveProfile(next);
-    if (!ok) {
-      toast({
-        variant: "destructive",
-        title: "Could not save photo",
-        description: "Storage may be full. Try a smaller image or clear site data.",
-      });
-      setProfile((p) => ({ ...p, profilePicture: prevPic }));
-      return;
-    }
-    syncResumeProfilePicture(dataUrl);
+    setProfile((prev) => ({ ...prev, profilePicture: dataUrl }));
     setImageToCrop(null);
-    toast({
-      title: "Photo saved",
-      description: "Cropped image is stored in your profile and synced to your resume.",
-    });
-  };
-
-  const clearPhoto = () => {
-    const next = { ...profile, profilePicture: "" };
-    setProfile(next);
-    const ok = saveProfile(next);
-    if (!ok) {
-      toast({ variant: "destructive", title: "Could not update profile", description: "Try again in a moment." });
-      return;
-    }
-    syncResumeProfilePicture(undefined);
-    toast({ title: "Photo removed", description: "Profile photo cleared from your resume and saved settings." });
+    toast({ title: "Photo Updated", description: "Profile photo saved." });
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl max-h-[85dvh] overflow-y-auto rounded-2xl border-border/60 bg-background/95 backdrop-blur-xl">
-        <DialogHeader>
-          <DialogTitle className="text-base">Profile & Settings</DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[88dvh] overflow-y-auto rounded-2xl border-border/70 bg-background/95 backdrop-blur-xl p-6">
+        <DialogHeader className="space-y-1">
+          <div className="flex items-center gap-2 text-primary font-semibold text-xs tracking-wider uppercase">
+            <Sparkles className="h-4 w-4" />
+            <span>Workspace Control Center</span>
+          </div>
+          <DialogTitle className="text-xl font-bold">Profile & Model Settings</DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
+            Manage your personal profile, custom AI provider API keys, GitHub backup sync, and database storage.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 pb-1">
-          <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Changes here sync to your global profile, resume identity fields, and AI context memory for better responses.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3 sm:flex-row sm:items-center">
-            <div className="flex items-center gap-3">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border/80 bg-background">
-                {profile.profilePicture ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={profile.profilePicture} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <UserRound className="h-8 w-8 text-muted-foreground" aria-hidden />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="pt-2">
+          <TabsList className="grid grid-cols-4 w-full h-9">
+            <TabsTrigger value="profile" className="text-xs gap-1">
+              <UserRound className="h-3.5 w-3.5" />
+              <span>Profile</span>
+            </TabsTrigger>
+            <TabsTrigger value="memory" className="text-xs gap-1 font-semibold text-primary">
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>Memory Vault</span>
+            </TabsTrigger>
+            <TabsTrigger value="keys" className="text-xs gap-1">
+              <Key className="h-3.5 w-3.5" />
+              <span>API Keys</span>
+            </TabsTrigger>
+            <TabsTrigger value="github" className="text-xs gap-1">
+              <Github className="h-3.5 w-3.5" />
+              <span>GitHub</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* TAB 1: PROFILE */}
+          <TabsContent value="profile" className="space-y-4 pt-3">
+            <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-muted/20 p-3 sm:flex-row sm:items-center">
+              <div className="flex items-center gap-3">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-background">
+                  {profile.profilePicture ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={profile.profilePicture} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <UserRound className="h-7 w-7 text-muted-foreground" />
+                  )}
+                </div>
+                <div>
+                  <Label className="text-xs font-semibold">Profile Photo</Label>
+                  <p className="text-[11px] text-muted-foreground">Used on your resumes, PDF exports, and career profile.</p>
+                </div>
+              </div>
+              <div className="flex gap-2 sm:ml-auto">
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={onPickPhoto} />
+                <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => fileInputRef.current?.click()}>
+                  <Camera className="h-3.5 w-3.5" /> Upload & Crop
+                </Button>
+                {profile.profilePicture && (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive" onClick={() => setProfile((p) => ({ ...p, profilePicture: "" }))}>
+                    Remove
+                  </Button>
                 )}
               </div>
-              <div className="min-w-0 space-y-0.5">
-                <Label className="text-xs font-medium">Profile photo</Label>
-                <p className="text-[10px] text-muted-foreground leading-snug">
-                  Crop a square headshot. The same image appears on your resume and PDF exports when profile context is on.
-                </p>
+            </div>
+
+            <ProfilePhotoCropDialog
+              open={cropOpen}
+              onOpenChange={(v) => {
+                setCropOpen(v);
+                if (!v) setImageToCrop(null);
+              }}
+              imageSrc={imageToCrop}
+              onCropComplete={onCropDone}
+            />
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Full Name</Label>
+                <Input value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))} placeholder="Alex Morgan" className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Email Address</Label>
+                <Input value={profile.email} onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))} placeholder="alex@example.com" className="h-9 text-xs" />
               </div>
             </div>
-            <div className="flex flex-wrap gap-2 sm:ml-auto sm:justify-end">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                onChange={onPickPhoto}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Phone</Label>
+                <Input value={profile.phone} onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))} placeholder="+1 (555) 019-2834" className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Location</Label>
+                <Input value={profile.location} onChange={(e) => setProfile((p) => ({ ...p, location: e.target.value }))} placeholder="San Francisco, CA / Remote" className="h-9 text-xs" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">LinkedIn Profile</Label>
+                <Input value={profile.linkedin} onChange={(e) => setProfile((p) => ({ ...p, linkedin: e.target.value }))} placeholder="linkedin.com/in/alexmorgan" className="h-9 text-xs" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">GitHub Username</Label>
+                <Input value={profile.github} onChange={(e) => setProfile((p) => ({ ...p, github: e.target.value }))} placeholder="alexmorgan" className="h-9 text-xs" />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Target Roles (for AI tailoring & ATS matching)</Label>
+              <Input value={profile.targetRoles} onChange={(e) => setProfile((p) => ({ ...p, targetRoles: e.target.value }))} placeholder="e.g. Senior Software Engineer, Full Stack Tech Lead" className="h-9 text-xs" />
+            </div>
+          </TabsContent>
+
+          {/* TAB 2: MASTER MEMORY VAULT (PLAIN MARKDOWN) */}
+          <TabsContent value="memory" className="space-y-3 pt-3">
+            <div className="p-3 rounded-xl border border-primary/30 bg-primary/5 text-xs text-muted-foreground leading-relaxed">
+              <div className="font-semibold text-primary flex items-center justify-between gap-1.5 mb-1">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Memory Vault (Markdown)</span>
+                </div>
+                <span className="text-[10px] font-mono text-muted-foreground bg-primary/10 px-2 py-0.5 rounded-md border border-primary/20">
+                  {(profile.ragKnowledgeBase || "").length} chars
+                </span>
+              </div>
+              Add your career goals, notes, full job history, projects, metrics, skills, or attached document excerpts here in Markdown. The AI assistant grounds on this Memory Vault for all resume, cover letter, and chat responses.
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Master Memory Vault Markdown</Label>
+                {!profile.ragKnowledgeBase && (
+                  <button
+                    type="button"
+                    onClick={() => setProfile((p) => ({
+                      ...p,
+                      ragKnowledgeBase: `# Master Career Memory Vault\n\n## Career Goals & Target Roles\n- Target: Senior / Staff Software Engineer, AI Engineer\n- Focus: Agentic AI systems, scalable full-stack applications, robotics\n\n## Summary\nSenior Software Engineer with 6+ years building scalable distributed systems, modern web apps, and AI applications.\n\n## Core Skills\n- Languages: TypeScript, JavaScript, Python, Go, SQL\n- Frontend: React, Next.js, Tailwind CSS\n- Backend & Cloud: Node.js, Express, FastAPI, PostgreSQL, Redis, Docker, AWS, CI/CD\n\n## Work History\n### Senior Full Stack Engineer — TechCorp (2022 – Present)\n- Architected high-throughput microservices handling $20M+ monthly transaction volume.\n- Reduced API latency by 45% through Redis caching and PostgreSQL query optimization.\n- Mentored 5 junior engineers and led migration to Next.js App Router.\n\n### Software Engineer — BetaApp (2020 – 2022)\n- Developed core real-time analytics dashboard with 100k+ active users.\n- Built automated CI/CD deployment pipelines on GitHub Actions.\n\n## Key Projects\n- AI Career Assistant: Full stack career application with real-time model streaming, ATS analyzer, and LaTeX generator.\n\n## Education & Certifications\n- B.S. in Computer Science — State University (2016 – 2020)\n- AWS Certified Solutions Architect Associate (2023)\n`
+                    }))}
+                    className="text-[11px] text-primary hover:underline font-medium"
+                  >
+                    + Load Markdown Template
+                  </button>
+                )}
+              </div>
+              <Textarea
+                value={profile.ragKnowledgeBase || ""}
+                onChange={(e) => setProfile((p) => ({ ...p, ragKnowledgeBase: e.target.value }))}
+                placeholder="# Master Career Memory Vault&#10;&#10;## Career Goals & Notes&#10;- Target: Senior Software Engineer...&#10;&#10;## Skills&#10;- TypeScript, Python, React, Next.js, Node.js, AWS, PostgreSQL...&#10;&#10;## Work Experience&#10;### Senior Software Engineer — Company A (2022-Present)&#10;- Led backend redesign reducing latency by 40%...&#10;&#10;## Projects & Education&#10;- B.S. Computer Science, AWS Certified..."
+                className="min-h-[280px] max-h-[380px] text-xs font-mono leading-relaxed"
               />
+            </div>
+          </TabsContent>
+
+          {/* TAB 3: API KEYS */}
+          <TabsContent value="keys" className="space-y-3 pt-3">
+            <div className="p-3 rounded-xl border border-primary/20 bg-primary/5 text-xs text-muted-foreground">
+              Add your custom API keys to unlock higher rate limits, custom quotas, or private Ollama instances. Keys are stored encrypted in your database profile or local browser storage.
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>Google Gemini API Key</span>
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.google || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, google: e.target.value }))}
+                  placeholder="AIzaSy..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>OpenAI API Key</span>
+                  <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.openai || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, openai: e.target.value }))}
+                  placeholder="sk-proj-..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>Anthropic API Key</span>
+                  <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.anthropic || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, anthropic: e.target.value }))}
+                  placeholder="sk-ant-..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>Groq API Key</span>
+                  <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.groq || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, groq: e.target.value }))}
+                  placeholder="gsk_..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>DeepSeek API Key</span>
+                  <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.deepseek || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, deepseek: e.target.value }))}
+                  placeholder="sk-..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>Ollama Local URL</span>
+                  <span className="text-[10px] text-muted-foreground">Default: http://localhost:11434</span>
+                </Label>
+                <Input
+                  value={keys.ollamaEndpoint || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, ollamaEndpoint: e.target.value }))}
+                  placeholder="http://localhost:11434"
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* TAB 4: GITHUB SYNC */}
+          <TabsContent value="github" className="space-y-3 pt-3">
+            <div className="p-3 rounded-xl border border-border/60 bg-muted/30 text-xs text-muted-foreground leading-relaxed">
+              <strong>Zero-Knowledge GitHub Backup</strong> commits your resumes, PDF versions, and chat logs directly to your private GitHub repository for 100% free and private storage.
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs">GitHub Username</Label>
+                <Input
+                  value={profile.github}
+                  onChange={(e) => setProfile((p) => ({ ...p, github: e.target.value }))}
+                  placeholder="e.g. octocat"
+                  className="h-9 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Backup Repository Name</Label>
+                <Input
+                  value={profile.githubRepo}
+                  onChange={(e) => setProfile((p) => ({ ...p, githubRepo: e.target.value }))}
+                  placeholder="career-agent-backup"
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs flex items-center justify-between">
+                <span>GitHub Personal Access Token (Classic / Fine-Grained)</span>
+                <a
+                  href="https://github.com/settings/tokens/new?scopes=repo&description=CareerAgent+Backup"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
+                >
+                  Create Token (repo scope) <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              </Label>
+              <Input
+                type="password"
+                value={profile.githubToken || ""}
+                onChange={(e) => setProfile((p) => ({ ...p, githubToken: e.target.value }))}
+                placeholder="ghp_..."
+                className="h-9 text-xs font-mono"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="rounded-xl gap-1.5"
-                onClick={() => fileInputRef.current?.click()}
+                className="text-xs h-8 gap-1.5"
+                onClick={handleTestGithub}
+                disabled={githubTesting}
               >
-                <Camera className="h-3.5 w-3.5" />
-                Upload & crop
+                {githubTesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                <span>Test Connection</span>
               </Button>
-              {profile.profilePicture ? (
-                <Button type="button" variant="ghost" size="sm" className="rounded-xl text-destructive" onClick={clearPhoto}>
-                  Remove
-                </Button>
-              ) : null}
-            </div>
-          </div>
 
-          <ProfilePhotoCropDialog
-            open={cropOpen}
-            onOpenChange={(v) => {
-              setCropOpen(v);
-              if (!v) setImageToCrop(null);
-            }}
-            imageSrc={imageToCrop}
-            onCropComplete={onCropDone}
-          />
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-xs">Name</Label>
-              <Input value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Email</Label>
-              <Input value={profile.email} onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))} />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Default email provider (HR compose)</Label>
-            <Select
-              value={normalizeDefaultEmailProvider(profile.defaultEmailProvider)}
-              onValueChange={(v) => setProfile((p) => ({ ...p, defaultEmailProvider: v }))}
-            >
-              <SelectTrigger className="h-10 rounded-xl">
-                <SelectValue placeholder="Provider" />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(EMAIL_PROVIDER_LABELS) as EmailProviderId[]).map((id) => (
-                  <SelectItem key={id} value={id} className="text-xs">
-                    {EMAIL_PROVIDER_LABELS[id]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[10px] text-muted-foreground">
-              Used when you open “Email HR” drafts. Native desktop mail integration is planned separately.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-xs">Phone</Label>
-              <Input value={profile.phone} onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))} />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Location</Label>
-              <Input
-                value={profile.location}
-                onChange={(e) => setProfile((p) => ({ ...p, location: e.target.value }))}
-                placeholder="e.g., Remote / Bengaluru / NYC"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-xs">LinkedIn</Label>
-              <Input
-                value={profile.linkedin}
-                onChange={(e) => setProfile((p) => ({ ...p, linkedin: e.target.value }))}
-                placeholder="linkedin.com/in/username"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Website</Label>
-              <Input
-                value={profile.website}
-                onChange={(e) => setProfile((p) => ({ ...p, website: e.target.value }))}
-                placeholder="yourwebsite.com"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label className="text-xs">GitHub</Label>
-              <Input
-                value={profile.github}
-                onChange={(e) => setProfile((p) => ({ ...p, github: e.target.value }))}
-                placeholder="github.com/username"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Target roles (for AI context)</Label>
-              <Input
-                value={profile.targetRoles}
-                onChange={(e) => setProfile((p) => ({ ...p, targetRoles: e.target.value }))}
-                placeholder="e.g. Embedded SWE, ML Engineer, Staff Backend"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Career notes & preferences</Label>
-            <Textarea
-              value={profile.careerNotes}
-              onChange={(e) => setProfile((p) => ({ ...p, careerNotes: e.target.value }))}
-              placeholder="Relocation, visa, salary band, industries you want — used as retrieved memory in chat."
-              className="min-h-[88px] rounded-xl"
-            />
-          </div>
-
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-border/60 px-3 py-2.5">
-            <div className="space-y-0.5">
-              <Label className="text-xs font-medium">Auto-merge assistant resume</Label>
-              <p className="text-[10px] text-muted-foreground leading-snug">
-                When the assistant sends a CV block, merge it into your saved resume automatically.
-              </p>
-            </div>
-            <Switch
-              checked={settings.autoMergeAssistantResume !== false}
-              onCheckedChange={(v) => onSettingsChange({ autoMergeAssistantResume: v })}
-              aria-label="Toggle auto-merge resume from assistant"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Default model</Label>
-            <Select value={settings.model} onValueChange={(v) => onSettingsChange({ model: v })}>
-              <SelectTrigger className="h-10 rounded-xl">
-                <SelectValue placeholder="Select a model" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[280px]">
-                {Object.entries(modelsByProvider).map(([provider, models]) => (
-                  <React.Fragment key={provider}>
-                    <div className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      {provider}
-                    </div>
-                    {models.map((m) => (
-                      <SelectItem key={m.value} value={m.value} className="text-xs pl-6">
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Default language (AI responses)</Label>
-            <Select value={settings.defaultLanguage || "en"} onValueChange={(v) => onSettingsChange({ defaultLanguage: v })}>
-              <SelectTrigger className="h-10 rounded-xl">
-                <SelectValue placeholder="Select language" />
-              </SelectTrigger>
-              <SelectContent className="max-h-[280px]">
-                {TRANSLATION_LANGUAGES.map((lang) => (
-                  <SelectItem key={lang.code} value={lang.code} className="text-xs">
-                    {lang.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[10px] text-muted-foreground">
-              The model is steered to answer in this language by default. Resume and tool cards translate in the browser with WASM (Bergamot); first use may download language models briefly.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-xs">Context (used as RAG/profile prompt)</Label>
-            <Textarea
-              value={settings.contextWindow}
-              onChange={(e) => onSettingsChange({ contextWindow: e.target.value })}
-              placeholder="Your profile context: skills, goals, target roles, constraints…"
-              className="min-h-[110px] rounded-xl"
-            />
-          </div>
-
-          {isOpenAiCompatibleChatModel(settings.model) ? (
-            <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-3">
-              <Label className="text-xs font-medium">OpenAI-compatible API</Label>
-              <p className="text-[10px] text-muted-foreground leading-snug">
-                Shown because <span className="font-medium text-foreground">OpenAI-compatible</span> is your selected model. Same values as the chat composer side panel (
-                <a
-                  className="underline underline-offset-2 hover:text-foreground"
-                  href="https://ai-sdk.dev/providers/openai-compatible-providers"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  docs
-                </a>
-                ).
-              </p>
-              <Input
-                value={settings.openAiCompatBaseUrl}
-                onChange={(e) => onSettingsChange({ openAiCompatBaseUrl: e.target.value })}
-                placeholder="https://api.example.com/v1"
-                className="h-10 rounded-xl"
-                autoComplete="off"
-              />
-              <Input
-                value={settings.openAiCompatModel}
-                onChange={(e) => onSettingsChange({ openAiCompatModel: e.target.value })}
-                placeholder="Model id, e.g. gpt-4o-mini"
-                className="h-10 rounded-xl"
-                autoComplete="off"
-              />
-            </div>
-          ) : null}
-
-          {needsHuggingFaceCustomModelField(settings.model) ? (
-            <div className="space-y-2 rounded-xl border border-border/50 bg-muted/20 px-3 py-3">
-              <Label className="text-xs font-medium">
-                {isHuggingFaceCustomHubModel(settings.model)
-                  ? "Hugging Face Hub model id (required)"
-                  : "Hugging Face Hub model (optional override)"}
-              </Label>
-              <p className="text-[10px] text-muted-foreground leading-snug">
-                {isHuggingFaceCustomHubModel(settings.model)
-                  ? "For “HF custom (Hub id)” you must enter the full Hub id. Same field as the Hub side panel in chat."
-                  : "Leave empty to use the model you selected in the list. When set, this Hub id is sent to the API instead."}
-              </p>
-              <Input
-                value={settings.huggingFaceCustomModel}
-                onChange={(e) => onSettingsChange({ huggingFaceCustomModel: e.target.value })}
-                placeholder="e.g. meta-llama/Llama-3.1-8B-Instruct"
-                className="h-10 rounded-xl font-mono text-xs"
-                autoComplete="off"
-              />
-            </div>
-          ) : null}
-
-          <div className="flex gap-2 pt-1">
-            <Button type="button" variant="outline" className="flex-1" onClick={() => onOpenChange(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button type="button" className="flex-1" onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Saving...
+              {githubStatus && (
+                <span className={`text-xs font-medium flex items-center gap-1 ${githubStatus.success ? "text-emerald-500" : "text-destructive"}`}>
+                  {githubStatus.success ? <Check className="h-3.5 w-3.5" /> : null}
+                  {githubStatus.message}
                 </span>
-              ) : (
-                "Save"
               )}
-            </Button>
-          </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        <div className="flex gap-2 pt-4 border-t border-border/60">
+          <Button type="button" variant="outline" className="flex-1 text-xs h-9" onClick={() => onOpenChange(false)} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="button" className="flex-1 text-xs h-9 font-semibold" onClick={handleSaveAll} disabled={saving}>
+            {saving ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Loader2 className="h-4 w-4 animate-spin" /> Saving Changes...
+              </span>
+            ) : (
+              "Save & Apply"
+            )}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -554,4 +650,3 @@ export function ProfileSettingsDialog({
 export function getStoredProfile(): UserProfile {
   return loadProfile();
 }
-

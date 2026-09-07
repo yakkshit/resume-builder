@@ -15,7 +15,7 @@ export type ChatOnboardingStep = {
   body: string;
   icon: typeof Sparkles;
   /** Highlight target; optional sidebar action */
-  tour?: "menu" | "composer" | "model-select" | "profile-toggle" | "quick-prompts" | "interview-lab" | "video";
+  tour?: "menu" | "composer" | "model-select" | "profile-toggle" | "quick-prompts" | "mcp-tools" | "video";
   openSidebar?: boolean;
 };
 
@@ -29,45 +29,38 @@ const DEFAULT_STEPS: ChatOnboardingStep[] = [
   },
   {
     title: "Sidebar, profile & settings",
-    body: "Menu (top-left): chat history, export/import, and Profile & Settings. There you edit your name, contact info, career notes, default model, and extra context for the AI. API keys are not stored in profile—use the model menu for that (next step).",
+    body: "Menu (top-left): chat history, export/import, and Profile & Settings. There you edit your name, contact info, Master RAG Career Vault, and custom AI provider API keys.",
     icon: PanelLeft,
     tour: "menu",
     openSidebar: true,
   },
   {
     title: "Pick a model",
-    body: "Tap the provider logo next to the input to search and choose a model. If you use OpenAI-compatible or Hugging Face (AI SDK), open the matching row in that menu for base URL / Hub id (same values also appear in Profile & Settings).",
+    body: "Tap the model icon next to the composer to quickly switch between Gemini, GPT-4o, Claude, DeepSeek, Groq, Mistral, and more.",
     icon: Zap,
     tour: "model-select",
     openSidebar: false,
   },
   {
-    title: "API key (this session only)",
-    body: "In the same model menu, open “API key (this session)”. Paste your key and Save. It stays in memory until you refresh—never written to profile storage. The dot on the logo is green when a key is set, red when you still need one.",
-    icon: Lock,
-    tour: "model-select",
-    openSidebar: false,
-  },
-  {
     title: "Global profile in prompts",
-    body: "The person icon toggles whether your saved profile (name, email, career notes, resume chunks) is included in what the model sees—separate from Profile & Settings. Use the paperclip to attach files.",
+    body: "The person icon toggles whether your Master Career RAG profile is automatically included in what the AI model sees. Use the paperclip to attach files.",
     icon: User,
     tour: "profile-toggle",
     openSidebar: false,
   },
   {
     title: "Composer",
-    body: "Type here. Enter sends; Shift+Enter adds a new line. The box grows while you type.",
+    body: "Type your career questions or resume requests here. Press Cmd+Enter (or Ctrl+Enter) to send, and Enter for a new line.",
     icon: BookOpen,
     tour: "composer",
     openSidebar: false,
   },
   {
-    title: "Interview Lab 🎬",
-    body: "Open Interview Lab (clapper icon) for AI interview rounds, code tests, and live coaching with screen + voice notes. If it says “requires Gemini”, switch your model to a Gemini option.",
+    title: "Job Scraper & MCP Tools 🛠️",
+    body: "Use the MCP & Integrations panel to search real-time job openings, scrape job requirements, and connect external MCP servers with custom tools.",
     icon: Clapperboard,
-    tour: "interview-lab",
-    openSidebar: false,
+    tour: "mcp-tools",
+    openSidebar: true,
   },
   {
     title: "Need more help?",
@@ -133,10 +126,6 @@ export function ChatOnboarding({
       const el = document.querySelector(`[data-chat-tour="${s.tour}"]`);
       el?.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
       el?.setAttribute("data-chat-tour-active", "true");
-      if (s.tour === "interview-lab") {
-        // Optional click to open the panel if the element is a button.
-        (el as HTMLElement | null)?.click?.();
-      }
     }
     return () => clearTourHighlights();
   }, [open, step, steps, setSidebarOpen]);

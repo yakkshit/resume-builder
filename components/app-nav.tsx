@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "@/components/auth/user-menu";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -99,6 +100,8 @@ export function AppNav() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+            <UserMenu />
+
             <Button
               asChild
               variant="outline"

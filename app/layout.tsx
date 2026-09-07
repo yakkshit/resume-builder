@@ -3,8 +3,8 @@ import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import { Toaster } from '@/components/ui/toaster'
 import { ThemeProvider } from '@/components/resume-coverletter/theme-provider'
-import { AppNav } from '@/components/app-nav'
-import CookieBanner from '@/components/cookie-banner'
+import { ClerkProvider } from '@clerk/nextjs'
+import { AuthProvider } from '@/lib/auth/auth-provider'
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://yakkshit.com'),
@@ -34,22 +34,39 @@ export const metadata: Metadata = {
   },
 }
 
+import { isClerkConfigured, getClerkPublishableKey } from '@/lib/auth/clerk-config'
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return (
+  const configured = isClerkConfigured();
+  const publishableKey = getClerkPublishableKey();
+
+  const htmlContent = (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {/* <AppNav /> */}
-          <main className="h-full w-full pt-2">{children}</main>
-          <Toaster />
-          {/* <CookieBanner /> */}
-          {process.env.NODE_ENV === 'production' ? <Analytics /> : null}
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+            {/* <AppNav /> */}
+            <main className="h-full w-full overflow-hidden">{children}</main>
+            <Toaster />
+            {/* <CookieBanner /> */}
+            {process.env.NODE_ENV === 'production' ? <Analytics /> : null}
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
-  )
+  );
+
+  if (configured) {
+    return (
+      <ClerkProvider publishableKey={publishableKey}>
+        {htmlContent}
+      </ClerkProvider>
+    );
+  }
+
+  return htmlContent;
 }

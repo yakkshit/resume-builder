@@ -54,7 +54,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
       try {
         const PDFTemplate = getResumeTemplate(template as string)
         const element = React.createElement(PDFTemplate, { resumeData: safeResumeData })
-        const pdfDoc = pdf(element)
+        const pdfDoc = (pdf as any)(element)
         const blob = await pdfDoc.toBlob()
 
         if (isCancelled) return
@@ -97,7 +97,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
       try {
         const PDFTemplate = getResumeTemplate(template as string)
         const element = React.createElement(PDFTemplate, { resumeData: safeResumeData })
-        blob = await pdf(element).toBlob()
+        blob = await (pdf as any)(element).toBlob()
       } catch (clientErr) {
         console.warn("Client-side PDF rendering failed, falling back to MCP server...", clientErr)
         const { mcpGenerateResumePdf } = await import("@/lib/mcp-client")

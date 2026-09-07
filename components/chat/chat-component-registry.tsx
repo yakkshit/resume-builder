@@ -34,7 +34,7 @@ import {
   Link2,
   CheckCircle2,
 } from "lucide-react";
-import { MockInterviewInteractive } from "./mock-interview-interactive";
+import { JobScraperCard } from "./components/job-scraper-card";
 import type { ResumeData, Template } from "@/lib/types";
 import { mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import ResumeEditor from "@/components/resume-coverletter/resume-editor";
@@ -55,6 +55,11 @@ const PdfPreviewClient = dynamic(
   { ssr: false }
 );
 
+const CoverLetterViewer = dynamic(
+  () => import("./components/cover-letter-viewer").then((m) => m.CoverLetterViewer),
+  { ssr: false }
+);
+
 export interface ComponentPropsMap {
   cv: {
     resumeData: ResumeData;
@@ -66,18 +71,23 @@ export interface ComponentPropsMap {
   jobLinks: { links: Array<{ title: string; url: string; company?: string }> };
   cvScorer: { score: number; feedback: string[]; jobDescription?: string };
   course: { title: string; provider: string; url?: string; skills: string[] };
-  mockInterview: {
-    /** Behavioral / STAR prompts (alias: `behavioralQuestions`) */
-    questions?: string[];
-    behavioralQuestions?: string[];
-    technicalQuestions?: string[];
-    systemDesignQuestions?: string[];
-    quizQuestions?: string[];
-    codingProblems?: string[];
-    role?: string;
+  jobScraper: {
+    query?: string;
+    location?: string;
+    jobs?: Array<{
+      id: string;
+      title: string;
+      company: string;
+      location: string;
+      salary?: string;
+      link: string;
+      description?: string;
+      postedMinutesAgo?: number;
+    }>;
   };
   hrNote: { subject: string; body: string; to?: string };
   jobApplySimulator: { steps: Array<{ action: string; status: "pending" | "done" | "current" | "failed"; details?: string }> };
+  memoryVault: { title?: string; content: string; source?: string };
 }
 
 export type ComponentType = keyof ComponentPropsMap;
@@ -185,62 +195,11 @@ function CvComponent({
   );
 }
 
-function CoverLetterComponent({ head, body, footer }: ComponentPropsMap["coverLetter"]) {
-  const [bodyOpen, setBodyOpen] = useState(true);
-  const fullLetter = [safeStr(head), safeStr(body), safeStr(footer)].filter(Boolean).join("\n\n");
-
+function CoverLetterComponent(props: ComponentPropsMap["coverLetter"]) {
   return (
-    <ChatArtifactWindow
-      variant="dark"
-      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
-      headerClassName={cn(CHAT_ARTIFACT_HEADER, "justify-between gap-2")}
-      contentClassName="p-0"
-      title={
-        <CardTitle className="text-sm flex items-center gap-2 text-white">
-          <Sparkles className="h-4 w-4 text-[#4da5fc]" />
-          Cover letter
-        </CardTitle>
-      }
-      trailing={
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="h-8 gap-1.5 shrink-0 border-white/10 bg-white/5 text-xs text-white hover:bg-white/10"
-          onClick={() => void copyToClipboard(fullLetter)}
-        >
-          <Copy className="h-3.5 w-3.5" />
-          Copy all
-        </Button>
-      }
-    >
-        <div className="space-y-0 px-4 py-3 text-[#e8e8ed]">
-          <p className="whitespace-pre-wrap text-sm font-medium leading-relaxed border-l-2 border-[#4da5fc]/50 pl-3">
-            {safeStr(head)}
-          </p>
-          <Collapsible open={bodyOpen} onOpenChange={setBodyOpen}>
-            <CollapsibleTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="mt-3 h-8 w-full justify-between px-2 text-[#a0a0a5] hover:bg-white/5 hover:text-white"
-              >
-                <span className="text-xs font-medium">Body</span>
-                <ChevronDown
-                  className={cn("h-4 w-4 transition-transform", bodyOpen && "rotate-180")}
-                />
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="whitespace-pre-wrap rounded-xl border border-white/5 bg-[#0f0f12]/80 p-3 text-sm leading-relaxed text-[#cfcfd3]">
-                {safeStr(body)}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-          <p className="whitespace-pre-wrap pt-3 text-sm text-[#8a8a8f]">{safeStr(footer)}</p>
-        </div>
-    </ChatArtifactWindow>
+    <div className="w-full">
+      <CoverLetterViewer data={props} persistToLocalStorage={true} />
+    </div>
   );
 }
 
@@ -498,32 +457,16 @@ function CourseComponent({ title, provider, url, skills }: ComponentPropsMap["co
   );
 }
 
-function MockInterviewComponent({
-  questions,
-  behavioralQuestions,
-  technicalQuestions,
-  systemDesignQuestions,
-  quizQuestions,
-  codingProblems,
-  role,
-}: ComponentPropsMap["mockInterview"]) {
-  const behavioral =
-    Array.isArray(behavioralQuestions) && behavioralQuestions.length > 0
-      ? behavioralQuestions
-      : Array.isArray(questions)
-        ? questions
-        : [];
-  const pList = Array.isArray(codingProblems) ? codingProblems : [];
+function JobScraperComponent({
+  query,
+  location,
+  jobs,
+}: ComponentPropsMap["jobScraper"]) {
   return (
-    <MockInterviewInteractive
-      questions={behavioral.map((q) => safeStr(q))}
-      technicalQuestions={(Array.isArray(technicalQuestions) ? technicalQuestions : []).map((q) => safeStr(q))}
-      systemDesignQuestions={(Array.isArray(systemDesignQuestions) ? systemDesignQuestions : []).map((q) =>
-        safeStr(q)
-      )}
-      quizQuestions={(Array.isArray(quizQuestions) ? quizQuestions : []).map((q) => safeStr(q))}
-      codingProblems={pList.map((p) => safeStr(p))}
-      role={role ? safeStr(role) : undefined}
+    <JobScraperCard
+      initialQuery={query}
+      initialLocation={location}
+      initialJobs={jobs}
     />
   );
 }
@@ -745,18 +688,95 @@ function JobApplySimulatorComponent({ steps }: ComponentPropsMap["jobApplySimula
   );
 }
 
-export const CHAT_COMPONENT_REGISTRY: Record<
-  ComponentType,
-  (props: ComponentPropsMap[ComponentType]) => React.ReactElement
-> = {
+function MemoryVaultComponent({
+  title = "Ingest Document / Excerpt",
+  content,
+  source,
+}: ComponentPropsMap["memoryVault"]) {
+  const [added, setAdded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleAdd = () => {
+    if (added || saving || !content) return;
+    setSaving(true);
+    try {
+      const { appendDocumentToMemoryVault } = require("@/lib/memory-vault");
+      const success = appendDocumentToMemoryVault(source || title || "Document Excerpt", content);
+      setSaving(false);
+      if (success) {
+        setAdded(true);
+      }
+    } catch {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <ChatArtifactWindow
+      variant="dark"
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+      headerClassName={cn(CHAT_ARTIFACT_HEADER, "justify-between gap-2")}
+      contentClassName="space-y-3 p-4 pt-0"
+      title={
+        <CardTitle className="text-sm flex items-center gap-2 text-white">
+          <Sparkles className="h-4 w-4 text-[#4da5fc]" />
+          <span>Memory Vault Ingestion</span>
+          {source && (
+            <Badge variant="outline" className="border-white/15 bg-white/5 text-[10px] text-[#a0a0a5]">
+              {source}
+            </Badge>
+          )}
+        </CardTitle>
+      }
+      trailing={
+        <Button
+          type="button"
+          size="sm"
+          disabled={added || saving || !content}
+          className={cn(
+            "h-8 text-xs font-semibold gap-1.5 transition-all shadow-md",
+            added
+              ? "bg-emerald-600 hover:bg-emerald-600 text-white"
+              : "bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-600 hover:to-cyan-600 text-white"
+          )}
+          onClick={handleAdd}
+        >
+          {added ? (
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>Added to Vault</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>{saving ? "Adding..." : "Yes, Add to Memory Vault"}</span>
+            </>
+          )}
+        </Button>
+      }
+    >
+      <div className="space-y-1.5">
+        <p className="text-xs font-semibold text-white/90">{title}</p>
+        <div className="max-h-[200px] overflow-y-auto rounded-xl border border-white/5 bg-[#0f0f12]/90 p-3 text-xs font-mono leading-relaxed text-[#b0b0b8] whitespace-pre-wrap">
+          {content}
+        </div>
+      </div>
+    </ChatArtifactWindow>
+  );
+}
+
+export const CHAT_COMPONENT_REGISTRY: {
+  [K in ComponentType]: (props: ComponentPropsMap[K]) => React.ReactElement;
+} = {
   cv: CvComponent as (p: ComponentPropsMap["cv"]) => React.ReactElement,
   coverLetter: CoverLetterComponent,
   jobLinks: JobLinksComponent,
   cvScorer: CvScorerComponent,
   course: CourseComponent,
-  mockInterview: MockInterviewComponent,
+  jobScraper: JobScraperComponent,
   hrNote: HRNoteComponent,
   jobApplySimulator: JobApplySimulatorComponent,
+  memoryVault: MemoryVaultComponent,
 };
 
 export interface CvComponentContext {
@@ -793,7 +813,7 @@ export function renderChatComponent(
           : {}),
       };
     }
-    const element = React.createElement(Component, mergedProps as ComponentPropsMap[ComponentType]);
+    const element = React.createElement(Component as React.ComponentType<any>, mergedProps as any);
     return React.isValidElement(element) ? element : null;
   } catch {
     return null;

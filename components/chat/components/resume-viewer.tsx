@@ -20,7 +20,7 @@ import ResumeEditor from "@/components/resume-coverletter/resume-editor";
 import { defaultResumeData } from "@/lib/default-resume-data";
 import type { ResumeData, Template } from "@/lib/types";
 import { resumeTemplates } from "@/components/pdf-templates";
-import { sanitizeResumeData } from "@/lib/sanitize-resume-data";
+import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
 import { deepMerge } from "@/lib/utils";
 import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume";

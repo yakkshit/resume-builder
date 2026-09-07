@@ -63,31 +63,31 @@ export const AVAILABLE_MODELS = [
   // Google Gemini
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", provider: "Google" },
   { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro", provider: "Google" },
-  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "Google" },
-  { value: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", provider: "Google" },
-  { value: "gemini-3-flash-preview", label: "Gemini 3 Flash", provider: "Google" },
   { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", provider: "Google" },
+  { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", provider: "Google" },
   // OpenAI
   { value: "gpt-4o", label: "GPT-4o", provider: "OpenAI" },
   { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "OpenAI" },
+  { value: "o3-mini", label: "o3 Mini", provider: "OpenAI" },
+  { value: "o1", label: "o1 Reasoning", provider: "OpenAI" },
   { value: "gpt-4-turbo", label: "GPT-4 Turbo", provider: "OpenAI" },
-  { value: "gpt-3.5-turbo", label: "GPT-3.5 Turbo", provider: "OpenAI" },
   // Anthropic
+  { value: "claude-3-7-sonnet", label: "Claude 3.7 Sonnet", provider: "Anthropic" },
   { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet", provider: "Anthropic" },
   { value: "claude-3-5-haiku", label: "Claude 3.5 Haiku", provider: "Anthropic" },
   // DeepSeek
-  { value: "deepseek-chat", label: "DeepSeek Chat", provider: "DeepSeek" },
+  { value: "deepseek-chat", label: "DeepSeek V3", provider: "DeepSeek" },
+  { value: "deepseek-reasoner", label: "DeepSeek R1", provider: "DeepSeek" },
   // Groq
+  { value: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", provider: "Groq" },
   { value: "llama-3.1-8b-instant", label: "Llama 3.1 8B", provider: "Groq" },
-  { value: "llama-3.1-70b-versatile", label: "Llama 3.1 70B", provider: "Groq" },
+  { value: "deepseek-r1-distill-llama-70b", label: "DeepSeek R1 (Groq)", provider: "Groq" },
   // Mistral
   { value: "mistral-large-latest", label: "Mistral Large", provider: "Mistral" },
   { value: "mistral-small-latest", label: "Mistral Small", provider: "Mistral" },
-  { value: "meta-llama/Llama-3.1-8B-Instruct", label: "Llama 3.1 8B", provider: "Hugging Face (AI SDK)" },
-  { value: "deepseek-ai/DeepSeek-V3-0324", label: "DeepSeek V3", provider: "Hugging Face (AI SDK)" },
-  { value: "Qwen/Qwen2.5-72B-Instruct", label: "Qwen2.5 72B", provider: "Hugging Face (AI SDK)" },
-  { value: "hf-custom-hub-aisdk", label: "HF custom (Hub id)", provider: "Hugging Face (AI SDK)" },
-  { value: "openai-compatible-aisdk", label: "OpenAI-compatible", provider: "OpenAI Compatible" },
+  // Local & Custom
+  { value: "ollama-local", label: "Ollama (Local)", provider: "Ollama" },
+  { value: "openai-compatible-aisdk", label: "OpenAI-Compatible / Custom", provider: "OpenAI Compatible" },
 ];
 
 const DEFAULT_SETTINGS: ChatSettings = {

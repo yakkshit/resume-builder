@@ -82,7 +82,14 @@ async function startWorkflow() {
         process.exit(1);
     }
 
-    // 2. Build
+    // 2. Drizzle Database Schema Sync & Generation
+    console.log("\n--- Syncing Drizzle Database Schema ---");
+    const dbPassed = await runCommand(`${runCmd} db:push`, "Drizzle Database Schema Sync (db:push)");
+    if (!dbPassed) {
+        console.log("\n⚠️ Drizzle Database sync encountered a warning or DATABASE_URL not reachable. Continuing build...");
+    }
+
+    // 3. Build
     const buildPassed = await runCommand(`${runCmd} build`, "Production Build");
     if (!buildPassed) {
         console.log("\n⚠️ Build failed. Stopping workflow.");

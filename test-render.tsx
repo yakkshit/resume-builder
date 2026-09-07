@@ -5,7 +5,7 @@ import { StandardCoverLetterPDFTemplate } from "./components/pdf-templates/cover
 async function test() {
   const coverLetterData = { head: "head\nline2", body: "body\nline2", footer: "footer\nline2" };
   try {
-    const stream = await renderToStream(React.createElement(StandardCoverLetterPDFTemplate, { coverLetterData }));
+    const stream = await (renderToStream as any)(React.createElement(StandardCoverLetterPDFTemplate, { coverLetterData }));
     console.log("Stream generated successfully");
   } catch (error) {
     console.error("Error with React.createElement:", error);
@@ -13,7 +13,7 @@ async function test() {
 
   try {
     const element = StandardCoverLetterPDFTemplate({ coverLetterData });
-    const stream = await renderToStream(element);
+    const stream = await (renderToStream as any)(element);
     console.log("Stream generated successfully with direct call");
   } catch (error) {
     console.error("Error with direct call:", error);

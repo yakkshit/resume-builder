@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { extractJobsFromSerpApiGoogleJobsResponse, filterJobsPostedWithinMinutes, type JobSuggestion } from "@/lib/job-scraper/google-jobs";
+import { searchLiveJobs } from "@/lib/job-scraper/live-scraper";
 
 type JobSearchBody = {
   query: string;
@@ -41,10 +42,10 @@ export async function POST(req: NextRequest) {
     return Response.json({ jobs: [], error: "Missing query" }, { status: 400 });
   }
 
-  const query = body.query;
-  const location = body.location;
-  const maxResults = body.maxResults ?? 30;
-  const maxPostedMinutes = body.maxPostedMinutes ?? 5;
+  const query = body.query.trim();
+  const location = (body.location || "Remote").trim();
+  const maxResults = body.maxResults ?? 20;
+  const maxPostedMinutes = body.maxPostedMinutes ?? 60;
 
   const apiKey =
     (typeof body.apiKey === "string" ? body.apiKey : "") ||
@@ -53,57 +54,49 @@ export async function POST(req: NextRequest) {
     "";
 
   if (!apiKey) {
-    // Development fallback: return a few deterministic suggestions.
-    const jobs: JobSuggestion[] = [
-      {
-        id: "fallback-1",
-        title: "Software Engineer",
-        company: "Example Inc",
-        location: location || "Remote",
-        link: "https://example.com/jobs/software-engineer",
-        postedMinutesAgo: 3,
-      },
-      {
-        id: "fallback-2",
-        title: "Frontend Developer",
-        company: "Sample Labs",
-        location: location || "Remote",
-        link: "https://example.com/jobs/frontend-developer",
-        postedMinutesAgo: 4,
-      },
-    ];
-    const filtered = filterJobsPostedWithinMinutes(jobs, maxPostedMinutes);
-    return Response.json({ jobs: filtered.length ? filtered : jobs, source: "fallback" });
+    // Live multi-source scraper (LinkedIn, Remotive, Arbeitnow)
+    const liveJobs = await searchLiveJobs(query, location, { maxResults });
+    if (liveJobs.length > 0) {
+      return Response.json({ jobs: liveJobs, source: "live-linkedin-remotive" });
+    }
   }
 
-  // SerpAPI paging: default page size is typically 10.
-  const perPage = 10;
-  const pages = Math.max(1, Math.ceil(maxResults / perPage));
+  try {
+    if (apiKey) {
+      // SerpAPI paging
+      const perPage = 10;
+      const pages = Math.max(1, Math.ceil(maxResults / perPage));
 
-  const all: JobSuggestion[] = [];
-  for (let page = 0; page < pages; page++) {
-    const start = page * perPage;
-    const serp = await fetchSerpApiGoogleJobs({ apiKey, query, location, start });
-    const jobs = extractJobsFromSerpApiGoogleJobsResponse(serp);
-    all.push(...jobs);
+      const all: JobSuggestion[] = [];
+      for (let page = 0; page < pages; page++) {
+        const start = page * perPage;
+        const serp = await fetchSerpApiGoogleJobs({ apiKey, query, location, start });
+        const jobs = extractJobsFromSerpApiGoogleJobsResponse(serp);
+        all.push(...jobs);
+      }
+
+      const withTime = all.some((j) => typeof j.postedMinutesAgo === "number");
+      const filtered = withTime ? filterJobsPostedWithinMinutes(all, maxPostedMinutes) : all;
+
+      const seen = new Set<string>();
+      const deduped: JobSuggestion[] = [];
+      for (const j of (filtered.length ? filtered : all)) {
+        const key = j.link || j.id;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push(j);
+        if (deduped.length >= maxResults) break;
+      }
+
+      if (deduped.length > 0) {
+        return Response.json({ jobs: deduped, source: "serpapi-google-jobs" });
+      }
+    }
+  } catch (err) {
+    console.warn("SerpAPI failed, falling back to live scraper:", err);
   }
 
-  // Filter "posted within 5 minutes" if possible. If provider doesn't provide time,
-  // we still return results but without the filter.
-  const withTime = all.some((j) => typeof j.postedMinutesAgo === "number");
-  const filtered = withTime ? filterJobsPostedWithinMinutes(all, maxPostedMinutes) : all;
-
-  // Dedupe by link/id
-  const seen = new Set<string>();
-  const deduped: JobSuggestion[] = [];
-  for (const j of filtered) {
-    const key = j.link || j.id;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(j);
-    if (deduped.length >= maxResults) break;
-  }
-
-  return Response.json({ jobs: deduped, source: "serpapi-google-jobs" });
+  // Fallback to live public search
+  const liveJobs = await searchLiveJobs(query, location, { maxResults });
+  return Response.json({ jobs: liveJobs, source: "live-scraper" });
 }
-

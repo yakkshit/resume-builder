@@ -24,6 +24,7 @@ import {
     Settings2,
     Lock,
     Clapperboard,
+    Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,8 @@ import { InfiniteGridBackground } from "@/components/ui/the-infinite-grid";
 import dynamic from "next/dynamic";
 
 import { MarkdownRenderer } from "./markdown-renderer";
-import { ComponentRenderer, type InterviewLabRenderContext } from "./component-renderer";
+import { ComponentRenderer } from "./component-renderer";
+import { UserMenu } from "@/components/auth/user-menu";
 import { useChatSettings, ChatMessage, AVAILABLE_MODELS, type ChatSettings } from "./chat-store";
 import {
     HF_CUSTOM_HUB_MODEL_ID,
@@ -64,7 +66,9 @@ import { tryLocalStorageGet, tryLocalStorageSet, tryLocalStorageRemove } from "@
 import { chatTextareaHeightPx } from "@/lib/chat-textarea";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { ModelProviderIcon } from "@/lib/model-provider-icon";
-import { getDefaultInterviewLabModelId, isInterviewLabCompatibleModel } from "@/lib/interview-lab-model-support";
+import { Plug } from "lucide-react";
+import { GitHubSyncService } from "@/lib/github/sync";
+import { getStoredProfile, ProfileSettingsDialog } from "./profile-settings-dialog";
 
 const panelLoading = () => (
     <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
@@ -80,10 +84,9 @@ const JobSuggestionsPanel = dynamic(
 const ChatOnboarding = dynamic(() => import("./chat-onboarding").then((m) => m.ChatOnboarding), {
     loading: panelLoading,
 });
-const InterviewLabPanel = dynamic(
-    () => import("./interview-lab-panel").then((m) => m.InterviewLabPanel),
-    { loading: panelLoading },
-);
+const MCPDialog = dynamic(() => import("./mcp-dialog").then((m) => m.MCPDialog), {
+    loading: panelLoading,
+});
 
 // ── Welcome Screen ─────────────────────────────────────────────────────────
 
@@ -95,7 +98,6 @@ const ACTION_PILLS = [
 ];
 
 const CHAT_INPUT_SHINE_LS = "ai-chat-input-shine-seen";
-const HAS_SEEN_INTERVIEW_LAB_LS = "hasSeenInterviewLab";
 
 const SUGGESTED_PROMPTS = [
     "Show me my resume",
@@ -175,13 +177,12 @@ function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>
     if (t === "coverletter" || t === "cover-letter") return "cover-letter";
     if (t === "cvscorer" || t === "cv-score") return "cv-score";
     if (t === "joblinks" || t === "job-recommendations") return "job-recommendations";
+    if (t === "jobscraper" || t === "job-scraper" || t === "jobsearch") return "job-scraper";
     if (t === "jobapplysimulator" || t === "auto-applier") return "auto-applier";
-    if (t === "mockinterview" || t === "mock-interview") return "mock-interview";
     if (t === "course" || t === "learning-resources") return "learning-resources";
     if (t === "codingchallenge" || t === "coding-challenge") return "coding-challenge";
     if (t === "emailhr" || t === "email-hr" || t === "hr-email") return "email-hr";
     if (t === "linkedindm" || t === "linkedin-dm" || t === "linkedin") return "linkedin-dm";
-    if (t === "interviewlab" || t === "interview-lab") return "interview-lab";
     if (t === "resumelatex" || t === "resume-latex" || t === "latexcv") return "resume-latex";
     if (t === "coverletterlatex" || t === "cover-letter-latex" || t === "latexcover") return "cover-letter-latex";
     return null;
@@ -311,7 +312,6 @@ function MessageBubble({
     chatApiKey,
     chatModel,
     canonicalResumeKey,
-    interviewLabContext,
 }: {
     message: UIMessage;
     isStreaming?: boolean;
@@ -320,7 +320,6 @@ function MessageBubble({
     chatApiKey?: string;
     chatModel?: string;
     canonicalResumeKey: string | null;
-    interviewLabContext?: InterviewLabRenderContext;
 }) {
     const isUser = message.role === "user";
     const [hovering, setHovering] = useState(false);
@@ -435,7 +434,7 @@ function MessageBubble({
                             data={c.data}
                             chatApiKey={chatApiKey}
                             chatModel={chatModel}
-                            interviewLabContext={c.type === "interview-lab" ? interviewLabContext : undefined}
+                            onSendMessage={onReply}
                             resumeSyncsWithGlobal={
                                 c.type === "resume"
                                     ? `${message.id ?? "m"}-${idx}` === canonicalResumeKey
@@ -473,14 +472,13 @@ const QUICK_PROMPTS: {
             "Write a LinkedIn connection or job-poster message under 200 characters and show the linkedinDm component so I can copy it",
     },
     { emoji: "⚡", label: "CV Score", prompt: "Analyze my CV score" },
-    { emoji: "🔍", label: "Jobs", prompt: "Find jobs for me" },
+    { emoji: "🔍", label: "Job Scraper", prompt: "Search and scrape live job postings for Frontend / Full Stack developer roles and match my resume" },
     { emoji: "🤖", label: "Auto-apply", prompt: "Start auto-applying to jobs" },
     { emoji: "💻", label: "Code", prompt: "Give me a coding challenge" },
     {
-        emoji: "🎬",
-        label: "Interview Lab",
-        prompt:
-            'Open the full Interview Lab in chat: respond with ```component:interviewLab\n{}\n``` plus a short intro, and mention it uses Gemini.',
+        emoji: "🛠️",
+        label: "MCP Tools",
+        prompt: "List available MCP tools and describe how you can help me generate documents and scrape jobs",
     },
     {
         emoji: "📐",
@@ -488,15 +486,7 @@ const QUICK_PROMPTS: {
         prompt:
             'I want a specific print style: give me both JSON resume updates if needed AND ```component:resumeLatex\n{"latex":"..."}\n``` with a full compilable LaTeX CV. If I also need a cover letter in LaTeX, add ```component:coverLetterLatex\n{"latex":"..."}\n```. Keep JSON valid.',
     },
-    { emoji: "🎤", label: "Interview", prompt: "Practice interview questions" },
     { emoji: "📚", label: "Learn", prompt: "Recommend learning resources" },
-    {
-        emoji: "🌐",
-        label: "Web search",
-        prompt: "",
-        disabled: true,
-        tooltip: "Search over the web — coming soon",
-    },
 ];
 
 function ChatInput({
@@ -517,7 +507,7 @@ function ChatInput({
     onSettingsChange,
     raiseForOnboarding,
     showToast,
-    onOpenInterviewLab,
+    onOpenMcpDialog,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -536,26 +526,14 @@ function ChatInput({
     onSettingsChange: (patch: Partial<ChatSettings>) => void;
     raiseForOnboarding?: boolean;
     showToast: (variant: "default" | "success" | "error" | "warning", msg: string) => void;
-    onOpenInterviewLab: () => void;
+    onOpenMcpDialog?: () => void;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [modelMenuOpen, setModelMenuOpen] = useState(false);
     const [modelQuery, setModelQuery] = useState("");
-    const [extrasSheet, setExtrasSheet] = useState<null | "openai" | "hf" | "apikey">(null);
-    const [apiKeySheetDraft, setApiKeySheetDraft] = useState("");
-    const [showInterviewLabChip, setShowInterviewLabChip] = useState(false);
-
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        if (tryLocalStorageGet(HAS_SEEN_INTERVIEW_LAB_LS) === "1") return;
-        const t = window.setTimeout(() => setShowInterviewLabChip(true), 650);
-        return () => window.clearTimeout(t);
-    }, []);
-
-    useEffect(() => {
-        if (extrasSheet === "apikey") setApiKeySheetDraft(settings.apiKey || "");
-    }, [extrasSheet, settings.apiKey]);
+    const [ingestingVault, setIngestingVault] = useState(false);
+    const [vaultAddedFiles, setVaultAddedFiles] = useState<Record<string, boolean>>({});
 
     useLayoutEffect(() => {
         const ta = textareaRef.current;
@@ -564,8 +542,8 @@ function ChatInput({
         ta.style.height = `${chatTextareaHeightPx(ta.scrollHeight, value)}px`;
     }, [value]);
 
-    const handleKey = (e: React.KeyboardEvent) => {
-        if (e.key === "Enter" && !e.shiftKey) {
+    const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             onSend();
         }
@@ -593,16 +571,10 @@ function ChatInput({
         return map;
     }, [filteredModels]);
 
-    const pickModel = (next: string, prev: string) => {
+    const pickModel = (next: string) => {
         onModelChange(next);
         setModelMenuOpen(false);
         setModelQuery("");
-        if (next === OPENAI_COMPAT_CHAT_MODEL_ID && prev !== OPENAI_COMPAT_CHAT_MODEL_ID) {
-            setExtrasSheet("openai");
-        }
-        if (next === HF_CUSTOM_HUB_MODEL_ID && prev !== HF_CUSTOM_HUB_MODEL_ID) {
-            setExtrasSheet("hf");
-        }
     };
 
     const inputShell = (child: React.ReactNode) =>
@@ -615,7 +587,6 @@ function ChatInput({
         );
 
     return (
-        <>
         <div
             className={cn(
                 "fixed bottom-5 left-1/2 z-30 w-full max-w-4xl -translate-x-1/2 px-4",
@@ -626,31 +597,8 @@ function ChatInput({
             {attachedFiles.length === 0 && (
                 <div
                     data-chat-tour="quick-prompts"
-                    className="flex gap-2 mb-2 overflow-x-auto pb-1"
-                    style={{ scrollbarWidth: "none" }}
+                    className="flex items-center gap-1.5 mb-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth justify-start sm:justify-center px-1"
                 >
-                    <AnimatePresence>
-                        {showInterviewLabChip ? (
-                            <motion.button
-                                type="button"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 10 }}
-                                transition={{ duration: 0.22, ease: "easeOut" }}
-                                onClick={() => {
-                                    tryLocalStorageSet(HAS_SEEN_INTERVIEW_LAB_LS, "1");
-                                    setShowInterviewLabChip(false);
-                                    onOpenInterviewLab();
-                                    showToast("success", "Opened Interview Lab");
-                                }}
-                                className="flex-shrink-0 flex min-h-[44px] items-center gap-1.5 rounded-full border border-violet-500/40 bg-gradient-to-r from-violet-600/20 to-indigo-600/10 px-3 py-1.5 text-xs font-semibold text-violet-100 shadow-sm transition-colors hover:bg-violet-500/20"
-                                aria-label="Try Interview Lab"
-                            >
-                                <span className="text-sm">🎬</span>
-                                <span>Try Interview Lab</span>
-                            </motion.button>
-                        ) : null}
-                    </AnimatePresence>
                     {QUICK_PROMPTS.map((q) => {
                         const chip = (
                             <button
@@ -694,18 +642,62 @@ function ChatInput({
                 </div>
             )}
 
-            {/* Attached files */}
+            {/* Attached files & Memory Vault Ingestion Prompt */}
             {attachedFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-2">
-                    {attachedFiles.map((f, i) => (
-                        <div key={i} className="flex items-center gap-1.5 bg-background/90 border border-border/60 rounded-lg px-2.5 py-1.5 text-xs shadow-sm">
-                            <FileText className="w-3 h-3 text-muted-foreground" />
-                            <span className="max-w-[120px] truncate">{f.name}</span>
-                            <button onClick={() => onRemoveFile(i)} className="text-muted-foreground hover:text-destructive ml-1">
-                                <X className="w-3 h-3" />
-                            </button>
+                <div className="space-y-2 mb-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {attachedFiles.map((f, i) => (
+                            <div key={i} className="flex items-center gap-1.5 bg-background/90 border border-border/60 rounded-lg px-2.5 py-1 text-xs shadow-sm">
+                                <FileText className="w-3.5 h-3.5 text-primary" />
+                                <span className="max-w-[130px] truncate font-medium">{f.name}</span>
+                                {vaultAddedFiles[f.name] && (
+                                    <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-0.5">
+                                        <Check className="w-3 h-3" /> In Vault
+                                    </span>
+                                )}
+                                <button onClick={() => onRemoveFile(i)} className="text-muted-foreground hover:text-destructive ml-1">
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-cyan-500/10 border border-indigo-500/20 backdrop-blur-md">
+                        <div className="flex items-center gap-2 text-xs">
+                            <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span className="text-muted-foreground">
+                                Add {attachedFiles.length > 1 ? "these files" : attachedFiles[0].name} to your <strong className="text-foreground font-semibold">Memory Vault</strong>?
+                            </span>
                         </div>
-                    ))}
+                        <Button
+                            type="button"
+                            size="sm"
+                            disabled={ingestingVault}
+                            onClick={async () => {
+                                setIngestingVault(true);
+                                try {
+                                    const { parseAndIngestFileToMemoryVault } = await import("@/lib/memory-vault");
+                                    for (const f of attachedFiles) {
+                                        const res = await parseAndIngestFileToMemoryVault(f);
+                                        if (res.success) {
+                                            setVaultAddedFiles((prev) => ({ ...prev, [f.name]: true }));
+                                            showToast("success", `Added ${f.name} to your Memory Vault!`);
+                                        } else {
+                                            showToast("warning", `Could not parse ${f.name}: ${res.error || "unknown"}`);
+                                        }
+                                    }
+                                } catch {
+                                    showToast("error", "Failed to add document to Memory Vault");
+                                } finally {
+                                    setIngestingVault(false);
+                                }
+                            }}
+                            className="h-7 text-xs px-2.5 font-semibold bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white shadow-sm"
+                        >
+                            {ingestingVault ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                            Yes, Add to Vault
+                        </Button>
+                    </div>
                 </div>
             )}
 
@@ -722,36 +714,27 @@ function ChatInput({
                 >
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <span className="relative inline-flex shrink-0">
-                                <PopoverTrigger asChild>
-                                    <button
-                                        type="button"
-                                        data-chat-tour="model-select"
-                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-muted/70 text-foreground ring-offset-background transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-2"
-                                        aria-label={`Model: ${selectedModel?.label ?? model}. Open model list. ${settings.apiKey?.trim() ? "API key set for this session." : "API key missing — use API key in the model menu."}`}
-                                        aria-expanded={modelMenuOpen}
-                                    >
-                                        {selectedModel?.provider ? (
-                                            <ModelProviderIcon provider={selectedModel.provider} size={18} className="opacity-95" />
-                                        ) : (
-                                            <span className="text-[10px] font-medium text-muted-foreground">?</span>
-                                        )}
-                                    </button>
-                                </PopoverTrigger>
-                                <span
-                                    className={cn(
-                                        "pointer-events-none absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border-2 border-background shadow-sm",
-                                        settings.apiKey?.trim() ? "bg-emerald-500" : "bg-red-500",
+                            <PopoverTrigger asChild>
+                                <button
+                                    type="button"
+                                    data-chat-tour="model-select"
+                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-muted/70 text-foreground ring-offset-background transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-2"
+                                    aria-label={`Model: ${selectedModel?.label ?? model}. Click to switch model.`}
+                                    aria-expanded={modelMenuOpen}
+                                >
+                                    {selectedModel?.provider ? (
+                                        <ModelProviderIcon provider={selectedModel.provider} size={18} className="opacity-95" />
+                                    ) : (
+                                        <span className="text-[10px] font-medium text-muted-foreground">?</span>
                                     )}
-                                    aria-hidden
-                                />
-                            </span>
+                                </button>
+                            </PopoverTrigger>
                         </TooltipTrigger>
                         <TooltipContent
                             side="top"
                             className="max-w-[min(92vw,280px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
                         >
-                            Tap the logo to choose a model and set your API key from the menu (session only, not saved). Green dot = key set; red = add a key.
+                            Model: {selectedModel?.label ?? model}. Click to switch AI models.
                         </TooltipContent>
                     </Tooltip>
                     <PopoverContent
@@ -762,7 +745,7 @@ function ChatInput({
                         className="z-[85] w-[min(94vw,22rem)] border-border/80 bg-popover p-0 shadow-xl"
                         onOpenAutoFocus={(e) => e.preventDefault()}
                     >
-                        <div className="space-y-2 border-b border-border/60 p-2.5">
+                        <div className="border-b border-border/60 p-2.5">
                             <div className="relative">
                                 <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                                 <Input
@@ -772,56 +755,6 @@ function ChatInput({
                                     className="h-9 rounded-lg border-border/60 bg-background/80 pl-8 text-xs"
                                 />
                             </div>
-                            {isOpenAiCompatibleChatModel(model) ? (
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="sm"
-                                    className="h-8 w-full justify-start gap-2 text-xs"
-                                    onClick={() => {
-                                        setExtrasSheet("openai");
-                                        setModelMenuOpen(false);
-                                    }}
-                                >
-                                    <Settings2 className="h-3.5 w-3.5 shrink-0" />
-                                    Endpoint &amp; model
-                                </Button>
-                            ) : null}
-                            {needsHuggingFaceCustomModelField(model) ? (
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="sm"
-                                    className="h-8 w-full justify-start gap-2 text-xs"
-                                    onClick={() => {
-                                        setExtrasSheet("hf");
-                                        setModelMenuOpen(false);
-                                    }}
-                                >
-                                    <Settings2 className="h-3.5 w-3.5 shrink-0" />
-                                    {isHuggingFaceCustomHubModel(model) ? "Hub model id" : "Hub model override"}
-                                </Button>
-                            ) : null}
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                size="sm"
-                                className="h-8 w-full justify-start gap-2 text-xs"
-                                onClick={() => {
-                                    setExtrasSheet("apikey");
-                                    setModelMenuOpen(false);
-                                }}
-                            >
-                                <Lock className="h-3.5 w-3.5 shrink-0" />
-                                <span className="min-w-0 flex-1 text-left">API key (this session)</span>
-                                <span
-                                    className={cn(
-                                        "h-2 w-2 shrink-0 rounded-full",
-                                        settings.apiKey?.trim() ? "bg-emerald-500" : "bg-red-500",
-                                    )}
-                                    aria-hidden
-                                />
-                            </Button>
                         </div>
                         <ScrollArea className="h-[min(50vh,300px)]">
                             <div className="p-1.5">
@@ -838,7 +771,7 @@ function ChatInput({
                                                     <button
                                                         key={m.value}
                                                         type="button"
-                                                        onClick={() => pickModel(m.value, model)}
+                                                        onClick={() => pickModel(m.value)}
                                                         className={cn(
                                                             "flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors hover:bg-muted/80",
                                                             m.value === model ? "bg-muted font-medium" : "",
@@ -881,7 +814,7 @@ function ChatInput({
                         side="top"
                         className="max-w-[min(92vw,300px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
                     >
-                        Type a message. Enter sends; Shift+Enter for a new line. The box grows while you type and returns to one line after you send.
+                        Press Cmd+Enter (or Ctrl+Enter) to send, Enter for a new line.
                     </TooltipContent>
                 </Tooltip>
 
@@ -956,103 +889,6 @@ function ChatInput({
                 </div>,
             )}
         </div>
-
-        <Sheet open={extrasSheet !== null} onOpenChange={(o) => !o && setExtrasSheet(null)}>
-            <SheetContent side="right" className="flex w-full flex-col border-l border-border/60 bg-background sm:max-w-[380px]">
-                <SheetHeader className="space-y-1 text-left">
-                    <SheetTitle className="text-base">
-                        {extrasSheet === "openai"
-                            ? "OpenAI-compatible API"
-                            : extrasSheet === "hf"
-                              ? "Hugging Face Hub model"
-                              : "API key"}
-                    </SheetTitle>
-                    <SheetDescription className="text-xs leading-relaxed">
-                        {extrasSheet === "openai"
-                            ? "Same fields as Profile & Settings. Values sync automatically when you change them here or in the profile dialog."
-                            : extrasSheet === "hf"
-                              ? isHuggingFaceCustomHubModel(model)
-                                  ? "Required for “HF custom (Hub id)”. Enter the full Hugging Face model id (org/model)."
-                                  : "Optional: override the Hub model id for curated Hugging Face (AI SDK) picks. Leave blank to use the list selection."
-                              : "Used for providers that need a key (OpenAI, Anthropic, Hugging Face, etc.). Kept in memory only for this tab — closing or refreshing clears it. Never written to profile storage."}
-                    </SheetDescription>
-                </SheetHeader>
-                <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto pb-4">
-                    {extrasSheet === "openai" ? (
-                        <>
-                            <div className="space-y-2">
-                                <Label className="text-xs">Base URL</Label>
-                                <Input
-                                    value={settings.openAiCompatBaseUrl}
-                                    onChange={(e) => onSettingsChange({ openAiCompatBaseUrl: e.target.value })}
-                                    placeholder="https://api.openai.com/v1"
-                                    className="h-10 rounded-xl text-sm"
-                                    autoComplete="off"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs">Model id</Label>
-                                <Input
-                                    value={settings.openAiCompatModel}
-                                    onChange={(e) => onSettingsChange({ openAiCompatModel: e.target.value })}
-                                    placeholder="gpt-4o-mini"
-                                    className="h-10 rounded-xl text-sm"
-                                    autoComplete="off"
-                                />
-                            </div>
-                        </>
-                    ) : null}
-                    {extrasSheet === "hf" ? (
-                        <div className="space-y-2">
-                            <Label className="text-xs">
-                                {isHuggingFaceCustomHubModel(model) ? "Hub model id (required)" : "Hub model id (optional)"}
-                            </Label>
-                            <Input
-                                value={settings.huggingFaceCustomModel}
-                                onChange={(e) => onSettingsChange({ huggingFaceCustomModel: e.target.value })}
-                                placeholder="e.g. meta-llama/Llama-3.1-8B-Instruct"
-                                className="h-10 rounded-xl font-mono text-xs"
-                                autoComplete="off"
-                            />
-                            <p className="text-[11px] leading-snug text-muted-foreground">
-                                {isHuggingFaceCustomHubModel(model)
-                                    ? "This value is sent as the router model. It must be a valid Hub id."
-                                    : "When empty, the app uses the model you picked in the list. When set, this id is sent to the Hugging Face router instead."}
-                            </p>
-                        </div>
-                    ) : null}
-                    {extrasSheet === "apikey" ? (
-                        <div className="space-y-2">
-                            <Label className="text-xs">API key</Label>
-                            <Input
-                                type="password"
-                                value={apiKeySheetDraft}
-                                onChange={(e) => setApiKeySheetDraft(e.target.value)}
-                                placeholder="Paste key — not saved to disk"
-                                className="h-10 rounded-xl text-sm"
-                                autoComplete="off"
-                            />
-                        </div>
-                    ) : null}
-                </div>
-                {extrasSheet === "apikey" ? (
-                    <SheetFooter className="gap-2 sm:flex-col sm:space-x-0">
-                        <Button
-                            type="button"
-                            className="w-full"
-                            onClick={() => {
-                                onSettingsChange({ apiKey: apiKeySheetDraft.trim() });
-                                showToast("success", "API key applied for this session. It will clear when you refresh.");
-                                setExtrasSheet(null);
-                            }}
-                        >
-                            Save
-                        </Button>
-                    </SheetFooter>
-                ) : null}
-            </SheetContent>
-        </Sheet>
-        </>
     );
 }
 
@@ -1064,7 +900,7 @@ export default function AICareerAssistantChat() {
     const [onboardingOpen, setOnboardingOpen] = useState(false);
     const [composerShine, setComposerShine] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [interviewLabOpen, setInterviewLabOpen] = useState(false);
+    const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const [jobPanelOpen, setJobPanelOpen] = useState(false);
     const [jobPanelLoading, setJobPanelLoading] = useState(false);
@@ -1282,6 +1118,7 @@ export default function AICareerAssistantChat() {
     };
 
     const toasterRef = useRef<ToasterRef>(null);
+    const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
     const showToast = (variant: 'default' | 'success' | 'error' | 'warning', msg: string) => {
         toasterRef.current?.show({
             title: variant.charAt(0).toUpperCase() + variant.slice(1),
@@ -1298,29 +1135,6 @@ export default function AICareerAssistantChat() {
         window.addEventListener("ai-chat-profile-updated", onProfileUpdated as EventListener);
         return () => window.removeEventListener("ai-chat-profile-updated", onProfileUpdated as EventListener);
     }, []);
-
-    const interviewLabToast = useCallback(
-        (
-            variant: 'default' | 'success' | 'error' | 'warning',
-            msg: string,
-            meta?: { docsUrl?: string },
-        ) => {
-            toasterRef.current?.show({
-                title: meta?.docsUrl ? 'Switch model' : variant.charAt(0).toUpperCase() + variant.slice(1),
-                message: msg,
-                variant: meta?.docsUrl ? 'warning' : variant,
-                duration: meta?.docsUrl ? 10000 : 4000,
-                position: 'bottom-right',
-                actions: meta?.docsUrl
-                    ? {
-                          label: 'Open docs',
-                          onClick: () => window.open(meta.docsUrl!, '_blank', 'noopener,noreferrer'),
-                      }
-                    : undefined,
-            });
-        },
-        [],
-    );
 
     // Wire up real AI SDK → /api/chat
     const { messages, sendMessage, status, error, stop, setMessages } = useChat({
@@ -1438,7 +1252,7 @@ export default function AICareerAssistantChat() {
         }
     }, [currentSessionId, setMessages]);
 
-    // When messages change, save them and update session title
+    // When messages change, save them and update session title based on user message
     useEffect(() => {
         if (!currentSessionId) return;
         if (messages.length > 0) {
@@ -1448,8 +1262,10 @@ export default function AICareerAssistantChat() {
                 const next = [...prev];
                 const idx = next.findIndex(s => s.id === currentSessionId);
                 if (idx !== -1) {
-                    const firstMsg = getTextContent(messages[0] || messages[1])?.slice(0, 30);
-                    next[idx] = { ...next[idx], title: firstMsg || "Chat", updatedAt: Date.now() };
+                    const firstUser = messages.find(m => m.role === "user");
+                    const userText = firstUser ? getTextContent(firstUser)?.trim() : "";
+                    const title = userText ? (userText.length > 35 ? `${userText.slice(0, 35)}…` : userText) : "New Chat";
+                    next[idx] = { ...next[idx], title, updatedAt: Date.now() };
                     tryLocalStorageSet("chat_sessions", JSON.stringify(next));
                 }
                 return next;
@@ -1475,6 +1291,21 @@ export default function AICareerAssistantChat() {
 
         // Hint only once per assistant message, right when stream finishes
         if (wasStreaming && nowIdle) {
+            // Auto-sync chat session to GitHub repository if PAT is configured
+            const p = getStoredProfile();
+            if (p.githubToken && p.github && p.githubRepo) {
+                const sessionMessages = messages.map((m) => ({
+                    role: m.role,
+                    content: getTextContent(m) ?? "",
+                }));
+                GitHubSyncService.syncChatSession(
+                    { token: p.githubToken, owner: p.github, repo: p.githubRepo },
+                    currentSessionId || "default",
+                    `Chat ${new Date().toLocaleDateString()}`,
+                    sessionMessages
+                ).catch(() => { /* silent background sync */ });
+            }
+
             if (resumeCvHintShownForAssistantIdRef.current !== last.id) {
                 let lastUser = "";
                 for (let i = messages.length - 2; i >= 0; i--) {
@@ -1501,7 +1332,6 @@ export default function AICareerAssistantChat() {
         }
 
         // Merge while idle whenever the last assistant message gains parseable resume JSON.
-        // Important: do NOT gate this only on streaming→idle — the final ``` fence often arrives on the next React commit after status flips, so a one-shot merge missed updates.
         if (status === "streaming" || status === "submitted") return;
 
         const { merged, template } = mergeAssistantResumeIntoCurrent(loadFullResumeFromStorage(), text);
@@ -1515,10 +1345,31 @@ export default function AICareerAssistantChat() {
             showToast("success", "Resume merged from the assistant’s latest reply.");
             window.dispatchEvent(new CustomEvent("resume-storage-updated"));
             setResumeApplyOfferId(null);
+
+            // Auto-persist resume to PostgreSQL database for authenticated users
+            fetch("/api/user/resumes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    title: (merged as any)?.basicInfo?.name ? `${(merged as any).basicInfo.name}'s Resume` : "My Resume",
+                    template: template || "modern",
+                    data: merged,
+                }),
+            }).catch(() => { /* offline / anonymous */ });
+
+            // Auto-sync resume to user's private GitHub repository if configured
+            const p = getStoredProfile();
+            if (p.githubToken && p.github && p.githubRepo) {
+                GitHubSyncService.syncResume(
+                    { token: p.githubToken, owner: p.github, repo: p.githubRepo },
+                    (merged as any)?.basicInfo?.name ? `${(merged as any).basicInfo.name}-Resume` : "Resume",
+                    merged as unknown as Record<string, unknown>
+                ).catch(() => { /* silent */ });
+            }
         } else {
             setResumeApplyOfferId(last.id);
         }
-    }, [status, messages, settings.autoMergeAssistantResume]);
+    }, [status, messages, settings.autoMergeAssistantResume, currentSessionId]);
 
     useEffect(() => {
         if (status === "submitted" || status === "streaming") setResumeApplyOfferId(null);
@@ -1547,14 +1398,32 @@ export default function AICareerAssistantChat() {
         setResumeApplyOfferId(null);
     }, [messages]);
 
-    const handleNewSession = () => {
+    const isAtBottomRef = useRef(true);
+
+    const handleChatScroll = useCallback(() => {
+        if (!scrollRef.current) return;
+        const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+        // User is considered at bottom if within 120px of bottom
+        isAtBottomRef.current = scrollHeight - (scrollTop + clientHeight) < 120;
+    }, []);
+
+    const handleNewSession = useCallback(() => {
         const id = Date.now().toString();
         const newSession = { id, title: "New Chat", createdAt: Date.now(), updatedAt: Date.now() };
-        const nextSessions = [newSession, ...sessions];
-        setSessions(nextSessions);
-        tryLocalStorageSet("chat_sessions", JSON.stringify(nextSessions));
+        setSessions((prev) => {
+            const next = [newSession, ...prev.filter((s) => s.id !== id)];
+            tryLocalStorageSet("chat_sessions", JSON.stringify(next));
+            return next;
+        });
         setCurrentSessionId(id);
-    };
+        setMessages([]);
+        setInput("");
+        setAttachedFiles([]);
+        isAtBottomRef.current = true;
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = 0;
+        }
+    }, [setMessages]);
 
     const handleDeleteSession = (id: string) => {
         const nextSessions = sessions.filter((s) => s.id !== id);
@@ -1581,9 +1450,9 @@ export default function AICareerAssistantChat() {
 
     const showWelcome = messages.length === 0;
 
-    // Scroll to bottom on new messages
+    // Scroll to bottom on new messages ONLY if user was already at the bottom
     useEffect(() => {
-        if (scrollRef.current) {
+        if (scrollRef.current && isAtBottomRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages, isLoading]);
@@ -1983,19 +1852,19 @@ export default function AICareerAssistantChat() {
     };
 
     return (
-        <TooltipProvider delayDuration={350}>
+        <TooltipProvider delayDuration={7000}>
         <InfiniteGridBackground className="fixed inset-0 h-[100dvh] max-h-[100dvh]">
             <div className="relative z-[1] flex h-full min-h-0 w-full flex-col">
             <ChatOnboarding open={onboardingOpen} onOpenChange={setOnboardingOpen} setSidebarOpen={setSidebarOpen} />
-            <InterviewLabPanel
-                open={interviewLabOpen}
-                onOpenChange={setInterviewLabOpen}
-                apiKey={settings.apiKey}
-                model={settings.model}
-                openaiTranscriptionApiKey={settings.openaiTranscriptionApiKey}
-                vercelOidcToken={settings.vercelOidcToken}
-                onSwitchToGemini={() => updateSettings({ model: getDefaultInterviewLabModelId() })}
-                onToast={interviewLabToast}
+            <MCPDialog
+                open={mcpDialogOpen}
+                onOpenChange={setMcpDialogOpen}
+            />
+            <ProfileSettingsDialog
+                open={profileSettingsOpen}
+                onOpenChange={setProfileSettingsOpen}
+                settings={settings}
+                onSettingsChange={updateSettings}
             />
             <Toaster ref={toasterRef} />
 
@@ -2065,50 +1934,46 @@ export default function AICareerAssistantChat() {
                 </TooltipContent>
             </Tooltip>
 
-            <TooltipProvider delayDuration={500}>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <motion.button
-                            data-chat-tour="interview-lab"
-                            type="button"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.44, type: "spring" }}
-                            onClick={() => setInterviewLabOpen(true)}
-                            className={cn(
-                                "fixed top-[7.25rem] left-5 z-30 flex h-9 w-10 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-violet-600/90 to-indigo-700/90 shadow-lg backdrop-blur-sm transition-opacity hover:opacity-95",
-                                onboardingOpen && "z-[70]",
-                            )}
-                            aria-label="Open Interview Lab"
-                        >
-                            <Clapperboard className="h-4 w-4 text-white" />
-                        </motion.button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right" className="max-w-[min(92vw,280px)] text-xs leading-snug">
-                        Interview Lab — Practice coding interviews with AI (interview rounds, code tests, live coaching).
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <motion.button
+                        data-chat-tour="mcp-tools"
+                        type="button"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.44, type: "spring" }}
+                        onClick={() => setMcpDialogOpen(true)}
+                        className={cn(
+                            "fixed top-[7.25rem] left-5 z-30 flex h-9 w-10 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-indigo-600/90 to-cyan-700/90 shadow-lg backdrop-blur-sm transition-opacity hover:opacity-95",
+                            onboardingOpen && "z-[70]",
+                        )}
+                        aria-label="Open MCP Servers & Tools"
+                    >
+                        <Plug className="h-4 w-4 text-white" />
+                    </motion.button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="max-w-[min(92vw,280px)] text-xs leading-snug">
+                    MCP & Tools — Connect external MCP servers and inspect available tool schemas.
+                </TooltipContent>
+            </Tooltip>
 
-            {/* Stop button when streaming */}
-            {isLoading && (
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <motion.button
-                            type="button"
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="fixed top-5 right-5 z-30 flex items-center gap-2 px-3 py-2 rounded-full bg-neutral-900 text-white text-xs shadow-lg hover:opacity-80 transition-opacity border border-white/10"
-                            onClick={stop}
-                            aria-label="Stop generating"
-                        >
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            Stop
-                        </motion.button>
-                    </TooltipTrigger>
-                    <TooltipContent side="left" className="text-xs">Stop the current reply</TooltipContent>
-                </Tooltip>
-            )}
+            {/* Top Right Header Controls */}
+            <div className="fixed top-5 right-5 z-30 flex items-center gap-2">
+                <UserMenu onOpenSettings={() => setProfileSettingsOpen(true)} />
+                {isLoading && (
+                    <motion.button
+                        type="button"
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900 text-white text-xs shadow-lg hover:opacity-80 transition-opacity border border-white/10"
+                        onClick={stop}
+                        aria-label="Stop generating"
+                    >
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                        <span>Stop</span>
+                    </motion.button>
+                )}
+            </div>
 
             {/* Error banner */}
             {error && (
@@ -2121,6 +1986,7 @@ export default function AICareerAssistantChat() {
             {/* Chat area — flex-1 keeps input pinned; scroll only messages */}
             <div
                 ref={scrollRef}
+                onScroll={handleChatScroll}
                 className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-40 pt-16 sm:pb-44"
                 style={{ scrollbarWidth: "thin" }}
             >
@@ -2145,14 +2011,6 @@ export default function AICareerAssistantChat() {
                                         chatApiKey={settings.apiKey}
                                         chatModel={settings.model}
                                         canonicalResumeKey={canonicalResumeKey}
-                                        interviewLabContext={{
-                                            apiKey: settings.apiKey,
-                                            model: settings.model,
-                                            openaiTranscriptionApiKey: settings.openaiTranscriptionApiKey,
-                                            vercelOidcToken: settings.vercelOidcToken,
-                                            onSwitchToGemini: () => updateSettings({ model: getDefaultInterviewLabModelId() }),
-                                            onToast: interviewLabToast,
-                                        }}
                                     />
                                 ))}
 
@@ -2199,46 +2057,27 @@ export default function AICareerAssistantChat() {
                 </div>
             )}
 
-            {/* Input bar (replaced by job suggestions when scraping) */}
-            {jobPanelOpen ? (
-                <JobSuggestionsPanel
-                    jobs={jobPanelJobs}
-                    open={jobPanelOpen}
-                    loading={jobPanelLoading}
-                    progress={jobPanelProgress}
-                    progressLabel={jobPanelProgressLabel}
-                    onClose={() => {
-                        setJobPanelOpen(false);
-                        setJobPanelLoading(false);
-                    }}
-                    onUseJob={(job) => void handleUseJob(job)}
-                    resumeData={getResumeData()}
-                    jobProfileOpen={jobProfileDialogOpen}
-                    onJobProfileOpenChange={setJobProfileDialogOpen}
-                    onJobProfileSaved={handleJobProfileSaved}
-                />
-            ) : (
-                <ChatInput
-                    value={input}
-                    onChange={setInput}
-                    onSend={handleSend}
-                    onFileAttach={handleFileAttach}
-                    attachedFiles={attachedFiles}
-                    onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                    model={settings.model}
-                    onModelChange={(m) => updateSettings({ model: m })}
-                    disabled={isLoading}
-                    useProfileContext={useProfileContext}
-                    onToggleProfileContext={() => setUseProfileContext((v) => !v)}
-                    composerShine={composerShine}
-                    onClearComposerShine={clearComposerShine}
-                    settings={settings}
-                    onSettingsChange={updateSettings}
-                    raiseForOnboarding={onboardingOpen}
-                    showToast={showToast}
-                    onOpenInterviewLab={() => setInterviewLabOpen(true)}
-                />
-            )}
+            {/* Always keep ChatInput visible */}
+            <ChatInput
+                value={input}
+                onChange={setInput}
+                onSend={handleSend}
+                onFileAttach={handleFileAttach}
+                attachedFiles={attachedFiles}
+                onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                model={settings.model}
+                onModelChange={(m) => updateSettings({ model: m })}
+                disabled={isLoading}
+                useProfileContext={useProfileContext}
+                onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                composerShine={composerShine}
+                onClearComposerShine={clearComposerShine}
+                settings={settings}
+                onSettingsChange={updateSettings}
+                raiseForOnboarding={onboardingOpen}
+                showToast={showToast}
+                onOpenMcpDialog={() => setMcpDialogOpen(true)}
+            />
             </div>
         </InfiniteGridBackground>
         </TooltipProvider>

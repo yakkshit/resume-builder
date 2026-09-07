@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { PDFViewer as ReactPDFViewer } from "@react-pdf/renderer"
+import { PDFViewer as ReactPDFViewer, pdf } from "@react-pdf/renderer"
 import type { CoverLetterData, CoverLetterTemplate } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Download, RefreshCw } from "lucide-react"
@@ -59,7 +59,7 @@ export default function CoverLetterPDFViewer({ coverLetterData, template }: PDFV
 
         try {
           const PDFTemplate = getCoverLetterTemplate(template as string)
-          const pdfDoc = pdf(<PDFTemplate coverLetterData={coverLetterData} />)
+          const pdfDoc = (pdf as any)(<PDFTemplate coverLetterData={coverLetterData} />)
           blob = await pdfDoc.toBlob()
         } catch (clientErr) {
           console.warn("Client-side cover letter PDF rendering failed, using MCP server...", clientErr)

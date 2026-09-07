@@ -64,7 +64,7 @@ interface EnhancedChatProps {
   onStop?: () => void
   applyAiChanges: () => void
   aiMode: boolean
-  attachmentRef: React.RefObject<HTMLInputElement>
+  attachmentRef: React.RefObject<HTMLInputElement | null>
   contextText?: string
   onFilesAttached?: (files: File[]) => void
 }

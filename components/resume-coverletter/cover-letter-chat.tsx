@@ -122,7 +122,7 @@ interface CoverLetterChatProps {
   onStop?: () => void
   applyAiChanges: () => void
   isApplyingChanges: boolean
-  attachmentRef: React.RefObject<HTMLInputElement>
+  attachmentRef: React.RefObject<HTMLInputElement | null>
 }
 
 export default function CoverLetterChat({

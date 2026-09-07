@@ -1,0 +1,331 @@
+"use client";
+
+import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
+
+export interface MCPToolSchema {
+  name: string;
+  description?: string;
+  inputSchema?: Record<string, any>;
+  serverName: string;
+  serverId: string;
+}
+
+export interface MCPServerConfig {
+  id: string;
+  name: string;
+  url: string;
+  type: "http" | "sse" | "builtin";
+  enabled: boolean;
+  headers?: Record<string, string>;
+  apiKey?: string;
+  tools?: MCPToolSchema[];
+  enabledTools?: string[];
+  status?: "connected" | "error" | "connecting" | "idle";
+  error?: string;
+}
+
+const MCP_SERVERS_STORAGE_ID = "chat_mcp_servers_config";
+
+export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
+  {
+    id: "builtin-resume-coverletter",
+    name: "Resume & Cover Letter MCP",
+    url: "/api/mcp",
+    type: "builtin",
+    enabled: true,
+    status: "connected",
+    tools: [
+      {
+        name: "list_templates",
+        description: "List all available PDF resume and cover letter templates.",
+        serverName: "Resume & Cover Letter MCP",
+        serverId: "builtin-resume-coverletter",
+        inputSchema: {
+          type: "object",
+          properties: {
+            category: { type: "string", enum: ["all", "resume", "coverletter"] },
+          },
+        },
+      },
+      {
+        name: "search_jobs",
+        description: "Search for live jobs and openings based on keywords, role, company, or location.",
+        serverName: "Resume & Cover Letter MCP",
+        serverId: "builtin-resume-coverletter",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Job title, keywords, or skills" },
+            location: { type: "string", description: "Location or 'Remote'" },
+            maxResults: { type: "number", description: "Max results" },
+          },
+          required: ["query"],
+        },
+      },
+      {
+        name: "scrape_job_posting",
+        description: "Scrape and extract key requirements and qualifications from a job posting URL or text.",
+        serverName: "Resume & Cover Letter MCP",
+        serverId: "builtin-resume-coverletter",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Job URL" },
+            text: { type: "string", description: "Pasted text" },
+          },
+        },
+      },
+      {
+        name: "scrape_github_profile",
+        description: "Scrape public GitHub profile metadata, top repositories, primary coding languages, stars, and bio to ground AI resume generation.",
+        serverName: "Resume & Cover Letter MCP",
+        serverId: "builtin-resume-coverletter",
+        inputSchema: {
+          type: "object",
+          properties: {
+            username: { type: "string", description: "GitHub username" },
+            githubToken: { type: "string", description: "Optional GitHub token" },
+          },
+          required: ["username"],
+        },
+      },
+      {
+        name: "scrape_linkedin_profile",
+        description: "Parse and extract structured career history, headline, skills, and work achievements from public LinkedIn profile text.",
+        serverName: "Resume & Cover Letter MCP",
+        serverId: "builtin-resume-coverletter",
+        inputSchema: {
+          type: "object",
+          properties: {
+            profileText: { type: "string", description: "Pasted text from public LinkedIn profile" },
+          },
+          required: ["profileText"],
+        },
+      },
+      {
+        name: "generate_resume_pdf",
+        description: "Generate a PDF document for a resume given JSON data and template name.",
+        serverName: "Resume & Cover Letter MCP",
+        serverId: "builtin-resume-coverletter",
+        inputSchema: {
+          type: "object",
+          properties: {
+            resumeData: { type: "object", description: "Resume JSON" },
+            template: { type: "string", description: "Template name" },
+          },
+          required: ["resumeData"],
+        },
+      },
+      {
+        name: "generate_cover_letter_pdf",
+        description: "Generate a PDF document for a cover letter given head, body, and footer content.",
+        serverName: "Resume & Cover Letter MCP",
+        serverId: "builtin-resume-coverletter",
+        inputSchema: {
+          type: "object",
+          properties: {
+            coverLetterData: { type: "object" },
+            template: { type: "string" },
+          },
+          required: ["coverLetterData"],
+        },
+      },
+      {
+        name: "prepare_job_application_package",
+        description: "Generate both resume and cover letter PDF binaries for a tailored job application package.",
+        serverName: "Resume & Cover Letter MCP",
+        serverId: "builtin-resume-coverletter",
+        inputSchema: {
+          type: "object",
+          properties: {
+            targetTitle: { type: "string" },
+            companyName: { type: "string" },
+            resumeData: { type: "object" },
+            coverLetterData: { type: "object" },
+          },
+          required: ["targetTitle", "companyName", "resumeData", "coverLetterData"],
+        },
+      },
+    ],
+  },
+];
+
+export function isToolEnabled(server: MCPServerConfig, toolName: string): boolean {
+  if (!server.enabled) return false;
+  if (!server.enabledTools || server.enabledTools.length === 0) return true; // all active by default
+  return server.enabledTools.includes(toolName);
+}
+
+export function toggleToolForServer(
+  servers: MCPServerConfig[],
+  serverId: string,
+  toolName: string,
+  enabled: boolean
+): MCPServerConfig[] {
+  return servers.map((server) => {
+    if (server.id !== serverId) return server;
+    const allTools = (server.tools || []).map((t) => t.name);
+    const currentEnabled = server.enabledTools ? [...server.enabledTools] : allTools;
+    let nextEnabled: string[];
+    if (enabled) {
+      nextEnabled = currentEnabled.includes(toolName) ? currentEnabled : [...currentEnabled, toolName];
+    } else {
+      nextEnabled = currentEnabled.filter((t) => t !== toolName);
+    }
+    return { ...server, enabledTools: nextEnabled };
+  });
+}
+
+export function setAllToolsForServer(
+  servers: MCPServerConfig[],
+  serverId: string,
+  enableAll: boolean
+): MCPServerConfig[] {
+  return servers.map((server) => {
+    if (server.id !== serverId) return server;
+    const allTools = (server.tools || []).map((t) => t.name);
+    return { ...server, enabledTools: enableAll ? allTools : [] };
+  });
+}
+
+export function getActiveMCPTools(servers: MCPServerConfig[]): MCPToolSchema[] {
+  const activeTools: MCPToolSchema[] = [];
+  for (const server of servers) {
+    if (!server.enabled) continue;
+    for (const tool of server.tools || []) {
+      if (isToolEnabled(server, tool.name)) {
+        activeTools.push(tool);
+      }
+    }
+  }
+  return activeTools;
+}
+
+export function loadMCPServers(): MCPServerConfig[] {
+  if (typeof window === "undefined") return BUILTIN_MCP_SERVERS;
+  try {
+    const raw = tryLocalStorageGet(MCP_SERVERS_STORAGE_ID);
+    if (!raw) return BUILTIN_MCP_SERVERS;
+    const custom = JSON.parse(raw) as MCPServerConfig[];
+    
+    // Merge builtins with custom servers
+    const builtins = BUILTIN_MCP_SERVERS.map((b) => {
+      const existing = custom.find((c) => c.id === b.id);
+      return existing
+        ? {
+            ...b,
+            enabled: existing.enabled,
+            enabledTools: existing.enabledTools || b.tools?.map((t) => t.name),
+          }
+        : b;
+    });
+
+    const userDefined = custom.filter((c) => !BUILTIN_MCP_SERVERS.some((b) => b.id === c.id));
+    return [...builtins, ...userDefined];
+  } catch (e) {
+    console.error("Failed to load MCP servers:", e);
+    return BUILTIN_MCP_SERVERS;
+  }
+}
+
+export function saveMCPServers(servers: MCPServerConfig[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    tryLocalStorageSet(MCP_SERVERS_STORAGE_ID, JSON.stringify(servers));
+  } catch (e) {
+    console.error("Failed to save MCP servers:", e);
+  }
+}
+
+/**
+ * Fetch and discover tools from an MCP server using JSON-RPC 2.0 tools/list.
+ */
+export async function discoverMCPTools(server: MCPServerConfig): Promise<MCPToolSchema[]> {
+  try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(server.headers || {}),
+    };
+    if (server.apiKey) {
+      headers["Authorization"] = `Bearer ${server.apiKey}`;
+      headers["x-api-key"] = server.apiKey;
+    }
+
+    const payload = {
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/list",
+      params: {},
+    };
+
+    const res = await fetch(server.url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+
+    const json = await res.json();
+    const tools = json?.result?.tools || [];
+
+    return tools.map((t: any) => ({
+      name: t.name,
+      description: t.description,
+      inputSchema: t.inputSchema || t.parameters,
+      serverName: server.name,
+      serverId: server.id,
+    }));
+  } catch (err: any) {
+    console.error(`Failed to discover tools on ${server.name}:`, err);
+    throw err;
+  }
+}
+
+/**
+ * Execute an MCP tool on its corresponding server via JSON-RPC 2.0 tools/call.
+ */
+export async function executeMCPTool(
+  server: MCPServerConfig,
+  toolName: string,
+  toolArguments: Record<string, any>
+): Promise<any> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(server.headers || {}),
+  };
+  if (server.apiKey) {
+    headers["Authorization"] = `Bearer ${server.apiKey}`;
+    headers["x-api-key"] = server.apiKey;
+  }
+
+  const payload = {
+    jsonrpc: "2.0",
+    id: Date.now(),
+    method: "tools/call",
+    params: {
+      name: toolName,
+      arguments: toolArguments,
+    },
+  };
+
+  const res = await fetch(server.url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`MCP tool execution failed (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+  if (data.error) {
+    throw new Error(data.error.message || "MCP tool error");
+  }
+
+  return data.result;
+}

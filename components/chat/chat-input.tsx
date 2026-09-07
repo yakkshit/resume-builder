@@ -35,7 +35,7 @@ export function ChatInput({
   }, [value]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       if (!isLoading && value.trim()) {
         onSubmit(e as unknown as React.FormEvent);
@@ -80,7 +80,7 @@ export function ChatInput({
         </Button>
       </div>
       <p className="text-xs text-center text-muted-foreground mt-2">
-        Press Enter to send, Shift+Enter for new line
+        Press Cmd+Enter (or Ctrl+Enter) to send, Enter for a new line
       </p>
     </form>
   );

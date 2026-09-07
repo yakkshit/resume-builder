@@ -18,7 +18,6 @@ const JobRecommendations = dynamic(
   { loading },
 );
 const AutoApplier = dynamic(() => import("./components/auto-applier").then((m) => m.AutoApplier), { loading });
-const MockInterview = dynamic(() => import("./components/mock-interview").then((m) => m.MockInterview), { loading });
 const CodingChallenge = dynamic(
   () => import("./components/coding-challenge").then((m) => m.CodingChallenge),
   { loading },
@@ -36,8 +35,8 @@ const LinkedinDmPanel = dynamic(
   () => import("./components/linkedin-dm-panel").then((m) => m.LinkedinDmPanel),
   { loading },
 );
-const InterviewLabPanel = dynamic(
-  () => import("./interview-lab-panel").then((m) => m.InterviewLabPanel),
+const JobScraperCard = dynamic(
+  () => import("./components/job-scraper-card").then((m) => m.JobScraperCard),
   { loading },
 );
 const ResumeLatexArtifact = dynamic(
@@ -50,28 +49,14 @@ export type ComponentType =
   | "cover-letter"
   | "cv-score"
   | "job-recommendations"
+  | "job-scraper"
   | "auto-applier"
-  | "mock-interview"
   | "coding-challenge"
   | "learning-resources"
   | "email-hr"
   | "linkedin-dm"
-  | "interview-lab"
   | "resume-latex"
   | "cover-letter-latex";
-
-export type InterviewLabRenderContext = {
-  apiKey: string;
-  model: string;
-  openaiTranscriptionApiKey: string;
-  vercelOidcToken: string;
-  onSwitchToGemini?: () => void;
-  onToast?: (
-    variant: "default" | "success" | "error" | "warning",
-    message: string,
-    meta?: { docsUrl?: string },
-  ) => void;
-};
 
 interface ComponentRendererProps {
   type: ComponentType;
@@ -85,8 +70,7 @@ interface ComponentRendererProps {
    * Only the latest resume block in the chat should pass true.
    */
   resumeSyncsWithGlobal?: boolean;
-  /** Required when rendering `interview-lab` inline in chat */
-  interviewLabContext?: InterviewLabRenderContext;
+  onSendMessage?: (text: string) => void;
 }
 
 export function ComponentRenderer({
@@ -95,7 +79,7 @@ export function ComponentRenderer({
   chatApiKey,
   chatModel,
   resumeSyncsWithGlobal,
-  interviewLabContext,
+  onSendMessage,
 }: ComponentRendererProps) {
   const translationFieldId = useId();
   const [targetLanguage, setTargetLanguage] = useState(TRANSLATION_ORIGINAL);
@@ -212,12 +196,24 @@ export function ComponentRenderer({
       );
     case "job-recommendations": {
       const d = activeData as any;
-      // Server/UI typically emits jobLinks format: { links: [{ title, url, company }] }
-      // Our in-chat component uses JobRecommendations; accept either `links` or `jobs`.
       return (
         <div>
           {header}
           <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />
+        </div>
+      );
+    }
+    case "job-scraper": {
+      const d = activeData as any;
+      return (
+        <div>
+          {header}
+          <JobScraperCard
+            initialQuery={d?.query || ""}
+            initialLocation={d?.location || "Remote"}
+            initialJobs={Array.isArray(d?.jobs) ? d.jobs : []}
+            onSendMessage={onSendMessage}
+          />
         </div>
       );
     }
@@ -226,13 +222,6 @@ export function ComponentRenderer({
         <div>
           {header}
           <AutoApplier />
-        </div>
-      );
-    case "mock-interview":
-      return (
-        <div>
-          {header}
-          <MockInterview data={activeData as any} />
         </div>
       );
     case "coding-challenge":
@@ -263,32 +252,6 @@ export function ComponentRenderer({
           <LinkedinDmPanel data={activeData} />
         </div>
       );
-    case "interview-lab": {
-      const ctx = interviewLabContext;
-      if (!ctx) {
-        return (
-          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-            Interview Lab needs chat settings (API keys). Open Interview Lab from the toolbar instead.
-          </p>
-        );
-      }
-      return (
-        <div>
-          {header}
-          <InterviewLabPanel
-            variant="embedded"
-            open
-            onOpenChange={() => {}}
-            apiKey={ctx.apiKey}
-            model={ctx.model}
-            openaiTranscriptionApiKey={ctx.openaiTranscriptionApiKey}
-            vercelOidcToken={ctx.vercelOidcToken}
-            onSwitchToGemini={ctx.onSwitchToGemini}
-            onToast={ctx.onToast}
-          />
-        </div>
-      );
-    }
     case "resume-latex": {
       const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
       const latex = typeof rec?.latex === "string" ? rec.latex : undefined;
@@ -299,11 +262,12 @@ export function ComponentRenderer({
         </div>
       );
     }
-    default:                   return null;
+    default:
+      return null;
   }
 }
 
-// ── Response generator (deterministic mock — replace with real AI SDK call) ─
+// ── Response generator (deterministic mock fallback) ─
 
 interface GeneratedResponse {
   text: string;
@@ -327,22 +291,16 @@ export function generateAIResponse(userInput: string, _apiKey: string, _model: s
       componentData: { score: 85, jobMatch: 78 },
     };
   }
-  if (lower.includes("job") || lower.includes("recommend") || lower.includes("opportunit")) {
+  if (lower.includes("job") || lower.includes("scrape") || lower.includes("search") || lower.includes("recommend") || lower.includes("opportunit")) {
     return {
-      text: "Based on your profile and skills, here are the **top job matches** for you right now:",
-      componentType: "job-recommendations",
+      text: "Based on your target roles and skills, here is the **Live Job Scraper & Matcher** for finding and tailoring roles:",
+      componentType: "job-scraper",
     };
   }
   if (lower.includes("apply") || lower.includes("auto") || lower.includes("automat")) {
     return {
       text: "Starting the automated application flow. I'll search for matching positions, tailor your resume, and submit applications on your behalf:",
       componentType: "auto-applier",
-    };
-  }
-  if (lower.includes("interview") || lower.includes("practice") || lower.includes("prepare")) {
-    return {
-      text: "Let's warm up for your interview! Here are practice questions tailored to your target role:",
-      componentType: "mock-interview",
     };
   }
   if (lower.includes("code") || lower.includes("challenge") || lower.includes("algorithm") || lower.includes("leetcode")) {
@@ -359,11 +317,11 @@ export function generateAIResponse(userInput: string, _apiKey: string, _model: s
   }
   if (lower.includes("create") || lower.includes("help") || lower.includes("start")) {
     return {
-      text: `Here's what I can do for you:\n\n- **Resume** — Build, edit, and customize your resume\n- **CV Score** — Analyze compatibility with job descriptions\n- **Job Matches** — Find roles tailored to your profile\n- **Auto-Apply** — Let me apply to jobs on your behalf\n- **Mock Interview** — Practice with curated questions\n- **Coding Challenges** — Sharpen your technical skills\n- **Learning** — Discover courses to fill skill gaps\n\nJust tell me what you'd like to work on!`,
+      text: `Here's what I can do for you:\n\n- **Resume** — Build, edit, and customize your resume\n- **Job Scraper & Matching** — Search live developer openings and match with 1 click\n- **MCP Servers** — Connect real-world tools and external services\n- **CV Score** — Analyze compatibility with job descriptions\n- **Auto-Apply** — Let me apply to jobs on your behalf\n- **Coding Challenges** — Sharpen your technical skills\n- **Learning** — Discover courses to fill skill gaps\n\nJust tell me what you'd like to work on!`,
     };
   }
 
   return {
-    text: `I'm your AI career assistant. I can help you with:\n\n1. **Building** a tailored resume\n2. **Analyzing** your CV score vs job descriptions\n3. **Finding** matching job opportunities\n4. **Automating** job applications\n5. **Preparing** for technical interviews\n6. **Practicing** coding challenges\n7. **Discovering** learning resources\n\nWhat would you like to work on today?`,
+    text: `I'm your AI career and resume assistant with MCP & Job Scraping capabilities. I can help you with:\n\n1. **Building & Tailoring** your resume and cover letter\n2. **Scraping & Searching** real-time job openings\n3. **Executing MCP Tools** to produce PDFs and analyze qualifications\n4. **Analyzing** your CV score vs job requirements\n5. **Automating** job applications\n6. **Practicing** coding challenges\n\nWhat would you like to work on today?`,
   };
 }

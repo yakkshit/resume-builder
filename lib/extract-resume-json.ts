@@ -95,7 +95,7 @@ export function unwrapResumeEnvelope(obj: Record<string, unknown> | null): {
   if (props && typeof props === "object" && !Array.isArray(props)) {
     const p = props as Record<string, unknown>
     const pt = typeof p.template === "string" ? p.template : topTemplate
-    const fromProps = tryFlat(p, pt)
+    const fromProps = tryFlat(p)
     if (fromProps) return { resume: fromProps, template: pt }
     const prd = p.resumeData
     if (prd && typeof prd === "object" && !Array.isArray(prd)) {
@@ -169,7 +169,8 @@ export function extractResumePayloadFromMessage(content: string): ExtractedResum
       fromFence = { resume, template: safeTemplate(template) }
     }
   })
-  if (fromFence?.resume) return fromFence
+  const fenceResult = fromFence as ExtractedResumePayload | null
+  if (fenceResult?.resume) return fenceResult
 
   // 2) Whole message is JSON
   const jsonStartMatch = trimmed.match(/^\s*(\{[\s\S]*\})\s*$/)

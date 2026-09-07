@@ -3,7 +3,9 @@ export type JobSuggestion = {
   title: string;
   company: string;
   location: string;
+  salary?: string;
   link: string;
+  description?: string;
   postedMinutesAgo?: number;
 };
 

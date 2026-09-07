@@ -12,8 +12,8 @@ const getMsgText = (m: { content?: string; parts?: Array<{ type: string; text?: 
 
 const MAX_CONTEXT_TEXT_CHARS = 12_000
 const MAX_MEMORY_CONTEXT_CHARS = 10_000
-const MAX_RETRIEVAL_CONTEXT_CHARS = 8_000
-const MAX_PROFILE_JSON_CHARS = 4_000
+const MAX_RETRIEVAL_CONTEXT_CHARS = 12_000
+const MAX_PROFILE_JSON_CHARS = 16_000
 
 function clipForPrompt(value: string | undefined, maxChars: number): string {
   const text = (value ?? "").trim()
@@ -80,11 +80,14 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "gpt-5.3-codex-spark": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-4o": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-4o-mini": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "o3-mini": { provider: "openai", modelId: "o3-mini", apiKey: process.env.OPENAI_API_KEY },
+  "o1": { provider: "openai", modelId: "o1", apiKey: process.env.OPENAI_API_KEY },
   "gpt-4-turbo": { provider: "openai", modelId: "gpt-4-turbo", apiKey: process.env.OPENAI_API_KEY },
   "gpt-4": { provider: "openai", modelId: "gpt-4-turbo", apiKey: process.env.OPENAI_API_KEY },
   "gpt-3.5-turbo": { provider: "openai", modelId: "gpt-3.5-turbo", apiKey: process.env.OPENAI_API_KEY },
 
-  // Anthropic Claude (4.x/5 + legacy; newer slugs may need API model IDs)
+  // Anthropic Claude
+  "claude-3-7-sonnet": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-opus-4.6": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-opus-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-sonnet-5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
@@ -110,6 +113,7 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "llama-3.1-8b-instant": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
   "llama-3.1-70b-versatile": { provider: "groq", modelId: "llama-3.1-70b-versatile", apiKey: process.env.GROQ_API_KEY },
   "llama-3.3-70b-versatile": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "deepseek-r1-distill-llama-70b": { provider: "groq", modelId: "deepseek-r1-distill-llama-70b", apiKey: process.env.GROQ_API_KEY },
   "mixtral-8x7b-32768": { provider: "groq", modelId: "mixtral-8x7b-32768", apiKey: process.env.GROQ_API_KEY },
   "gemma2-9b-it": { provider: "groq", modelId: "gemma2-9b-it", apiKey: process.env.GROQ_API_KEY },
   "llama-3.1-8b": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
@@ -406,7 +410,7 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
   if (chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)) {
     const profileJson = clipForPrompt(JSON.stringify(chatGlobalProfile), MAX_PROFILE_JSON_CHARS)
     if (profileJson) {
-      systemMessage += `\n\nGlobal profile context (profile icon is enabled in chat): ${profileJson}`
+      systemMessage += `\n\nGlobal Master Career Profile & Memory Vault:\n${profileJson}\n\nMaster Memory Vault Grounding Rules:\n- Ground strictly on the user's provided Master Memory Vault / Profile data (career goals, summary, skills, work history, projects, education, certifications, languages). Never hallucinate or assume placeholder data (such as John Doe, Spanish, French, etc.).\n- When the user requests a tailored resume, CV score, cover letter, or job application for ANY specific job description or target role, select and prioritize the most relevant achievements, skills, and projects directly from their Memory Vault.`
     }
   }
 
@@ -417,24 +421,74 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
 
   const clippedRetrievalContext = clipForPrompt(retrievalContext, MAX_RETRIEVAL_CONTEXT_CHARS)
   if (clippedRetrievalContext) {
-    systemMessage += `\n\nRetrieved conversation/context snippets (RAG-style):\n${clippedRetrievalContext}`
+    systemMessage += `\n\nRetrieved conversation/context snippets (Memory Vault):\n${clippedRetrievalContext}`
   }
 
-  systemMessage += `\n\nBehavior requirements:
+  systemMessage += `\n\nBehavior & Formatting Requirements:
 - Use the full conversation history provided in this request as the primary source of user intent.
-- Use the latest resume snapshot in this request (already merged from editor + chat changes) when tailoring resumes.
-- If user manually edited resume content earlier in this chat flow, preserve and build on those edits unless the user asks to replace them.
-- When user asks to customize for a job description, prioritize direct job requirements and measurable relevance in bullets/skills/summary.`
+- Use the user's Master Memory Vault as the ultimate source of truth when tailoring resumes or answering career questions.
+- **Page Length & Budget Calibration**:
+  - **1-Page Resume Request**: High-impact density. Emit 1 concise summary (2–3 sentences), 6–10 prioritized skills, 2–3 most relevant roles with 2–3 quantified bullet points each, top 2 key projects with tech stack, and concise education & languages.
+  - **2-Page Resume Request**: Comprehensive depth. Emit an expanded technical summary, categorized core skill clusters (e.g. Languages, AI & Robotics, Frontend/Mobile, Backend/Cloud), 4–6 detailed roles with 3–4 bullet points each with metrics and impact, 3–5 featured projects with technology stacks, full education, certifications, and languages.
+- When user asks to customize for a job description, prioritize direct job requirements and measurable relevance in bullets/skills/summary.
+- **Chain of Thought & Reasoning**:
+  When planning complex tasks, evaluating ATS scores, scraping jobs, tailoring resumes, or generating cover letters, wrap your step-by-step reasoning in \\<think\\>...\\</think\\>.
+  In your thinking, declare which tool you are executing (e.g., using tool: search_jobs, using tool: scrape_github_profile, using tool: generate_cover_letter_pdf, using tool: ingest_memory_vault).
+  This reasoning will be streamed directly into the user's collapsible Chain of Thought / Reasoning panel.
 
-  const normalizedPreferredLanguage =
-    typeof preferredLanguage === "string" ? preferredLanguage.trim().toLowerCase() : ""
-  if (normalizedPreferredLanguage && normalizedPreferredLanguage !== "en") {
-    systemMessage += `\n- Default response language: ${normalizedPreferredLanguage}. Unless the user asks otherwise, generate responses and suggested content in this language.`
-  }
-
-
-
-
+- **Available Tools & Component Dispatching**:
+  1. **Job Scraping & Search**: When the user asks to find, scrape, or search jobs for any role or location, reason in \\<think\\> and emit:
+     \`\`\`component:jobScraper
+     {
+       "query": "Target Role",
+       "location": "Location / Remote",
+       "jobs": [
+         {
+           "id": "job-1",
+           "title": "Role Title",
+           "company": "Company Name",
+           "location": "Location",
+           "salary": "$X - $Y",
+           "link": "https://...",
+           "description": "Key requirements and duties...",
+           "postedMinutesAgo": 5
+         }
+       ]
+     }
+     \`\`\`
+     This renders the interactive Job Scraper Card directly inside the chat conversation stream.
+  2. **Cover Letter Generator**: When the user requests a tailored cover letter or application letter, reason in \\<think\\> and emit:
+     \`\`\`component:coverLetter
+     {
+       "head": "Sender & Recipient details, Date, Subject line",
+       "body": "Opening hook, core achievements aligned to the role, value proposition, and closing enthusiasm",
+       "footer": "Sincerely,\\n[User Name]",
+       "template": "modern"
+     }
+     \`\`\`
+     This renders the interactive Cover Letter PDF viewer with instant template switching and single-block editor inside the chat.
+  3. **Resume / CV Generator**: When generating or tailoring resumes, emit:
+     \`\`\`component:cv
+     {
+       "resumeData": {
+         "basicInfo": {},
+         "experience": [],
+         "education": [],
+         "skills": {}
+       },
+       "template": "modern"
+     }
+     \`\`\`
+  4. **Memory Vault Ingestion**: When the user attaches a document, PDF, or asks to add career achievements/goals/notes to their Memory Vault, reason in \\<think\\> and emit:
+     \`\`\`component:memoryVault
+     {
+       "title": "Ingest Career Document / Experience",
+       "content": "Formatted markdown of achievements or document text to add...",
+       "source": "filename.pdf"
+     }
+     \`\`\`
+     This renders an interactive card with a 'Yes, Add to Memory Vault' button that allows the user to confirm and persist the knowledge directly into their Memory Vault.
+  5. **GitHub & LinkedIn Grounding**: Ground directly on public repositories, stars, and LinkedIn history to extract authentic career milestones without dummy placeholder hallucination.`
 
   // Format the conversation for the AI
   const messagesList = Array.isArray(messages) ? messages : []

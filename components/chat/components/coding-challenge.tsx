@@ -72,38 +72,7 @@ export function CodingChallenge({ data }: CodingChallengeProps) {
     setExecMode(null);
     setExecMs(null);
     try {
-      const token = getVercelOidcToken().trim();
       const startedAt = performance.now();
-
-      // Prefer sandbox for TS/JS/Python when token exists.
-      if (token && (lang === "typescript" || lang === "javascript" || lang === "python")) {
-        const res = await fetch("/api/interview-lab/sandbox-run", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ oidcToken: token, language: lang, code }),
-        });
-        const j = (await res.json().catch(() => ({}))) as {
-          ok?: boolean;
-          passed?: boolean;
-          output?: string;
-          error?: string;
-          hint?: string;
-          ms?: number;
-        };
-        setExecMode("vercel-sandbox");
-        setExecMs(typeof j.ms === "number" ? Math.round(j.ms) : Math.round(performance.now() - startedAt));
-
-        if (res.ok && j.ok) {
-          const passed = Boolean(j.passed);
-          setStatus(passed ? "pass" : "fail");
-          if (!passed && j.error) setRunError(j.error);
-          if (j.output?.trim()) setRunDetails(j.output.trim());
-          return;
-        }
-        // fall back
-        setRunError(j.hint || j.error || "Sandbox run failed; falling back to local VM.");
-      }
-
       const res = await fetch("/api/code-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

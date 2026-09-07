@@ -1,11 +1,18 @@
 "use client";
 
-import React, { Children, isValidElement } from "react";
+import React, { Children, isValidElement, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
-import { stripIncompleteJsonTail } from "@/lib/streaming-chat-content";
+import { stripIncompleteJsonTail, parseChainOfThought, type ParsedToolCall } from "@/lib/streaming-chat-content";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtContent,
+  ChainOfThoughtStep,
+  ChainOfThoughtTool,
+} from "@/components/ai-elements/chain-of-thought";
 import { renderChatComponent, type ComponentType, type CvComponentContext } from "./chat-component-registry";
 
 /** HAST / React can pass className as string or string[] — normalize for language checks */
@@ -158,10 +165,13 @@ function normalizeComponentType(s: string): ComponentType | null {
     coverletter: "coverLetter",
     joblinks: "jobLinks",
     cvscorer: "cvScorer",
-    course: "course",
-    mockinterview: "mockInterview",
+    jobscraper: "jobScraper",
+    jobscrapercard: "jobScraper",
     hrnote: "hrNote",
     jobapplysimulator: "jobApplySimulator",
+    memoryvault: "memoryVault",
+    "memory-vault": "memoryVault",
+    memory_vault: "memoryVault",
   };
   return map[key] ?? null;
 }
@@ -196,13 +206,47 @@ export function ChatMessageRenderer({
   dark: _dark = false,
 }: ChatMessageRendererProps) {
   const raw = content ?? "";
-  const normalizedContent = normalizeComponentMarkdown(stripIncompleteJsonTail(raw, isStreaming));
+  const cotResult = parseChainOfThought(raw, isStreaming);
+  const normalizedContent = normalizeComponentMarkdown(stripIncompleteJsonTail(cotResult.cleanedContent, isStreaming));
+
+  const hasCoT = Boolean(cotResult.thinkingText || cotResult.tools.length > 0 || cotResult.isThinkingActive);
+
   if (!normalizedContent.trim()) {
+    if (hasCoT) {
+      return (
+        <div className={cn("space-y-3", className)}>
+          <ChainOfThought defaultOpen={isStreaming || cotResult.isThinkingActive}>
+            <ChainOfThoughtHeader isStreaming={isStreaming && cotResult.isThinkingActive} toolCount={cotResult.tools.length}>
+              {cotResult.isThinkingActive ? "Thinking & Executing Tools…" : "Reasoning & Tools"}
+            </ChainOfThoughtHeader>
+            <ChainOfThoughtContent>
+              {cotResult.tools.length > 0 && (
+                <div className="space-y-1.5 pt-1">
+                  {cotResult.tools.map((t, idx) => (
+                    <ChainOfThoughtTool key={idx} name={t.name} args={t.args} status={t.status} output={t.output} />
+                  ))}
+                </div>
+              )}
+              {cotResult.thinkingText && (
+                <div className="rounded-lg bg-background/60 p-2.5 text-xs text-muted-foreground whitespace-pre-wrap font-mono border border-border/40 max-h-60 overflow-y-auto leading-relaxed mt-1">
+                  {cotResult.thinkingText}
+                  {cotResult.isThinkingActive && (
+                    <span className="inline-block w-1.5 h-3 ml-1 bg-sky-400 animate-pulse align-middle" />
+                  )}
+                </div>
+              )}
+            </ChainOfThoughtContent>
+          </ChainOfThought>
+          {isStreaming && !cotResult.isThinkingActive && <StreamingStructuredPlaceholder />}
+        </div>
+      );
+    }
     if (isStreaming && raw.trim()) {
       return <StreamingStructuredPlaceholder />;
     }
     return null;
   }
+
   const parts = parseContentWithComponents(normalizedContent);
   const hasParsedComponent = parts.some((p) => p.type === "component");
 
@@ -230,6 +274,30 @@ export function ChatMessageRenderer({
 
   return (
     <div className={cn("space-y-4", className)}>
+      {hasCoT && (
+        <ChainOfThought defaultOpen={isStreaming || cotResult.isThinkingActive}>
+          <ChainOfThoughtHeader isStreaming={isStreaming && cotResult.isThinkingActive} toolCount={cotResult.tools.length}>
+            {cotResult.isThinkingActive ? "Thinking & Executing Tools…" : "Reasoning & Tools"}
+          </ChainOfThoughtHeader>
+          <ChainOfThoughtContent>
+            {cotResult.tools.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                {cotResult.tools.map((t, idx) => (
+                  <ChainOfThoughtTool key={idx} name={t.name} args={t.args} status={t.status} output={t.output} />
+                ))}
+              </div>
+            )}
+            {cotResult.thinkingText && (
+              <div className="rounded-lg bg-background/60 p-2.5 text-xs text-muted-foreground whitespace-pre-wrap font-mono border border-border/40 max-h-60 overflow-y-auto leading-relaxed mt-1">
+                {cotResult.thinkingText}
+                {cotResult.isThinkingActive && (
+                  <span className="inline-block w-1.5 h-3 ml-1 bg-sky-400 animate-pulse align-middle" />
+                )}
+              </div>
+            )}
+          </ChainOfThoughtContent>
+        </ChainOfThought>
+      )}
       {parts.map((part, i) => {
         if (part.type === "markdown") {
           return (

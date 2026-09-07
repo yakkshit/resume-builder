@@ -257,29 +257,37 @@ export function sanitizeResumeData(data: Partial<ResumeData> | unknown): ResumeD
   }
 }
 
+import { validateAndNormalizeResumeData } from "./resume-schema"
+
 /**
  * Merges partial AI-generated resume JSON with defaults, then sanitizes.
  * Prevents React-PDF / chat CV preview from crashing on missing fields or bad types.
  */
 export function mergeResumeDataWithDefault(incoming: unknown): ResumeData {
-  const base = defaultResumeData
   if (!incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
-    return sanitizeResumeData({ ...base })
+    return validateAndNormalizeResumeData(defaultResumeData)
   }
-  const r = incoming as Record<string, unknown>
-  const sanitizedIncoming = sanitizeResumeData(r)
-  const merged: ResumeData = {
+  const base = defaultResumeData
+  const sanitizedIncoming = sanitizeResumeData(incoming as Record<string, unknown>)
+  const merged = {
     basicInfo: {
       ...base.basicInfo,
       ...sanitizedIncoming.basicInfo,
       name: sanitizedIncoming.basicInfo.name || base.basicInfo.name,
       title: sanitizedIncoming.basicInfo.title || base.basicInfo.title,
+      email: sanitizedIncoming.basicInfo.email || base.basicInfo.email,
+      phone: sanitizedIncoming.basicInfo.phone || base.basicInfo.phone,
+      location: sanitizedIncoming.basicInfo.location || base.basicInfo.location,
+      linkedin: sanitizedIncoming.basicInfo.linkedin || base.basicInfo.linkedin,
+      website: sanitizedIncoming.basicInfo.website || base.basicInfo.website,
+      summary: sanitizedIncoming.basicInfo.summary || base.basicInfo.summary,
     },
     experience: sanitizedIncoming.experience.length ? sanitizedIncoming.experience : base.experience,
     education: sanitizedIncoming.education.length ? sanitizedIncoming.education : base.education,
     skills: sanitizedIncoming.skills.length ? sanitizedIncoming.skills : base.skills,
-    projects: (sanitizedIncoming.projects && sanitizedIncoming.projects.length) ? sanitizedIncoming.projects : base.projects,
-    achievements: (sanitizedIncoming.achievements && sanitizedIncoming.achievements.length) ? sanitizedIncoming.achievements : base.achievements,
+    projects: (sanitizedIncoming.projects && sanitizedIncoming.projects.length) ? sanitizedIncoming.projects : (base.projects || []),
+    achievements: (sanitizedIncoming.achievements && sanitizedIncoming.achievements.length) ? sanitizedIncoming.achievements : (base.achievements || []),
   }
-  return sanitizeResumeData(merged)
+  return validateAndNormalizeResumeData(merged)
 }
+
