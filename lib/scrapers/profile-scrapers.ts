@@ -168,7 +168,17 @@ export function parseLinkedInPublicProfile(rawText: string): LinkedInParsedProfi
         const clean = line.replace(/^[#*-]+\s*/, "").replace(/\*\*/g, "");
         education.push({ institution: clean });
       }
-    } else if (!headline && !line.startsWith("#")) {
+    } else if (line.startsWith("#")) {
+      // Name heading like "# John Doe" - skip so next non-heading line is captured as headline
+      continue;
+    } else if (!headline) {
+      headline = line;
+    } else if (
+      headline.split(" ").length <= 4 &&
+      !/(engineer|developer|manager|lead|architect|scientist|director|designer|consultant|at |—|-)/i.test(headline) &&
+      /(engineer|developer|manager|lead|architect|scientist|director|designer|consultant|at |—|-)/i.test(line)
+    ) {
+      // Previous line was likely just the person's name (e.g., "John Doe"), this line is the actual headline
       headline = line;
     }
   }

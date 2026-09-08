@@ -517,6 +517,27 @@ async function handleToolCall(name: string, args: any) {
   throw new Error(`Unknown tool: ${name}`)
 }
 
+import { DatabaseService } from "@/lib/db/plsql-storage"
+
+function extractAuthToken(req: NextRequest): string | null {
+  const authHeader = req.headers.get("authorization") || req.headers.get("x-api-key") || req.headers.get("x-mcp-token")
+  if (authHeader) {
+    if (authHeader.startsWith("Bearer ")) {
+      return authHeader.slice(7).trim()
+    }
+    return authHeader.trim()
+  }
+  const { searchParams } = new URL(req.url)
+  return searchParams.get("token") || searchParams.get("auth") || null
+}
+
+function extractHarnessId(req: NextRequest): string | null {
+  const harnessHeader = req.headers.get("x-mcp-harness")
+  if (harnessHeader) return harnessHeader.trim()
+  const { searchParams } = new URL(req.url)
+  return searchParams.get("harness") || searchParams.get("agent") || null
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, {
     status: 204,
@@ -526,6 +547,24 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
   try {
+    const token = extractAuthToken(req)
+    const harnessId = extractHarnessId(req)
+
+    let allowedTools = TOOLS
+    let serverName = "career-agent-mcp-server"
+
+    // If an agent harness is requested, resolve its tool subset and verify token
+    if (harnessId) {
+      const harness = await DatabaseService.getAgentHarnessBySlugOrToken(harnessId, token || undefined)
+      if (harness) {
+        serverName = `career-agent-harness-${harness.slug}`
+        const selected = Array.isArray(harness.selectedTools) ? (harness.selectedTools as string[]) : []
+        if (selected.length > 0) {
+          allowedTools = TOOLS.filter((t) => selected.includes(t.name))
+        }
+      }
+    }
+
     const json = await req.json()
     const { jsonrpc, id, method, params } = json
 
@@ -543,8 +582,8 @@ export async function POST(req: NextRequest) {
               logging: {},
             },
             serverInfo: {
-              name: "resume-coverletter-mcp-server",
-              version: "1.0.0",
+              name: serverName,
+              version: "2.0.0",
             },
           },
         },
@@ -573,7 +612,7 @@ export async function POST(req: NextRequest) {
           jsonrpc: "2.0",
           id,
           result: {
-            tools: TOOLS,
+            tools: allowedTools,
           },
         },
         { headers: corsHeaders }
@@ -608,6 +647,22 @@ export async function POST(req: NextRequest) {
 
     if (method === "tools/call") {
       const { name, arguments: toolArgs } = params || {}
+
+      // Verify tool is permitted in this harness
+      if (!allowedTools.some((t) => t.name === name)) {
+        return NextResponse.json(
+          {
+            jsonrpc: "2.0",
+            id,
+            error: {
+              code: -32601,
+              message: `Tool '${name}' is not authorized or available in this Career Agent MCP harness.`,
+            },
+          },
+          { headers: corsHeaders, status: 403 }
+        )
+      }
+
       const result = await handleToolCall(name, toolArgs)
       return NextResponse.json(
         {
@@ -648,16 +703,79 @@ export async function GET(req: NextRequest) {
   const host = req.headers.get("host") || "localhost:3000"
   const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https")
   const baseUrl = `${proto}://${host}`
+  const token = extractAuthToken(req) || "mcp_sec_live_token"
+  const harnessId = extractHarnessId(req)
+
+  let allowedTools = TOOLS
+  let serverName = "career-agent-mcp-server"
+
+  if (harnessId) {
+    const harness = await DatabaseService.getAgentHarnessBySlugOrToken(harnessId, token)
+    if (harness) {
+      serverName = `career-agent-harness-${harness.slug}`
+      const selected = Array.isArray(harness.selectedTools) ? (harness.selectedTools as string[]) : []
+      if (selected.length > 0) {
+        allowedTools = TOOLS.filter((t) => selected.includes(t.name))
+      }
+    }
+  }
+
+  const endpointUrl = harnessId
+    ? `${baseUrl}/api/mcp?harness=${encodeURIComponent(harnessId)}&token=${token}`
+    : `${baseUrl}/api/mcp?token=${token}`
 
   return NextResponse.json(
     {
       status: "ok",
-      server: "resume-coverletter-mcp-server",
+      server: serverName,
+      name: "Career Agent MCP Server",
       protocolVersion: "2024-11-05",
-      endpoint: `${baseUrl}/api/mcp`,
+      endpoint: endpointUrl,
       methods: ["initialize", "ping", "tools/list", "tools/call", "resources/list", "prompts/list"],
-      supportedTools: TOOLS.map((t) => t.name),
-      tools: TOOLS,
+      supportedTools: allowedTools.map((t) => t.name),
+      tools: allowedTools,
+      clientConfigurations: {
+        cursor: {
+          configPath: "~/.cursor/mcp.json",
+          json: {
+            mcpServers: {
+              "career-agent": {
+                url: `${baseUrl}/api/mcp`,
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            },
+          },
+        },
+        claudeCode: {
+          command: `claude mcp add career-agent ${baseUrl}/api/mcp --header "Authorization: Bearer ${token}"`,
+        },
+        claudeDesktop: {
+          configPath: "~/Library/Application Support/Claude/claude_desktop_config.json",
+          json: {
+            mcpServers: {
+              "career-agent": {
+                command: "npx",
+                args: ["-y", "mcp-remote", `${baseUrl}/api/mcp`, "--header", `Authorization: Bearer ${token}`],
+              },
+            },
+          },
+        },
+        windsurf: {
+          configPath: "~/.codeium/windsurf/mcp_config.json",
+          json: {
+            mcpServers: {
+              "career-agent": {
+                serverUrl: `${baseUrl}/api/mcp`,
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            },
+          },
+        },
+      },
     },
     { headers: corsHeaders }
   )

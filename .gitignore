@@ -49,5 +49,13 @@ issues.md
 ./ai-career-assistant*.json
 # context-gen-cli security & secrets
 .env.*
+.env.production
+.env.development
 .context-gen-key
+credentials.json
+serviceAccountKey*.json
+*.key
+*.p12
+*.cert
 mcp.md
+

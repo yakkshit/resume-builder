@@ -4,8 +4,22 @@
  */
 
 import { db } from "./index";
-import { users, resumes, customModels, type User, type Resume, type CustomModel } from "./schema";
-import { eq, desc } from "drizzle-orm";
+import {
+  users,
+  resumes,
+  customModels,
+  mcpServers,
+  agentHarnesses,
+  type User,
+  type Resume,
+  type CustomModel,
+  type DbMcpServer,
+  type DbAgentHarness,
+} from "./schema";
+import { eq, desc, or, and } from "drizzle-orm";
+
+const inMemoryMcpServers = new Map<string, DbMcpServer>();
+const inMemoryHarnesses = new Map<string, DbAgentHarness>();
 
 export class DatabaseService {
   /**
@@ -266,6 +280,324 @@ export class DatabaseService {
     } catch (e) {
       console.warn("Database getUserCustomModels error:", e);
       return [];
+    }
+  }
+
+  /**
+   * Save or update an MCP server configuration in database
+   */
+  static async saveMcpServer(server: {
+    id?: string;
+    userId?: string;
+    name: string;
+    url: string;
+    type?: string;
+    authToken?: string;
+    enabled?: boolean;
+    tools?: any[];
+    enabledTools?: string[];
+    headers?: Record<string, string>;
+  }): Promise<{ success: boolean; server?: DbMcpServer }> {
+    const fallbackServer: DbMcpServer = {
+      id: (server.id || `local-mcp-${Date.now()}`) as any,
+      userId: server.userId || null,
+      name: server.name,
+      url: server.url,
+      type: server.type || "http",
+      authToken: server.authToken || null,
+      enabled: server.enabled !== false,
+      tools: server.tools || [],
+      enabledTools: server.enabledTools || [],
+      headers: server.headers || {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    if (!process.env.DATABASE_URL && !process.env.XATA_DATABASE_URL) {
+      inMemoryMcpServers.set(fallbackServer.id.toString(), fallbackServer);
+      return {
+        success: true,
+        server: fallbackServer,
+      };
+    }
+
+    try {
+      if (server.id) {
+        const [existing] = await db
+          .select()
+          .from(mcpServers)
+          .where(eq(mcpServers.id, server.id as any))
+          .limit(1);
+
+        if (existing) {
+          const [updated] = await db
+            .update(mcpServers)
+            .set({
+              name: server.name ?? existing.name,
+              url: server.url ?? existing.url,
+              type: server.type ?? existing.type,
+              authToken: server.authToken ?? existing.authToken,
+              enabled: server.enabled ?? existing.enabled,
+              tools: server.tools ?? existing.tools,
+              enabledTools: server.enabledTools ?? existing.enabledTools,
+              headers: server.headers ?? existing.headers,
+              updatedAt: new Date(),
+            })
+            .where(eq(mcpServers.id, server.id as any))
+            .returning();
+          return { success: true, server: updated };
+        }
+      }
+
+      const [created] = await db
+        .insert(mcpServers)
+        .values({
+          userId: server.userId,
+          name: server.name,
+          url: server.url,
+          type: server.type ?? "http",
+          authToken: server.authToken,
+          enabled: server.enabled ?? true,
+          tools: server.tools ?? [],
+          enabledTools: server.enabledTools ?? [],
+          headers: server.headers ?? {},
+        })
+        .returning();
+
+      return { success: true, server: created };
+    } catch (e) {
+      console.warn("Database saveMcpServer error:", e);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Get MCP servers for a user
+   */
+  static async getUserMcpServers(userId?: string): Promise<DbMcpServer[]> {
+    if (!process.env.DATABASE_URL && !process.env.XATA_DATABASE_URL) {
+      return Array.from(inMemoryMcpServers.values());
+    }
+
+    try {
+      if (userId) {
+        return await db
+          .select()
+          .from(mcpServers)
+          .where(eq(mcpServers.userId, userId))
+          .orderBy(desc(mcpServers.createdAt));
+      }
+      return await db.select().from(mcpServers).orderBy(desc(mcpServers.createdAt));
+    } catch (e) {
+      console.warn("Database getUserMcpServers error:", e);
+      return [];
+    }
+  }
+
+  /**
+   * Delete an MCP server
+   */
+  static async deleteMcpServer(id: string): Promise<boolean> {
+    inMemoryMcpServers.delete(id);
+    if (!process.env.DATABASE_URL && !process.env.XATA_DATABASE_URL) {
+      return true;
+    }
+
+    try {
+      await db.delete(mcpServers).where(eq(mcpServers.id, id as any));
+      return true;
+    } catch (e) {
+      console.warn("Database deleteMcpServer error:", e);
+      return false;
+    }
+  }
+
+  /**
+   * Save or update an Agent Harness configuration in database
+   */
+  static async saveAgentHarness(harness: {
+    id?: string;
+    userId?: string;
+    name: string;
+    description?: string;
+    slug: string;
+    authToken: string;
+    systemPrompt?: string;
+    selectedTools?: string[];
+    customInstructions?: string;
+    isPublic?: boolean;
+  }): Promise<{ success: boolean; harness?: DbAgentHarness }> {
+    const fallbackHarness: DbAgentHarness = {
+      id: (harness.id || `local-harness-${Date.now()}`) as any,
+      userId: harness.userId || null,
+      name: harness.name,
+      description: harness.description || null,
+      slug: harness.slug,
+      authToken: harness.authToken,
+      systemPrompt: harness.systemPrompt || null,
+      selectedTools: harness.selectedTools || [],
+      customInstructions: harness.customInstructions || null,
+      isPublic: harness.isPublic || false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    if (!process.env.DATABASE_URL && !process.env.XATA_DATABASE_URL) {
+      inMemoryHarnesses.set(harness.slug, fallbackHarness);
+      inMemoryHarnesses.set(fallbackHarness.id.toString(), fallbackHarness);
+      return {
+        success: true,
+        harness: fallbackHarness,
+      };
+    }
+
+    try {
+      const [existing] = await db
+        .select()
+        .from(agentHarnesses)
+        .where(or(
+          harness.id ? eq(agentHarnesses.id, harness.id as any) : undefined,
+          eq(agentHarnesses.slug, harness.slug)
+        ))
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db
+          .update(agentHarnesses)
+          .set({
+            name: harness.name ?? existing.name,
+            description: harness.description ?? existing.description,
+            authToken: harness.authToken ?? existing.authToken,
+            systemPrompt: harness.systemPrompt ?? existing.systemPrompt,
+            selectedTools: harness.selectedTools ?? existing.selectedTools,
+            customInstructions: harness.customInstructions ?? existing.customInstructions,
+            isPublic: harness.isPublic ?? existing.isPublic,
+            updatedAt: new Date(),
+          })
+          .where(eq(agentHarnesses.id, existing.id))
+          .returning();
+        return { success: true, harness: updated };
+      }
+
+      const [created] = await db
+        .insert(agentHarnesses)
+        .values({
+          userId: harness.userId,
+          name: harness.name,
+          description: harness.description,
+          slug: harness.slug,
+          authToken: harness.authToken,
+          systemPrompt: harness.systemPrompt,
+          selectedTools: harness.selectedTools ?? [],
+          customInstructions: harness.customInstructions,
+          isPublic: harness.isPublic ?? false,
+        })
+        .returning();
+
+      return { success: true, harness: created };
+    } catch (e) {
+      console.warn("Database saveAgentHarness error:", e);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Get all Agent Harnesses for a user
+   */
+  static async getUserAgentHarnesses(userId?: string): Promise<DbAgentHarness[]> {
+    if (!process.env.DATABASE_URL && !process.env.XATA_DATABASE_URL) {
+      // Filter out duplicate entries stored by ID vs slug
+      const uniqueHarnesses = new Map<string, DbAgentHarness>();
+      for (const h of inMemoryHarnesses.values()) {
+        uniqueHarnesses.set(h.slug, h);
+      }
+      return Array.from(uniqueHarnesses.values());
+    }
+
+    try {
+      if (userId) {
+        return await db
+          .select()
+          .from(agentHarnesses)
+          .where(eq(agentHarnesses.userId, userId))
+          .orderBy(desc(agentHarnesses.createdAt));
+      }
+      return await db.select().from(agentHarnesses).orderBy(desc(agentHarnesses.createdAt));
+    } catch (e) {
+      console.warn("Database getUserAgentHarnesses error:", e);
+      return [];
+    }
+  }
+
+  /**
+   * Find an Agent Harness by slug or ID and verify token
+   */
+  static async getAgentHarnessBySlugOrToken(
+    slugOrId: string,
+    token?: string
+  ): Promise<DbAgentHarness | null> {
+    if (!process.env.DATABASE_URL && !process.env.XATA_DATABASE_URL) {
+      const match = inMemoryHarnesses.get(slugOrId);
+      if (match) {
+        if (token && match.authToken !== token && !match.isPublic) {
+          return null;
+        }
+        return match;
+      }
+      return null;
+    }
+
+    try {
+      const [bySlug] = await db
+        .select()
+        .from(agentHarnesses)
+        .where(eq(agentHarnesses.slug, slugOrId))
+        .limit(1);
+
+      if (bySlug) {
+        if (token && bySlug.authToken !== token && !bySlug.isPublic) {
+          return null;
+        }
+        return bySlug;
+      }
+
+      const [byId] = await db
+        .select()
+        .from(agentHarnesses)
+        .where(eq(agentHarnesses.id, slugOrId as any))
+        .limit(1);
+
+      if (byId) {
+        if (token && byId.authToken !== token && !byId.isPublic) {
+          return null;
+        }
+        return byId;
+      }
+
+      return null;
+    } catch (e) {
+      console.warn("Database getAgentHarnessBySlugOrToken error:", e);
+      return null;
+    }
+  }
+
+  /**
+   * Delete an Agent Harness
+   */
+  static async deleteAgentHarness(idOrSlug: string): Promise<boolean> {
+    inMemoryHarnesses.delete(idOrSlug);
+    if (!process.env.DATABASE_URL && !process.env.XATA_DATABASE_URL) {
+      return true;
+    }
+
+    try {
+      await db
+        .delete(agentHarnesses)
+        .where(or(eq(agentHarnesses.id, idOrSlug as any), eq(agentHarnesses.slug, idOrSlug)));
+      return true;
+    } catch (e) {
+      console.warn("Database deleteAgentHarness error:", e);
+      return false;
     }
   }
 }

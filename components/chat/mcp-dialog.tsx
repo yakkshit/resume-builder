@@ -11,8 +11,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Server,
   Plus,
@@ -30,21 +32,32 @@ import {
   Github,
   Linkedin,
   FileCode2,
-  ToggleLeft,
-  ToggleRight,
+  Copy,
+  Check,
+  Share2,
+  Cpu,
+  Bot,
+  Sparkles,
   ChevronDown,
+  Terminal,
+  ExternalLink,
 } from "lucide-react";
 import {
   MCPServerConfig,
   MCPToolSchema,
+  AgentHarnessConfig,
   loadMCPServers,
   saveMCPServers,
+  loadAgentHarnesses,
+  saveAgentHarnesses,
+  deleteAgentHarnessLocal,
   discoverMCPTools,
   isToolEnabled,
   toggleToolForServer,
   setAllToolsForServer,
 } from "@/lib/mcp/mcp-manager";
 import { toast } from "sonner";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export interface MCPDialogProps {
   open: boolean;
@@ -76,25 +89,70 @@ function getToolCategory(name: string): { label: string; color: string; icon: Re
 }
 
 export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogProps) {
+  const [activeMainTab, setActiveMainTab] = useState<"career" | "harnesses" | "external">("career");
   const [servers, setServers] = useState<MCPServerConfig[]>([]);
+  const [harnesses, setHarnesses] = useState<AgentHarnessConfig[]>([]);
   const [activeTab, setActiveTab] = useState<string>("");
+  const [toolSearch, setToolSearch] = useState("");
+  const [expandedToolSchema, setExpandedToolSchema] = useState<string | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // External server form state
+  const [showAddForm, setShowAddForm] = useState(false);
   const [newServerName, setNewServerName] = useState("");
   const [newServerUrl, setNewServerUrl] = useState("");
   const [newServerKey, setNewServerKey] = useState("");
-  const [isTesting, setIsTesting] = useState(false);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [toolSearch, setToolSearch] = useState("");
-  const [expandedToolSchema, setExpandedToolSchema] = useState<string | null>(null);
+
+  // Agent harness form state
+  const [showHarnessForm, setShowHarnessForm] = useState(false);
+  const [harnessName, setHarnessName] = useState("");
+  const [harnessDescription, setHarnessDescription] = useState("");
+  const [harnessPrompt, setHarnessPrompt] = useState("");
+  const [harnessTools, setHarnessTools] = useState<string[]>(["search_jobs", "scrape_job_posting", "generate_resume_pdf"]);
+  const [isSavingHarness, setIsSavingHarness] = useState(false);
+
+  // Live origin for sharing
+  const [origin, setOrigin] = useState<string>("http://localhost:3000");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  const defaultAuthToken = "mcp-carrier-live-auth";
 
   useEffect(() => {
     if (open) {
       const s = loadMCPServers();
       setServers(s);
+      const h = loadAgentHarnesses();
+      setHarnesses(h);
+
+      // Fetch harnesses from DB if available
+      fetch("/api/mcp/harness")
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data.harnesses) && data.harnesses.length > 0) {
+            setHarnesses(data.harnesses);
+            saveAgentHarnesses(data.harnesses);
+          }
+        })
+        .catch(() => {});
+
       if (s.length > 0 && !activeTab) {
         setActiveTab(s[0].id);
       }
     }
   }, [open]);
+
+  const handleCopy = (text: string, key: string) => {
+    copyToClipboard(text);
+    setCopiedKey(key);
+    toast.success("Copied to clipboard!");
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
   const handleToggleServer = (id: string, enabled: boolean) => {
     const updated = servers.map((s) => (s.id === id ? { ...s, enabled } : s));
@@ -118,6 +176,68 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
     saveMCPServers(updated);
     onServersUpdated?.(updated);
     toast.success(enableAll ? "Enabled all tools" : "Disabled all tools");
+  };
+
+  const handleCreateHarness = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!harnessName.trim()) {
+      toast.error("Please enter a name for your agent harness");
+      return;
+    }
+
+    setIsSavingHarness(true);
+    try {
+      const res = await fetch("/api/mcp/harness", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: harnessName.trim(),
+          description: harnessDescription.trim(),
+          systemPrompt: harnessPrompt.trim(),
+          selectedTools: harnessTools,
+          isPublic: false,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create harness");
+
+      const created: AgentHarnessConfig = {
+        id: data.harness.id,
+        name: data.harness.name,
+        description: data.harness.description,
+        slug: data.harness.slug,
+        authToken: data.harness.authToken,
+        systemPrompt: data.harness.systemPrompt,
+        selectedTools: Array.isArray(data.harness.selectedTools) ? data.harness.selectedTools : harnessTools,
+        shareableUrl: data.shareableUrl,
+        createdAt: new Date().toISOString(),
+      };
+
+      const updated = [created, ...harnesses];
+      setHarnesses(updated);
+      saveAgentHarnesses(updated);
+      setShowHarnessForm(false);
+      setHarnessName("");
+      setHarnessDescription("");
+      setHarnessPrompt("");
+      toast.success(`Agent Harness "${created.name}" created and synced to XataDB!`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save agent harness");
+    } finally {
+      setIsSavingHarness(false);
+    }
+  };
+
+  const handleDeleteHarness = async (id: string, slug: string) => {
+    try {
+      await fetch(`/api/mcp/harness?id=${id}`, { method: "DELETE" }).catch(() => {});
+      const updated = deleteAgentHarnessLocal(id);
+      setHarnesses(updated);
+      toast.success("Agent harness deleted");
+    } catch (err: any) {
+      toast.error("Failed to delete harness");
+    }
   };
 
   const handleAddServer = async (e: React.FormEvent) => {
@@ -163,347 +283,642 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
     }
   };
 
-  const handleDeleteServer = (id: string) => {
-    const updated = servers.filter((s) => s.id !== id);
-    setServers(updated);
-    saveMCPServers(updated);
-    onServersUpdated?.(updated);
-    if (activeTab === id && updated.length > 0) {
-      setActiveTab(updated[0].id);
-    }
-    toast.success("Server removed");
-  };
-
-  const handleRefreshServer = async (server: MCPServerConfig) => {
-    setIsTesting(true);
-    try {
-      const tools = await discoverMCPTools(server);
-      const updated = servers.map((s) =>
-        s.id === server.id ? { ...s, tools, status: "connected" as const, error: undefined } : s
-      );
-      setServers(updated);
-      saveMCPServers(updated);
-      onServersUpdated?.(updated);
-      toast.success(`Refreshed ${server.name}: ${tools.length} tools available`);
-    } catch (err: any) {
-      const updated = servers.map((s) =>
-        s.id === server.id ? { ...s, status: "error" as const, error: err.message } : s
-      );
-      setServers(updated);
-      toast.error(`Failed to refresh tools: ${err.message}`);
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const currentServer = servers.find((s) => s.id === activeTab) || servers[0];
+  const careerServer = servers.find((s) => s.id === "builtin-career-agent" || s.id === "builtin-resume-coverletter") || servers[0];
+  const careerShareUrl = `${origin}/api/mcp?token=${defaultAuthToken}`;
 
   const filteredTools = useMemo(() => {
-    if (!currentServer?.tools) return [];
-    if (!toolSearch.trim()) return currentServer.tools;
+    if (!careerServer?.tools) return [];
+    if (!toolSearch.trim()) return careerServer.tools;
     const q = toolSearch.toLowerCase();
-    return currentServer.tools.filter(
+    return careerServer.tools.filter(
       (t) => t.name.toLowerCase().includes(q) || (t.description || "").toLowerCase().includes(q)
     );
-  }, [currentServer, toolSearch]);
+  }, [careerServer, toolSearch]);
 
-  const activeToolCount = useMemo(() => {
-    if (!currentServer?.tools) return 0;
-    return currentServer.tools.filter((t) => isToolEnabled(currentServer, t.name)).length;
-  }, [currentServer]);
+  const cursorJsonConfig = JSON.stringify(
+    {
+      mcpServers: {
+        "career-agent": {
+          url: `${origin}/api/mcp`,
+          headers: {
+            Authorization: `Bearer ${defaultAuthToken}`,
+          },
+        },
+      },
+    },
+    null,
+    2
+  );
+
+  const claudeCodeCommand = `claude mcp add career-agent ${origin}/api/mcp --header "Authorization: Bearer ${defaultAuthToken}"`;
+
+  const claudeDesktopConfig = JSON.stringify(
+    {
+      mcpServers: {
+        "career-agent": {
+          command: "npx",
+          args: ["-y", "mcp-remote", `${origin}/api/mcp`, "--header", `Authorization: Bearer ${defaultAuthToken}`],
+        },
+      },
+    },
+    null,
+    2
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden border-white/10 bg-neutral-950 text-neutral-100 sm:rounded-2xl">
+      <DialogContent className="max-w-4xl max-h-[88vh] flex flex-col gap-0 p-0 overflow-hidden border-white/10 bg-neutral-950 text-neutral-100 sm:rounded-2xl">
         <DialogHeader className="p-5 border-b border-white/10 bg-neutral-900/50">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-indigo-300">
-                <Plug className="h-5 w-5" />
+                <Cpu className="h-5 w-5" />
               </div>
               <div>
-                <DialogTitle className="text-base font-semibold text-white">
-                  Model Context Protocol (MCP) Servers & Tools
+                <DialogTitle className="text-base font-semibold text-white flex items-center gap-2">
+                  Career Agent MCP & Multi-Agent Harness Platform
+                  <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px]">
+                    XataDB Synced
+                  </Badge>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Activate, customize, and configure individual tools for real-time AI chat execution
+                  Share MCP tools with Cursor, Claude Code, Windsurf, or build custom agent harnesses
                 </DialogDescription>
               </div>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="h-8 gap-1.5 rounded-xl bg-indigo-500 text-xs font-semibold text-indigo-950 hover:bg-indigo-400"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add Custom Server
-            </Button>
+
+            <Tabs value={activeMainTab} onValueChange={(v) => setActiveMainTab(v as any)} className="w-auto">
+              <TabsList className="bg-black/50 border border-white/10 h-8 p-0.5 rounded-lg">
+                <TabsTrigger value="career" className="text-xs px-3 h-7 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                  Career Agent MCP
+                </TabsTrigger>
+                <TabsTrigger value="harnesses" className="text-xs px-3 h-7 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                  Agent Harnesses ({harnesses.length})
+                </TabsTrigger>
+                <TabsTrigger value="external" className="text-xs px-3 h-7 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+                  External MCP
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </DialogHeader>
 
-        {showAddForm && (
-          <form onSubmit={handleAddServer} className="border-b border-white/10 bg-indigo-950/20 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-indigo-200">Connect New MCP Server</h4>
-              <button
-                type="button"
-                onClick={() => setShowAddForm(false)}
-                className="text-xs text-muted-foreground hover:text-white"
-              >
-                Cancel
-              </button>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-12">
-              <div className="sm:col-span-4">
-                <Label className="text-[11px] text-muted-foreground">Server Name</Label>
-                <Input
-                  value={newServerName}
-                  onChange={(e) => setNewServerName(e.target.value)}
-                  placeholder="e.g. GitHub MCP / Notion MCP"
-                  className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
-                />
-              </div>
-              <div className="sm:col-span-5">
-                <Label className="text-[11px] text-muted-foreground">Endpoint URL (HTTP/JSON-RPC)</Label>
-                <Input
-                  value={newServerUrl}
-                  onChange={(e) => setNewServerUrl(e.target.value)}
-                  placeholder="https://... or http://localhost:8080/mcp"
-                  className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
-                />
-              </div>
-              <div className="sm:col-span-3">
-                <Label className="text-[11px] text-muted-foreground">API Key / Token (optional)</Label>
-                <Input
-                  type="password"
-                  value={newServerKey}
-                  onChange={(e) => setNewServerKey(e.target.value)}
-                  placeholder="Bearer token"
-                  className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button
-                type="submit"
-                size="sm"
-                disabled={isTesting}
-                className="h-8 rounded-lg bg-indigo-500 text-xs font-semibold text-indigo-950 hover:bg-indigo-400"
-              >
-                {isTesting ? <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1.5 h-3.5 w-3.5" />}
-                Connect & Discover Tools
-              </Button>
-            </div>
-          </form>
-        )}
-
-        <div className="grid flex-1 sm:grid-cols-12 overflow-hidden min-h-[420px]">
-          {/* Server List Sidebar */}
-          <div className="sm:col-span-4 border-r border-white/10 bg-black/20 p-3 space-y-1.5 overflow-y-auto">
-            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              Connected MCP Servers
-            </div>
-            {servers.map((server) => {
-              const isSelected = server.id === currentServer?.id;
-              const serverActiveCount = server.tools?.filter((t) => isToolEnabled(server, t.name)).length || 0;
-              return (
-                <div
-                  key={server.id}
-                  onClick={() => setActiveTab(server.id)}
-                  className={`group flex items-center justify-between rounded-xl p-2.5 cursor-pointer transition-all border ${
-                    isSelected
-                      ? "border-indigo-500/40 bg-indigo-500/10 text-white"
-                      : "border-white/5 bg-white/[0.02] text-neutral-400 hover:border-white/10 hover:bg-white/[0.04]"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Server className={`h-4 w-4 shrink-0 ${isSelected ? "text-indigo-400" : "text-neutral-500"}`} />
-                    <div className="truncate">
-                      <div className="font-semibold text-xs truncate">{server.name}</div>
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {serverActiveCount}/{server.tools?.length || 0} tools active
-                      </div>
-                    </div>
+        {/* Tab 1: Career Agent MCP (Share & Connect) */}
+        {activeMainTab === "career" && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            {/* Shareable Endpoint Card */}
+            <div className="rounded-2xl border border-indigo-500/30 bg-indigo-950/20 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-indigo-400" />
+                    <h3 className="text-sm font-semibold text-white">Career Agent MCP Endpoint & Auth Token</h3>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                    <Switch
-                      checked={server.enabled}
-                      onCheckedChange={(checked) => handleToggleServer(server.id, checked)}
-                      className="scale-75 data-[state=checked]:bg-indigo-500"
+                  <p className="text-xs text-indigo-200/80">
+                    Use this standard Model Context Protocol (MCP) server in Cursor, Claude, or any external platform.
+                  </p>
+                </div>
+                <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs">
+                  Active & Ready
+                </Badge>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-12">
+                <div className="sm:col-span-8 space-y-1">
+                  <Label className="text-[11px] text-indigo-200">Shareable MCP Server URL</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={careerShareUrl}
+                      className="h-8 font-mono text-xs bg-black/60 border-white/10 text-indigo-200 select-all"
                     />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleCopy(careerShareUrl, "shareUrl")}
+                      className="h-8 shrink-0 bg-indigo-500 text-indigo-950 hover:bg-indigo-400 font-semibold text-xs"
+                    >
+                      {copiedKey === "shareUrl" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5 mr-1" />}
+                      Copy URL
+                    </Button>
                   </div>
                 </div>
-              );
-            })}
-          </div>
 
-          {/* Server Details & Interactive Per-Tool Control */}
-          <div className="sm:col-span-8 p-4 overflow-y-auto space-y-4">
-            {currentServer ? (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      {currentServer.name}
-                      <Badge
-                        variant="secondary"
-                        className={`text-[10px] ${
-                          currentServer.enabled
-                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                            : "border-neutral-500/30 bg-neutral-500/10 text-neutral-400"
-                        }`}
-                      >
-                        {currentServer.enabled ? `${activeToolCount} Tools Active` : "Server Disabled"}
-                      </Badge>
-                    </h3>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">{currentServer.url}</p>
-                  </div>
-
+                <div className="sm:col-span-4 space-y-1">
+                  <Label className="text-[11px] text-indigo-200">Auth Token</Label>
                   <div className="flex items-center gap-2">
+                    <Input
+                      readOnly
+                      value={defaultAuthToken}
+                      className="h-8 font-mono text-xs bg-black/60 border-white/10 text-indigo-200 select-all"
+                    />
                     <Button
                       size="sm"
                       variant="outline"
-                      disabled={isTesting}
-                      onClick={() => handleRefreshServer(currentServer)}
-                      className="h-7 border-white/10 bg-white/5 text-[11px] text-neutral-300 hover:bg-white/10"
+                      onClick={() => handleCopy(defaultAuthToken, "token")}
+                      className="h-8 shrink-0 border-white/10 bg-white/5 text-xs text-neutral-300"
                     >
-                      <RefreshCw className={`mr-1.5 h-3 w-3 ${isTesting ? "animate-spin" : ""}`} />
-                      Refresh
-                    </Button>
-                    {currentServer.type !== "builtin" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleDeleteServer(currentServer.id)}
-                        className="h-7 text-[11px] text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Tool Search & Bulk Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-2 bg-white/[0.02] p-2 rounded-xl border border-white/5">
-                  <div className="relative flex-1 min-w-[180px]">
-                    <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      value={toolSearch}
-                      onChange={(e) => setToolSearch(e.target.value)}
-                      placeholder="Search tools by name or description…"
-                      className="h-7.5 pl-8 text-xs bg-black/40 border-white/10"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleBulkToggleTools(currentServer.id, true)}
-                      className="h-7 px-2 text-[11px] text-indigo-300 hover:bg-indigo-500/10"
-                    >
-                      Enable All
-                    </Button>
-                    <span className="text-muted-foreground text-xs">|</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleBulkToggleTools(currentServer.id, false)}
-                      className="h-7 px-2 text-[11px] text-neutral-400 hover:bg-white/5"
-                    >
-                      Disable All
+                      {copiedKey === "token" ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
                 </div>
+              </div>
+            </div>
 
-                {/* Interactive Tool Cards with Individual Toggle Switches */}
-                <div className="space-y-2">
-                  <div className="text-[11px] font-semibold text-neutral-300 uppercase tracking-wider px-1">
-                    Callable Tools for AI Chat ({filteredTools.length})
+            {/* Quick 1-Click Setup Guides for External Platforms */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                1-Click External Platform Configurations
+              </h4>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {/* Cursor */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-semibold text-xs text-white">
+                      <Code2 className="h-4 w-4 text-cyan-400" />
+                      Cursor (~/.cursor/mcp.json)
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCopy(cursorJsonConfig, "cursor")}
+                      className="h-6 px-2 text-[10px] text-cyan-300 hover:bg-cyan-500/10"
+                    >
+                      {copiedKey === "cursor" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                      Copy Config
+                    </Button>
                   </div>
-                  {filteredTools.map((tool) => {
-                    const isEnabled = isToolEnabled(currentServer, tool.name);
-                    const category = getToolCategory(tool.name);
-                    const CategoryIcon = category.icon;
-                    const isExpanded = expandedToolSchema === tool.name;
+                  <pre className="p-2 rounded-lg bg-black/70 border border-white/5 font-mono text-[10px] text-cyan-200 overflow-x-auto max-h-24">
+                    {cursorJsonConfig}
+                  </pre>
+                </div>
 
-                    return (
-                      <div
-                        key={tool.name}
-                        className={`rounded-xl border p-3 transition-all ${
-                          isEnabled
-                            ? "border-white/10 bg-white/[0.03] hover:border-white/20"
-                            : "border-white/5 bg-white/[0.01] opacity-60 hover:opacity-80"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-2.5 min-w-0">
-                            <div className="mt-0.5 rounded-lg border border-white/10 bg-black/40 p-1.5 text-indigo-400">
-                              <CategoryIcon className="h-4 w-4" />
-                            </div>
-                            <div className="space-y-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-xs font-semibold text-white">
-                                  {tool.name}
-                                </span>
-                                <Badge variant="outline" className={`text-[10px] h-4.5 px-1.5 font-normal ${category.color}`}>
-                                  {category.label}
-                                </Badge>
-                                <Badge
-                                  variant="secondary"
-                                  className={`text-[9px] h-4 px-1.5 font-semibold ${
-                                    isEnabled
-                                      ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                                      : "bg-neutral-800 text-neutral-400"
-                                  }`}
-                                >
-                                  {isEnabled ? "Active in Chat" : "Disabled"}
-                                </Badge>
-                              </div>
-                              <p className="text-xs text-neutral-400 leading-relaxed">
-                                {tool.description || "No description provided."}
-                              </p>
-                            </div>
+                {/* Claude Code */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-semibold text-xs text-white">
+                      <Terminal className="h-4 w-4 text-amber-400" />
+                      Claude Code CLI
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCopy(claudeCodeCommand, "claudeCode")}
+                      className="h-6 px-2 text-[10px] text-amber-300 hover:bg-amber-500/10"
+                    >
+                      {copiedKey === "claudeCode" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                      Copy Command
+                    </Button>
+                  </div>
+                  <pre className="p-2 rounded-lg bg-black/70 border border-white/5 font-mono text-[10px] text-amber-200 overflow-x-auto max-h-24">
+                    {claudeCodeCommand}
+                  </pre>
+                </div>
+
+                {/* Claude Desktop */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-semibold text-xs text-white">
+                      <Bot className="h-4 w-4 text-purple-400" />
+                      Claude Desktop (claude_desktop_config.json)
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCopy(claudeDesktopConfig, "claudeDesktop")}
+                      className="h-6 px-2 text-[10px] text-purple-300 hover:bg-purple-500/10"
+                    >
+                      {copiedKey === "claudeDesktop" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                      Copy Config
+                    </Button>
+                  </div>
+                  <pre className="p-2 rounded-lg bg-black/70 border border-white/5 font-mono text-[10px] text-purple-200 overflow-x-auto max-h-24">
+                    {claudeDesktopConfig}
+                  </pre>
+                </div>
+
+                {/* Windsurf */}
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-semibold text-xs text-white">
+                      <Globe className="h-4 w-4 text-sky-400" />
+                      Windsurf (~/.codeium/windsurf/mcp_config.json)
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleCopy(cursorJsonConfig, "windsurf")}
+                      className="h-6 px-2 text-[10px] text-sky-300 hover:bg-sky-500/10"
+                    >
+                      {copiedKey === "windsurf" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                      Copy Config
+                    </Button>
+                  </div>
+                  <pre className="p-2 rounded-lg bg-black/70 border border-white/5 font-mono text-[10px] text-sky-200 overflow-x-auto max-h-24">
+                    {cursorJsonConfig}
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            {/* Callable Tools Management */}
+            <div className="space-y-3 pt-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-neutral-300">
+                  Career Agent Tools ({careerServer?.tools?.length || 0})
+                </div>
+                <div className="relative min-w-[200px]">
+                  <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={toolSearch}
+                    onChange={(e) => setToolSearch(e.target.value)}
+                    placeholder="Filter tools…"
+                    className="h-7.5 pl-8 text-xs bg-black/40 border-white/10"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {filteredTools.map((tool) => {
+                  const isEnabled = careerServer ? isToolEnabled(careerServer, tool.name) : true;
+                  const category = getToolCategory(tool.name);
+                  const CategoryIcon = category.icon;
+                  const isExpanded = expandedToolSchema === tool.name;
+
+                  return (
+                    <div
+                      key={tool.name}
+                      className={`rounded-xl border p-3 transition-all ${
+                        isEnabled
+                          ? "border-white/10 bg-white/[0.03] hover:border-white/20"
+                          : "border-white/5 bg-white/[0.01] opacity-60 hover:opacity-80"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <div className="mt-0.5 rounded-lg border border-white/10 bg-black/40 p-1.5 text-indigo-400">
+                            <CategoryIcon className="h-4 w-4" />
                           </div>
-
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Switch
-                              checked={isEnabled}
-                              onCheckedChange={(checked) => handleToggleTool(currentServer.id, tool.name, checked)}
-                              className="data-[state=checked]:bg-indigo-500"
-                            />
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-xs font-semibold text-white">{tool.name}</span>
+                              <Badge variant="outline" className={`text-[10px] h-4.5 px-1.5 font-normal ${category.color}`}>
+                                {category.label}
+                              </Badge>
+                              <Badge
+                                variant="secondary"
+                                className={`text-[9px] h-4 px-1.5 font-semibold ${
+                                  isEnabled
+                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-neutral-800 text-neutral-400"
+                                }`}
+                              >
+                                {isEnabled ? "Active" : "Disabled"}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-neutral-400 leading-relaxed">
+                              {tool.description || "No description provided."}
+                            </p>
                           </div>
                         </div>
 
-                        {/* Schema Details toggle */}
-                        {tool.inputSchema && (
-                          <div className="mt-2 pt-2 border-t border-white/5">
-                            <button
-                              type="button"
-                              onClick={() => setExpandedToolSchema(isExpanded ? null : tool.name)}
-                              className="text-[10px] text-muted-foreground hover:text-white flex items-center gap-1 font-mono transition-colors"
-                            >
-                              <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
-                              {isExpanded ? "Hide input schema" : "View input schema"}
-                            </button>
-                            {isExpanded && (
-                              <pre className="mt-2 p-2 rounded-lg bg-black/60 border border-white/10 text-[10px] text-indigo-200 font-mono overflow-x-auto max-h-40">
-                                {JSON.stringify(tool.inputSchema, null, 2)}
-                              </pre>
-                            )}
-                          </div>
+                        {careerServer && (
+                          <Switch
+                            checked={isEnabled}
+                            onCheckedChange={(checked) => handleToggleTool(careerServer.id, tool.name, checked)}
+                            className="data-[state=checked]:bg-indigo-500"
+                          />
                         )}
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {tool.inputSchema && (
+                        <div className="mt-2 pt-2 border-t border-white/5">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedToolSchema(isExpanded ? null : tool.name)}
+                            className="text-[10px] text-muted-foreground hover:text-white flex items-center gap-1 font-mono transition-colors"
+                          >
+                            <ChevronDown className={`h-3 w-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+                            {isExpanded ? "Hide schema" : "View JSON schema"}
+                          </button>
+                          {isExpanded && (
+                            <pre className="mt-2 p-2 rounded-lg bg-black/60 border border-white/10 text-[10px] text-indigo-200 font-mono overflow-x-auto max-h-40">
+                              {JSON.stringify(tool.inputSchema, null, 2)}
+                            </pre>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ) : (
-              <div className="p-8 text-center text-xs text-muted-foreground">
-                No MCP servers connected. Click "Add Custom Server" to connect.
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Tab 2: Custom Agent Harnesses (Multi-Agent Builder) */}
+        {activeMainTab === "harnesses" && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <Bot className="h-4 w-4 text-indigo-400" />
+                  Your Custom Agentic Harnesses
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Build custom servers with customized tool subsets and individual shareable URLs.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => setShowHarnessForm(!showHarnessForm)}
+                className="h-8 gap-1.5 bg-indigo-500 text-indigo-950 font-semibold hover:bg-indigo-400 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Build Agent Harness
+              </Button>
+            </div>
+
+            {showHarnessForm && (
+              <form onSubmit={handleCreateHarness} className="rounded-2xl border border-indigo-500/30 bg-indigo-950/20 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-semibold text-indigo-200">Configure New Agent Harness</h4>
+                  <button type="button" onClick={() => setShowHarnessForm(false)} className="text-xs text-muted-foreground hover:text-white">
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-indigo-200">Agent Name</Label>
+                    <Input
+                      value={harnessName}
+                      onChange={(e) => setHarnessName(e.target.value)}
+                      placeholder="e.g. Job Search & Application Agent"
+                      className="h-8 bg-black/40 border-white/10 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-indigo-200">Description</Label>
+                    <Input
+                      value={harnessDescription}
+                      onChange={(e) => setHarnessDescription(e.target.value)}
+                      placeholder="e.g. Specialized in job scraping and ATS tailoring"
+                      className="h-8 bg-black/40 border-white/10 text-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-indigo-200">Custom System Persona / Instructions</Label>
+                  <Textarea
+                    value={harnessPrompt}
+                    onChange={(e) => setHarnessPrompt(e.target.value)}
+                    placeholder="e.g. You are a dedicated job search agent. Focus on extracting exact ATS keywords..."
+                    className="min-h-[70px] bg-black/40 border-white/10 text-xs resize-none"
+                  />
+                </div>
+
+                {/* Tool Selector */}
+                <div className="space-y-2">
+                  <Label className="text-[11px] text-indigo-200">Enabled Tools for this Harness</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {(careerServer?.tools || []).map((t) => {
+                      const isSelected = harnessTools.includes(t.name);
+                      return (
+                        <div
+                          key={t.name}
+                          onClick={() => {
+                            setHarnessTools((prev) =>
+                              isSelected ? prev.filter((name) => name !== t.name) : [...prev, t.name]
+                            );
+                          }}
+                          className={`flex items-center gap-2 p-2 rounded-lg border text-xs cursor-pointer select-none transition-all ${
+                            isSelected
+                              ? "border-indigo-500/40 bg-indigo-500/20 text-white"
+                              : "border-white/5 bg-white/[0.02] text-neutral-400 hover:bg-white/[0.04]"
+                          }`}
+                        >
+                          <div className={`h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0 ${isSelected ? "border-indigo-400 bg-indigo-500 text-black" : "border-white/20"}`}>
+                            {isSelected && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                          </div>
+                          <span className="font-mono truncate">{t.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isSavingHarness}
+                    className="h-8 bg-indigo-500 text-indigo-950 font-semibold hover:bg-indigo-400 text-xs"
+                  >
+                    {isSavingHarness ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                    Save Harness to XataDB
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            {/* Harnesses List */}
+            <div className="space-y-3">
+              {harnesses.length === 0 ? (
+                <div className="rounded-xl border border-white/5 p-8 text-center text-xs text-muted-foreground">
+                  No custom agent harnesses yet. Click "Build Agent Harness" to create your first specialized agent server.
+                </div>
+              ) : (
+                harnesses.map((h) => {
+                  const shareUrl = `${origin}/api/mcp?harness=${encodeURIComponent(h.slug)}&token=${h.authToken}`;
+                  const cursorHarnessConfig = JSON.stringify(
+                    {
+                      mcpServers: {
+                        [h.slug]: {
+                          url: `${origin}/api/mcp?harness=${h.slug}`,
+                          headers: { Authorization: `Bearer ${h.authToken}` },
+                        },
+                      },
+                    },
+                    null,
+                    2
+                  );
+
+                  return (
+                    <div key={h.id || h.slug} className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Bot className="h-4 w-4 text-indigo-400" />
+                            <h4 className="text-sm font-semibold text-white">{h.name}</h4>
+                            <Badge variant="outline" className="border-indigo-500/30 bg-indigo-500/10 text-indigo-300 font-mono text-[10px]">
+                              {h.slug}
+                            </Badge>
+                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px]">
+                              {h.selectedTools?.length || 0} Tools
+                            </Badge>
+                          </div>
+                          {h.description && <p className="text-xs text-neutral-400">{h.description}</p>}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteHarness(h.id, h.slug)}
+                            className="h-7 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Tool Badges */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {(h.selectedTools || []).map((tool) => (
+                          <Badge key={tool} variant="outline" className="border-white/10 bg-black/40 text-neutral-300 font-mono text-[10px]">
+                            {tool}
+                          </Badge>
+                        ))}
+                      </div>
+
+                      {/* Shareable Link */}
+                      <div className="space-y-1 pt-1">
+                        <Label className="text-[10px] text-muted-foreground">Shareable Harness URL</Label>
+                        <div className="flex items-center gap-2">
+                          <Input readOnly value={shareUrl} className="h-7 font-mono text-[11px] bg-black/60 border-white/10 select-all" />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCopy(shareUrl, `harness-url-${h.slug}`)}
+                            className="h-7 shrink-0 text-xs border-white/10"
+                          >
+                            {copiedKey === `harness-url-${h.slug}` ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3 mr-1" />}
+                            Copy URL
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleCopy(cursorHarnessConfig, `harness-config-${h.slug}`)}
+                            className="h-7 shrink-0 text-xs border-white/10 text-cyan-300"
+                          >
+                            {copiedKey === `harness-config-${h.slug}` ? <Check className="h-3 w-3" /> : <Code2 className="h-3 w-3 mr-1" />}
+                            Cursor Config
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab 3: External MCP Servers */}
+        {activeMainTab === "external" && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-white">Third-Party External MCP Servers</h3>
+                <p className="text-xs text-muted-foreground">Connect remote MCP tools (e.g. GitHub, Notion, PostgreSQL).</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="h-8 gap-1.5 bg-indigo-500 text-indigo-950 font-semibold hover:bg-indigo-400 text-xs"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add External Server
+              </Button>
+            </div>
+
+            {showAddForm && (
+              <form onSubmit={handleAddServer} className="border border-white/10 bg-indigo-950/20 rounded-xl p-4 space-y-3">
+                <h4 className="text-xs font-semibold text-indigo-200">Connect New Remote MCP Server</h4>
+                <div className="grid gap-3 sm:grid-cols-12">
+                  <div className="sm:col-span-4">
+                    <Label className="text-[11px] text-muted-foreground">Server Name</Label>
+                    <Input
+                      value={newServerName}
+                      onChange={(e) => setNewServerName(e.target.value)}
+                      placeholder="e.g. GitHub MCP / Brave Search"
+                      className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-5">
+                    <Label className="text-[11px] text-muted-foreground">Endpoint URL</Label>
+                    <Input
+                      value={newServerUrl}
+                      onChange={(e) => setNewServerUrl(e.target.value)}
+                      placeholder="https://... or http://localhost:8080/mcp"
+                      className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
+                    />
+                  </div>
+                  <div className="sm:col-span-3">
+                    <Label className="text-[11px] text-muted-foreground">API Key (optional)</Label>
+                    <Input
+                      type="password"
+                      value={newServerKey}
+                      onChange={(e) => setNewServerKey(e.target.value)}
+                      placeholder="Bearer token"
+                      className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isTesting}
+                    className="h-8 rounded-lg bg-indigo-500 text-xs font-semibold text-indigo-950 hover:bg-indigo-400"
+                  >
+                    {isTesting ? <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1.5 h-3.5 w-3.5" />}
+                    Connect & Discover Tools
+                  </Button>
+                </div>
+              </form>
+            )}
+
+            <div className="space-y-3">
+              {servers.filter((s) => s.type !== "builtin").length === 0 ? (
+                <div className="rounded-xl border border-white/5 p-8 text-center text-xs text-muted-foreground">
+                  No external MCP servers connected. Click "Add External Server" to connect third-party MCP endpoints.
+                </div>
+              ) : (
+                servers
+                  .filter((s) => s.type !== "builtin")
+                  .map((s) => (
+                    <div key={s.id} className="rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-semibold text-white">{s.name}</h4>
+                          <p className="text-xs text-muted-foreground font-mono">{s.url}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={s.enabled}
+                            onCheckedChange={(checked) => handleToggleServer(s.id, checked)}
+                            className="data-[state=checked]:bg-indigo-500"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {(s.tools || []).map((t) => (
+                          <Badge key={t.name} variant="outline" className="text-[10px] border-white/10 bg-black/40 text-neutral-300 font-mono">
+                            {t.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

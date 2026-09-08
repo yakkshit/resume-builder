@@ -207,6 +207,13 @@ async function startWorkflow() {
             execSync(`git checkout ${branchName}`, { stdio: "inherit" });
         }
 
+        // Pre-commit security check: ensure no .env files or secret credentials are in git status
+        const gitStatusOutput = execSync("git status --porcelain", { encoding: "utf-8" });
+        if (/^\s*[AM\?].*(\.env|\.pem|\.key|credentials\.json|serviceAccountKey)/m.test(gitStatusOutput)) {
+            console.error("\n🛑 SECURITY ALERT: A sensitive file (.env, .pem, .key, credentials.json) was detected in git status! Push aborted.");
+            process.exit(1);
+        }
+
         // 5. Git add (stages everything: package.json, report.md, and previous changes)
         execSync("git add .", { stdio: "inherit" });
 

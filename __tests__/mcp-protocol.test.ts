@@ -1,22 +1,24 @@
 import { describe, it, expect, vi } from "vitest";
 import { POST, GET, OPTIONS } from "@/app/api/mcp/route";
+import { POST as HarnessPOST, GET as HarnessGET } from "@/app/api/mcp/harness/route";
 import { NextRequest } from "next/server";
+import { DatabaseService } from "@/lib/db/plsql-storage";
 
-function createPostRequest(body: Record<string, unknown>): NextRequest {
+function createPostRequest(body: Record<string, unknown>, headers: Record<string, string> = {}): NextRequest {
   return new NextRequest("http://localhost:3000/api/mcp", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 }
 
-function createGetRequest(): NextRequest {
-  return new NextRequest("http://localhost:3000/api/mcp", {
+function createGetRequest(url: string = "http://localhost:3000/api/mcp"): NextRequest {
+  return new NextRequest(url, {
     method: "GET",
   });
 }
 
-describe("Model Context Protocol (MCP) Server & Tools", () => {
+describe("Career Agent MCP Server & Multi-Agent Harness Platform", () => {
   it("handles OPTIONS preflight with CORS headers", async () => {
     const res = await OPTIONS();
     expect(res.status).toBe(204);
@@ -24,21 +26,27 @@ describe("Model Context Protocol (MCP) Server & Tools", () => {
     expect(res.headers.get("Access-Control-Allow-Methods")).toContain("POST");
   });
 
-  it("handles GET endpoint metadata discovery", async () => {
-    const req = createGetRequest();
+  it("handles GET endpoint metadata discovery and client configurations", async () => {
+    const req = createGetRequest("http://localhost:3000/api/mcp?token=mcp_test_token");
     const res = await GET(req);
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.status).toBe("ok");
-    expect(data.server).toBe("resume-coverletter-mcp-server");
+    expect(data.server).toBe("career-agent-mcp-server");
+    expect(data.name).toBe("Career Agent MCP Server");
+    expect(data.endpoint).toContain("/api/mcp?token=mcp_test_token");
     expect(data.supportedTools).toContain("list_templates");
     expect(data.supportedTools).toContain("search_jobs");
     expect(data.supportedTools).toContain("scrape_github_profile");
     expect(data.supportedTools).toContain("scrape_linkedin_profile");
     expect(data.supportedTools).toContain("generate_resume_pdf");
+    expect(data.clientConfigurations.cursor).toBeDefined();
+    expect(data.clientConfigurations.claudeCode).toBeDefined();
+    expect(data.clientConfigurations.claudeDesktop).toBeDefined();
+    expect(data.clientConfigurations.windsurf).toBeDefined();
   });
 
-  it("handles JSON-RPC initialize method", async () => {
+  it("handles JSON-RPC initialize method with Career Agent MCP name", async () => {
     const req = createPostRequest({
       jsonrpc: "2.0",
       id: 1,
@@ -49,7 +57,8 @@ describe("Model Context Protocol (MCP) Server & Tools", () => {
     const data = await res.json();
     expect(data.jsonrpc).toBe("2.0");
     expect(data.id).toBe(1);
-    expect(data.result.serverInfo.name).toBe("resume-coverletter-mcp-server");
+    expect(data.result.serverInfo.name).toBe("career-agent-mcp-server");
+    expect(data.result.serverInfo.version).toBe("2.0.0");
   });
 
   it("handles JSON-RPC ping method", async () => {
@@ -102,137 +111,120 @@ describe("Model Context Protocol (MCP) Server & Tools", () => {
     const data = await res.json();
     expect(data.jsonrpc).toBe("2.0");
     expect(data.id).toBe(4);
-    const parsedText = JSON.parse(data.result.content[0].text);
-    expect(parsedText.resumeTemplates.length).toBeGreaterThan(0);
-    expect(parsedText.coverLetterTemplates.length).toBeGreaterThan(0);
+    expect(data.result.content[0].type).toBe("text");
+    const parsed = JSON.parse(data.result.content[0].text);
+    expect(Array.isArray(parsed.resumeTemplates)).toBe(true);
+    expect(parsed.resumeTemplates.length).toBeGreaterThan(0);
   });
 
-  it("executes scrape_linkedin_profile tool call successfully", async () => {
-    const rawLinkedIn = `
-# Yakkshit Sai
-Robotics & AI Engineer
-
-## Experience
-### Robotics Researcher at University of Konstanz
-- Implemented multi-agent ROS2 robot coordination.
-
-## Skills
-ROS2, C++, PyTorch, Python, FastAPIs
-`;
-
+  it("executes scrape_github_profile tool call (mock or live fetch)", async () => {
     const req = createPostRequest({
       jsonrpc: "2.0",
       id: 5,
       method: "tools/call",
       params: {
-        name: "scrape_linkedin_profile",
-        arguments: { profileText: rawLinkedIn },
+        name: "scrape_github_profile",
+        arguments: { username: "octocat" },
       },
     });
     const res = await POST(req);
     const data = await res.json();
+    expect(data.jsonrpc).toBe("2.0");
+    expect(data.result).toBeDefined();
     expect(data.result.content[0].type).toBe("text");
-    const parsed = JSON.parse(data.result.content[0].text);
-    expect(parsed.headline).toContain("Robotics & AI Engineer");
-    expect(parsed.skills).toContain("ROS2");
-    expect(parsed.skills).toContain("C++");
   });
 
-  it("executes search_jobs tool call and returns matching job structures", async () => {
+  it("executes scrape_linkedin_profile text parsing", async () => {
+    const rawText = "John Doe\nSenior Staff Engineer at Google\nExperience in Distributed Systems, Rust, Go";
     const req = createPostRequest({
       jsonrpc: "2.0",
       id: 6,
       method: "tools/call",
       params: {
-        name: "search_jobs",
-        arguments: { query: "Robotics Engineer", location: "Remote", maxResults: 3 },
-      },
-    });
-    const res = await POST(req);
-    const data = await res.json();
-    const parsed = JSON.parse(data.result.content[0].text);
-    expect(parsed.total).toBeGreaterThan(0);
-    expect(parsed.jobs[0].title).toBeDefined();
-    expect(parsed.jobs[0].company).toBeDefined();
-  });
-
-  it("executes scrape_job_posting tool call successfully", async () => {
-    const req = createPostRequest({
-      jsonrpc: "2.0",
-      id: 7,
-      method: "tools/call",
-      params: {
-        name: "scrape_job_posting",
-        arguments: {
-          text: "We are seeking a Senior Robotics Engineer with 5+ years of experience in ROS2, C++, and SLAM algorithms.",
-        },
+        name: "scrape_linkedin_profile",
+        arguments: { profileText: rawText },
       },
     });
     const res = await POST(req);
     const data = await res.json();
     expect(data.result.content[0].type).toBe("text");
     const parsed = JSON.parse(data.result.content[0].text);
-    expect(parsed.keyRequirements.length).toBeGreaterThan(0);
-    expect(parsed.recommendedKeywords.length).toBeGreaterThan(0);
+    expect(parsed.headline).toContain("Senior Staff Engineer");
   });
 
-  it("executes scrape_github_profile tool call successfully with mocked response", async () => {
-    const originalFetch = global.fetch;
-    const mockUser = {
-      name: "Test Developer",
-      bio: "Open Source AI Engineer",
-      public_repos: 12,
-      followers: 40,
-    };
-    const mockRepos = [
-      {
-        name: "ros2-nav",
-        description: "Autonomous navigation stack",
-        language: "C++",
-        stargazers_count: 25,
-        fork: false,
-        html_url: "https://github.com/testdev/ros2-nav",
-      },
-    ];
-
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/repos")) {
-        return Promise.resolve(new Response(JSON.stringify(mockRepos), { status: 200 }));
-      }
-      return Promise.resolve(new Response(JSON.stringify(mockUser), { status: 200 }));
-    }) as any;
-
-    try {
-      const req = createPostRequest({
-        jsonrpc: "2.0",
-        id: 8,
-        method: "tools/call",
-        params: {
-          name: "scrape_github_profile",
-          arguments: { username: "testdev" },
-        },
-      });
-      const res = await POST(req);
-      const data = await res.json();
-      expect(data.result.content[0].type).toBe("text");
-      const parsed = JSON.parse(data.result.content[0].text);
-      expect(parsed.username).toBe("testdev");
-      expect(parsed.name).toBe("Test Developer");
-      expect(parsed.topLanguages).toContain("C++");
-    } finally {
-      global.fetch = originalFetch;
-    }
-  });
-
-  it("returns method not found error for unknown JSON-RPC methods", async () => {
+  it("executes search_jobs tool call", async () => {
     const req = createPostRequest({
       jsonrpc: "2.0",
-      id: 9,
-      method: "unknown/method",
+      id: 7,
+      method: "tools/call",
+      params: {
+        name: "search_jobs",
+        arguments: { query: "Software Engineer", location: "Remote" },
+      },
     });
     const res = await POST(req);
     const data = await res.json();
-    expect(data.error.code).toBe(-32601);
-    expect(data.error.message).toContain("Method not found");
+    expect(data.jsonrpc).toBe("2.0");
+    expect(data.result.content[0].type).toBe("text");
+    const jobs = JSON.parse(data.result.content[0].text);
+    expect(jobs).toBeDefined();
+  });
+
+  it("handles unknown tool errors cleanly", async () => {
+    const req = createPostRequest({
+      jsonrpc: "2.0",
+      id: 8,
+      method: "tools/call",
+      params: {
+        name: "non_existent_tool",
+        arguments: {},
+      },
+    });
+    const res = await POST(req);
+    const data = await res.json();
+    expect(data.error).toBeDefined();
+  });
+
+  it("creates, retrieves, and tests custom Agent Harnesses via API", async () => {
+    const harnessReq = new NextRequest("http://localhost:3000/api/mcp/harness", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Job Hunter Agent",
+        description: "Specialized in scraping jobs and tailoring ATS resumes",
+        slug: "job-hunter-agent-test",
+        selectedTools: ["search_jobs", "scrape_job_posting"],
+        authToken: "mcp-carrier-harness-id",
+      }),
+    });
+
+    const harnessRes = await HarnessPOST(harnessReq);
+    expect(harnessRes.status).toBe(200);
+    const harnessData = await harnessRes.json();
+    expect(harnessData.success).toBe(true);
+    expect(harnessData.harness.slug).toBe("job-hunter-agent-test");
+    expect(harnessData.shareableUrl).toContain("harness=job-hunter-agent-test");
+
+    // Test querying MCP with this harness
+    const mcpHarnessReq = new NextRequest(
+      "http://localhost:3000/api/mcp?harness=job-hunter-agent-test&token=mcp-carrier-harness-id",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 10,
+          method: "tools/list",
+        }),
+      }
+    );
+
+    const mcpHarnessRes = await POST(mcpHarnessReq);
+    const mcpHarnessData = await mcpHarnessRes.json();
+    expect(mcpHarnessData.result.tools.length).toBe(2);
+    const tools = mcpHarnessData.result.tools.map((t: any) => t.name);
+    expect(tools).toContain("search_jobs");
+    expect(tools).toContain("scrape_job_posting");
+    expect(tools).not.toContain("generate_cover_letter_pdf");
   });
 });

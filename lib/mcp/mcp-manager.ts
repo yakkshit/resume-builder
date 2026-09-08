@@ -24,12 +24,27 @@ export interface MCPServerConfig {
   error?: string;
 }
 
+export interface AgentHarnessConfig {
+  id: string;
+  name: string;
+  description?: string;
+  slug: string;
+  authToken: string;
+  systemPrompt?: string;
+  selectedTools: string[];
+  customInstructions?: string;
+  isPublic?: boolean;
+  shareableUrl?: string;
+  createdAt?: string;
+}
+
 const MCP_SERVERS_STORAGE_ID = "chat_mcp_servers_config";
+const AGENT_HARNESSES_STORAGE_ID = "chat_agent_harnesses_config";
 
 export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
   {
-    id: "builtin-resume-coverletter",
-    name: "Resume & Cover Letter MCP",
+    id: "builtin-career-agent",
+    name: "Career Agent MCP",
     url: "/api/mcp",
     type: "builtin",
     enabled: true,
@@ -38,8 +53,8 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       {
         name: "list_templates",
         description: "List all available PDF resume and cover letter templates.",
-        serverName: "Resume & Cover Letter MCP",
-        serverId: "builtin-resume-coverletter",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
         inputSchema: {
           type: "object",
           properties: {
@@ -50,8 +65,8 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       {
         name: "search_jobs",
         description: "Search for live jobs and openings based on keywords, role, company, or location.",
-        serverName: "Resume & Cover Letter MCP",
-        serverId: "builtin-resume-coverletter",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
         inputSchema: {
           type: "object",
           properties: {
@@ -65,8 +80,8 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       {
         name: "scrape_job_posting",
         description: "Scrape and extract key requirements and qualifications from a job posting URL or text.",
-        serverName: "Resume & Cover Letter MCP",
-        serverId: "builtin-resume-coverletter",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
         inputSchema: {
           type: "object",
           properties: {
@@ -78,8 +93,8 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       {
         name: "scrape_github_profile",
         description: "Scrape public GitHub profile metadata, top repositories, primary coding languages, stars, and bio to ground AI resume generation.",
-        serverName: "Resume & Cover Letter MCP",
-        serverId: "builtin-resume-coverletter",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
         inputSchema: {
           type: "object",
           properties: {
@@ -92,8 +107,8 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       {
         name: "scrape_linkedin_profile",
         description: "Parse and extract structured career history, headline, skills, and work achievements from public LinkedIn profile text.",
-        serverName: "Resume & Cover Letter MCP",
-        serverId: "builtin-resume-coverletter",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
         inputSchema: {
           type: "object",
           properties: {
@@ -105,8 +120,8 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       {
         name: "generate_resume_pdf",
         description: "Generate a PDF document for a resume given JSON data and template name.",
-        serverName: "Resume & Cover Letter MCP",
-        serverId: "builtin-resume-coverletter",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
         inputSchema: {
           type: "object",
           properties: {
@@ -119,8 +134,8 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       {
         name: "generate_cover_letter_pdf",
         description: "Generate a PDF document for a cover letter given head, body, and footer content.",
-        serverName: "Resume & Cover Letter MCP",
-        serverId: "builtin-resume-coverletter",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
         inputSchema: {
           type: "object",
           properties: {
@@ -133,8 +148,8 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       {
         name: "prepare_job_application_package",
         description: "Generate both resume and cover letter PDF binaries for a tailored job application package.",
-        serverName: "Resume & Cover Letter MCP",
-        serverId: "builtin-resume-coverletter",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
         inputSchema: {
           type: "object",
           properties: {
@@ -329,3 +344,37 @@ export async function executeMCPTool(
 
   return data.result;
 }
+
+/**
+ * Load saved Agent Harnesses from local storage
+ */
+export function loadAgentHarnesses(): AgentHarnessConfig[] {
+  if (typeof window === "undefined") return [];
+  const raw = tryLocalStorageGet(AGENT_HARNESSES_STORAGE_ID);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Save Agent Harnesses to local storage
+ */
+export function saveAgentHarnesses(harnesses: AgentHarnessConfig[]): void {
+  if (typeof window === "undefined") return;
+  tryLocalStorageSet(AGENT_HARNESSES_STORAGE_ID, JSON.stringify(harnesses));
+}
+
+/**
+ * Delete an Agent Harness locally
+ */
+export function deleteAgentHarnessLocal(id: string): AgentHarnessConfig[] {
+  const current = loadAgentHarnesses();
+  const updated = current.filter((h) => h.id !== id && h.slug !== id);
+  saveAgentHarnesses(updated);
+  return updated;
+}
+

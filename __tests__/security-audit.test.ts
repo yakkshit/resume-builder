@@ -33,6 +33,11 @@ const IGNORED_FILES = [
 /** Benign strings that are not secrets (localStorage keys, feature flags, etc.) */
 const FALSE_POSITIVE_VALUES = [
     "cookie-consent-accepted",
+    "mcp-carrier-harness-token",
+    "mcp-carrier-harness-id",
+    "mcp-carrier-live-auth",
+    "mcp-career-live-auth",
+    "mcp_agent_harnesses_v1",
 ];
 
 const SECRET_PATTERNS = [
