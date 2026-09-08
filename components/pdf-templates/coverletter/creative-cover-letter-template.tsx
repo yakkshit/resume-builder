@@ -35,10 +35,10 @@ interface CreativeCoverLetterPDFTemplateProps {
 }
 
 export const CreativeCoverLetterPDFTemplate = ({ coverLetterData }: CreativeCoverLetterPDFTemplateProps) => {
-  // Split the text into paragraphs
-  const headParagraphs = coverLetterData.head.split("\n").filter((p) => p.trim() !== "")
-  const bodyParagraphs = coverLetterData.body.split("\n").filter((p) => p.trim() !== "")
-  const footerParagraphs = coverLetterData.footer.split("\n").filter((p) => p.trim() !== "")
+  // Split the text into paragraphs safely
+  const headParagraphs = (coverLetterData?.head || "").split("\n").filter((p) => p.trim() !== "")
+  const bodyParagraphs = (coverLetterData?.body || "").split("\n").filter((p) => p.trim() !== "")
+  const footerParagraphs = (coverLetterData?.footer || "").split("\n").filter((p) => p.trim() !== "")
 
   return (
     <Document>

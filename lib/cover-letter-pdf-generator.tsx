@@ -11,10 +11,8 @@ export async function generateCoverLetterPDF(
   try {
     // Get the appropriate template component
     const PDFTemplate = getCoverLetterTemplate(template as string)
-
-    // Generate the PDF document by evaluating the template directly
-    const documentElement = PDFTemplate({ coverLetterData });
-    const pdfDoc = pdf(documentElement)
+    const element = React.createElement(PDFTemplate, { coverLetterData }) as any
+    const pdfDoc = (pdf as any)(element)
     const blob = await pdfDoc.toBlob()
 
     // Create a URL for the blob
@@ -44,12 +42,9 @@ export async function generateCoverLetterPDFBlob(
   template: CoverLetterTemplate,
 ): Promise<Blob> {
   try {
-    // Get the appropriate template component
     const PDFTemplate = getCoverLetterTemplate(template as string)
-
-    // Generate the PDF document by evaluating the template directly
-    const documentElement = PDFTemplate({ coverLetterData });
-    const pdfDoc = pdf(documentElement)
+    const element = React.createElement(PDFTemplate, { coverLetterData }) as any
+    const pdfDoc = (pdf as any)(element)
     return await pdfDoc.toBlob()
   } catch (error) {
     console.error("Error generating PDF blob:", error)
@@ -63,15 +58,11 @@ export async function generateCoverLetterPDFBuffer(
   template: CoverLetterTemplate,
 ) {
   try {
-    // Get the appropriate template component
     const PDFTemplate = getCoverLetterTemplate(template as string)
-
-    // Generate the PDF document by evaluating the template directly
-    // to pass a <Document> directly to renderToBuffer
-    const documentElement = PDFTemplate({ coverLetterData });
+    const element = React.createElement(PDFTemplate, { coverLetterData }) as any
     // @ts-ignore - renderToBuffer is available in node
     const { renderToBuffer } = await import('@react-pdf/renderer');
-    return await renderToBuffer(documentElement);
+    return await (renderToBuffer as any)(element);
   } catch (error) {
     console.error("Error generating PDF buffer:", error)
     throw error

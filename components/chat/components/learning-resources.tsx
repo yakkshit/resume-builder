@@ -29,8 +29,31 @@ const levelColor: Record<string, string> = {
   Advanced: "bg-purple-500/15 text-purple-600 border-purple-500/30",
 };
 
-export function LearningResources({ data = [] }: { data?: Resource[] }) {
-  const resources = data.length > 0 ? data : DEFAULT;
+export function LearningResources({ data }: { data?: unknown }) {
+  const list = Array.isArray(data)
+    ? data
+    : Array.isArray((data as any)?.resources)
+      ? (data as any).resources
+      : Array.isArray((data as any)?.courses)
+        ? (data as any).courses
+        : Array.isArray((data as any)?.items)
+          ? (data as any).items
+          : Array.isArray((data as any)?.data)
+            ? (data as any).data
+            : [];
+
+  const resources: Resource[] =
+    list.length > 0
+      ? list.map((r: any, idx: number): Resource => ({
+          id: typeof r?.id === "number" ? r.id : idx + 1,
+          title: typeof r?.title === "string" ? r.title : typeof r?.name === "string" ? r.name : `Course ${idx + 1}`,
+          platform: typeof r?.platform === "string" ? r.platform : "Online",
+          duration: typeof r?.duration === "string" ? r.duration : "Self-paced",
+          level: r?.level === "Beginner" || r?.level === "Intermediate" || r?.level === "Advanced" ? r.level : "Intermediate",
+          price: typeof r?.price === "string" ? r.price : "Free",
+          rating: typeof r?.rating === "number" ? r.rating : 4.8,
+        }))
+      : DEFAULT;
 
   return (
     <ChatArtifactWindow

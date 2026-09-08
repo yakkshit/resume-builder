@@ -47,6 +47,14 @@ const ChartViewer = dynamic(
   () => import("./components/chart-viewer").then((m) => m.ChartViewer),
   { loading },
 );
+const BrowserController = dynamic(
+  () => import("./components/browser-controller").then((m) => m.BrowserController),
+  { loading },
+);
+
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PanelRightOpen, PanelRightClose, Sparkles, Layout } from "lucide-react";
 
 export type ComponentType =
   | "resume"
@@ -61,7 +69,25 @@ export type ComponentType =
   | "email-hr"
   | "linkedin-dm"
   | "resume-latex"
-  | "cover-letter-latex";
+  | "cover-letter-latex"
+  | "browser";
+
+export const COMPONENT_TITLES: Record<ComponentType, string> = {
+  resume: "Resume Preview & Editor",
+  "cover-letter": "Cover Letter Document",
+  "resume-latex": "LaTeX Resume Document",
+  "cover-letter-latex": "LaTeX Cover Letter",
+  "cv-score": "CV Match Score & Insights",
+  "job-recommendations": "Recommended Opportunities",
+  "job-scraper": "Live Job Scraper & Matcher",
+  chart: "Career Analytics & Metrics",
+  "auto-applier": "Autonomous Job Applier",
+  "coding-challenge": "Technical Coding Challenge",
+  "learning-resources": "Curated Skill Roadmap",
+  "email-hr": "HR Email Outreach Assistant",
+  "linkedin-dm": "LinkedIn Networking Messenger",
+  browser: "Autonomous Browser Controller",
+};
 
 interface ComponentRendererProps {
   type: ComponentType;
@@ -76,6 +102,11 @@ interface ComponentRendererProps {
    */
   resumeSyncsWithGlobal?: boolean;
   onSendMessage?: (text: string) => void;
+  componentId?: string;
+  onPopOutToSide?: (opts: { id: string; type: ComponentType; data?: Record<string, unknown>; title: string }) => void;
+  onDockToChat?: () => void;
+  isInSideStage?: boolean;
+  isSideActive?: boolean;
 }
 
 export function ComponentRenderer({
@@ -85,6 +116,11 @@ export function ComponentRenderer({
   chatModel,
   resumeSyncsWithGlobal,
   onSendMessage,
+  componentId,
+  onPopOutToSide,
+  onDockToChat,
+  isInSideStage,
+  isSideActive,
 }: ComponentRendererProps) {
   const translationFieldId = useId();
   const [targetLanguage, setTargetLanguage] = useState(TRANSLATION_ORIGINAL);
@@ -99,6 +135,8 @@ export function ComponentRenderer({
     type === "cover-letter" ||
     type === "resume-latex" ||
     type === "cover-letter-latex";
+
+  const title = COMPONENT_TITLES[type] || "Interactive Component";
 
   useEffect(() => {
     setTranslatedData(data);
@@ -160,15 +198,101 @@ export function ComponentRenderer({
     [isTemplateType, translatedData, data]
   );
 
+  // If this component is currently active in the side stage and we are rendering in the chat stream, show an interactive Google-grade placeholder card
+  if (isSideActive && !isInSideStage) {
+    return (
+      <div className="flex items-center justify-between p-3.5 rounded-xl border border-primary/30 bg-primary/5 dark:bg-primary/10 shadow-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center justify-center size-7 rounded-lg bg-primary/15 text-primary">
+            <Layout className="size-4" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground truncate">{title}</p>
+            <p className="text-[11px] text-muted-foreground truncate">
+              Currently open in the right side canvas
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onDockToChat}
+          className="h-7 text-xs gap-1.5 rounded-md border-primary/30 hover:bg-primary/10 text-primary"
+        >
+          <PanelRightClose className="size-3.5" />
+          <span>Bring into Chat</span>
+        </Button>
+      </div>
+    );
+  }
+
   const header = (
-    <div className="mb-2 flex justify-end sm:justify-end">
-      <TranslationControls
-        id={translationFieldId}
-        value={targetLanguage}
-        disabled={isTranslating}
-        isTranslating={isTranslating}
-        onChange={setTargetLanguage}
-      />
+    <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
+      <div className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5">
+        <span className="size-1.5 rounded-full bg-primary/70" />
+        <span>{title}</span>
+      </div>
+      <div className="flex items-center gap-1.5 ml-auto">
+        {isTemplateType && (
+          <TranslationControls
+            id={translationFieldId}
+            value={targetLanguage}
+            disabled={isTranslating}
+            isTranslating={isTranslating}
+            onChange={setTargetLanguage}
+          />
+        )}
+        {onPopOutToSide && !isInSideStage && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() =>
+                    onPopOutToSide({
+                      id: componentId || `${type}-${Date.now()}`,
+                      type,
+                      data: activeData,
+                      title,
+                    })
+                  }
+                  className="h-7 px-2 text-[11px] gap-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                >
+                  <PanelRightOpen className="size-3.5" />
+                  <span className="hidden sm:inline">Side Panel</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Open in side-by-side workspace panel
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+        {isInSideStage && onDockToChat && (
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={onDockToChat}
+                  className="h-7 px-2 text-[11px] gap-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted"
+                >
+                  <PanelRightClose className="size-3.5" />
+                  <span className="hidden sm:inline">Dock to Chat</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Dock back into chat bubble
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+      </div>
     </div>
   );
 
@@ -213,34 +337,84 @@ export function ComponentRenderer({
       );
     }
     case "cv-score":
-      return <CVScore data={data as any} />;
+      return (
+        <div>
+          {header}
+          <CVScore data={data as any} />
+        </div>
+      );
     case "job-recommendations": {
       const d = data as any;
-      return <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />;
+      return (
+        <div>
+          {header}
+          <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />
+        </div>
+      );
     }
     case "job-scraper": {
       const d = data as any;
       return (
-        <JobScraperCard
-          initialQuery={d?.query || ""}
-          initialLocation={d?.location || "Remote"}
-          initialJobs={Array.isArray(d?.jobs) ? d.jobs : []}
-          onSendMessage={onSendMessage}
-        />
+        <div>
+          {header}
+          <JobScraperCard
+            initialQuery={d?.query || ""}
+            initialLocation={d?.location || "Remote"}
+            initialJobs={Array.isArray(d?.jobs) ? d.jobs : []}
+            onSendMessage={onSendMessage}
+          />
+        </div>
       );
     }
     case "chart":
-      return <ChartViewer data={data as any} />;
+      return (
+        <div>
+          {header}
+          <ChartViewer data={data as any} />
+        </div>
+      );
     case "auto-applier":
-      return <AutoApplier />;
+      return (
+        <div>
+          {header}
+          <AutoApplier />
+        </div>
+      );
     case "coding-challenge":
-      return <CodingChallenge data={data as any} />;
+      return (
+        <div>
+          {header}
+          <CodingChallenge data={data as any} />
+        </div>
+      );
     case "learning-resources":
-      return <LearningResources data={(data as any)?.resources} />;
+      return (
+        <div>
+          {header}
+          <LearningResources data={data as any} />
+        </div>
+      );
     case "email-hr":
-      return <EmailHrPanel data={data} chatApiKey={chatApiKey} chatModel={chatModel} />;
+      return (
+        <div>
+          {header}
+          <EmailHrPanel data={data} chatApiKey={chatApiKey} chatModel={chatModel} />
+        </div>
+      );
     case "linkedin-dm":
-      return <LinkedinDmPanel data={data} />;
+      return (
+        <div>
+          {header}
+          <LinkedinDmPanel data={data} />
+        </div>
+      );
+    case "browser":
+      return (
+        <div>
+          {header}
+          <BrowserController data={data as any} onSendMessage={onSendMessage} />
+        </div>
+      );
     default:
       return null;
   }

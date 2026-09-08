@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { CoverLetterSingleBlockEditor } from "./cover-letter-single-block-editor";
 
+import { sanitizeCoverLetterData } from "@/lib/sanitize-cover-letter-data";
+
 export function CoverLetterViewer({
   data = {},
   persistToLocalStorage = true,
@@ -22,21 +24,22 @@ export function CoverLetterViewer({
   persistToLocalStorage?: boolean;
 }) {
   const [coverLetterData, setCoverLetterData] = useState<CoverLetterData>(() => {
+    const payload = data?.coverLetterData ?? data?.coverLetter ?? data?.data ?? data;
+    if (
+      payload &&
+      typeof payload === "object" &&
+      (payload.head || payload.body || payload.header || payload.content || payload.paragraphs || payload.text)
+    ) {
+      return sanitizeCoverLetterData(payload);
+    }
     let current = defaultCoverLetterData;
     if (typeof window !== "undefined") {
       const raw = localStorage.getItem("coverLetterData");
       if (raw) {
-        try { current = JSON.parse(raw); } catch {}
+        try {
+          current = sanitizeCoverLetterData(JSON.parse(raw));
+        } catch {}
       }
-    }
-    const payload = data?.coverLetterData ?? data;
-    if (payload && typeof payload === "object") {
-      current = {
-        ...current,
-        ...(typeof payload.head === "string" ? { head: payload.head } : {}),
-        ...(typeof payload.body === "string" ? { body: payload.body } : {}),
-        ...(typeof payload.footer === "string" ? { footer: payload.footer } : {}),
-      };
     }
     return current;
   });
@@ -64,16 +67,12 @@ export function CoverLetterViewer({
     localStorage.setItem("coverLetterTemplate", template);
   }, [template, persistToLocalStorage]);
 
-  // Sync state when parent supplies new data (e.g. translated view).
+  // Sync state when parent supplies new data (e.g. generated or translated view).
   useEffect(() => {
-    const payload = data?.coverLetterData ?? data;
+    const payload = data?.coverLetterData ?? data?.coverLetter ?? data?.data ?? data;
     if (payload && typeof payload === "object") {
-      setCoverLetterData((prev) => ({
-        ...prev,
-        ...(typeof payload.head === "string" ? { head: payload.head } : {}),
-        ...(typeof payload.body === "string" ? { body: payload.body } : {}),
-        ...(typeof payload.footer === "string" ? { footer: payload.footer } : {}),
-      }));
+      const sanitized = sanitizeCoverLetterData(payload);
+      setCoverLetterData(sanitized);
     }
     if (typeof data?.template === "string" && data.template.trim()) {
       setTemplate(data.template as CoverLetterTemplate);

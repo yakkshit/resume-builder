@@ -115,10 +115,10 @@ interface GradientCoverLetterTemplateProps {
 }
 
 export const GradientCoverLetterTemplate = ({ coverLetterData }: GradientCoverLetterTemplateProps) => {
-  // Split the text into paragraphs
-  const headParagraphs = coverLetterData.head.split("\n").filter((p) => p.trim() !== "")
-  const bodyParagraphs = coverLetterData.body.split("\n").filter((p) => p.trim() !== "")
-  const footerParagraphs = coverLetterData.footer.split("\n").filter((p) => p.trim() !== "")
+  // Split the text into paragraphs safely
+  const headParagraphs = (coverLetterData?.head || "").split("\n").filter((p) => p.trim() !== "")
+  const bodyParagraphs = (coverLetterData?.body || "").split("\n").filter((p) => p.trim() !== "")
+  const footerParagraphs = (coverLetterData?.footer || "").split("\n").filter((p) => p.trim() !== "")
 
   // SVG icons as data URLs for email, phone, location
   const emailIcon =

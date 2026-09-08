@@ -12,7 +12,7 @@ export interface ParsedToolCall {
  */
 export function isLikelyJsonEnvelope(s: string): boolean {
   const t = s.trim();
-  return /^\{[\s\n]*"(?:component|componentType|resumeData|type)"/.test(t);
+  return /^\{[\s\n]*"(?:component|componentType|resumeData|coverLetterData|head|body|type)"/.test(t);
 }
 
 /**

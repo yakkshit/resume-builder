@@ -21,6 +21,29 @@ const nextConfig = {
   async redirects() {
     return []
   },
+  async headers() {
+    return [
+      {
+        // Apply permissive CSP to the webview proxy route so it can serve any site's HTML
+        source: '/api/webview/:path*',
+        headers: [
+          { key: 'X-Frame-Options', value: 'ALLOWALL' },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' },
+        ],
+      },
+      {
+        // Allow all pages to embed iframes from any source
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Content-Security-Policy',
+            value: "frame-src *; child-src *;",
+          },
+        ],
+      },
+    ]
+  },
   images: {
     unoptimized: true,
     remotePatterns: [
@@ -43,12 +66,7 @@ const nextConfig = {
     'pdf-parse',
     'pdfjs-dist',
   ],
-  experimental: {
-    // Disabled - can trigger "Cannot read properties of undefined (reading 'length')" in webpack
-    // webpackBuildWorker: true,
-    // parallelServerBuildTraces: true,
-    // parallelServerCompiles: true,
-  },
+  experimental: {},
   turbopack: {},
   webpack: (config, { isServer }) => {
     config.resolve.alias.canvas = false
@@ -64,14 +82,6 @@ const nextConfig = {
 }
 
 mergeConfig(nextConfig, userConfig)
-
-// Ensure problematic experimental flags stay disabled (avoids "Cannot read properties of undefined (reading 'length')")
-nextConfig.experimental = {
-  ...nextConfig.experimental,
-  webpackBuildWorker: false,
-  parallelServerBuildTraces: false,
-  parallelServerCompiles: false,
-}
 
 function mergeConfig(nextConfig, userConfig) {
   if (!userConfig) {

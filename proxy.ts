@@ -11,12 +11,14 @@ const isClerkKeyValid = Boolean(
   publishableKey.length > 20
 );
 
-export default function middleware(req: NextRequest, event: NextFetchEvent) {
+export function proxy(req: NextRequest, event: NextFetchEvent) {
   if (isClerkKeyValid) {
     return clerkMiddleware()(req, event);
   }
   return NextResponse.next();
 }
+
+export default proxy;
 
 export const config = {
   matcher: [

@@ -38,6 +38,10 @@ const FALSE_POSITIVE_VALUES = [
     "mcp-carrier-live-auth",
     "mcp-career-live-auth",
     "mcp_agent_harnesses_v1",
+    "Access-Control-Allow-Origin",
+    "Access-Control-Allow-Methods",
+    "Content-Security-Policy",
+    "X-Frame-Options",
 ];
 
 const SECRET_PATTERNS = [

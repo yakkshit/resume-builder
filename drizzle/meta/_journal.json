@@ -8,6 +8,13 @@
       "when": 1788782281133,
       "tag": "0000_optimal_fallen_one",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788906919492,
+      "tag": "0001_wandering_starjammers",
+      "breakpoints": true
     }
   ]
 }

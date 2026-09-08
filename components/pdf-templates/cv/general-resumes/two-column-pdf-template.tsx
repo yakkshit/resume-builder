@@ -116,8 +116,7 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 10.5,
     fontFamily: "Helvetica-Bold",
-    flex: 1,
-    marginRight: 8,
+    marginBottom: 1,
   },
   itemSubtitle: {
     fontSize: 9.5,

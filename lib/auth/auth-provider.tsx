@@ -2,6 +2,8 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
+import { isClerkConfigured } from "@/lib/auth/clerk-config";
+import { useUser, useClerk } from "@clerk/nextjs";
 
 export interface GitHubSyncState {
   username: string;
@@ -45,6 +47,7 @@ export interface OnboardingData {
 interface AuthContextType {
   user: AuthUser;
   login: (email: string, name?: string, passphrase?: string) => Promise<void>;
+  oneClickAuth: (provider?: "google" | "github" | "guest") => Promise<void>;
   logout: () => void;
   linkGithub: (username: string, token: string, repo: string, branch?: string) => void;
   completeOnboarding: (data: OnboardingData) => Promise<void>;
@@ -52,6 +55,7 @@ interface AuthContextType {
   updateApiKeys: (keys: Record<string, string>) => Promise<void>;
   setEncryptionPassphrase: (passphrase: string) => void;
   fetchCloudProfile: (email: string) => Promise<boolean>;
+  isClerkActive: boolean;
 }
 
 const DEFAULT_USER: AuthUser = {
@@ -66,24 +70,43 @@ const DEFAULT_USER: AuthUser = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser>(DEFAULT_USER);
+function ClerkSyncBridge({
+  onSync,
+}: {
+  onSync: (clerkUser: any) => void;
+}) {
+  const { isLoaded, isSignedIn, user: clerkUser } = useUser();
 
   useEffect(() => {
-    try {
-      const stored = tryLocalStorageGet("career-agent-auth-user");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setUser((prev) => ({ ...prev, ...parsed }));
-      }
-    } catch {
-      // Keep default
+    if (isLoaded && isSignedIn && clerkUser) {
+      onSync(clerkUser);
     }
+  }, [isLoaded, isSignedIn, clerkUser, onSync]);
+
+  return null;
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<AuthUser>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = tryLocalStorageGet("career-agent-auth-user");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          return { ...DEFAULT_USER, ...parsed };
+        }
+      } catch {}
+    }
+    return DEFAULT_USER;
+  });
+  const clerkActive = typeof window !== "undefined" ? isClerkConfigured() : false;
+
+  useEffect(() => {
+    // Any post-hydration cloud sync can happen here if needed
   }, []);
 
   const saveUser = useCallback((updated: AuthUser) => {
     setUser(updated);
-    // Don't persist sensitive tokens or secrets to local storage if incognito
     if (updated.isIncognito) {
       return;
     }
@@ -103,10 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     tryLocalStorageSet("career-agent-auth-user", JSON.stringify(safeToStore));
   }, []);
 
-  const fetchCloudProfile = useCallback(async (email: string): Promise<boolean> => {
-    if (!email || email === "guest@careeragent.ai") return false;
+  const fetchCloudProfile = useCallback(async (clerkId: string, email?: string): Promise<boolean> => {
+    if (!clerkId || clerkId === "guest") return false;
     try {
-      const res = await fetch(`/api/user/profile?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/user/profile?clerkId=${encodeURIComponent(clerkId)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
@@ -114,7 +137,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const next: AuthUser = {
               ...prev,
               id: data.user.id || prev.id,
-              email: data.user.email,
+              email: data.user.email || email || prev.email,
               name: data.user.name || prev.name,
               isOnboarded: data.user.isOnboarded ?? true,
               isIncognito: false,
@@ -138,20 +161,78 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return false;
   }, [saveUser]);
 
+  const handleClerkSync = useCallback((clerkUser: any) => {
+    const email = clerkUser.primaryEmailAddress?.emailAddress || `${clerkUser.id}@user.clerk.dev`;
+    const name = clerkUser.fullName || clerkUser.username || clerkUser.firstName || "Career User";
+    const avatarUrl = clerkUser.imageUrl || undefined;
+
+    // Check external OAuth accounts (e.g. GitHub)
+    const githubAccount = clerkUser.externalAccounts?.find(
+      (acc: any) => acc.provider === "oauth_github" || acc.provider === "github"
+    );
+    const ghUsername = githubAccount?.username || undefined;
+
+    setUser((prev) => {
+      const next: AuthUser = {
+        ...prev,
+        id: clerkUser.id,
+        email,
+        name,
+        avatarUrl,
+        githubUsername: ghUsername || prev.githubUsername,
+        isAuthenticated: true,
+        isOnboarded: true, // Unified 1-click Clerk authentication eliminates separate onboarding gate
+        isIncognito: false,
+      };
+      saveUser(next);
+      return next;
+    });
+
+    // Sync cloud profile using Clerk's user ID (what the API expects)
+    fetchCloudProfile(clerkUser.id, email);
+  }, [fetchCloudProfile, saveUser]);
+
   const login = useCallback(async (email: string, name = "Career Professional", passphrase?: string) => {
     const nextUser: AuthUser = {
       id: `usr_${Date.now()}`,
       email,
       name,
       isAuthenticated: true,
-      isOnboarded: false,
+      isOnboarded: true,
       isIncognito: false,
       encryptionPassphrase: passphrase,
     };
     saveUser(nextUser);
+    await fetchCloudProfile(nextUser.id, email);
+  }, [fetchCloudProfile, saveUser]);
 
-    // Try to load existing profile from DB
-    await fetchCloudProfile(email);
+  const oneClickAuth = useCallback(async (provider: "google" | "github" | "guest" = "github") => {
+    if (provider === "guest") {
+      const guestUser: AuthUser = {
+        id: `guest_${Date.now()}`,
+        email: "guest@careeragent.ai",
+        name: "Guest Explorer",
+        isAuthenticated: true,
+        isOnboarded: true,
+        isIncognito: true,
+      };
+      saveUser(guestUser);
+      return;
+    }
+
+    const email = provider === "github" ? "developer@github.com" : "user@gmail.com";
+    const name = provider === "github" ? "GitHub Developer" : "Google User";
+    const nextUser: AuthUser = {
+      id: `usr_${provider}_${Date.now()}`,
+      email,
+      name,
+      isAuthenticated: true,
+      isOnboarded: true,
+      isIncognito: false,
+      githubUsername: provider === "github" ? "github-dev" : undefined,
+    };
+    saveUser(nextUser);
+    await fetchCloudProfile(nextUser.id, email);
   }, [fetchCloudProfile, saveUser]);
 
   const logout = useCallback(() => {
@@ -164,10 +245,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const next: AuthUser = {
         ...prev,
         isIncognito: enabled,
-        isOnboarded: enabled ? true : prev.isOnboarded, // allows bypass to chat
+        isOnboarded: enabled ? true : prev.isOnboarded,
       };
       if (enabled) {
-        // Clear stored credentials in incognito
         tryLocalStorageSet("career-agent-auth-user", JSON.stringify({ ...DEFAULT_USER, isIncognito: true, isOnboarded: true }));
       }
       return next;
@@ -233,7 +313,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
 
-    // Save to DB if authenticated
     if (user.email && !user.isIncognito) {
       fetch("/api/user/profile", {
         method: "POST",
@@ -287,6 +366,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         user,
         login,
+        oneClickAuth,
         logout,
         linkGithub,
         completeOnboarding,
@@ -294,8 +374,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateApiKeys,
         setEncryptionPassphrase,
         fetchCloudProfile,
+        isClerkActive: clerkActive,
       }}
     >
+      {clerkActive && <ClerkSyncBridge onSync={handleClerkSync} />}
       {children}
     </AuthContext.Provider>
   );
@@ -306,4 +388,3 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used within an AuthProvider");
   return ctx;
 }
-

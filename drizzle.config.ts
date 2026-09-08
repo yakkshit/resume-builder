@@ -10,7 +10,7 @@ export default defineConfig({
   dialect: "postgresql",
   schema: "./lib/db/schema.ts",
   out: "./drizzle",
-  tablesFilter: ["users", "resumes", "custom_models"],
+  tablesFilter: ["users", "resumes", "custom_models", "mcp_servers", "agent_harnesses"],
   dbCredentials: {
     url: dbUrl,
   },

@@ -163,6 +163,115 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
       },
     ],
   },
+  {
+    id: "builtin-playwright-agent",
+    name: "Playwright & Puppeteer Browser MCP",
+    url: "/api/mcp",
+    type: "builtin",
+    enabled: true,
+    status: "connected",
+    tools: [
+      {
+        name: "playwright_navigate",
+        description: "Navigate headless Chromium browser to any target URL, evaluate network state, and return rendered HTML content.",
+        serverName: "Playwright & Puppeteer Browser MCP",
+        serverId: "builtin-playwright-agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Target website URL (e.g. 'https://cedzlabs.com' or 'https://github.com')" },
+            waitUntil: { type: "string", enum: ["load", "domcontentloaded", "networkidle"], description: "Wait condition (default: domcontentloaded)" },
+          },
+          required: ["url"],
+        },
+      },
+      {
+        name: "playwright_screenshot",
+        description: "Capture a full-page or viewport screenshot of any website using headless browser rendering.",
+        serverName: "Playwright & Puppeteer Browser MCP",
+        serverId: "builtin-playwright-agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Target website URL" },
+            fullPage: { type: "boolean", description: "Whether to take a full page screenshot" },
+          },
+          required: ["url"],
+        },
+      },
+      {
+        name: "playwright_extract_dom",
+        description: "Extract clean semantic HTML structure, buttons, forms, headings, and text for AI reasoning and React component generation.",
+        serverName: "Playwright & Puppeteer Browser MCP",
+        serverId: "builtin-playwright-agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Target page URL" },
+            selector: { type: "string", description: "Optional CSS selector to scope extraction" },
+          },
+          required: ["url"],
+        },
+      },
+      {
+        name: "playwright_fill_form",
+        description: "Automatically fill and submit forms, inputs, textareas, and select elements on the page.",
+        serverName: "Playwright & Puppeteer Browser MCP",
+        serverId: "builtin-playwright-agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Target form page URL" },
+            fields: { type: "object", description: "Key-value mapping of field name or selector to value" },
+            submitSelector: { type: "string", description: "Optional submit button selector" },
+          },
+          required: ["url", "fields"],
+        },
+      },
+      {
+        name: "playwright_click_element",
+        description: "Simulate click or hover interaction on interactive elements, tabs, links, and navigation items.",
+        serverName: "Playwright & Puppeteer Browser MCP",
+        serverId: "builtin-playwright-agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Target page URL" },
+            selector: { type: "string", description: "Target CSS selector or element text to click" },
+          },
+          required: ["url", "selector"],
+        },
+      },
+      {
+        name: "playwright_evaluate",
+        description: "Evaluate a custom JavaScript snippet in page context to extract dynamic data or compute element layout.",
+        serverName: "Playwright & Puppeteer Browser MCP",
+        serverId: "builtin-playwright-agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Target page URL" },
+            script: { type: "string", description: "JavaScript function or expression to execute" },
+          },
+          required: ["url", "script"],
+        },
+      },
+      {
+        name: "browser_handoff",
+        description: "Hand over browser control to the human user for manual verification (CAPTCHA, 2FA, logins) and resume when ready.",
+        serverName: "Playwright & Puppeteer Browser MCP",
+        serverId: "builtin-playwright-agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            url: { type: "string", description: "Current page URL" },
+            reason: { type: "string", description: "Reason for human handoff" },
+          },
+          required: ["url"],
+        },
+      },
+    ],
+  },
 ];
 
 export function isToolEnabled(server: MCPServerConfig, toolName: string): boolean {

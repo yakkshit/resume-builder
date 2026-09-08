@@ -107,7 +107,8 @@ export const coverLetterTemplates = {
 
 import React from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
-import type { ResumeData } from "@/lib/types"
+import { sanitizeCoverLetterData } from "@/lib/sanitize-cover-letter-data"
+import type { ResumeData, CoverLetterData } from "@/lib/types"
 
 function createSafeResumeTemplate(RawTemplate: any) {
   const SafeComponent = (props: { resumeData: ResumeData; [key: string]: any }) => {
@@ -115,6 +116,15 @@ function createSafeResumeTemplate(RawTemplate: any) {
     return React.createElement(RawTemplate, { ...props, resumeData: safeData })
   }
   SafeComponent.displayName = `SafeTemplate(${RawTemplate.displayName || RawTemplate.name || "Template"})`
+  return SafeComponent
+}
+
+function createSafeCoverLetterTemplate(RawTemplate: any) {
+  const SafeComponent = (props: { coverLetterData: CoverLetterData; [key: string]: any }) => {
+    const safeData = sanitizeCoverLetterData(props?.coverLetterData)
+    return React.createElement(RawTemplate, { ...props, coverLetterData: safeData })
+  }
+  SafeComponent.displayName = `SafeCoverLetterTemplate(${RawTemplate.displayName || RawTemplate.name || "Template"})`
   return SafeComponent
 }
 
@@ -126,5 +136,6 @@ export function getResumeTemplate(templateName: string) {
 
 // Get cover letter template by name
 export function getCoverLetterTemplate(templateName: string) {
-  return coverLetterTemplates[templateName as keyof typeof coverLetterTemplates] || StandardCoverLetterPDFTemplate
+  const raw = coverLetterTemplates[templateName as keyof typeof coverLetterTemplates] || StandardCoverLetterPDFTemplate
+  return createSafeCoverLetterTemplate(raw)
 }

@@ -58,12 +58,14 @@ import {
 } from "@/lib/chat-provider-settings";
 import { getTextContent, getReasoningContent, isReasoningStreaming } from "@/lib/message-utils";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ai-elements/reasoning";
+import { Persona } from "@/components/ai-elements/persona";
 import type { JobSuggestion } from "@/lib/job-scraper/google-jobs";
 import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import { stripIncompleteJsonTail, parseChainOfThought, type ParsedToolCall } from "@/lib/streaming-chat-content";
 import { mergeAssistantResumeIntoCurrent, extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
 import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume";
 import { buildResumeDataForChatRequest, messagesForResumeContext } from "@/lib/chat-resume-context";
+import { sanitizeCoverLetterData, extractCoverLetterJsonFromMessage } from "@/lib/sanitize-cover-letter-data";
 import { buildUserKnowledgeStoreChunks } from "@/lib/user-knowledge-context";
 import { DEFAULT_TRANSLATION_LANGUAGE } from "@/lib/translation";
 import type { ResumeData } from "@/lib/types";
@@ -78,6 +80,7 @@ import { useAuth } from "@/lib/auth/auth-provider";
 import { OnboardingModal } from "@/components/auth/onboarding-modal";
 import { ChatFeedback } from "./chat-feedback";
 import { ChromiumWebview } from "./chromium-webview";
+import { ComponentStage, type StageComponentInfo } from "./components/component-stage";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 const panelLoading = () => (
@@ -182,25 +185,26 @@ function WelcomeScreen({ onPrompt }: { onPrompt: (p: string) => void }) {
 // ── Inline component extraction from AI response text ──────────────────────
 
 function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>[0]["type"] | null {
-    const t = rawType.toLowerCase();
+    const t = rawType.toLowerCase().replace(/_/g, "-");
     if (t === "cv" || t === "resume") return "resume";
-    if (t === "coverletter" || t === "cover-letter") return "cover-letter";
-    if (t === "cvscorer" || t === "cv-score") return "cv-score";
-    if (t === "joblinks" || t === "job-recommendations") return "job-recommendations";
-    if (t === "jobscraper" || t === "job-scraper" || t === "jobsearch") return "job-scraper";
+    if (t === "coverletter" || t === "cover-letter" || t === "cover" || t === "coverletters" || t === "cover-letters") return "cover-letter";
+    if (t === "cvscorer" || t === "cv-score" || t === "cvscore") return "cv-score";
+    if (t === "joblinks" || t === "job-recommendations" || t === "jobrecommendations") return "job-recommendations";
+    if (t === "jobscraper" || t === "job-scraper" || t === "jobsearch" || t === "job-search") return "job-scraper";
     if (t === "chart" || t === "recharts" || t === "analytics" || t === "graph") return "chart";
-    if (t === "jobapplysimulator" || t === "auto-applier") return "auto-applier";
-    if (t === "course" || t === "learning-resources") return "learning-resources";
+    if (t === "jobapplysimulator" || t === "auto-applier" || t === "autoapplier") return "auto-applier";
+    if (t === "course" || t === "learning-resources" || t === "learningresources") return "learning-resources";
     if (t === "codingchallenge" || t === "coding-challenge") return "coding-challenge";
     if (t === "emailhr" || t === "email-hr" || t === "hr-email") return "email-hr";
     if (t === "linkedindm" || t === "linkedin-dm" || t === "linkedin") return "linkedin-dm";
     if (t === "resumelatex" || t === "resume-latex" || t === "latexcv") return "resume-latex";
     if (t === "coverletterlatex" || t === "cover-letter-latex" || t === "latexcover") return "cover-letter-latex";
+    if (t === "browser" || t === "browser-controller" || t === "chromium" || t === "mcp-browser") return "browser";
     return null;
 }
 
 function extractComponents(text: string) {
-    const componentRegex = /```component:([a-zA-Z0-9-]+)\s*([\s\S]*?)(?:```|$)/g;
+    const componentRegex = /```component:([a-zA-Z0-9-_]+)\s*([\s\S]*?)(?:```|$)/gi;
     const components: { type: Parameters<typeof ComponentRenderer>[0]["type"] | null, data: any, isComplete: boolean }[] = [];
     let usedResumeJsonFallback = false;
 
@@ -241,8 +245,10 @@ function extractComponents(text: string) {
 
             const maybe = tryParseLoose(candidate);
             parsedData = maybe && typeof maybe === "object" ? maybe : {};
+            const resolvedType = mapComponentType(typeStr);
+
             // Normalize flat resume JSON or odd envelopes into { resumeData } for ResumeViewer
-            if (mapComponentType(typeStr) === "resume" && parsedData && typeof parsedData === "object") {
+            if (resolvedType === "resume" && parsedData && typeof parsedData === "object") {
                 const rec = parsedData as Record<string, unknown>;
                 if (rec.resumeData && typeof rec.resumeData === "object") {
                     const rd = rec.resumeData as Record<string, unknown>;
@@ -265,6 +271,17 @@ function extractComponents(text: string) {
                     }
                 }
             }
+
+            // Normalize cover letter payload into { coverLetterData, template } for CoverLetterViewer
+            if (resolvedType === "cover-letter" && parsedData && typeof parsedData === "object") {
+                const rec = parsedData as Record<string, unknown>;
+                const sanitized = sanitizeCoverLetterData(rec.coverLetterData ?? rec.coverLetter ?? rec.data ?? rec);
+                parsedData = {
+                    ...rec,
+                    coverLetterData: sanitized,
+                    template: typeof rec.template === "string" ? rec.template : "modern",
+                };
+            }
         }
 
         components.push({
@@ -276,7 +293,7 @@ function extractComponents(text: string) {
         cleanText = cleanText.replace(rawMatch, "");
     }
 
-    // Fallback: if model returned resume JSON (no component fence), still render Resume tool/PDF.
+    // Fallback 1: if model returned resume JSON (no component fence), still render Resume tool/PDF.
     const hasExplicitResumeComponent = components.some((c) => c.type === "resume");
     if (!hasExplicitResumeComponent) {
         const fallbackResume = extractResumeJsonFromMessage(text);
@@ -286,6 +303,19 @@ function extractComponents(text: string) {
             components.push({
                 type: "resume",
                 data: { resumeData: flat },
+                isComplete: true,
+            });
+        }
+    }
+
+    // Fallback 2: if model returned cover letter JSON (no component fence), render Cover Letter PDF.
+    const hasExplicitCoverLetterComponent = components.some((c) => c.type === "cover-letter");
+    if (!hasExplicitCoverLetterComponent) {
+        const fallbackCover = extractCoverLetterJsonFromMessage(text);
+        if (fallbackCover) {
+            components.push({
+                type: "cover-letter",
+                data: { coverLetterData: fallbackCover, template: "modern" },
                 isComplete: true,
             });
         }
@@ -465,6 +495,9 @@ function MessageBubble({
     chatApiKey,
     chatModel,
     canonicalResumeKey,
+    activeStageComponentId,
+    onPopOutToSide,
+    onDockToChat,
 }: {
     message: UIMessage;
     isStreaming?: boolean;
@@ -473,6 +506,9 @@ function MessageBubble({
     chatApiKey?: string;
     chatModel?: string;
     canonicalResumeKey: string | null;
+    activeStageComponentId?: string | null;
+    onPopOutToSide?: (opts: StageComponentInfo) => void;
+    onDockToChat?: () => void;
 }) {
     const isUser = message.role === "user";
     const [hovering, setHovering] = useState(false);
@@ -528,12 +564,16 @@ function MessageBubble({
             onMouseLeave={() => setHovering(false)}
         >
             {!isUser && (
-                <div className="w-8 h-8 rounded-full bg-neutral-900 border border-border flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Bot className="w-4 h-4 text-white" />
+                <div className="flex-shrink-0 mt-0.5">
+                    <Persona
+                        state={isStreaming ? (isReasoningActive ? "thinking" : "speaking") : "idle"}
+                        variant="obsidian"
+                        className="size-8"
+                    />
                 </div>
             )}
 
-            <div className={`flex flex-col gap-3 ${isUser ? "items-end" : "items-start"} ${isUser ? "max-w-[90%]" : "w-full max-w-[min(980px,calc(100%-3rem))]"}`}>
+            <div className={`flex flex-col gap-2 ${isUser ? "items-end" : "items-start"} ${isUser ? "max-w-[90%]" : "w-full max-w-[min(980px,calc(100%-3rem))]"}`}>
                 {showReasoning ? (
                     <Reasoning
                         className="w-full max-w-[min(720px,calc(100%-3rem))]"
@@ -567,66 +607,70 @@ function MessageBubble({
                     {isStreaming && (
                         <span className="inline-block w-2 h-4 ml-1 bg-current opacity-70 animate-pulse align-text-bottom" />
                     )}
-
-                    {/* Hover actions */}
-                    <AnimatePresence>
-                        {hovering && !isStreaming && (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.85 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.85 }}
-                                className={`absolute top-2 flex gap-1 ${isUser ? "-left-16" : "-right-16"}`}
-                            >
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <button type="button" onClick={copy} aria-label="Copy message" className="p-1.5 bg-background border border-border rounded-lg text-muted-foreground hover:text-foreground shadow-sm">
-                                            <Copy className="w-3 h-3" />
-                                        </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="bottom" className="text-xs">Copy</TooltipContent>
-                                </Tooltip>
-                                {!isUser && (
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <button type="button" onClick={() => onReply(content)} aria-label="Quote in reply" className="p-1.5 bg-background border border-border rounded-lg text-muted-foreground hover:text-foreground shadow-sm">
-                                                <RotateCcw className="w-3 h-3" />
-                                            </button>
-                                        </TooltipTrigger>
-                                        <TooltipContent side="bottom" className="text-xs">Quote in input</TooltipContent>
-                                    </Tooltip>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
                 </div>
 
                 {/* Inline dynamic components */}
-                {extracted.components.map((c, idx) => c.type && (!isStreaming || c.isComplete) && (
-                    <div key={`${message.id ?? "m"}-${idx}-${c.type}`} className="w-full mt-2">
-                        <ComponentRenderer
-                            type={c.type}
-                            data={c.data}
-                            chatApiKey={chatApiKey}
-                            chatModel={chatModel}
-                            onSendMessage={onReply}
-                            resumeSyncsWithGlobal={
-                                c.type === "resume"
-                                    ? `${message.id ?? "m"}-${idx}` === canonicalResumeKey
-                                    : undefined
-                            }
-                        />
-                    </div>
-                ))}
+                {extracted.components.map((c, idx) => {
+                    const compId = `${message.id ?? "m"}-${idx}-${c.type}`;
+                    return c.type && (!isStreaming || c.isComplete) && (
+                        <div key={compId} className="w-full mt-2">
+                            <ComponentRenderer
+                                type={c.type}
+                                data={c.data}
+                                chatApiKey={chatApiKey}
+                                chatModel={chatModel}
+                                onSendMessage={onReply}
+                                componentId={compId}
+                                isSideActive={activeStageComponentId === compId}
+                                onPopOutToSide={onPopOutToSide}
+                                onDockToChat={onDockToChat}
+                                resumeSyncsWithGlobal={
+                                    c.type === "resume"
+                                        ? `${message.id ?? "m"}-${idx}` === canonicalResumeKey
+                                        : undefined
+                                }
+                            />
+                        </div>
+                    );
+                })}
 
-                {/* Model Training Feedback (RLHF) */}
+                {/* Non-overlapping Footer Action Bar: Model Training Feedback + Copy + Quote */}
                 {!isUser && !isStreaming && (
-                    <div className="flex items-center justify-between mt-1 px-1">
+                    <div className="flex items-center justify-between w-full mt-1 px-1 text-xs text-muted-foreground gap-2">
                         <ChatFeedback
                             messageId={message.id || `msg_${Date.now()}`}
                             prompt={content}
                             response={content}
                             onFeedbackSubmitted={() => onToast("success", "Feedback saved for model training!")}
                         />
+                        <div className="flex items-center gap-1">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={copy}
+                                        aria-label="Copy message"
+                                        className="p-1.5 rounded-lg border border-border/50 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-xs"
+                                    >
+                                        <Copy className="w-3.5 h-3.5" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">Copy response</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <button
+                                        type="button"
+                                        onClick={() => onReply(content)}
+                                        aria-label="Quote in reply"
+                                        className="p-1.5 rounded-lg border border-border/50 bg-background/80 hover:bg-muted text-muted-foreground hover:text-foreground transition-all shadow-xs"
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                    </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="text-xs">Quote in input</TooltipContent>
+                            </Tooltip>
+                        </div>
                     </div>
                 )}
             </div>
@@ -694,6 +738,7 @@ function ChatInput({
     raiseForOnboarding,
     showToast,
     onOpenMcpDialog,
+    inSplitPanel,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -713,6 +758,7 @@ function ChatInput({
     raiseForOnboarding?: boolean;
     showToast: (variant: "default" | "success" | "error" | "warning", msg: string) => void;
     onOpenMcpDialog?: () => void;
+    inSplitPanel?: boolean;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -775,7 +821,9 @@ function ChatInput({
     return (
         <div
             className={cn(
-                "fixed bottom-5 left-1/2 z-30 w-full max-w-4xl -translate-x-1/2 px-4",
+                inSplitPanel
+                    ? "absolute bottom-3 left-0 right-0 z-30 w-full max-w-2xl mx-auto px-3 pointer-events-auto"
+                    : "fixed bottom-5 left-1/2 z-30 w-full max-w-4xl -translate-x-1/2 px-4 pointer-events-auto",
                 raiseForOnboarding && "z-[70]",
             )}
         >
@@ -1088,9 +1136,13 @@ export default function AICareerAssistantChat() {
     const [onboardingGateOpen, setOnboardingGateOpen] = useState(false);
     const [composerShine, setComposerShine] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
     const [webviewOpen, setWebviewOpen] = useState(false);
     const [webviewSplitMode, setWebviewSplitMode] = useState<"horizontal" | "vertical" | "fullscreen">("horizontal");
+    const [activeStageComponent, setActiveStageComponent] = useState<StageComponentInfo | null>(null);
+    const [activeSideTab, setActiveSideTab] = useState<"webview" | "stage">("stage");
+    const isSplitLayout = webviewOpen || activeStageComponent !== null;
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const [jobPanelOpen, setJobPanelOpen] = useState(false);
     const [jobPanelLoading, setJobPanelLoading] = useState(false);
@@ -2119,8 +2171,7 @@ export default function AICareerAssistantChat() {
 
     return (
         <TooltipProvider delayDuration={7000}>
-        <InfiniteGridBackground className="fixed inset-0 h-[100dvh] max-h-[100dvh]">
-            <div className="relative z-[1] flex h-full min-h-0 w-full flex-col">
+            <div className="relative z-[1] flex h-full min-h-0 w-full flex-row overflow-hidden">
             <ChatOnboarding open={onboardingOpen} onOpenChange={setOnboardingOpen} setSidebarOpen={setSidebarOpen} />
             <MCPDialog
                 open={mcpDialogOpen}
@@ -2134,11 +2185,12 @@ export default function AICareerAssistantChat() {
             />
             <Toaster ref={toasterRef} />
 
-            {/* Sidebar */}
+            {/* Sidebar (Desktop Collapsible Rail / Expanded + Mobile Drawer) */}
             <ChatSidebar
-                elevateForOnboarding={onboardingOpen}
                 isOpen={sidebarOpen}
                 onClose={() => setSidebarOpen(false)}
+                isCollapsed={sidebarCollapsed}
+                onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
                 sessions={sessions}
                 currentId={currentSessionId}
                 settings={settings}
@@ -2149,120 +2201,45 @@ export default function AICareerAssistantChat() {
                 onImport={handleImport}
                 onSettingsChange={updateSettings}
                 onIntegrationsToast={showToast}
+                onOpenWebview={() => setWebviewOpen((v) => !v)}
+                webviewOpen={webviewOpen}
+                onOpenMcp={() => setMcpDialogOpen(true)}
+                onOpenGuide={() => setOnboardingOpen(true)}
+                onOpenSettings={() => setProfileSettingsOpen(true)}
             />
 
-            {/* Menu button */}
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <motion.button
-                        data-chat-tour="menu"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.3, type: "spring" }}
+            {/* Main Content Column */}
+            <div className="flex-1 flex flex-col h-full min-w-0 bg-[#161619]/90 relative overflow-hidden">
+                {/* Mobile-only floating sidebar trigger */}
+                <div className="md:hidden absolute top-3 left-3 z-30">
+                    <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={() => setSidebarOpen(true)}
-                        className={cn(
-                            "fixed top-5 left-5 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-neutral-900 shadow-lg transition-opacity hover:opacity-80 dark:bg-neutral-800",
-                            onboardingOpen && "z-[70]",
-                        )}
+                        className="size-8 rounded-lg border border-white/10 bg-[#141416]/80 text-foreground backdrop-blur-md shadow-md"
                         aria-label="Open sidebar"
                         type="button"
                     >
-                        <Menu className="w-4 h-4 text-white" />
-                    </motion.button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="text-xs">
-                    Chats, export, import, global profile, navigation
-                </TooltipContent>
-            </Tooltip>
+                        <Menu className="size-4" />
+                    </Button>
+                </div>
 
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <motion.button
-                        type="button"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.38, type: "spring" }}
-                        onClick={() => setOnboardingOpen(true)}
-                        className={cn(
-                            "fixed top-[4.75rem] left-5 z-30 flex h-9 w-10 items-center justify-center rounded-full border border-white/10 bg-neutral-900/95 shadow-lg backdrop-blur-sm transition-opacity hover:opacity-90 dark:bg-neutral-800/95",
-                            onboardingOpen && "z-[70]",
-                        )}
-                        aria-label="Open chat guide"
-                    >
-                        <BookMarked className="h-4 w-4 text-white" />
-                    </motion.button>
-                </TooltipTrigger>
-                <TooltipContent
-                    side="right"
-                    className="max-w-[min(88vw,260px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-md"
-                >
-                    Step-by-step guide: sidebar, models, profile context, and composer (with optional video).
-                </TooltipContent>
-            </Tooltip>
-
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <motion.button
-                        data-chat-tour="mcp-tools"
-                        type="button"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.44, type: "spring" }}
-                        onClick={() => setMcpDialogOpen(true)}
-                        className={cn(
-                            "fixed top-[7.25rem] left-5 z-30 flex h-9 w-10 items-center justify-center rounded-full border border-white/10 bg-gradient-to-br from-indigo-600/90 to-cyan-700/90 shadow-lg backdrop-blur-sm transition-opacity hover:opacity-95",
-                            onboardingOpen && "z-[70]",
-                        )}
-                        aria-label="Open MCP Servers & Tools"
-                    >
-                        <Plug className="h-4 w-4 text-white" />
-                    </motion.button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-[min(92vw,280px)] text-xs leading-snug">
-                    MCP & Tools — Connect external MCP servers and inspect available tool schemas.
-                </TooltipContent>
-            </Tooltip>
-
-            {/* Top Right Header Controls */}
-            <div className="fixed top-5 right-5 z-30 flex items-center gap-2">
-                <Tooltip>
-                    <TooltipTrigger asChild>
+                {/* Floating Stop generation button if generating */}
+                {isLoading && (
+                    <div className="absolute top-3 right-3 z-30">
                         <Button
                             type="button"
-                            variant="outline"
                             size="sm"
-                            onClick={() => setWebviewOpen((v) => !v)}
-                            className={`h-8 px-2.5 text-xs flex items-center gap-1.5 rounded-full border border-border/80 shadow-sm backdrop-blur-md transition-all ${
-                                webviewOpen
-                                    ? "bg-indigo-600 text-white border-indigo-500 font-semibold hover:bg-indigo-700"
-                                    : "bg-background/80 text-foreground hover:bg-muted"
-                            }`}
-                            aria-label="Toggle In-App Web Browser"
+                            variant="destructive"
+                            onClick={stop}
+                            className="h-7 px-2.5 text-xs gap-1.5 rounded-full shadow-lg backdrop-blur-md"
+                            aria-label="Stop generating"
                         >
-                            <Globe className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">{webviewOpen ? "Close Webview" : "Web Browser"}</span>
+                            <Loader2 className="size-3 animate-spin" />
+                            <span>Stop</span>
                         </Button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="text-xs">
-                        {webviewOpen ? "Close In-App Browser" : "Open In-App Web Browser (Job Search & Text Selection)"}
-                    </TooltipContent>
-                </Tooltip>
-
-                <UserMenu onOpenSettings={() => setProfileSettingsOpen(true)} />
-                {isLoading && (
-                    <motion.button
-                        type="button"
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-neutral-900 text-white text-xs shadow-lg hover:opacity-80 transition-opacity border border-white/10"
-                        onClick={stop}
-                        aria-label="Stop generating"
-                    >
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                        <span>Stop</span>
-                    </motion.button>
+                    </div>
                 )}
-            </div>
 
             {/* Error banner */}
             {error && (
@@ -2272,8 +2249,8 @@ export default function AICareerAssistantChat() {
                 </div>
             )}
 
-            {/* Main Workspace Layout (Supports Split Webview + Chat) */}
-            {webviewOpen ? (
+            {/* Main Workspace Layout (Supports Split Webview / Component Stage + Chat) */}
+            {isSplitLayout ? (
                 <ResizablePanelGroup
                     direction={webviewSplitMode === "vertical" ? "vertical" : "horizontal"}
                     className="flex-1 h-full w-full min-h-0 z-10"
@@ -2281,12 +2258,71 @@ export default function AICareerAssistantChat() {
                     {webviewSplitMode === "vertical" && (
                         <>
                             <ResizablePanel defaultSize={50} minSize={25} className="h-full relative">
-                                <ChromiumWebview
-                                    splitLayout={webviewSplitMode}
-                                    onToggleSplitLayout={setWebviewSplitMode}
-                                    onClose={() => setWebviewOpen(false)}
-                                    onInjectSnippet={handleInjectWebviewSnippet}
-                                />
+                                {webviewOpen && activeStageComponent ? (
+                                    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
+                                        <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b border-border/60 shrink-0">
+                                            <div className="flex items-center gap-1 bg-background/80 p-0.5 rounded-lg border border-border/50">
+                                                <Button
+                                                    type="button"
+                                                    variant={activeSideTab === "webview" ? "secondary" : "ghost"}
+                                                    size="sm"
+                                                    onClick={() => setActiveSideTab("webview")}
+                                                    className="h-6 px-2 text-xs gap-1.5 rounded-md"
+                                                >
+                                                    <Globe className="size-3" />
+                                                    <span>Browser</span>
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant={activeSideTab === "stage" ? "secondary" : "ghost"}
+                                                    size="sm"
+                                                    onClick={() => setActiveSideTab("stage")}
+                                                    className="h-6 px-2 text-xs gap-1.5 rounded-md"
+                                                >
+                                                    <Sparkles className="size-3" />
+                                                    <span className="truncate max-w-[120px]">{activeStageComponent.title}</span>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 min-h-0 relative">
+                                            {activeSideTab === "webview" ? (
+                                                <ChromiumWebview
+                                                    splitLayout={webviewSplitMode}
+                                                    onToggleSplitLayout={setWebviewSplitMode}
+                                                    onClose={() => setWebviewOpen(false)}
+                                                    onInjectSnippet={handleInjectWebviewSnippet}
+                                                />
+                                            ) : (
+                                                <ComponentStage
+                                                    component={activeStageComponent}
+                                                    onDockToChat={() => setActiveStageComponent(null)}
+                                                    onClose={() => setActiveStageComponent(null)}
+                                                    chatApiKey={settings.apiKey}
+                                                    chatModel={settings.model}
+                                                    canonicalResumeKey={canonicalResumeKey}
+                                                    onSendMessage={handlePrompt}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : activeStageComponent ? (
+                                    <ComponentStage
+                                        component={activeStageComponent}
+                                        onDockToChat={() => setActiveStageComponent(null)}
+                                        onClose={() => setActiveStageComponent(null)}
+                                        chatApiKey={settings.apiKey}
+                                        chatModel={settings.model}
+                                        canonicalResumeKey={canonicalResumeKey}
+                                        onSendMessage={handlePrompt}
+                                    />
+                                ) : (
+                                    <ChromiumWebview
+                                        splitLayout={webviewSplitMode}
+                                        onToggleSplitLayout={setWebviewSplitMode}
+                                        onClose={() => setWebviewOpen(false)}
+                                        onInjectSnippet={handleInjectWebviewSnippet}
+                                    />
+                                )}
                             </ResizablePanel>
                             <ResizableHandle withHandle />
                         </>
@@ -2297,7 +2333,7 @@ export default function AICareerAssistantChat() {
                         <div
                             ref={scrollRef}
                             onScroll={handleChatScroll}
-                            className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-40 pt-16 sm:pb-44"
+                            className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-64 pt-4 sm:pb-72"
                             style={{ scrollbarWidth: "thin" }}
                         >
                             <div className="mx-auto w-full max-w-3xl px-3 sm:px-5">
@@ -2321,6 +2357,12 @@ export default function AICareerAssistantChat() {
                                                     chatApiKey={settings.apiKey}
                                                     chatModel={settings.model}
                                                     canonicalResumeKey={canonicalResumeKey}
+                                                    activeStageComponentId={activeStageComponent?.id}
+                                                    onPopOutToSide={(comp) => {
+                                                        setActiveStageComponent(comp);
+                                                        setActiveSideTab("stage");
+                                                    }}
+                                                    onDockToChat={() => setActiveStageComponent(null)}
                                                 />
                                             ))}
 
@@ -2333,9 +2375,7 @@ export default function AICareerAssistantChat() {
                                                         exit={{ opacity: 0 }}
                                                         className="flex gap-3"
                                                     >
-                                                        <div className="w-8 h-8 rounded-full bg-neutral-900 border border-border flex items-center justify-center">
-                                                            <Bot className="w-4 h-4 text-white" />
-                                                        </div>
+                                                        <Persona state="thinking" variant="obsidian" className="size-8 flex-shrink-0" />
                                                         <div className="bg-background border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
                                                             <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                                                             <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -2369,6 +2409,7 @@ export default function AICareerAssistantChat() {
                             raiseForOnboarding={onboardingOpen}
                             showToast={showToast}
                             onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                            inSplitPanel={true}
                         />
                     </ResizablePanel>
 
@@ -2376,12 +2417,71 @@ export default function AICareerAssistantChat() {
                         <>
                             <ResizableHandle withHandle />
                             <ResizablePanel defaultSize={50} minSize={30} className="h-full relative">
-                                <ChromiumWebview
-                                    splitLayout={webviewSplitMode}
-                                    onToggleSplitLayout={setWebviewSplitMode}
-                                    onClose={() => setWebviewOpen(false)}
-                                    onInjectSnippet={handleInjectWebviewSnippet}
-                                />
+                                {webviewOpen && activeStageComponent ? (
+                                    <div className="flex flex-col h-full w-full bg-background overflow-hidden">
+                                        <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b border-border/60 shrink-0">
+                                            <div className="flex items-center gap-1 bg-background/80 p-0.5 rounded-lg border border-border/50">
+                                                <Button
+                                                    type="button"
+                                                    variant={activeSideTab === "webview" ? "secondary" : "ghost"}
+                                                    size="sm"
+                                                    onClick={() => setActiveSideTab("webview")}
+                                                    className="h-6 px-2 text-xs gap-1.5 rounded-md"
+                                                >
+                                                    <Globe className="size-3" />
+                                                    <span>Browser</span>
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant={activeSideTab === "stage" ? "secondary" : "ghost"}
+                                                    size="sm"
+                                                    onClick={() => setActiveSideTab("stage")}
+                                                    className="h-6 px-2 text-xs gap-1.5 rounded-md"
+                                                >
+                                                    <Sparkles className="size-3" />
+                                                    <span className="truncate max-w-[120px]">{activeStageComponent.title}</span>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 min-h-0 relative">
+                                            {activeSideTab === "webview" ? (
+                                                <ChromiumWebview
+                                                    splitLayout={webviewSplitMode}
+                                                    onToggleSplitLayout={setWebviewSplitMode}
+                                                    onClose={() => setWebviewOpen(false)}
+                                                    onInjectSnippet={handleInjectWebviewSnippet}
+                                                />
+                                            ) : (
+                                                <ComponentStage
+                                                    component={activeStageComponent}
+                                                    onDockToChat={() => setActiveStageComponent(null)}
+                                                    onClose={() => setActiveStageComponent(null)}
+                                                    chatApiKey={settings.apiKey}
+                                                    chatModel={settings.model}
+                                                    canonicalResumeKey={canonicalResumeKey}
+                                                    onSendMessage={handlePrompt}
+                                                />
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : activeStageComponent ? (
+                                    <ComponentStage
+                                        component={activeStageComponent}
+                                        onDockToChat={() => setActiveStageComponent(null)}
+                                        onClose={() => setActiveStageComponent(null)}
+                                        chatApiKey={settings.apiKey}
+                                        chatModel={settings.model}
+                                        canonicalResumeKey={canonicalResumeKey}
+                                        onSendMessage={handlePrompt}
+                                    />
+                                ) : (
+                                    <ChromiumWebview
+                                        splitLayout={webviewSplitMode}
+                                        onToggleSplitLayout={setWebviewSplitMode}
+                                        onClose={() => setWebviewOpen(false)}
+                                        onInjectSnippet={handleInjectWebviewSnippet}
+                                    />
+                                )}
                             </ResizablePanel>
                         </>
                     )}
@@ -2392,7 +2492,7 @@ export default function AICareerAssistantChat() {
                     <div
                         ref={scrollRef}
                         onScroll={handleChatScroll}
-                        className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-40 pt-16 sm:pb-44"
+                        className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-64 pt-4 sm:pb-72"
                         style={{ scrollbarWidth: "thin" }}
                     >
                         <div className="mx-auto w-full max-w-4xl px-3 sm:px-5">
@@ -2416,6 +2516,12 @@ export default function AICareerAssistantChat() {
                                                 chatApiKey={settings.apiKey}
                                                 chatModel={settings.model}
                                                 canonicalResumeKey={canonicalResumeKey}
+                                                activeStageComponentId={null}
+                                                onPopOutToSide={(comp) => {
+                                                    setActiveStageComponent(comp);
+                                                    setActiveSideTab("stage");
+                                                }}
+                                                onDockToChat={() => setActiveStageComponent(null)}
                                             />
                                         ))}
 
@@ -2428,9 +2534,7 @@ export default function AICareerAssistantChat() {
                                                     exit={{ opacity: 0 }}
                                                     className="flex gap-3"
                                                 >
-                                                    <div className="w-8 h-8 rounded-full bg-neutral-900 border border-border flex items-center justify-center">
-                                                        <Bot className="w-4 h-4 text-white" />
-                                                    </div>
+                                                    <Persona state="thinking" variant="obsidian" className="size-8 flex-shrink-0" />
                                                     <div className="bg-background border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
                                                         <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                                                         <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -2464,6 +2568,7 @@ export default function AICareerAssistantChat() {
                         raiseForOnboarding={onboardingOpen}
                         showToast={showToast}
                         onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                        inSplitPanel={false}
                     />
                 </>
             )}
@@ -2490,7 +2595,7 @@ export default function AICareerAssistantChat() {
                 onOpenChange={setOnboardingGateOpen}
             />
             </div>
-        </InfiniteGridBackground>
+        </div>
         </TooltipProvider>
     );
 }

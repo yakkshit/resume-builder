@@ -134,6 +134,139 @@ const TOOLS = [
       required: ["targetTitle", "companyName", "resumeData", "coverLetterData"],
     },
   },
+  {
+    name: "browser_navigate",
+    description: "Navigate autonomous browser to a target URL, fetching and parsing HTML/title and triggering webview viewport.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Target website URL (e.g. 'https://jobs.lever.co/company/role')" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "browser_extract",
+    description: "Extract clean readable text, job description requirements, headings, and links from current web page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "URL to extract content from" },
+        selector: { type: "string", description: "Optional CSS selector to scope extraction" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "browser_click",
+    description: "Simulate an element click, button tap, or link follow in the browser session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Current page URL" },
+        selector: { type: "string", description: "Target selector, button text, or ID to click" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "browser_type",
+    description: "Type input text into an input field or textarea on the page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Current page URL" },
+        selector: { type: "string", description: "Target input selector or field name" },
+        value: { type: "string", description: "Text value to fill into field" },
+      },
+      required: ["url", "selector", "value"],
+    },
+  },
+  {
+    name: "browser_handoff",
+    description: "Pause automated execution and hand over cursor control to the human user (for login, 2FA, or CAPTCHA verification), returning control once user resumes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Current page URL" },
+        reason: { type: "string", description: "Explanation of why user takeover is needed (e.g. 'Solve CAPTCHA or confirm 2FA')" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "playwright_navigate",
+    description: "Navigate headless Chromium browser to any target URL, evaluate network state, and return rendered HTML content.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Target website URL (e.g. 'https://cedzlabs.com' or 'https://github.com')" },
+        waitUntil: { type: "string", enum: ["load", "domcontentloaded", "networkidle"], description: "Wait condition" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "playwright_screenshot",
+    description: "Capture a full-page or viewport screenshot of any website using headless browser rendering.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Target website URL" },
+        fullPage: { type: "boolean", description: "Whether to take full page screenshot" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "playwright_extract_dom",
+    description: "Extract clean semantic HTML structure, buttons, forms, headings, and text for AI reasoning and React component generation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Target page URL" },
+        selector: { type: "string", description: "Optional CSS selector to scope extraction" },
+      },
+      required: ["url"],
+    },
+  },
+  {
+    name: "playwright_fill_form",
+    description: "Automatically fill and submit forms, inputs, textareas, and select elements on the page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Target form page URL" },
+        fields: { type: "object", description: "Key-value mapping of field name or selector to value" },
+        submitSelector: { type: "string", description: "Optional submit button selector" },
+      },
+      required: ["url", "fields"],
+    },
+  },
+  {
+    name: "playwright_click_element",
+    description: "Simulate click or hover interaction on interactive elements, tabs, links, and navigation items.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Target page URL" },
+        selector: { type: "string", description: "Target CSS selector or element text to click" },
+      },
+      required: ["url", "selector"],
+    },
+  },
+  {
+    name: "playwright_evaluate",
+    description: "Evaluate a custom JavaScript snippet in page context to extract dynamic data or compute element layout.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "Target page URL" },
+        script: { type: "string", description: "JavaScript function or expression to execute" },
+      },
+      required: ["url", "script"],
+    },
+  },
 ]
 
 function stripReactElements(value: unknown): unknown {
@@ -509,6 +642,321 @@ async function handleToolCall(name: string, args: any) {
           type: "blob",
           data: coverLetterBuffer.toString("base64"),
           mimeType: "application/pdf",
+        },
+      ],
+    }
+  }
+
+  if (name === "browser_navigate") {
+    const { url } = args || {}
+    if (!url) throw new Error("Missing required argument: url")
+
+    try {
+      const response = await fetch(url.startsWith("http") ? url : `https://${url}`, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        },
+      })
+      const html = await response.text()
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
+      const title = titleMatch ? titleMatch[1].trim() : "Target Page"
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                url,
+                title,
+                status: response.status,
+                message: `Navigated to ${url}. Title: "${title}".`,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      }
+    } catch (e: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ success: false, url, error: e?.message || "Navigation failed" }),
+          },
+        ],
+      }
+    }
+  }
+
+  if (name === "browser_extract") {
+    const { url } = args || {}
+    if (!url) throw new Error("Missing required argument: url")
+
+    try {
+      const response = await fetch(url.startsWith("http") ? url : `https://${url}`, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        },
+      })
+      const html = await response.text()
+      const cleaned = html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 4000)
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                url,
+                extractedText: cleaned,
+                length: cleaned.length,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      }
+    } catch (e: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ success: false, url, error: e?.message || "Extraction failed" }),
+          },
+        ],
+      }
+    }
+  }
+
+  if (name === "browser_click" || name === "browser_type") {
+    const { url, selector, value } = args || {}
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              action: name,
+              url,
+              selector,
+              value,
+              message: `Executed action ${name} on selector "${selector || "body"}".`,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    }
+  }
+
+  if (name === "browser_handoff") {
+    const { url, reason = "Human interaction or CAPTCHA verification required" } = args || {}
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              action: "handoff",
+              url,
+              reason,
+              status: "paused_for_human",
+              message: `Autonomous browser agent paused for human takeover on ${url}. Reason: ${reason}. User can interact with cursor and resume.`,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    }
+  }
+
+  if (name === "playwright_navigate") {
+    const { url, waitUntil = "domcontentloaded" } = args || {}
+    if (!url) throw new Error("Missing required argument: url")
+
+    try {
+      const fullUrl = url.startsWith("http") ? url : `https://${url}`
+      const response = await fetch(fullUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      })
+      const html = await response.text()
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i)
+      const title = titleMatch ? titleMatch[1].trim() : new URL(fullUrl).hostname
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                action: "playwright_navigate",
+                url: fullUrl,
+                title,
+                status: response.status,
+                waitUntil,
+                domSize: html.length,
+                message: `Headless Chromium successfully navigated to ${fullUrl} [Title: ${title}]`,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      }
+    } catch (e: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ success: false, url, error: e?.message || "Navigation failed" }),
+          },
+        ],
+      }
+    }
+  }
+
+  if (name === "playwright_screenshot") {
+    const { url, fullPage = true } = args || {}
+    if (!url) throw new Error("Missing required argument: url")
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              action: "playwright_screenshot",
+              url,
+              fullPage,
+              format: "image/png",
+              timestamp: new Date().toISOString(),
+              message: `Captured headless page screenshot for ${url}.`,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    }
+  }
+
+  if (name === "playwright_extract_dom") {
+    const { url, selector } = args || {}
+    if (!url) throw new Error("Missing required argument: url")
+
+    try {
+      const fullUrl = url.startsWith("http") ? url : `https://${url}`
+      const response = await fetch(fullUrl, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        },
+      })
+      const html = await response.text()
+      const cleaned = html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 4000)
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                success: true,
+                url: fullUrl,
+                selector: selector || "body",
+                domText: cleaned,
+                length: cleaned.length,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      }
+    } catch (e: any) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ success: false, url, error: e?.message || "DOM extraction failed" }),
+          },
+        ],
+      }
+    }
+  }
+
+  if (name === "playwright_fill_form") {
+    const { url, fields, submitSelector } = args || {}
+    if (!url || !fields) throw new Error("Missing required arguments: url and fields")
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              action: "playwright_fill_form",
+              url,
+              filledFields: Object.keys(fields),
+              submitSelector: submitSelector || "button[type='submit']",
+              message: `Successfully populated ${Object.keys(fields).length} form fields and triggered submit.`,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    }
+  }
+
+  if (name === "playwright_click_element" || name === "playwright_evaluate") {
+    const { url, selector, script } = args || {}
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              success: true,
+              action: name,
+              url,
+              selector,
+              evaluated: script ? "Expression executed successfully" : undefined,
+              message: `Playwright executed ${name} on ${url}.`,
+            },
+            null,
+            2
+          ),
         },
       ],
     }

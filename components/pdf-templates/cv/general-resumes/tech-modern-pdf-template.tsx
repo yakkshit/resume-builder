@@ -98,8 +98,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
+    marginBottom: 2,
   },
   itemTitle: {
+    fontSize: 9.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#0f172a",
+    marginBottom: 1,
+  },
+  itemHeaderTitle: {
     fontSize: 9.5,
     fontFamily: "Helvetica-Bold",
     color: "#0f172a",
@@ -110,6 +117,7 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     fontFamily: "Helvetica-Oblique",
     color: "#0284c7",
+    marginBottom: 1,
   },
   itemDates: {
     fontSize: 8,
@@ -121,6 +129,7 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     color: "#334155",
     marginTop: 2,
+    lineHeight: 1.35,
   },
   bulletList: {
     marginTop: 2,
@@ -237,7 +246,7 @@ export function TechModernPDFTemplate({ resumeData }: Props) {
                 {experience.map((exp, idx) => (
                   <View key={idx} style={styles.itemGroup}>
                     <View style={styles.itemHeader}>
-                      <Text style={styles.itemTitle}>{exp.position}</Text>
+                      <Text style={styles.itemHeaderTitle}>{exp.position}</Text>
                       <Text style={styles.itemDates}>
                         {exp.startDate} {exp.endDate ? `- ${exp.endDate}` : ""}
                       </Text>
@@ -265,7 +274,7 @@ export function TechModernPDFTemplate({ resumeData }: Props) {
                 {projects.map((proj, pIdx) => (
                   <View key={pIdx} style={styles.itemGroup}>
                     <View style={styles.itemHeader}>
-                      <Text style={styles.itemTitle}>{proj.name}</Text>
+                      <Text style={styles.itemHeaderTitle}>{proj.name}</Text>
                       {proj.startDate && (
                         <Text style={styles.itemDates}>
                           {proj.startDate} {proj.endDate ? `- ${proj.endDate}` : ""}
@@ -309,12 +318,12 @@ export function TechModernPDFTemplate({ resumeData }: Props) {
                 {education.map((edu, eIdx) => (
                   <View key={eIdx} style={styles.itemGroup}>
                     <Text style={styles.itemTitle}>{edu.degree}</Text>
-                    {edu.field && <Text style={styles.text}>{edu.field}</Text>}
+                    {edu.field ? <Text style={styles.text}>{edu.field}</Text> : null}
                     <Text style={styles.itemCompany}>{edu.institution}</Text>
                     <Text style={styles.itemDates}>
                       {edu.startDate} {edu.endDate ? `- ${edu.endDate}` : ""}
                     </Text>
-                    {edu.gpa && <Text style={styles.itemDates}>GPA: {edu.gpa}</Text>}
+                    {edu.gpa ? <Text style={styles.itemDates}>GPA: {edu.gpa}</Text> : null}
                   </View>
                 ))}
               </View>
@@ -326,8 +335,8 @@ export function TechModernPDFTemplate({ resumeData }: Props) {
                 {achievements.map((ach, aIdx) => (
                   <View key={aIdx} style={styles.itemGroup}>
                     <Text style={styles.itemTitle}>{ach.title}</Text>
-                    {ach.date && <Text style={styles.itemDates}>{ach.date}</Text>}
-                    {ach.description && <Text style={styles.text}>{ach.description}</Text>}
+                    {ach.date ? <Text style={styles.itemDates}>{ach.date}</Text> : null}
+                    {ach.description ? <Text style={styles.text}>{ach.description}</Text> : null}
                   </View>
                 ))}
               </View>

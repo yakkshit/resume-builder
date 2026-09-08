@@ -1,78 +1,105 @@
 "use client";
 
-import React from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import React, { useState } from "react";
+import { motion } from "framer-motion";
 import {
-  X,
   Sparkles,
-  Clock,
-  Download,
-  Upload,
+  Plus,
+  Search,
+  BookOpen,
+  Users,
+  Code2,
+  FolderKanban,
+  MessageSquare,
+  PanelLeftClose,
+  PanelLeft,
+  ChevronDown,
   Trash2,
-  MessageSquarePlus,
-  FileText,
-  AlignLeft,
+  MoreHorizontal,
   Sun,
   Moon,
-  Settings2,
-  Search,
-  ChevronRight,
+  FileText,
+  Layers,
+  Wrench,
+  BarChart3,
+  Plug,
+  ExternalLink,
+  Globe,
+  BookMarked,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChatSession, ChatSettings } from "./chat-store";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { ProfileSettingsDialog, getStoredProfile } from "./profile-settings-dialog";
-import { SidebarIntegrationsAccordion } from "./sidebar-integrations-accordion";
+import { SidebarUserControls, SidebarCompactUserControls } from "@/components/auth/user-menu";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
-  /** Lift above onboarding dim layer so the panel stays readable during the tour */
-  elevateForOnboarding?: boolean;
-  isOpen: boolean;
+  isOpen: boolean; // on mobile: drawer open
   onClose: () => void;
+  isCollapsed: boolean; // on desktop: icon rail mode
+  onToggleCollapse: () => void;
   sessions: ChatSession[];
   currentId: string;
   settings: ChatSettings;
   onSessionSelect: (id: string) => void;
   onNewSession: () => void;
   onDeleteSession: (id: string) => void;
-  onExport: () => void;
-  onImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onExport?: () => void;
+  onImport?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSettingsChange: (patch: Partial<ChatSettings>) => void;
   onIntegrationsToast?: (variant: "default" | "success" | "error" | "warning", message: string) => void;
+  onOpenWebview?: () => void;
+  webviewOpen?: boolean;
+  onOpenMcp?: () => void;
+  onOpenGuide?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export function ChatSidebar({
-  elevateForOnboarding = false,
   isOpen,
   onClose,
+  isCollapsed,
+  onToggleCollapse,
   sessions,
   currentId,
   settings,
   onSessionSelect,
   onNewSession,
   onDeleteSession,
-  onExport,
-  onImport,
   onSettingsChange,
-  onIntegrationsToast,
+  onOpenWebview,
+  webviewOpen,
+  onOpenMcp,
+  onOpenGuide,
+  onOpenSettings,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const [profileOpen, setProfileOpen] = React.useState(false);
-  const [profileName, setProfileName] = React.useState("");
-  const [profileEmail, setProfileEmail] = React.useState("");
-
-  const [searchQuery, setSearchQuery] = React.useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileName, setProfileName] = useState("Yakkshit");
+  const [profileEmail, setProfileEmail] = useState("AI Engineer");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [allChatsExpanded, setAllChatsExpanded] = useState(true);
+  const [projectsExpanded, setProjectsExpanded] = useState(true);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
     const p = getStoredProfile();
-    setProfileName(p.name || "Your Profile");
-    setProfileEmail(p.email || "Memory Vault & Settings");
+    setProfileName(p.name || "Yakkshit");
+    setProfileEmail(p.email || "AI Studio");
   }, [profileOpen]);
+
+  const handleOpenSettings = () => {
+    if (onOpenSettings) {
+      onOpenSettings();
+    } else {
+      setProfileOpen(true);
+    }
+  };
 
   const filteredSessions = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -85,12 +112,13 @@ export function ChatSidebar({
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const yesterday = today - 86400000;
     const past7Days = today - 86400000 * 7;
+    const past30Days = today - 86400000 * 30;
 
     const groups: { [key: string]: ChatSession[] } = {
       Today: [],
       Yesterday: [],
-      "Previous 7 Days": [],
-      Older: [],
+      "Previous 7 days": [],
+      "Previous 30 days": [],
     };
 
     for (const s of filteredSessions) {
@@ -100,278 +128,439 @@ export function ChatSidebar({
       } else if (time >= yesterday) {
         groups.Yesterday.push(s);
       } else if (time >= past7Days) {
-        groups["Previous 7 Days"].push(s);
+        groups["Previous 7 days"].push(s);
       } else {
-        groups.Older.push(s);
+        groups["Previous 30 days"].push(s);
       }
     }
 
     return groups;
   }, [filteredSessions]);
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Subtle backdrop */}
-          <motion.div
-            key="backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className={cn(
-              "fixed inset-0 bg-background/60 backdrop-blur-xs",
-              elevateForOnboarding ? "z-[65]" : "z-40",
-            )}
-            onClick={onClose}
-          />
+  // Desktop Collapsed Icon Rail
+  if (isCollapsed) {
+    return (
+      <TooltipProvider delayDuration={150}>
+        <aside className="hidden md:flex flex-col items-center justify-between w-14 h-full bg-[#141416] border-r border-white/5 py-3 z-30 shrink-0 select-none">
+          {/* Top Action Icons */}
+          <div className="flex flex-col items-center gap-2.5 w-full">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  className="size-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Expand Sidebar"
+                >
+                  <PanelLeft className="size-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">Expand Sidebar</TooltipContent>
+            </Tooltip>
 
-          {/* Minimal sidebar panel */}
-          <motion.aside
-            key="sidebar"
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ type: "spring", damping: 30, stiffness: 320 }}
-            className={cn(
-              "fixed left-2.5 top-2.5 bottom-2.5 flex w-[290px] flex-col overflow-hidden rounded-2xl",
-              "border border-border/70 bg-background/95 dark:bg-neutral-900/95 backdrop-blur-2xl shadow-xl",
-              elevateForOnboarding ? "z-[68]" : "z-50",
-            )}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between gap-2 px-3.5 py-3 border-b border-border/50">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <div>
-                  <h3 className="text-xs font-semibold text-foreground leading-none">Career Agent</h3>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Workspace & Chat</p>
-                </div>
-              </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onNewSession}
+                  className="size-9 rounded-xl flex items-center justify-center text-neutral-300 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="New Chat"
+                >
+                  <Plus className="size-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">New Chat</TooltipContent>
+            </Tooltip>
 
-              <div className="flex items-center gap-0.5">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      type="button"
-                      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                      className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
-                      aria-label="Toggle theme"
-                    >
-                      {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">Toggle theme</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onClose}
-                      className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground"
-                      aria-label="Close sidebar"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="text-xs">Close</TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onToggleCollapse();
+                    setSearchOpen(true);
+                  }}
+                  className="size-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Search Chats"
+                >
+                  <Search className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">Search Chats</TooltipContent>
+            </Tooltip>
 
-            <ProfileSettingsDialog
-              open={profileOpen}
-              onOpenChange={setProfileOpen}
-              settings={settings}
-              onSettingsChange={onSettingsChange}
-            />
+            <div className="w-8 h-px bg-white/5 my-1" />
 
-            {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-2.5 py-2 space-y-3" style={{ scrollbarWidth: "none" }}>
-              {/* New Chat Button */}
-              <button
-                type="button"
-                onClick={() => { onNewSession(); onClose(); }}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-medium transition-all shadow-xs"
-              >
-                <MessageSquarePlus className="w-3.5 h-3.5" />
-                <span>New Conversation</span>
-              </button>
-
-              {/* Navigation links */}
-              <div className="space-y-0.5 pt-0.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Link
                   href="/"
-                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                  className="size-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="My Library & Resumes"
                 >
-                  <span className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" /> Resume Builder
-                  </span>
-                  <ChevronRight className="w-3 h-3 opacity-40" />
+                  <BookOpen className="size-4" />
                 </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">My Library</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Link
                   href="/cover-letter"
-                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                  className="size-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Cover Letters"
                 >
-                  <span className="flex items-center gap-2">
-                    <FileText className="w-3.5 h-3.5" /> Cover Letter
-                  </span>
-                  <ChevronRight className="w-3 h-3 opacity-40" />
+                  <FileText className="size-4" />
                 </Link>
-                <Link
-                  href="/price"
-                  className="flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <AlignLeft className="w-3.5 h-3.5" /> Pricing Plans
-                  </span>
-                  <ChevronRight className="w-3 h-3 opacity-40" />
-                </Link>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">Cover Letters</TooltipContent>
+            </Tooltip>
+
+            {onOpenWebview && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={onOpenWebview}
+                    className={cn(
+                      "size-9 rounded-xl flex items-center justify-center transition-colors",
+                      webviewOpen
+                        ? "bg-indigo-600 text-white"
+                        : "text-neutral-400 hover:text-white hover:bg-white/10"
+                    )}
+                    aria-label="In-App Web Browser"
+                  >
+                    <Globe className="size-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">
+                  {webviewOpen ? "Close In-App Browser" : "Open Chromium Browser"}
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {onOpenMcp && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={onOpenMcp}
+                    className="size-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                    aria-label="MCP Tools & Servers"
+                  >
+                    <Plug className="size-4 text-indigo-400" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="text-xs">MCP Tools</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
+
+          {/* Bottom Avatar & Clerk User Controls */}
+          <div className="flex flex-col items-center gap-2">
+            <SidebarCompactUserControls onOpenSettings={handleOpenSettings} />
+          </div>
+
+          <ProfileSettingsDialog
+            open={profileOpen}
+            onOpenChange={setProfileOpen}
+            settings={settings}
+            onSettingsChange={onSettingsChange}
+          />
+        </aside>
+      </TooltipProvider>
+    );
+  }
+
+  // Desktop Expanded Sidebar & Mobile Drawer
+  return (
+    <TooltipProvider delayDuration={150}>
+      <aside
+        className={cn(
+          "flex flex-col justify-between w-64 h-full bg-[#141416] border-r border-white/5 z-30 shrink-0 select-none transition-all duration-200",
+          "fixed md:relative inset-y-0 left-0",
+          isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+      >
+        {/* Top Header & Navigation Section */}
+        <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
+          {/* Brand & Collapse Header */}
+          <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/5 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="size-6 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
+                <Sparkles className="size-3.5" />
               </div>
+              <span className="font-bold text-sm tracking-tight text-white">Career Studio</span>
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  className="size-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+                  aria-label="Collapse Sidebar"
+                >
+                  <PanelLeftClose className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">Collapse Sidebar</TooltipContent>
+            </Tooltip>
+          </div>
 
-              {/* Integrations drawer */}
-              <SidebarIntegrationsAccordion
-                settings={settings}
-                onSettingsChange={onSettingsChange}
-                onToast={onIntegrationsToast}
-              />
+          {/* Scrollable Navigation Items */}
+          <div className="flex-1 overflow-y-auto px-2.5 py-3 space-y-4 scrollbar-thin">
+            {/* Primary Action Buttons */}
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onNewSession();
+                  onClose();
+                }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white text-xs font-medium transition-all group border border-white/5"
+              >
+                <Plus className="size-4 text-neutral-400 group-hover:text-white transition-colors" />
+                <span>New Chat</span>
+              </button>
 
-              {/* Chat Search Box */}
-              {sessions.length > 2 && (
-                <div className="relative pt-1">
-                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-3 text-muted-foreground/60" />
+              {/* Search Trigger / Input */}
+              {searchOpen ? (
+                <div className="relative px-1 py-0.5">
+                  <Search className="size-3.5 absolute left-3.5 top-2.5 text-neutral-400" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search history..."
-                    className="w-full bg-muted/40 border border-border/60 rounded-lg pl-8 pr-2.5 py-1 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary/50 transition-colors"
+                    placeholder="Search chats..."
+                    autoFocus
+                    className="w-full h-8 pl-8 pr-3 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-neutral-500 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs font-normal transition-colors"
+                >
+                  <Search className="size-3.5" />
+                  <span>Search Chats</span>
+                </button>
               )}
 
-              {/* Chat History */}
-              <div className="space-y-3 pt-1">
-                <div className="flex items-center justify-between px-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-muted-foreground/80" /> History
-                  </p>
+              {/* My Library with Thumbnail Previews */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between px-3 py-1 text-xs text-neutral-400">
+                  <span className="flex items-center gap-2 text-neutral-300 font-medium text-xs">
+                    <BookOpen className="size-3.5" /> My Library
+                  </span>
                 </div>
-
-                <div className="space-y-3">
-                  {Object.entries(groupedSessions).map(([period, groupItems]) => {
-                    if (groupItems.length === 0) return null;
-                    return (
-                      <div key={period} className="space-y-1">
-                        <p className="px-1 text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
-                          {period}
-                        </p>
-                        <div className="space-y-0.5">
-                          {groupItems.map((s) => (
-                            <div key={s.id} className="group relative">
-                              <button
-                                onClick={() => { onSessionSelect(s.id); onClose(); }}
-                                className={cn(
-                                  "w-full text-left px-2.5 py-2 rounded-lg text-xs transition-all flex items-center gap-2",
-                                  s.id === currentId
-                                    ? "bg-primary/10 text-primary font-medium border border-primary/20"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                )}
-                              >
-                                <div
-                                  className={cn(
-                                    "w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors",
-                                    s.id === currentId ? "bg-primary" : "bg-muted-foreground/30 group-hover:bg-muted-foreground/60"
-                                  )}
-                                />
-                                <div className="flex-1 min-w-0 pr-5">
-                                  <p className="truncate text-xs">{s.title || "New Chat"}</p>
-                                </div>
-                              </button>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onDeleteSession(s.id);
-                                    }}
-                                    className="absolute right-1.5 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 text-muted-foreground hover:text-destructive rounded focus:opacity-100"
-                                    aria-label="Delete chat"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="left" className="text-xs">Delete</TooltipContent>
-                              </Tooltip>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {filteredSessions.length === 0 && (
-                    <div className="py-6 text-center text-xs text-muted-foreground/60">
-                      {searchQuery ? "No matching chats" : "No chat history yet"}
+                {/* Visual Thumbnail Cards */}
+                <div className="grid grid-cols-3 gap-1.5 px-2.5 pt-1.5">
+                  <Link
+                    href="/"
+                    className="group flex flex-col items-center p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-center"
+                    title="Resume Builder"
+                  >
+                    <div className="size-9 rounded bg-neutral-800 flex items-center justify-center text-neutral-300 group-hover:text-white mb-1 shadow-2xs">
+                      <FileText className="size-4 text-indigo-400" />
                     </div>
-                  )}
+                    <span className="text-[10px] text-neutral-400 group-hover:text-neutral-200 truncate w-full">Resumes</span>
+                  </Link>
+
+                  <Link
+                    href="/cover-letter"
+                    className="group flex flex-col items-center p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-center"
+                    title="Cover Letters"
+                  >
+                    <div className="size-9 rounded bg-neutral-800 flex items-center justify-center text-neutral-300 group-hover:text-white mb-1 shadow-2xs">
+                      <FileText className="size-4 text-sky-400" />
+                    </div>
+                    <span className="text-[10px] text-neutral-400 group-hover:text-neutral-200 truncate w-full">Letters</span>
+                  </Link>
+
+                  <Link
+                    href="/price"
+                    className="group flex flex-col items-center p-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/5 transition-all text-center"
+                    title="Pricing & Templates"
+                  >
+                    <div className="size-9 rounded bg-neutral-800 flex items-center justify-center text-neutral-300 group-hover:text-white mb-1 shadow-2xs">
+                      <Layers className="size-4 text-emerald-400" />
+                    </div>
+                    <span className="text-[10px] text-neutral-400 group-hover:text-neutral-200 truncate w-full">Plans</span>
+                  </Link>
                 </div>
               </div>
-            </div>
 
-            {/* Export / Import & Profile Footer */}
-            <div className="border-t border-border/50 p-2 space-y-1.5 bg-muted/20">
-              <div className="flex gap-1.5">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 h-7 text-[11px] font-normal text-muted-foreground hover:text-foreground hover:bg-muted"
-                  onClick={onExport}
+              {/* Tools & Links */}
+              <div className="pt-2 space-y-0.5">
+                {onOpenWebview && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenWebview();
+                      if (window.innerWidth < 768) onClose();
+                    }}
+                    className={cn(
+                      "w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-colors",
+                      webviewOpen
+                        ? "bg-indigo-600/20 text-indigo-300 border border-indigo-500/30"
+                        : "text-neutral-400 hover:text-white hover:bg-white/5"
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Globe className="size-3.5 text-indigo-400" />
+                      <span>In-App Web Browser</span>
+                    </div>
+                    {webviewOpen && (
+                      <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded font-medium">Active</span>
+                    )}
+                  </button>
+                )}
+
+                {onOpenMcp && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenMcp();
+                      if (window.innerWidth < 768) onClose();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs transition-colors"
+                  >
+                    <Plug className="size-3.5 text-neutral-400" />
+                    <span>MCP Tools & Agents</span>
+                  </button>
+                )}
+
+                {onOpenGuide && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenGuide();
+                      if (window.innerWidth < 768) onClose();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs transition-colors"
+                  >
+                    <BookMarked className="size-3.5 text-neutral-400" />
+                    <span>Interactive Guide</span>
+                  </button>
+                )}
+
+                <Link
+                  href="/"
+                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs transition-colors"
                 >
-                  <Download className="w-3 h-3 mr-1" /> Export
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex-1 h-7 text-[11px] font-normal text-muted-foreground hover:text-foreground hover:bg-muted"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="w-3 h-3 mr-1" /> Import
-                </Button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  className="hidden"
-                  onChange={onImport}
-                />
+                  <Users className="size-3.5 text-neutral-400" />
+                  <span>Community & Templates</span>
+                </Link>
               </div>
 
-              {/* Minimal Profile Button */}
-              <button
-                type="button"
-                onClick={() => setProfileOpen(true)}
-                className="w-full flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted transition-colors text-left"
-              >
-                <div className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold text-[10px] shrink-0">
-                  {profileName ? profileName.charAt(0).toUpperCase() : "U"}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-foreground truncate">{profileName || "Your Profile"}</p>
-                  <p className="text-[10px] text-muted-foreground truncate">{profileEmail || "Memory Vault & Settings"}</p>
-                </div>
-                <Settings2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              </button>
+              {/* Projects Collapsible Group */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => setProjectsExpanded(!projectsExpanded)}
+                  className="w-full flex items-center justify-between px-3 py-1 text-xs text-neutral-400 hover:text-white transition-colors"
+                >
+                  <span className="text-[11px] font-medium text-neutral-400">Projects</span>
+                  <ChevronDown className={cn("size-3 transition-transform", !projectsExpanded && "-rotate-90")} />
+                </button>
+                {projectsExpanded && (
+                  <div className="pl-3 pt-1 space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onNewSession();
+                        onClose();
+                      }}
+                      className="w-full flex items-center gap-2 px-2 py-1 rounded text-neutral-400 hover:text-white text-xs hover:bg-white/5 transition-colors"
+                    >
+                      <Plus className="size-3" />
+                      <span>New Project</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* All Chats Section */}
+              <div className="pt-3">
+                <button
+                  type="button"
+                  onClick={() => setAllChatsExpanded(!allChatsExpanded)}
+                  className="w-full flex items-center justify-between px-3 py-1 text-xs text-neutral-400 hover:text-white transition-colors"
+                >
+                  <span className="text-[11px] font-medium text-neutral-400">All chats</span>
+                  <ChevronDown className={cn("size-3 transition-transform", !allChatsExpanded && "-rotate-90")} />
+                </button>
+
+                {allChatsExpanded && (
+                  <div className="pt-1.5 space-y-3">
+                    {Object.entries(groupedSessions).map(([groupTitle, list]) => {
+                      if (list.length === 0) return null;
+                      return (
+                        <div key={groupTitle} className="space-y-1">
+                          <p className="px-3 text-[10px] font-semibold text-neutral-400 tracking-wider">
+                            {groupTitle}
+                          </p>
+                          {list.map((s) => {
+                            const isActive = s.id === currentId;
+                            return (
+                              <div
+                                key={s.id}
+                                className={cn(
+                                  "group relative flex items-center justify-between px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer",
+                                  isActive
+                                    ? "bg-white/10 text-white font-medium"
+                                    : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
+                                )}
+                                onClick={() => {
+                                  onSessionSelect(s.id);
+                                  onClose();
+                                }}
+                              >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  {isActive && (
+                                    <span className="size-1.5 rounded-full bg-indigo-400 shrink-0 animate-pulse" />
+                                  )}
+                                  <span className="truncate">{s.title || "New Conversation"}</span>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeleteSession(s.id);
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 p-1 text-neutral-500 hover:text-destructive transition-all rounded"
+                                  title="Delete conversation"
+                                >
+                                  <Trash2 className="size-3" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Bottom User Profile Section with Clerk Credentials */}
+        <div className="p-3 border-t border-white/5 shrink-0">
+          <SidebarUserControls onOpenSettings={handleOpenSettings} />
+        </div>
+
+        <ProfileSettingsDialog
+          open={profileOpen}
+          onOpenChange={setProfileOpen}
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+        />
+      </aside>
+    </TooltipProvider>
   );
 }

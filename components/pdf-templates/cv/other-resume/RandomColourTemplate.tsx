@@ -242,8 +242,7 @@ const createStyles = (palette: typeof colorPalettes[0]) => StyleSheet.create({
     fontSize: 10,
     fontFamily: "Helvetica-Bold",
     color: "#ffffff",
-    flex: 1,
-    marginRight: 8,
+    marginBottom: 1,
   },
 
   itemSubtitle: {
