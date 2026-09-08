@@ -89,6 +89,12 @@ export function ComponentRenderer({
   const [isTranslating, setIsTranslating] = useState(false);
   const [translatedLatex, setTranslatedLatex] = useState<string | undefined>(undefined);
 
+  const isTemplateType =
+    type === "resume" ||
+    type === "cover-letter" ||
+    type === "resume-latex" ||
+    type === "cover-letter-latex";
+
   useEffect(() => {
     setTranslatedData(data);
   }, [data]);
@@ -96,7 +102,8 @@ export function ComponentRenderer({
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (!data || targetLanguage === TRANSLATION_ORIGINAL) {
+      // Only translate template content (resume and cover-letter documents)
+      if (!isTemplateType || !data || targetLanguage === TRANSLATION_ORIGINAL) {
         if (!cancelled) setTranslatedData(data);
         return;
       }
@@ -114,13 +121,13 @@ export function ComponentRenderer({
     return () => {
       cancelled = true;
     };
-  }, [data, targetLanguage]);
+  }, [data, targetLanguage, isTemplateType]);
 
   // Special-case LaTeX: translate "plain text runs" without overwriting saved source.
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      if (targetLanguage === TRANSLATION_ORIGINAL) {
+      if (!isTemplateType || targetLanguage === TRANSLATION_ORIGINAL) {
         if (!cancelled) setTranslatedLatex(undefined);
         return;
       }
@@ -141,9 +148,12 @@ export function ComponentRenderer({
     return () => {
       cancelled = true;
     };
-  }, [data, targetLanguage]);
+  }, [data, targetLanguage, isTemplateType]);
 
-  const activeData = useMemo(() => translatedData ?? data, [translatedData, data]);
+  const activeData = useMemo(
+    () => (isTemplateType ? translatedData ?? data : data),
+    [isTemplateType, translatedData, data]
+  );
 
   const header = (
     <div className="mb-2 flex justify-end sm:justify-end">
@@ -187,71 +197,6 @@ export function ComponentRenderer({
         </div>
       );
     }
-    case "cv-score":
-      return (
-        <div>
-          {header}
-          <CVScore data={activeData as any} />
-        </div>
-      );
-    case "job-recommendations": {
-      const d = activeData as any;
-      return (
-        <div>
-          {header}
-          <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />
-        </div>
-      );
-    }
-    case "job-scraper": {
-      const d = activeData as any;
-      return (
-        <div>
-          {header}
-          <JobScraperCard
-            initialQuery={d?.query || ""}
-            initialLocation={d?.location || "Remote"}
-            initialJobs={Array.isArray(d?.jobs) ? d.jobs : []}
-            onSendMessage={onSendMessage}
-          />
-        </div>
-      );
-    }
-    case "auto-applier":
-      return (
-        <div>
-          {header}
-          <AutoApplier />
-        </div>
-      );
-    case "coding-challenge":
-      return (
-        <div>
-          {header}
-          <CodingChallenge data={activeData as any} />
-        </div>
-      );
-    case "learning-resources":
-      return (
-        <div>
-          {header}
-          <LearningResources data={(activeData as any)?.resources} />
-        </div>
-      );
-    case "email-hr":
-      return (
-        <div>
-          {header}
-          <EmailHrPanel data={activeData} chatApiKey={chatApiKey} chatModel={chatModel} />
-        </div>
-      );
-    case "linkedin-dm":
-      return (
-        <div>
-          {header}
-          <LinkedinDmPanel data={activeData} />
-        </div>
-      );
     case "resume-latex": {
       const rec = data && typeof data === "object" ? (data as Record<string, unknown>) : null;
       const latex = typeof rec?.latex === "string" ? rec.latex : undefined;
@@ -262,6 +207,33 @@ export function ComponentRenderer({
         </div>
       );
     }
+    case "cv-score":
+      return <CVScore data={data as any} />;
+    case "job-recommendations": {
+      const d = data as any;
+      return <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />;
+    }
+    case "job-scraper": {
+      const d = data as any;
+      return (
+        <JobScraperCard
+          initialQuery={d?.query || ""}
+          initialLocation={d?.location || "Remote"}
+          initialJobs={Array.isArray(d?.jobs) ? d.jobs : []}
+          onSendMessage={onSendMessage}
+        />
+      );
+    }
+    case "auto-applier":
+      return <AutoApplier />;
+    case "coding-challenge":
+      return <CodingChallenge data={data as any} />;
+    case "learning-resources":
+      return <LearningResources data={(data as any)?.resources} />;
+    case "email-hr":
+      return <EmailHrPanel data={data} chatApiKey={chatApiKey} chatModel={chatModel} />;
+    case "linkedin-dm":
+      return <LinkedinDmPanel data={data} />;
     default:
       return null;
   }

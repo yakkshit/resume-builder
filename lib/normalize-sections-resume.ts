@@ -6,7 +6,29 @@
 import { normalizeSkillsToStringArray } from "@/lib/sanitize-resume-data"
 import type { PortfolioLink } from "@/lib/types"
 
-const RESUME_TOP_KEYS = ["basicInfo", "experience", "education", "skills", "projects", "achievements"] as const
+const RESUME_TOP_KEYS = [
+  "basicInfo",
+  "personalInfo",
+  "contactInfo",
+  "profile",
+  "summary",
+  "about",
+  "bio",
+  "experience",
+  "workExperience",
+  "work",
+  "employment",
+  "education",
+  "academics",
+  "degrees",
+  "skills",
+  "technicalSkills",
+  "projects",
+  "achievements",
+  "awards",
+  "languages",
+  "portfolioLinks",
+] as const
 
 function str(v: unknown): string {
   if (v == null) return ""
@@ -131,11 +153,13 @@ export function sectionsResumeToFlat(sections: Record<string, unknown>, parent: 
     }
   })
 
-  let skills: unknown[] = []
+  let skills: unknown = undefined
   const skillsSec = sections.skills
   if (skillsSec && typeof skillsSec === "object" && !Array.isArray(skillsSec)) {
     const items = (skillsSec as { items?: unknown }).items
-    if (Array.isArray(items)) skills = items
+    skills = items !== undefined ? items : skillsSec
+  } else if (skillsSec != null) {
+    skills = skillsSec
   }
   const skillsFlat = normalizeSkillsToStringArray(skills)
 

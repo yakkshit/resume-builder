@@ -48,8 +48,12 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   // Specialized
   "lingo-ai": { provider: "lingo-ai", modelId: "resume-model-v1" },
 
-  // Google Gemini — core chat / multimodal models (no TTS-only, embeddings, etc.)
+  // Google Gemini — core chat / multimodal models
+  "gemini-3.8-flash": { provider: "google", modelId: "gemini-3.8-flash" },
+  "gemini-3.7-flash": { provider: "google", modelId: "gemini-3.7-flash" },
+  "gemini-3.7-pro": { provider: "google", modelId: "gemini-3.7-pro" },
   "gemini-3.1-pro-preview": { provider: "google", modelId: "gemini-3.1-pro-preview" },
+  "gemini-3-pro-preview": { provider: "google", modelId: "gemini-3-pro-preview" },
   "gemini-3-flash-preview": { provider: "google", modelId: "gemini-3-flash-preview" },
   "gemini-3.1-flash-lite-preview": { provider: "google", modelId: "gemini-3.1-flash-lite-preview" },
   "gemini-3.1-flash-image-preview": { provider: "google", modelId: "gemini-3.1-flash-image-preview" },
@@ -71,13 +75,29 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "gemini-2.0-flash-lite": { provider: "google", modelId: "gemini-2.0-flash-lite" },
   "gemini-2.0-flash-lite-001": { provider: "google", modelId: "gemini-2.0-flash-lite" },
   "gemini-2.0-pro": { provider: "google", modelId: "gemini-2.0-pro" },
+  "gemini-1.5-pro": { provider: "google", modelId: "gemini-1.5-pro" },
+  "gemini-1.5-flash": { provider: "google", modelId: "gemini-1.5-flash" },
 
-  // OpenAI (core + 2026 roadmap IDs; newer may resolve to latest)
-  "gpt-5": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  // OpenAI
+  "gpt-6-astra": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.6": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.6-luna": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.6-sol": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.6-terra": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.5": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.4-mini": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.4-nano": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.2-pro": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-5.2": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-5.2-instant": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.1": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5.1-codex": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-5.3-codex": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-5.3-codex-spark": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-5-mini": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4.1": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-4.1-mini": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
   "gpt-4o": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-4o-mini": { provider: "openai", modelId: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY },
   "o3-mini": { provider: "openai", modelId: "o3-mini", apiKey: process.env.OPENAI_API_KEY },
@@ -87,12 +107,19 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "gpt-3.5-turbo": { provider: "openai", modelId: "gpt-3.5-turbo", apiKey: process.env.OPENAI_API_KEY },
 
   // Anthropic Claude
-  "claude-3-7-sonnet": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-sonnet-5": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-fable-5-1": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-fable-5": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-opus-4.8": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-opus-4.7": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-opus-4.6": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-opus-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
-  "claude-sonnet-5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-opus-4.1": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-sonnet-4.6": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-sonnet-4.5": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-sonnet-4.0": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-haiku-4.5": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-3-7-sonnet": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-3-5-sonnet": { provider: "anthropic", modelId: "claude-3-5-sonnet-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-3-5-haiku": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-3-opus": { provider: "anthropic", modelId: "claude-3-opus-20240229", apiKey: process.env.ANTHROPIC_API_KEY },
@@ -102,18 +129,38 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "claude-2.0": { provider: "anthropic", modelId: "claude-2.0", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-instant-1.2": { provider: "anthropic", modelId: "claude-instant-1.2", apiKey: process.env.ANTHROPIC_API_KEY },
 
+  // xAI Grok
+  "grok-4.6": { provider: "xai", modelId: "grok-2-latest", apiKey: process.env.XAI_API_KEY },
+  "grok-4.5": { provider: "xai", modelId: "grok-2-latest", apiKey: process.env.XAI_API_KEY },
+  "grok-4-fast-reasoning": { provider: "xai", modelId: "grok-2-mini", apiKey: process.env.XAI_API_KEY },
+  "grok-4": { provider: "xai", modelId: "grok-2-latest", apiKey: process.env.XAI_API_KEY },
+  "grok-3": { provider: "xai", modelId: "grok-2-latest", apiKey: process.env.XAI_API_KEY },
+  "grok-3-mini": { provider: "xai", modelId: "grok-2-mini", apiKey: process.env.XAI_API_KEY },
+
   // DeepSeek
+  "deepseek-v4-flash-vision-exp": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-v4-flash": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
+  "deepseek-v4-pro": { provider: "deepseek", modelId: "deepseek-reasoner", apiKey: process.env.DEEPSEEK_API_KEY },
   "deepseek-chat": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
   "deepseek-reasoner": { provider: "deepseek", modelId: "deepseek-reasoner", apiKey: process.env.DEEPSEEK_API_KEY },
   "deepseek-coder": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
   "deepseek-coder-v2": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
   "deepseek-coder-v2-lite": { provider: "deepseek", modelId: "deepseek-chat", apiKey: process.env.DEEPSEEK_API_KEY },
 
+  // Moonshot AI / Kimi
+  "kimi-k3": { provider: "moonshotai", modelId: "moonshot-v1-32k", apiKey: process.env.MOONSHOT_API_KEY },
+  "kimi-k2.7-code": { provider: "moonshotai", modelId: "moonshot-v1-32k", apiKey: process.env.MOONSHOT_API_KEY },
+  "kimi-k2.6": { provider: "moonshotai", modelId: "moonshot-v1-8k", apiKey: process.env.MOONSHOT_API_KEY },
+
   // Groq
+  "meta-llama/llama-4-scout-17b-16e-instruct": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
   "llama-3.1-8b-instant": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
   "llama-3.1-70b-versatile": { provider: "groq", modelId: "llama-3.1-70b-versatile", apiKey: process.env.GROQ_API_KEY },
   "llama-3.3-70b-versatile": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
   "deepseek-r1-distill-llama-70b": { provider: "groq", modelId: "deepseek-r1-distill-llama-70b", apiKey: process.env.GROQ_API_KEY },
+  "qwen-qwq-32b": { provider: "groq", modelId: "qwen-2.5-32b", apiKey: process.env.GROQ_API_KEY },
+  "openai/gpt-oss-120b": { provider: "groq", modelId: "llama-3.3-70b-versatile", apiKey: process.env.GROQ_API_KEY },
+  "gemma-4-31b": { provider: "groq", modelId: "gemma2-9b-it", apiKey: process.env.GROQ_API_KEY },
   "mixtral-8x7b-32768": { provider: "groq", modelId: "mixtral-8x7b-32768", apiKey: process.env.GROQ_API_KEY },
   "gemma2-9b-it": { provider: "groq", modelId: "gemma2-9b-it", apiKey: process.env.GROQ_API_KEY },
   "llama-3.1-8b": { provider: "groq", modelId: "llama-3.1-8b-instant", apiKey: process.env.GROQ_API_KEY },
@@ -122,6 +169,7 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "llama3-70b-8192": { provider: "groq", modelId: "llama3-70b-8192", apiKey: process.env.GROQ_API_KEY },
 
   // Mistral (3.x + mini/magistral/devstral)
+  "pixtral-large-latest": { provider: "mistral", modelId: "pixtral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-large-3": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-medium-3.1": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-small-3.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
@@ -130,6 +178,8 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "ministral-3-14b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "ministral-3-8b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "ministral-3-3b": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
+  "magistral-medium-2506": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "magistral-small-2506": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "magistral-medium-1.2": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
   "magistral-small-1.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "devstral-2": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
@@ -138,6 +188,7 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "mistral-large-latest": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-medium-latest": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-small-latest": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-8b-latest": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-7b-instruct": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
 
   // Together.ai
@@ -146,9 +197,15 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "meta-llama/llama-3.3-70b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.3-70B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
 
   // Cohere
+  "command-a-03-2025": { provider: "cohere", modelId: "command-r-plus", apiKey: process.env.COHERE_API_KEY },
+  "command-a-reasoning-08-2025": { provider: "cohere", modelId: "command-r-plus", apiKey: process.env.COHERE_API_KEY },
   "command-r-plus": { provider: "cohere", modelId: "command-r-plus", apiKey: process.env.COHERE_API_KEY },
   "command-r": { provider: "cohere", modelId: "command-r", apiKey: process.env.COHERE_API_KEY },
   "command-light": { provider: "cohere", modelId: "command-light", apiKey: process.env.COHERE_API_KEY },
+
+  // Alibaba / DeepInfra
+  "qwen3-max": { provider: "openai-like", modelId: "qwen-max", apiKey: process.env.DASHSCOPE_API_KEY },
+  "qwen-plus": { provider: "openai-like", modelId: "qwen-plus", apiKey: process.env.DASHSCOPE_API_KEY },
 
   // Perplexity
   "llama-3.1-sonar-large-128k-online": { provider: "perplexity", modelId: "llama-3.1-sonar-large-128k-online", apiKey: process.env.PERPLEXITY_API_KEY },
@@ -678,6 +735,34 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
           )
         } catch (error: any) {
           console.error("Error with OpenAI-like model:", error)
+          throw error
+        }
+
+      case "xai":
+        try {
+          return await handleWithOpenAILike(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || process.env.XAI_API_KEY,
+            "https://api.x.ai/v1",
+            modelConfig.modelId,
+          )
+        } catch (error: any) {
+          console.error("Error with xAI model:", error)
+          throw error
+        }
+
+      case "moonshotai":
+        try {
+          return await handleWithOpenAILike(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || process.env.MOONSHOT_API_KEY,
+            "https://api.moonshot.cn/v1",
+            modelConfig.modelId,
+          )
+        } catch (error: any) {
+          console.error("Error with Moonshot AI model:", error)
           throw error
         }
 

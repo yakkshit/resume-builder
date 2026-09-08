@@ -24,8 +24,9 @@ const styles = StyleSheet.create({
   },
 
   profileImageContainer: {
-    marginRight: 15,
+    marginRight: 14,
     flexShrink: 0,
+    alignSelf: "center",
   },
 
   profileImage: {
@@ -34,6 +35,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 2,
     borderColor: "rgba(255, 255, 255, 0.8)",
+    objectFit: "cover",
   },
 
   headerContent: {
@@ -41,25 +43,26 @@ const styles = StyleSheet.create({
   },
 
   name: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
+    marginBottom: 2,
     color: "#ffffff",
     letterSpacing: 0.3,
+    lineHeight: 1.2,
   },
 
   title: {
-    fontSize: 12,
-    marginBottom: 8,
+    fontSize: 10.5,
+    marginBottom: 6,
     color: "#e0e7ff",
     fontFamily: "Helvetica-Oblique",
+    lineHeight: 1.25,
   },
 
   contactInfo: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 6,
-    gap: 8,
+    marginTop: 4,
   },
 
   contactItem: {
@@ -70,6 +73,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.15)",
     padding: "3 6",
     borderRadius: 3,
+    marginRight: 6,
+    marginBottom: 4,
   },
 
   contactIcon: {
@@ -87,8 +92,7 @@ const styles = StyleSheet.create({
   portfolioLinks: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 6,
-    gap: 6,
+    marginTop: 4,
   },
 
   portfolioLink: {
@@ -99,6 +103,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.15)",
     padding: "3 6",
     borderRadius: 3,
+    marginRight: 6,
+    marginBottom: 4,
   },
 
   section: {
@@ -187,7 +193,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     marginTop: 6,
-    gap: 5,
   },
 
   skillBadge: {
@@ -197,6 +202,8 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: "#ffffff",
     fontFamily: "Helvetica-Bold",
+    marginRight: 5,
+    marginBottom: 4,
   },
 
   projectTech: {
@@ -204,7 +211,6 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     marginTop: 4,
     marginBottom: 4,
-    gap: 4,
   },
 
   techBadge: {
@@ -213,16 +219,18 @@ const styles = StyleSheet.create({
     padding: "1 4",
     fontSize: 7,
     color: "#e0e7ff",
+    marginRight: 4,
+    marginBottom: 3,
   },
 
   twoColumnContainer: {
     flexDirection: "row",
     marginTop: 10,
-    gap: 15,
   },
 
   column: {
     flex: 1,
+    marginRight: 10,
   },
 
   projectLink: {

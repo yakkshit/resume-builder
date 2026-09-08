@@ -94,4 +94,34 @@ describe("extractResumeJsonFromMessage", () => {
     expect(merged!.basicInfo.name).toBe("NewName");
     expect(merged!.basicInfo.profilePicture).toBe("data:image/png;base64,AAA");
   });
+
+  it("extracts categorized skills JSON update from assistant markdown and merges properly", () => {
+    const current: ResumeData = {
+      ...defaultResumeData,
+      skills: ["0: 0: 0: JavaScript", "1: 1: TypeScript"],
+    };
+    const message = `I've corrected the formatting of your skills section.
+
+\`\`\`json
+{
+  "skills": {
+    "AI & Agentic Systems": [
+      "LangChain",
+      "LangGraph"
+    ],
+    "Backend & Cloud": [
+      "Python",
+      "FastAPI"
+    ]
+  }
+}
+\`\`\``;
+
+    const { merged } = mergeAssistantResumeIntoCurrent(current, message);
+    expect(merged).not.toBeNull();
+    expect(merged!.skills).toEqual([
+      "AI & Agentic Systems: LangChain, LangGraph",
+      "Backend & Cloud: Python, FastAPI",
+    ]);
+  });
 });

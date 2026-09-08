@@ -1,4 +1,4 @@
-import type { ResumeData, BasicInfo, Experience, Education, Project, Achievement } from "./types"
+import type { ResumeData, BasicInfo, Experience, Education, Project, Achievement, PortfolioLink } from "./types"
 import { defaultResumeData } from "./default-resume-data"
 
 /** Check if value looks like a React element - never pass to @react-pdf Text */
@@ -21,13 +21,18 @@ function safeStr(v: unknown): string {
 export function normalizeSkillsToStringArray(skills: unknown): string[] {
   if (!skills) return []
 
+  const cleanSkillText = (s: string): string => {
+    // Strip repeated numeric index prefixes like "0: ", "0: 0: ", "1: ", "1. ", etc.
+    return s.replace(/^(?:\d+\s*[:.)-]\s*)+/, "").trim()
+  }
+
   // If already a string, e.g. "React, Node.js, TypeScript"
   if (typeof skills === "string") {
     const trimmed = skills.trim()
     if (!trimmed) return []
     return trimmed
       .split(/[,;\n•]+/)
-      .map((s) => s.trim())
+      .map((s) => cleanSkillText(s))
       .filter(Boolean)
   }
 
@@ -36,18 +41,19 @@ export function normalizeSkillsToStringArray(skills: unknown): string[] {
     const out: string[] = []
     for (const x of skills) {
       if (typeof x === "string") {
-        const s = x.trim()
+        const s = cleanSkillText(x)
         if (s) out.push(s)
         continue
       }
       if (x && typeof x === "object" && !Array.isArray(x)) {
         const o = x as Record<string, unknown>
-        const cat = safeStr(o.name ?? o.category ?? o.title ?? o.skill)
+        const rawCat = safeStr(o.name ?? o.category ?? o.title ?? o.skill)
+        const cat = cleanSkillText(rawCat)
         const kwRaw = o.keywords ?? o.skills ?? o.items
         const kws = Array.isArray(kwRaw)
-          ? kwRaw.map((k) => safeStr(k)).filter(Boolean)
+          ? kwRaw.map((k) => cleanSkillText(safeStr(k))).filter(Boolean)
           : typeof kwRaw === "string"
-            ? kwRaw.split(/[,;\n]+/).map((k) => k.trim()).filter(Boolean)
+            ? kwRaw.split(/[,;\n]+/).map((k) => cleanSkillText(k)).filter(Boolean)
             : []
         if (cat && kws.length) out.push(`${cat}: ${kws.join(", ")}`)
         else if (kws.length) out.push(...kws)
@@ -61,12 +67,27 @@ export function normalizeSkillsToStringArray(skills: unknown): string[] {
   if (typeof skills === "object" && skills !== null) {
     const out: string[] = []
     for (const [key, val] of Object.entries(skills as Record<string, unknown>)) {
-      const cat = key.trim()
+      const isNumericKey = /^\d+$/.test(key.trim())
+      const cat = isNumericKey ? "" : cleanSkillText(key)
+
       if (Array.isArray(val)) {
-        const items = val.map((v) => safeStr(v)).filter(Boolean)
-        if (items.length) out.push(`${cat}: ${items.join(", ")}`)
+        const items = val.map((v) => cleanSkillText(safeStr(v))).filter(Boolean)
+        if (items.length) {
+          if (cat) out.push(`${cat}: ${items.join(", ")}`)
+          else out.push(...items)
+        }
       } else if (typeof val === "string" && val.trim()) {
-        out.push(`${cat}: ${val.trim()}`)
+        const cleanVal = cleanSkillText(val)
+        if (cleanVal) {
+          if (cat) out.push(`${cat}: ${cleanVal}`)
+          else out.push(cleanVal)
+        }
+      } else if (typeof val === "object" && val !== null) {
+        const nested = normalizeSkillsToStringArray(val)
+        if (nested.length) {
+          if (cat) out.push(`${cat}: ${nested.join(", ")}`)
+          else out.push(...nested)
+        }
       }
     }
     if (out.length) return out
@@ -76,29 +97,131 @@ export function normalizeSkillsToStringArray(skills: unknown): string[] {
 }
 
 /** Languages normalization */
-function normalizeLanguagesArray(languages: unknown): string[] {
+/** Languages normalization */
+export function normalizeLanguagesArray(languages: unknown): string[] {
   if (!languages) return []
+
+  const cleanLangText = (s: string): string => {
+    return s.replace(/^(?:\d+\s*[:.)-]\s*)+/, "").trim()
+  }
+
   if (typeof languages === "string") {
-    return languages.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+    return languages
+      .split(/[,;\n•]+/)
+      .map(cleanLangText)
+      .filter(Boolean)
   }
-  if (!Array.isArray(languages)) return []
-  const out: string[] = []
-  for (const x of languages) {
-    if (typeof x === "string") {
-      const s = x.trim()
-      if (s) out.push(s)
-      continue
+
+  if (Array.isArray(languages)) {
+    const out: string[] = []
+    for (const x of languages) {
+      if (typeof x === "string") {
+        const s = cleanLangText(x)
+        if (s) out.push(s)
+        continue
+      }
+      if (x && typeof x === "object" && !Array.isArray(x)) {
+        const o = x as Record<string, unknown>
+        const label = cleanLangText(safeStr(o.name || o.language || o.label || o.lang))
+        const prof = cleanLangText(safeStr(o.proficiency || o.level || o.fluency))
+        if (label && prof) out.push(`${label} (${prof})`)
+        else if (label) out.push(label)
+        else if (prof) out.push(prof)
+      }
     }
-    if (x && typeof x === "object" && !Array.isArray(x)) {
-      const o = x as Record<string, unknown>
-      const label = safeStr(o.name || o.language || o.label)
-      const prof = safeStr(o.proficiency || o.level)
-      if (label && prof) out.push(`${label} (${prof})`)
-      else if (label) out.push(label)
-      else if (prof) out.push(prof)
-    }
+    return out
   }
-  return out
+
+  // If a dictionary, e.g. { "English": "Fluent", "German": "A2" }
+  if (typeof languages === "object" && languages !== null) {
+    const out: string[] = []
+    for (const [key, val] of Object.entries(languages as Record<string, unknown>)) {
+      const isNumericKey = /^\d+$/.test(key.trim())
+      const label = isNumericKey ? "" : cleanLangText(key)
+      const prof = typeof val === "string" ? cleanLangText(val) : ""
+
+      if (label && prof) {
+        out.push(`${label} (${prof})`)
+      } else if (label) {
+        out.push(label)
+      } else if (prof) {
+        out.push(prof)
+      }
+    }
+    if (out.length) return out
+  }
+
+  return []
+}
+
+function inferPlatform(url: string, fallback = "Link"): string {
+  const lower = url.toLowerCase()
+  if (lower.includes("github.com")) return "GitHub"
+  if (lower.includes("linkedin.com")) return "LinkedIn"
+  if (lower.includes("twitter.com") || lower.includes("x.com")) return "X (Twitter)"
+  if (lower.includes("leetcode.com")) return "LeetCode"
+  if (lower.includes("behance.net")) return "Behance"
+  if (lower.includes("dribbble.com")) return "Dribbble"
+  if (lower.includes("medium.com")) return "Medium"
+  return fallback
+}
+
+/** Portfolio links normalization */
+export function normalizePortfolioLinks(links: unknown): PortfolioLink[] {
+  if (!links) return []
+
+  if (typeof links === "string") {
+    const trimmed = links.trim()
+    if (!trimmed) return []
+    return trimmed
+      .split(/[,;\n]+/)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((url) => ({
+        platform: inferPlatform(url),
+        url: safeStr(url),
+      }))
+  }
+
+  if (Array.isArray(links)) {
+    const out: PortfolioLink[] = []
+    for (const l of links) {
+      if (typeof l === "string") {
+        const u = l.trim()
+        if (u) out.push({ platform: inferPlatform(u), url: u })
+        continue
+      }
+      if (l && typeof l === "object" && !Array.isArray(l)) {
+        const o = l as Record<string, unknown>
+        const rawUrl = safeStr(o.url || o.link || o.href)
+        const rawPlatform = safeStr(o.platform || o.name || o.title || inferPlatform(rawUrl))
+        const username = safeStr(o.username || o.handle) || undefined
+        if (rawUrl || rawPlatform) {
+          out.push({
+            platform: rawPlatform || "Link",
+            url: rawUrl,
+            username,
+          })
+        }
+      }
+    }
+    return out
+  }
+
+  if (typeof links === "object" && links !== null) {
+    const out: PortfolioLink[] = []
+    for (const [key, val] of Object.entries(links as Record<string, unknown>)) {
+      const isNumeric = /^\d+$/.test(key.trim())
+      const url = safeStr(typeof val === "string" ? val : (val as any)?.url || (val as any)?.link)
+      const platform = isNumeric ? inferPlatform(url) : key.trim()
+      if (url || platform) {
+        out.push({ platform: platform || "Link", url })
+      }
+    }
+    return out
+  }
+
+  return []
 }
 
 /** Only allow profilePicture as data URL or http(s) URL */
@@ -108,6 +231,20 @@ function safeProfilePicture(v: unknown): string | undefined {
   if (!s) return undefined
   if (s.startsWith("data:image/") || s.startsWith("https://") || s.startsWith("http://")) return s
   return undefined
+}
+
+function parseDateRange(item: Record<string, unknown>): { start: string; end: string } {
+  const explicitStart = safeStr(item.startDate || item.start_date || item.start || item.from || item.from_date || item.date)
+  const explicitEnd = safeStr(item.endDate || item.end_date || item.end || item.to || item.to_date || item.graduationDate || item.graduation_date)
+  if (explicitStart || explicitEnd) {
+    return { start: explicitStart, end: explicitEnd }
+  }
+  const rawDates = safeStr(item.dates || item.duration || item.period || item.time || item.years)
+  if (!rawDates) return { start: "", end: "" }
+  const normalized = rawDates.replace(/\u2013/g, "–").replace(/\u2014/g, "–")
+  const m = normalized.match(/^(.+?)\s*[–—-]\s*(.+)$/s)
+  if (m) return { start: m[1].trim(), end: m[2].trim() }
+  return { start: rawDates, end: "" }
 }
 
 /**
@@ -128,27 +265,17 @@ export function sanitizeResumeData(data: Partial<ResumeData> | unknown): ResumeD
     {}) as Record<string, unknown>
 
   const basicInfo: BasicInfo = {
-    name: safeStr(rawBasic.name || rawBasic.fullName || rawBasic.full_name || rawBasic.candidateName),
-    title: safeStr(rawBasic.title || rawBasic.jobTitle || rawBasic.job_title || rawBasic.role || rawBasic.position || rawBasic.headline),
-    email: safeStr(rawBasic.email || rawBasic.mail || rawBasic.emailAddress),
-    phone: safeStr(rawBasic.phone || rawBasic.phoneNumber || rawBasic.phone_number || rawBasic.tel || rawBasic.mobile),
-    location: safeStr(rawBasic.location || rawBasic.address || rawBasic.city || rawBasic.country),
-    linkedin: safeStr(rawBasic.linkedin || rawBasic.linkedinUrl || rawBasic.linkedin_url),
-    website: safeStr(rawBasic.website || rawBasic.url || rawBasic.portfolio || rawBasic.portfolioUrl),
-    summary: safeStr(rawBasic.summary || rawBasic.about || rawBasic.bio || rawBasic.objective || rawBasic.profileSummary || rawBasic.aboutMe),
-    profilePicture: safeProfilePicture(rawBasic.profilePicture),
-    languages: normalizeLanguagesArray(rawBasic.languages),
-    portfolioLinks: (Array.isArray(rawBasic.portfolioLinks) ? rawBasic.portfolioLinks : [])
-      .filter((link) => link && typeof link === "object")
-      .map((link) => {
-        const l = link as Record<string, unknown>
-        return {
-          platform: safeStr(l.platform || l.name || "Link"),
-          url: safeStr(l.url || l.link),
-          username: safeStr(l.username || l.handle) || undefined,
-        }
-      })
-      .filter((l) => l.platform || l.url),
+    name: safeStr(rawBasic.name || root.name || rawBasic.fullName || root.fullName || rawBasic.full_name || root.full_name || rawBasic.candidateName || root.candidateName),
+    title: safeStr(rawBasic.title || root.title || rawBasic.jobTitle || root.jobTitle || rawBasic.job_title || root.job_title || rawBasic.role || root.role || rawBasic.position || root.position || rawBasic.headline || root.headline),
+    email: safeStr(rawBasic.email || root.email || rawBasic.mail || root.mail || rawBasic.emailAddress || root.emailAddress),
+    phone: safeStr(rawBasic.phone || root.phone || rawBasic.phoneNumber || root.phoneNumber || rawBasic.phone_number || root.phone_number || rawBasic.tel || root.tel || rawBasic.mobile || root.mobile),
+    location: safeStr(rawBasic.location || root.location || rawBasic.address || root.address || rawBasic.city || root.city || rawBasic.country || root.country),
+    linkedin: safeStr(rawBasic.linkedin || root.linkedin || rawBasic.linkedinUrl || root.linkedinUrl || rawBasic.linkedin_url || root.linkedin_url),
+    website: safeStr(rawBasic.website || root.website || rawBasic.url || root.url || rawBasic.portfolio || root.portfolio || rawBasic.portfolioUrl || root.portfolioUrl),
+    summary: safeStr(rawBasic.summary || root.summary || rawBasic.about || root.about || rawBasic.bio || root.bio || rawBasic.objective || root.objective || rawBasic.profileSummary || root.profileSummary || rawBasic.aboutMe || root.aboutMe),
+    profilePicture: safeProfilePicture(rawBasic.profilePicture || root.profilePicture),
+    languages: normalizeLanguagesArray(rawBasic.languages || root.languages),
+    portfolioLinks: normalizePortfolioLinks(rawBasic.portfolioLinks || root.portfolioLinks || root.portfolio),
   }
 
   // Map alternative names for experience
@@ -166,19 +293,21 @@ export function sanitizeResumeData(data: Partial<ResumeData> | unknown): ResumeD
     .filter((it) => it && typeof it === "object")
     .map((item) => {
       const it = item as Record<string, unknown>
-      const rawHighlights = it.highlights || it.responsibilities || it.bullets || it.bulletPoints || it.bullet_points || it.achievements || it.keywords || []
+      const rawHighlights = it.highlights || it.responsibilities || it.bullets || it.bulletPoints || it.bullet_points || it.achievements || it.keywords || it.tasks || []
       const highlights: string[] = Array.isArray(rawHighlights)
         ? rawHighlights.map(safeStr).filter(Boolean)
         : typeof rawHighlights === "string"
           ? rawHighlights.split(/[\n•]+/).map((h) => h.trim()).filter(Boolean)
           : []
 
+      const dates = parseDateRange(it)
+
       return {
-        company: safeStr(it.company || it.employer || it.organization || it.companyName || it.company_name),
+        company: safeStr(it.company || it.employer || it.organization || it.companyName || it.company_name || it.name),
         position: safeStr(it.position || it.role || it.title || it.jobTitle || it.job_title || it.designation),
-        startDate: safeStr(it.startDate || it.start_date || it.start || it.from || it.from_date || it.date),
-        endDate: safeStr(it.endDate || it.end_date || it.end || it.to || it.to_date),
-        description: safeStr(it.description || it.summary || it.details),
+        startDate: dates.start,
+        endDate: dates.end,
+        description: safeStr(it.description || it.summary || it.details || it.about),
         highlights,
       }
     })
@@ -191,13 +320,15 @@ export function sanitizeResumeData(data: Partial<ResumeData> | unknown): ResumeD
     .filter((it) => it && typeof it === "object")
     .map((item) => {
       const it = item as Record<string, unknown>
+      const dates = parseDateRange(it)
+
       return {
-        institution: safeStr(it.institution || it.school || it.university || it.college || it.schoolName),
-        degree: safeStr(it.degree || it.qualification || it.title),
-        field: safeStr(it.field || it.major || it.branch || it.study || it.area || it.specialization),
-        startDate: safeStr(it.startDate || it.start_date || it.start || it.from),
-        endDate: safeStr(it.endDate || it.end_date || it.end || it.to || it.graduationDate || it.graduation_date),
-        gpa: safeStr(it.gpa || it.grade || it.score || it.cgpa || it.percentage),
+        institution: safeStr(it.institution || it.school || it.university || it.college || it.schoolName || it.academy),
+        degree: safeStr(it.degree || it.qualification || it.title || it.degreeName || it.level),
+        field: safeStr(it.field || it.major || it.branch || it.study || it.area || it.specialization || it.course),
+        startDate: dates.start,
+        endDate: dates.end,
+        gpa: safeStr(it.gpa || it.grade || it.score || it.cgpa || it.percentage || it.marks),
       }
     })
 
@@ -206,7 +337,7 @@ export function sanitizeResumeData(data: Partial<ResumeData> | unknown): ResumeD
   const skills: string[] = normalizeSkillsToStringArray(rawSkills)
 
   // Projects
-  const rawProj = root.projects || root.projectList || root.personalProjects || []
+  const rawProj = root.projects || root.projectList || root.personalProjects || root.sideProjects || []
   const projArray = Array.isArray(rawProj) ? rawProj : typeof rawProj === "object" && rawProj !== null ? Object.values(rawProj) : []
 
   const projects: Project[] = projArray
@@ -214,19 +345,16 @@ export function sanitizeResumeData(data: Partial<ResumeData> | unknown): ResumeD
     .map((item) => {
       const it = item as Record<string, unknown>
       const rawTech = it.technologies || it.techStack || it.tech_stack || it.tech || it.tools || it.skills || []
-      const technologies: string[] = Array.isArray(rawTech)
-        ? rawTech.map(safeStr).filter(Boolean)
-        : typeof rawTech === "string"
-          ? rawTech.split(/[,;\n]+/).map((t) => t.trim()).filter(Boolean)
-          : []
+      const technologies: string[] = normalizeSkillsToStringArray(rawTech)
+      const dates = parseDateRange(it)
 
       return {
-        name: safeStr(it.name || it.title || it.projectName || it.project_name),
-        description: safeStr(it.description || it.summary || it.details),
+        name: safeStr(it.name || it.title || it.projectName || it.project_name || it.heading),
+        description: safeStr(it.description || it.summary || it.details || it.about),
         technologies,
-        link: safeStr(it.link || it.url || it.github || it.website) || undefined,
-        startDate: safeStr(it.startDate || it.start) || undefined,
-        endDate: safeStr(it.endDate || it.end) || undefined,
+        link: safeStr(it.link || it.url || it.github || it.website || it.demo || it.repo) || undefined,
+        startDate: dates.start || undefined,
+        endDate: dates.end || undefined,
       }
     })
     .filter((p) => p.name || p.description)
@@ -240,9 +368,9 @@ export function sanitizeResumeData(data: Partial<ResumeData> | unknown): ResumeD
     .map((item) => {
       const it = item as Record<string, unknown>
       return {
-        title: safeStr(it.title || it.name || it.heading || it.award),
-        description: safeStr(it.description || it.details || it.summary || it.issuer),
-        date: safeStr(it.date || it.year || it.time) || undefined,
+        title: safeStr(it.title || it.name || it.heading || it.award || it.certificate || it.honor),
+        description: safeStr(it.description || it.details || it.summary || it.issuer || it.organization || it.by),
+        date: safeStr(it.date || it.year || it.time || it.issueDate || it.issued) || undefined,
       }
     })
     .filter((a) => a.title || a.description)

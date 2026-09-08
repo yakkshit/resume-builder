@@ -31,43 +31,48 @@ const styles = StyleSheet.create({
   // Profile Section (Compact)
   profileSection: {
     alignItems: "center",
-    marginBottom: 18,
+    marginBottom: 16,
   },
   profileImageContainer: {
     width: 70,
     height: 70,
     borderRadius: 35,
-    overflow: "hidden",
-    border: "3px solid #3182ce",
-    marginBottom: 10,
+    border: "2.5px solid #3182ce",
+    marginBottom: 8,
+    alignSelf: "center",
+    justifyContent: "center",
+    alignItems: "center",
   },
   profileImage: {
-    width: "100%",
-    height: "100%",
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
     objectFit: "cover",
   },
   profileName: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Helvetica-Bold",
     color: "#ffffff",
     textAlign: "center",
-    marginBottom: 4,
+    marginBottom: 3,
+    lineHeight: 1.2,
     letterSpacing: 0.3,
   },
   profileTitle: {
-    fontSize: 10,
+    fontSize: 9.5,
     color: "#90cdf4",
     textAlign: "center",
     fontFamily: "Helvetica-Oblique",
-    marginBottom: 12,
+    marginBottom: 10,
+    lineHeight: 1.25,
   },
 
   // Compact Contact Section
   contactSection: {
-    marginBottom: 18,
+    marginBottom: 16,
   },
   sidebarSectionTitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: "Helvetica-Bold",
     color: "#90cdf4",
     marginBottom: 8,
@@ -99,17 +104,17 @@ const styles = StyleSheet.create({
 
   // Compact Skills Section
   skillsSection: {
-    marginBottom: 18,
+    marginBottom: 16,
   },
   skillsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 4,
   },
   skillItem: {
     backgroundColor: "rgba(49, 130, 206, 0.2)",
-    padding: "3 8",
-    borderRadius: 10,
+    padding: "3 7",
+    borderRadius: 8,
+    marginRight: 4,
     marginBottom: 4,
   },
   skillText: {
@@ -120,29 +125,29 @@ const styles = StyleSheet.create({
 
   // Compact Languages Section
   languagesSection: {
-    marginBottom: 18,
+    marginBottom: 16,
   },
   languageItem: {
-    marginBottom: 5,
-    padding: "4 0",
+    marginBottom: 4,
+    padding: "3 0",
     borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
   },
   languageName: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: "#ffffff",
     fontFamily: "Helvetica-Bold",
   },
 
   // Compact Portfolio Section
   portfolioSection: {
-    marginBottom: 15,
+    marginBottom: 14,
   },
   portfolioItem: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 6,
+    marginBottom: 5,
     backgroundColor: "rgba(49, 130, 206, 0.1)",
-    padding: "4 6",
+    padding: "3 5",
     borderRadius: 3,
   },
   portfolioIcon: {

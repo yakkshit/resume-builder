@@ -27,31 +27,35 @@ const styles = StyleSheet.create({
   },
   profileContainer: {
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 10,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
+    marginBottom: 8,
     borderWidth: 2,
     borderColor: "#10b981", // teal
+    objectFit: "cover",
+    alignSelf: "center",
   },
   name: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
+    marginBottom: 3,
     color: "white",
     textAlign: "center",
+    lineHeight: 1.2,
   },
   title: {
-    fontSize: 12,
+    fontSize: 10.5,
     color: "#10b981", // teal
-    marginBottom: 10,
+    marginBottom: 8,
     textAlign: "center",
+    lineHeight: 1.25,
   },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Helvetica-Bold",
     marginBottom: 8,
     color: "#10b981", // teal
@@ -61,7 +65,7 @@ const styles = StyleSheet.create({
     paddingBottom: 3,
   },
   rightSectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Helvetica-Bold",
     marginBottom: 8,
     color: "#1f2937", // dark gray
@@ -88,41 +92,47 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   skillItem: {
-    marginBottom: 5,
-    fontSize: 9,
+    marginBottom: 4,
+    fontSize: 8.5,
+    lineHeight: 1.3,
   },
   languageItem: {
-    marginBottom: 5,
-    fontSize: 9,
+    marginBottom: 4,
+    fontSize: 8.5,
   },
   portfolioItem: {
-    marginBottom: 5,
-    fontSize: 9,
+    marginBottom: 4,
+    fontSize: 8.5,
   },
   experienceItem: {
-    marginBottom: 15,
+    marginBottom: 12,
   },
   itemHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 3,
   },
   itemTitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: "Helvetica-Bold",
+    flex: 1,
+    marginRight: 8,
   },
   itemSubtitle: {
-    fontSize: 10,
+    fontSize: 9.5,
     color: "#4b5563", // gray
   },
   itemDate: {
-    fontSize: 9,
+    fontSize: 8.5,
     color: "#6b7280", // lighter gray
+    flexShrink: 0,
+    textAlign: "right",
   },
   itemDescription: {
-    fontSize: 9,
+    fontSize: 8.5,
     marginTop: 3,
-    lineHeight: 1.4,
+    lineHeight: 1.35,
   },
   summary: {
     fontSize: 10,

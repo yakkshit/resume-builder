@@ -34,19 +34,36 @@ const RESUME_KEYS = [
   "contactInfo",
   "contact_info",
   "profile",
+  "summary",
+  "about",
+  "bio",
+  "objective",
+  "profileSummary",
+  "headline",
   "experience",
   "workExperience",
   "work_experience",
   "work",
   "employment",
+  "jobs",
+  "history",
   "education",
   "academics",
   "degrees",
+  "schools",
   "skills",
   "technicalSkills",
+  "skillList",
   "projects",
+  "sideProjects",
+  "personalProjects",
   "achievements",
   "awards",
+  "certifications",
+  "publications",
+  "languages",
+  "portfolioLinks",
+  "portfolio",
 ] as const
 
 function isResumeUpdateShape(obj: unknown): obj is Record<string, unknown> {
@@ -233,11 +250,64 @@ export function mergeAssistantResumeIntoCurrent(current: ResumeData, assistantMe
  */
 export function getSuggestedSectionsSummary(update: Record<string, unknown>): string[] {
   const sections: string[] = []
-  if (update.basicInfo && typeof update.basicInfo === "object") sections.push("Summary & basic info")
-  if (Array.isArray(update.experience) && update.experience.length) sections.push("Experience")
-  if (Array.isArray(update.education) && update.education.length) sections.push("Education")
-  if (Array.isArray(update.skills) && update.skills.length) sections.push("Skills")
-  if (Array.isArray(update.projects) && update.projects.length) sections.push("Projects")
-  if (Array.isArray(update.achievements) && update.achievements.length) sections.push("Achievements")
+  if (
+    (update.basicInfo && typeof update.basicInfo === "object") ||
+    (update.personalInfo && typeof update.personalInfo === "object") ||
+    (update.contactInfo && typeof update.contactInfo === "object") ||
+    (update.profile && typeof update.profile === "object") ||
+    typeof update.summary === "string" ||
+    typeof update.about === "string" ||
+    typeof update.bio === "string" ||
+    typeof update.name === "string" ||
+    typeof update.title === "string"
+  ) {
+    sections.push("Summary & basic info")
+  }
+  if (
+    (Array.isArray(update.experience) && update.experience.length > 0) ||
+    (Array.isArray(update.workExperience) && update.workExperience.length > 0) ||
+    (Array.isArray(update.work) && update.work.length > 0) ||
+    (Array.isArray(update.employment) && update.employment.length > 0) ||
+    (update.experience && typeof update.experience === "object" && Object.keys(update.experience).length > 0)
+  ) {
+    sections.push("Experience")
+  }
+  if (
+    (Array.isArray(update.education) && update.education.length > 0) ||
+    (Array.isArray(update.academics) && update.academics.length > 0) ||
+    (Array.isArray(update.degrees) && update.degrees.length > 0) ||
+    (update.education && typeof update.education === "object" && Object.keys(update.education).length > 0)
+  ) {
+    sections.push("Education")
+  }
+  if (
+    (Array.isArray(update.skills) && update.skills.length > 0) ||
+    (typeof update.skills === "string" && update.skills.trim().length > 0) ||
+    (update.skills && typeof update.skills === "object" && Object.keys(update.skills).length > 0) ||
+    (Array.isArray(update.technicalSkills) && update.technicalSkills.length > 0)
+  ) {
+    sections.push("Skills")
+  }
+  if (
+    (Array.isArray(update.projects) && update.projects.length > 0) ||
+    (Array.isArray(update.sideProjects) && update.sideProjects.length > 0) ||
+    (update.projects && typeof update.projects === "object" && Object.keys(update.projects).length > 0)
+  ) {
+    sections.push("Projects")
+  }
+  if (
+    (Array.isArray(update.achievements) && update.achievements.length > 0) ||
+    (Array.isArray(update.awards) && update.awards.length > 0) ||
+    (Array.isArray(update.certifications) && update.certifications.length > 0) ||
+    (update.achievements && typeof update.achievements === "object" && Object.keys(update.achievements).length > 0)
+  ) {
+    sections.push("Achievements")
+  }
+  if (
+    (Array.isArray(update.languages) && update.languages.length > 0) ||
+    (update.languages && typeof update.languages === "object" && Object.keys(update.languages).length > 0)
+  ) {
+    sections.push("Languages")
+  }
   return sections
 }

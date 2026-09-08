@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "2.10.0",
+  "version": "2.10.1",
   "private": true,
   "overrides": {
     "react": "^19.0.0",

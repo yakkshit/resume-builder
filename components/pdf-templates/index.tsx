@@ -17,6 +17,12 @@ import { DarkCoverLetterTemplate } from "./coverletter/dark-cover-letter-templat
 import { GradientCoverLetterTemplate } from "./coverletter/gradient-cover-letter-template"
 import { GermanLebenslaufTemplate } from "./cv/german-templates/GermanLebenslaufTemplate"
 import { GermanModernLebenslaufTemplate } from "./cv/german-templates/GermanModernLebenslaufTemplate"
+import { GermanTealWaveTemplate } from "./cv/german-templates/GermanTealWaveTemplate"
+import { GermanSlateSplitTemplate } from "./cv/german-templates/GermanSlateSplitTemplate"
+import { GermanRoseGoldTemplate } from "./cv/german-templates/GermanRoseGoldTemplate"
+import { GermanTimelineMinimalTemplate } from "./cv/german-templates/GermanTimelineMinimalTemplate"
+import { GermanBurgundyDualTemplate } from "./cv/german-templates/GermanBurgundyDualTemplate"
+import { IvyLeaguePDFTemplate } from "./cv/general-resumes/ivy-league-pdf-template"
 import { MultiColorfulGradientPDFTemplate } from "./cv/other-resume/RandomColourTemplate"
 import { MinimalCleanPDFTemplate } from "./cv/general-resumes/minimal-clean-pdf-template"
 import { TechModernPDFTemplate } from "./cv/general-resumes/tech-modern-pdf-template"
@@ -39,6 +45,12 @@ export {
   GradientGrayPDFTemplate,
   GermanLebenslaufTemplate,
   GermanModernLebenslaufTemplate,
+  GermanTealWaveTemplate,
+  GermanSlateSplitTemplate,
+  GermanRoseGoldTemplate,
+  GermanTimelineMinimalTemplate,
+  GermanBurgundyDualTemplate,
+  IvyLeaguePDFTemplate,
   MinimalCleanPDFTemplate,
   TechModernPDFTemplate,
   // Cover letter templates
@@ -68,6 +80,13 @@ export const resumeTemplates = {
   "gradient-gray": GradientGrayPDFTemplate,
   "german-cv": GermanLebenslaufTemplate,
   "german-modern": GermanModernLebenslaufTemplate,
+  "german-teal-wave": GermanTealWaveTemplate,
+  "german-slate-split": GermanSlateSplitTemplate,
+  "german-rose-gold": GermanRoseGoldTemplate,
+  "german-timeline-minimal": GermanTimelineMinimalTemplate,
+  "german-burgundy-dual": GermanBurgundyDualTemplate,
+  "ivy-league": IvyLeaguePDFTemplate,
+  "engineering-ats": IvyLeaguePDFTemplate,
   "minimal-clean": MinimalCleanPDFTemplate,
   "tech-modern": TechModernPDFTemplate,
   "multi-colour" : MultiColorfulGradientPDFTemplate

@@ -24,31 +24,35 @@ const styles = StyleSheet.create({
   },
   headerLeft: {
     flex: 1,
+    paddingRight: 12,
   },
   name: {
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: "Helvetica-Bold",
     color: "#ffffff",
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
+    lineHeight: 1.2,
   },
   title: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: "#38bdf8",
     fontFamily: "Helvetica-Bold",
-    marginTop: 3,
-    marginBottom: 10,
+    marginTop: 2,
+    marginBottom: 8,
     textTransform: "uppercase",
+    lineHeight: 1.25,
   },
   contactGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
   },
   contactItem: {
     flexDirection: "row",
     alignItems: "center",
     fontSize: 8.5,
     color: "#cbd5e1",
+    marginRight: 10,
+    marginBottom: 4,
   },
   icon: {
     width: 9,
@@ -56,8 +60,8 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   photo: {
-    width: 65,
-    height: 65,
+    width: 62,
+    height: 62,
     borderRadius: 6,
     borderWidth: 2,
     borderColor: "#38bdf8",
@@ -65,19 +69,19 @@ const styles = StyleSheet.create({
   },
   columns: {
     flexDirection: "row",
-    gap: 20,
   },
   mainColumn: {
     flex: 2,
+    paddingRight: 15,
   },
   sideColumn: {
     flex: 1,
   },
   section: {
-    marginBottom: 14,
+    marginBottom: 13,
   },
   sectionTitle: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: "Helvetica-Bold",
     color: "#0f172a",
     textTransform: "uppercase",
@@ -88,26 +92,30 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   itemGroup: {
-    marginBottom: 9,
+    marginBottom: 8,
   },
   itemHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "baseline",
+    alignItems: "flex-start",
   },
   itemTitle: {
     fontSize: 9.5,
     fontFamily: "Helvetica-Bold",
     color: "#0f172a",
+    flex: 1,
+    marginRight: 8,
   },
   itemCompany: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontFamily: "Helvetica-Oblique",
     color: "#0284c7",
   },
   itemDates: {
     fontSize: 8,
     color: "#64748b",
+    flexShrink: 0,
+    textAlign: "right",
   },
   text: {
     fontSize: 8.5,
@@ -115,7 +123,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   bulletList: {
-    marginTop: 3,
+    marginTop: 2,
   },
   bulletItem: {
     flexDirection: "row",
@@ -134,7 +142,6 @@ const styles = StyleSheet.create({
   techPillContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 4,
     marginTop: 4,
   },
   techPill: {
@@ -145,6 +152,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 2,
     borderRadius: 3,
+    marginRight: 4,
+    marginBottom: 4,
   },
   link: {
     color: "#38bdf8",

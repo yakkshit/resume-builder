@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ResumeData, BasicInfo, Experience, Education, Project, Achievement, PortfolioLink } from "./types";
 import { defaultResumeData } from "./default-resume-data";
+import { normalizeSkillsToStringArray } from "./sanitize-resume-data";
 
 /**
  * Coerce any unknown value to a clean string with default fallback.
@@ -190,7 +191,7 @@ export const resumeDataSchema = z.preprocess(
       basicInfo: typeof basic === "object" && basic !== null ? basic : {},
       experience: Array.isArray(rawExp) ? rawExp : [],
       education: Array.isArray(rawEdu) ? rawEdu : [],
-      skills: Array.isArray(rawSkills) || typeof rawSkills === "string" ? rawSkills : [],
+      skills: normalizeSkillsToStringArray(rawSkills),
       projects: Array.isArray(rawProj) ? rawProj : [],
       achievements: Array.isArray(rawAch) ? rawAch : [],
     };
