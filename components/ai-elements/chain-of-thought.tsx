@@ -17,6 +17,11 @@ import {
   FileText,
   AlertTriangle,
   Loader2,
+  BarChart3,
+  Database,
+  Lock,
+  Target,
+  Cpu,
 } from "lucide-react";
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 import { Badge } from "@/components/ui/badge";
@@ -221,18 +226,32 @@ export function ChainOfThoughtTool({
   className,
 }: ChainOfThoughtToolProps) {
   const getToolIcon = () => {
-    switch (name) {
+    switch (name.toLowerCase()) {
       case "search_jobs":
+      case "job_scraper":
         return Search;
       case "scrape_job_posting":
+      case "web_scraper":
         return Globe;
       case "scrape_github_profile":
+      case "github_encrypted_sync":
         return Github;
       case "scrape_linkedin_profile":
         return Linkedin;
+      case "chart_generator":
+      case "generate_chart":
+        return BarChart3;
+      case "neo4j_career_graph":
+        return Database;
+      case "gitlab_encrypted_sync":
+        return Lock;
+      case "calculate_ats_score":
+      case "cv_scorer":
+        return Target;
       case "generate_resume_pdf":
       case "generate_cover_letter_pdf":
       case "prepare_job_application_package":
+      case "compile_latex":
         return FileText;
       case "list_templates":
         return FileCode2;
@@ -244,18 +263,27 @@ export function ChainOfThoughtTool({
   const ToolIcon = getToolIcon();
 
   const getToolDescription = () => {
-    if (!args) return `Executing MCP Tool: ${name}`;
-    if (name === "search_jobs" && args.query) {
+    if (!args) return `Executing System/MCP Tool: ${name}`;
+    if ((name === "search_jobs" || name === "job_scraper") && args.query) {
       return `Searching jobs for "${args.query}" in ${args.location || "Remote"}`;
     }
     if (name === "scrape_github_profile" && args.username) {
       return `Scraping GitHub repositories & stars for @${args.username}`;
     }
-    if (name === "scrape_job_posting") {
+    if (name === "scrape_job_posting" || name === "web_scraper") {
       return args.url ? `Scraping requirements from ${args.url}` : "Parsing job posting requirements";
+    }
+    if (name === "chart_generator" || name === "generate_chart") {
+      return `Generating interactive ${args.type || "analytics"} chart visualization`;
     }
     if (name === "generate_resume_pdf") {
       return `Generating PDF with template: ${args.template || "modern"}`;
+    }
+    if (name === "calculate_ats_score" || name === "cv_scorer") {
+      return "Analyzing ATS score alignment against job requirements";
+    }
+    if (name === "neo4j_career_graph") {
+      return "Querying Neo4j Career Knowledge Graph nodes and relationships";
     }
     return `Arguments: ${JSON.stringify(args)}`;
   };

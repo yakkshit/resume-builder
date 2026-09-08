@@ -25,6 +25,11 @@ import {
     Lock,
     Clapperboard,
     Check,
+    BarChart3,
+    Globe,
+    Target,
+    Cpu,
+    Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,7 +37,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import Toaster, { ToasterRef } from '@/components/ui/toast';
 import { useChat } from "@ai-sdk/react";
@@ -55,7 +60,7 @@ import { getTextContent, getReasoningContent, isReasoningStreaming } from "@/lib
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ai-elements/reasoning";
 import type { JobSuggestion } from "@/lib/job-scraper/google-jobs";
 import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
-import { stripIncompleteJsonTail } from "@/lib/streaming-chat-content";
+import { stripIncompleteJsonTail, parseChainOfThought, type ParsedToolCall } from "@/lib/streaming-chat-content";
 import { mergeAssistantResumeIntoCurrent, extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
 import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume";
 import { buildResumeDataForChatRequest, messagesForResumeContext } from "@/lib/chat-resume-context";
@@ -69,6 +74,11 @@ import { ModelProviderIcon } from "@/lib/model-provider-icon";
 import { Plug } from "lucide-react";
 import { GitHubSyncService } from "@/lib/github/sync";
 import { getStoredProfile, ProfileSettingsDialog } from "./profile-settings-dialog";
+import { useAuth } from "@/lib/auth/auth-provider";
+import { OnboardingModal } from "@/components/auth/onboarding-modal";
+import { ChatFeedback } from "./chat-feedback";
+import { ChromiumWebview } from "./chromium-webview";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 const panelLoading = () => (
     <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
@@ -178,6 +188,7 @@ function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>
     if (t === "cvscorer" || t === "cv-score") return "cv-score";
     if (t === "joblinks" || t === "job-recommendations") return "job-recommendations";
     if (t === "jobscraper" || t === "job-scraper" || t === "jobsearch") return "job-scraper";
+    if (t === "chart" || t === "recharts" || t === "analytics" || t === "graph") return "chart";
     if (t === "jobapplysimulator" || t === "auto-applier") return "auto-applier";
     if (t === "course" || t === "learning-resources") return "learning-resources";
     if (t === "codingchallenge" || t === "coding-challenge") return "coding-challenge";
@@ -302,6 +313,148 @@ function computeCanonicalResumeInstanceKey(messages: UIMessage[], isStreamingLas
     return null;
 }
 
+// ── Tool Execution Badges ──────────────────────────────────────────────────
+
+function ToolExecutionBadges({
+    tools,
+    components,
+    isStreaming,
+}: {
+    tools: Array<{ name: string; status?: string; args?: Record<string, any> }>;
+    components: Array<{ type: Parameters<typeof ComponentRenderer>[0]["type"] | null; isComplete: boolean }>;
+    isStreaming?: boolean;
+}) {
+    const allBadges: Array<{ id: string; label: string; icon: React.ComponentType<{ className?: string }>; active: boolean }> = [];
+
+    for (const tool of tools) {
+        const name = tool.name.toLowerCase();
+        let label = `Tool: ${tool.name}`;
+        let IconComponent = Wrench;
+        if (name.includes("job") || name.includes("search")) {
+            label = "Job Scraper & Search";
+            IconComponent = Search;
+        } else if (name.includes("github") || name.includes("sync")) {
+            label = "GitHub Encrypted Sync";
+            IconComponent = Code;
+        } else if (name.includes("chart")) {
+            label = "Chart Generator";
+            IconComponent = BarChart3;
+        } else if (name.includes("ats") || name.includes("scorer")) {
+            label = "ATS Score Analyzer";
+            IconComponent = Target;
+        } else if (name.includes("pdf") || name.includes("resume")) {
+            label = "Resume PDF Engine";
+            IconComponent = FileText;
+        } else if (name.includes("web") || name.includes("scrape")) {
+            label = "Web Scraper";
+            IconComponent = Globe;
+        } else if (name.includes("neo4j") || name.includes("graph")) {
+            label = "Neo4j Knowledge Graph";
+            IconComponent = Cpu;
+        }
+        allBadges.push({
+            id: `tool-${tool.name}`,
+            label,
+            icon: IconComponent,
+            active: Boolean(isStreaming && tool.status === "active"),
+        });
+    }
+
+    for (const comp of components) {
+        if (!comp.type) continue;
+        let label = "UI Component";
+        let IconComponent = Sparkles;
+        switch (comp.type) {
+            case "resume":
+                label = "CV Builder & Live PDF";
+                IconComponent = FileText;
+                break;
+            case "cover-letter":
+                label = "Cover Letter Generator";
+                IconComponent = BookOpen;
+                break;
+            case "cv-score":
+                label = "ATS Match Scorer";
+                IconComponent = Target;
+                break;
+            case "job-scraper":
+                label = "Live Job Scraper Card";
+                IconComponent = Search;
+                break;
+            case "job-recommendations":
+                label = "Job Match Recommendations";
+                IconComponent = Briefcase;
+                break;
+            case "chart":
+                label = "Interactive Analytics Chart";
+                IconComponent = BarChart3;
+                break;
+            case "auto-applier":
+                label = "Application Auto-Applier";
+                IconComponent = Cpu;
+                break;
+            case "coding-challenge":
+                label = "Coding Interview Challenge";
+                IconComponent = Code;
+                break;
+            case "learning-resources":
+                label = "Learning Pick & Courses";
+                IconComponent = BookOpen;
+                break;
+            case "email-hr":
+                label = "HR Outreach Email Draft";
+                IconComponent = Send;
+                break;
+            case "linkedin-dm":
+                label = "LinkedIn Direct Message";
+                IconComponent = Briefcase;
+                break;
+            case "resume-latex":
+            case "cover-letter-latex":
+                label = "LaTeX Compiler Artifact";
+                IconComponent = FileText;
+                break;
+        }
+        if (!allBadges.some((b) => b.label === label)) {
+            allBadges.push({
+                id: `comp-${comp.type}`,
+                label,
+                icon: IconComponent,
+                active: Boolean(isStreaming && !comp.isComplete),
+            });
+        }
+    }
+
+    if (allBadges.length === 0) return null;
+
+    return (
+        <div className="flex flex-wrap items-center gap-1.5 py-1">
+            {allBadges.map((b) => {
+                const Icon = b.icon;
+                return (
+                    <div
+                        key={b.id}
+                        className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all shadow-xs",
+                            b.active
+                                ? "border-sky-500/40 bg-sky-500/10 text-sky-300 animate-pulse"
+                                : "border-white/10 bg-white/[0.04] text-muted-foreground hover:text-foreground hover:border-white/20"
+                        )}
+                    >
+                        <Icon className={cn("w-3 h-3 shrink-0", b.active ? "text-sky-400" : "text-primary/70")} />
+                        <span>{b.label}</span>
+                        {b.active ? (
+                            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping" />
+                        ) : (
+                            <Check className="w-3 h-3 text-emerald-400/80" />
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
 // ── Message Bubble ─────────────────────────────────────────────────────────
 
 function MessageBubble({
@@ -324,13 +477,25 @@ function MessageBubble({
     const isUser = message.role === "user";
     const [hovering, setHovering] = useState(false);
     const content = getTextContent(message) ?? "";
-    const reasoningText = !isUser ? getReasoningContent(message) : "";
-    const showReasoning = !isUser && (reasoningText.trim().length > 0 || isReasoningStreaming(message));
+
+    const cotResult = useMemo(
+        () => (!isUser ? parseChainOfThought(content, isStreaming) : null),
+        [isUser, content, isStreaming]
+    );
+
+    const sdkReasoning = !isUser ? getReasoningContent(message) : "";
+    const effectiveReasoning = sdkReasoning || cotResult?.thinkingText || "";
+    const isReasoningActive = Boolean(
+        isStreaming && (isReasoningStreaming(message) || cotResult?.isThinkingActive)
+    );
+    const showReasoning = !isUser && (effectiveReasoning.trim().length > 0 || isReasoningActive);
+
+    const textToClean = cotResult?.cleanedContent ?? content;
 
     /** Stable reference when message text unchanged — avoids ResumeViewer re-running merge on every parent render. */
     const extracted = useMemo(
-        () => (!isUser ? extractComponents(content) : { cleanText: content, components: [], usedResumeJsonFallback: false }),
-        [isUser, content],
+        () => (!isUser ? extractComponents(textToClean) : { cleanText: content, components: [], usedResumeJsonFallback: false }),
+        [isUser, textToClean, content],
     );
 
     const renderedText = isUser ? content : extracted.cleanText;
@@ -372,12 +537,21 @@ function MessageBubble({
                 {showReasoning ? (
                     <Reasoning
                         className="w-full max-w-[min(720px,calc(100%-3rem))]"
-                        isStreaming={Boolean(isStreaming && isReasoningStreaming(message))}
+                        isStreaming={isReasoningActive}
                     >
                         <ReasoningTrigger />
-                        <ReasoningContent>{reasoningText || " "}</ReasoningContent>
+                        <ReasoningContent>{effectiveReasoning || " "}</ReasoningContent>
                     </Reasoning>
                 ) : null}
+
+                {!isUser && ((cotResult?.tools && cotResult.tools.length > 0) || extracted.components.length > 0) ? (
+                    <ToolExecutionBadges
+                        tools={cotResult?.tools ?? []}
+                        components={extracted.components}
+                        isStreaming={isStreaming}
+                    />
+                ) : null}
+
                 {/* Bubble */}
                 <div
                     className={`relative px-4 py-3 rounded-2xl text-sm ${isUser
@@ -443,6 +617,18 @@ function MessageBubble({
                         />
                     </div>
                 ))}
+
+                {/* Model Training Feedback (RLHF) */}
+                {!isUser && !isStreaming && (
+                    <div className="flex items-center justify-between mt-1 px-1">
+                        <ChatFeedback
+                            messageId={message.id || `msg_${Date.now()}`}
+                            prompt={content}
+                            response={content}
+                            onFeedbackSubmitted={() => onToast("success", "Feedback saved for model training!")}
+                        />
+                    </div>
+                )}
             </div>
 
             {isUser && (
@@ -896,11 +1082,15 @@ function ChatInput({
 
 export default function AICareerAssistantChat() {
     const { settings, updateSettings } = useChatSettings();
+    const { user, setIncognitoMode } = useAuth();
     const [input, setInput] = useState("");
     const [onboardingOpen, setOnboardingOpen] = useState(false);
+    const [onboardingGateOpen, setOnboardingGateOpen] = useState(false);
     const [composerShine, setComposerShine] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
+    const [webviewOpen, setWebviewOpen] = useState(false);
+    const [webviewSplitMode, setWebviewSplitMode] = useState<"horizontal" | "vertical" | "fullscreen">("horizontal");
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
     const [jobPanelOpen, setJobPanelOpen] = useState(false);
     const [jobPanelLoading, setJobPanelLoading] = useState(false);
@@ -909,6 +1099,14 @@ export default function AICareerAssistantChat() {
     const [jobPanelJobs, setJobPanelJobs] = useState<JobSuggestion[]>([]);
     const [jobProfileDialogOpen, setJobProfileDialogOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+
+    const handleInjectWebviewSnippet = useCallback((snippet: string, _sourceUrl?: string) => {
+        setInput((prev) => {
+            const prefix = prev.trim() ? `${prev}\n\n` : "";
+            return `${prefix}${snippet}`;
+        });
+        showToast("success", "Selected web snippet added to chat composer.");
+    }, []);
     const PROFILE_CONTEXT_TOGGLE_ID = "ai-chat-use-profile-context";
     const MAX_RETRIEVAL_MESSAGES = 80;
     const MAX_RETRIEVAL_SNIPPETS = 6;
@@ -1218,6 +1416,16 @@ export default function AICareerAssistantChat() {
     const [sessions, setSessions] = useState<any[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string>("");
 
+    // Trigger onboarding gate if user hasn't onboarded and hasn't selected Incognito mode
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        if (!user.isOnboarded && !user.isIncognito) {
+            setOnboardingGateOpen(true);
+        } else {
+            setOnboardingGateOpen(false);
+        }
+    }, [user.isOnboarded, user.isIncognito]);
+
     useEffect(() => {
         const saved = tryLocalStorageGet("chat_sessions");
         if (saved) {
@@ -1240,6 +1448,50 @@ export default function AICareerAssistantChat() {
             setCurrentSessionId("default");
         }
     }, []);
+
+    // Cross-Device Restoration: Fetch and decrypt past chat sessions and resumes from GitHub
+    const hasRestoredFromCloudRef = useRef(false);
+    useEffect(() => {
+        const p = getStoredProfile();
+        const ghToken = user.githubToken || p.githubToken;
+        const ghOwner = user.githubUsername || p.github;
+        const ghRepo = user.githubRepo || p.githubRepo;
+        const passphrase = user.encryptionPassphrase;
+
+        if (user.isOnboarded && ghToken && ghOwner && ghRepo && !hasRestoredFromCloudRef.current) {
+            hasRestoredFromCloudRef.current = true;
+            GitHubSyncService.fetchAllEncryptedChatSessions(
+                { token: ghToken, owner: ghOwner, repo: ghRepo },
+                passphrase
+            ).then((remoteSessions) => {
+                if (remoteSessions && remoteSessions.length > 0) {
+                    const formatted = remoteSessions.map((rs: any) => ({
+                        id: rs.id || `session_${Date.now()}`,
+                        title: rs.title || "Restored Chat",
+                        createdAt: rs.createdAt || Date.now(),
+                        updatedAt: rs.updatedAt || Date.now(),
+                    }));
+                    setSessions((prev) => {
+                        const map = new Map();
+                        for (const s of prev) map.set(s.id, s);
+                        for (const s of formatted) map.set(s.id, s);
+                        const merged = Array.from(map.values());
+                        tryLocalStorageSet("chat_sessions", JSON.stringify(merged));
+                        return merged;
+                    });
+                    remoteSessions.forEach((rs: any) => {
+                        if (rs.messages && rs.id) {
+                            tryLocalStorageSet(`chat_messages_${rs.id}`, JSON.stringify(rs.messages));
+                        }
+                    });
+                    if (formatted.length > 0) {
+                        setCurrentSessionId(formatted[0].id);
+                    }
+                    showToast("success", `Restored ${remoteSessions.length} encrypted chat session(s) from GitHub.`);
+                }
+            }).catch(() => { /* silent */ });
+        }
+    }, [user.isOnboarded, user.githubToken, user.githubUsername, user.githubRepo, user.encryptionPassphrase, showToast]);
 
     // When currentSessionId changes, load its messages
     useEffect(() => {
@@ -1291,18 +1543,24 @@ export default function AICareerAssistantChat() {
 
         // Hint only once per assistant message, right when stream finishes
         if (wasStreaming && nowIdle) {
-            // Auto-sync chat session to GitHub repository if PAT is configured
+            // Auto-sync chat session to GitHub repository (Zero-Knowledge Encrypted) if configured
             const p = getStoredProfile();
-            if (p.githubToken && p.github && p.githubRepo) {
+            const ghToken = user.githubToken || p.githubToken;
+            const ghOwner = user.githubUsername || p.github;
+            const ghRepo = user.githubRepo || p.githubRepo;
+            const passphrase = user.encryptionPassphrase;
+
+            if (ghToken && ghOwner && ghRepo) {
                 const sessionMessages = messages.map((m) => ({
                     role: m.role,
                     content: getTextContent(m) ?? "",
                 }));
-                GitHubSyncService.syncChatSession(
-                    { token: p.githubToken, owner: p.github, repo: p.githubRepo },
+                GitHubSyncService.syncEncryptedChatSession(
+                    { token: ghToken, owner: ghOwner, repo: ghRepo },
                     currentSessionId || "default",
                     `Chat ${new Date().toLocaleDateString()}`,
-                    sessionMessages
+                    sessionMessages,
+                    passphrase
                 ).catch(() => { /* silent background sync */ });
             }
 
@@ -1346,24 +1604,32 @@ export default function AICareerAssistantChat() {
             window.dispatchEvent(new CustomEvent("resume-storage-updated"));
             setResumeApplyOfferId(null);
 
-            // Auto-persist resume to PostgreSQL database for authenticated users
-            fetch("/api/user/resumes", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: (merged as any)?.basicInfo?.name ? `${(merged as any).basicInfo.name}'s Resume` : "My Resume",
-                    template: template || "modern",
-                    data: merged,
-                }),
-            }).catch(() => { /* offline / anonymous */ });
+            // Auto-persist resume to PostgreSQL database for authenticated users (unless in incognito)
+            if (!user.isIncognito) {
+                fetch("/api/user/resumes", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        title: (merged as any)?.basicInfo?.name ? `${(merged as any).basicInfo.name}'s Resume` : "My Resume",
+                        template: template || "modern",
+                        data: merged,
+                    }),
+                }).catch(() => { /* offline / anonymous */ });
+            }
 
-            // Auto-sync resume to user's private GitHub repository if configured
+            // Auto-sync resume to user's private GitHub repository (Zero-Knowledge Encrypted)
             const p = getStoredProfile();
-            if (p.githubToken && p.github && p.githubRepo) {
-                GitHubSyncService.syncResume(
-                    { token: p.githubToken, owner: p.github, repo: p.githubRepo },
+            const ghToken = user.githubToken || p.githubToken;
+            const ghOwner = user.githubUsername || p.github;
+            const ghRepo = user.githubRepo || p.githubRepo;
+            const passphrase = user.encryptionPassphrase;
+
+            if (ghToken && ghOwner && ghRepo) {
+                GitHubSyncService.syncEncryptedResume(
+                    { token: ghToken, owner: ghOwner, repo: ghRepo },
                     (merged as any)?.basicInfo?.name ? `${(merged as any).basicInfo.name}-Resume` : "Resume",
-                    merged as unknown as Record<string, unknown>
+                    merged as unknown as Record<string, unknown>,
+                    passphrase
                 ).catch(() => { /* silent */ });
             }
         } else {
@@ -1959,6 +2225,29 @@ export default function AICareerAssistantChat() {
 
             {/* Top Right Header Controls */}
             <div className="fixed top-5 right-5 z-30 flex items-center gap-2">
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setWebviewOpen((v) => !v)}
+                            className={`h-8 px-2.5 text-xs flex items-center gap-1.5 rounded-full border border-border/80 shadow-sm backdrop-blur-md transition-all ${
+                                webviewOpen
+                                    ? "bg-indigo-600 text-white border-indigo-500 font-semibold hover:bg-indigo-700"
+                                    : "bg-background/80 text-foreground hover:bg-muted"
+                            }`}
+                            aria-label="Toggle In-App Web Browser"
+                        >
+                            <Globe className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">{webviewOpen ? "Close Webview" : "Web Browser"}</span>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">
+                        {webviewOpen ? "Close In-App Browser" : "Open In-App Web Browser (Job Search & Text Selection)"}
+                    </TooltipContent>
+                </Tooltip>
+
                 <UserMenu onOpenSettings={() => setProfileSettingsOpen(true)} />
                 {isLoading && (
                     <motion.button
@@ -1983,62 +2272,201 @@ export default function AICareerAssistantChat() {
                 </div>
             )}
 
-            {/* Chat area — flex-1 keeps input pinned; scroll only messages */}
-            <div
-                ref={scrollRef}
-                onScroll={handleChatScroll}
-                className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-40 pt-16 sm:pb-44"
-                style={{ scrollbarWidth: "thin" }}
-            >
-                <div className="mx-auto w-full max-w-4xl px-3 sm:px-5">
-                    <AnimatePresence mode="wait">
-                        {showWelcome ? (
-                            <WelcomeScreen key="welcome" onPrompt={handlePrompt} />
-                        ) : (
-                            <motion.div
-                                key="messages"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                className="space-y-6 py-8"
-                            >
-                                {messages.map((msg, i) => (
-                                    <MessageBubble
-                                        key={msg.id ?? i}
-                                        message={msg}
-                                        isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
-                                        onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
-                                        onToast={showToast}
-                                        chatApiKey={settings.apiKey}
-                                        chatModel={settings.model}
-                                        canonicalResumeKey={canonicalResumeKey}
-                                    />
-                                ))}
+            {/* Main Workspace Layout (Supports Split Webview + Chat) */}
+            {webviewOpen ? (
+                <ResizablePanelGroup
+                    direction={webviewSplitMode === "vertical" ? "vertical" : "horizontal"}
+                    className="flex-1 h-full w-full min-h-0 z-10"
+                >
+                    {webviewSplitMode === "vertical" && (
+                        <>
+                            <ResizablePanel defaultSize={50} minSize={25} className="h-full relative">
+                                <ChromiumWebview
+                                    splitLayout={webviewSplitMode}
+                                    onToggleSplitLayout={setWebviewSplitMode}
+                                    onClose={() => setWebviewOpen(false)}
+                                    onInjectSnippet={handleInjectWebviewSnippet}
+                                />
+                            </ResizablePanel>
+                            <ResizableHandle withHandle />
+                        </>
+                    )}
 
-                                {/* Typing indicator while submitted (before streaming starts) */}
-                                <AnimatePresence>
-                                    {status === "submitted" && (
+                    {/* Chat Column */}
+                    <ResizablePanel defaultSize={50} minSize={30} className="flex flex-col relative h-full min-h-0 overflow-hidden">
+                        <div
+                            ref={scrollRef}
+                            onScroll={handleChatScroll}
+                            className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-40 pt-16 sm:pb-44"
+                            style={{ scrollbarWidth: "thin" }}
+                        >
+                            <div className="mx-auto w-full max-w-3xl px-3 sm:px-5">
+                                <AnimatePresence mode="wait">
+                                    {showWelcome ? (
+                                        <WelcomeScreen key="welcome" onPrompt={handlePrompt} />
+                                    ) : (
                                         <motion.div
-                                            initial={{ opacity: 0, y: 8 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            exit={{ opacity: 0 }}
-                                            className="flex gap-3"
+                                            key="messages"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            className="space-y-6 py-8"
                                         >
-                                            <div className="w-8 h-8 rounded-full bg-neutral-900 border border-border flex items-center justify-center">
-                                                <Bot className="w-4 h-4 text-white" />
-                                            </div>
-                                            <div className="bg-background border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
-                                                <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                                <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                                <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                                            </div>
+                                            {messages.map((msg, i) => (
+                                                <MessageBubble
+                                                    key={msg.id ?? i}
+                                                    message={msg}
+                                                    isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
+                                                    onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
+                                                    onToast={showToast}
+                                                    chatApiKey={settings.apiKey}
+                                                    chatModel={settings.model}
+                                                    canonicalResumeKey={canonicalResumeKey}
+                                                />
+                                            ))}
+
+                                            {/* Typing indicator while submitted */}
+                                            <AnimatePresence>
+                                                {status === "submitted" && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: 8 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0 }}
+                                                        className="flex gap-3"
+                                                    >
+                                                        <div className="w-8 h-8 rounded-full bg-neutral-900 border border-border flex items-center justify-center">
+                                                            <Bot className="w-4 h-4 text-white" />
+                                                        </div>
+                                                        <div className="bg-background border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
+                                                            <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                                            <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                                                            <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                                                        </div>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-            </div>
+                            </div>
+                        </div>
+
+                        <ChatInput
+                            value={input}
+                            onChange={setInput}
+                            onSend={handleSend}
+                            onFileAttach={handleFileAttach}
+                            attachedFiles={attachedFiles}
+                            onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                            model={settings.model}
+                            onModelChange={(m) => updateSettings({ model: m })}
+                            disabled={isLoading}
+                            useProfileContext={useProfileContext}
+                            onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                            composerShine={composerShine}
+                            onClearComposerShine={clearComposerShine}
+                            settings={settings}
+                            onSettingsChange={updateSettings}
+                            raiseForOnboarding={onboardingOpen}
+                            showToast={showToast}
+                            onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                        />
+                    </ResizablePanel>
+
+                    {webviewSplitMode === "horizontal" && (
+                        <>
+                            <ResizableHandle withHandle />
+                            <ResizablePanel defaultSize={50} minSize={30} className="h-full relative">
+                                <ChromiumWebview
+                                    splitLayout={webviewSplitMode}
+                                    onToggleSplitLayout={setWebviewSplitMode}
+                                    onClose={() => setWebviewOpen(false)}
+                                    onInjectSnippet={handleInjectWebviewSnippet}
+                                />
+                            </ResizablePanel>
+                        </>
+                    )}
+                </ResizablePanelGroup>
+            ) : (
+                /* Fullscreen Standard Chat */
+                <>
+                    <div
+                        ref={scrollRef}
+                        onScroll={handleChatScroll}
+                        className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-40 pt-16 sm:pb-44"
+                        style={{ scrollbarWidth: "thin" }}
+                    >
+                        <div className="mx-auto w-full max-w-4xl px-3 sm:px-5">
+                            <AnimatePresence mode="wait">
+                                {showWelcome ? (
+                                    <WelcomeScreen key="welcome" onPrompt={handlePrompt} />
+                                ) : (
+                                    <motion.div
+                                        key="messages"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="space-y-6 py-8"
+                                    >
+                                        {messages.map((msg, i) => (
+                                            <MessageBubble
+                                                key={msg.id ?? i}
+                                                message={msg}
+                                                isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
+                                                onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
+                                                onToast={showToast}
+                                                chatApiKey={settings.apiKey}
+                                                chatModel={settings.model}
+                                                canonicalResumeKey={canonicalResumeKey}
+                                            />
+                                        ))}
+
+                                        {/* Typing indicator while submitted */}
+                                        <AnimatePresence>
+                                            {status === "submitted" && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 8 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0 }}
+                                                    className="flex gap-3"
+                                                >
+                                                    <div className="w-8 h-8 rounded-full bg-neutral-900 border border-border flex items-center justify-center">
+                                                        <Bot className="w-4 h-4 text-white" />
+                                                    </div>
+                                                    <div className="bg-background border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
+                                                        <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                                        <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                                                        <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
+
+                    <ChatInput
+                        value={input}
+                        onChange={setInput}
+                        onSend={handleSend}
+                        onFileAttach={handleFileAttach}
+                        attachedFiles={attachedFiles}
+                        onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                        model={settings.model}
+                        onModelChange={(m) => updateSettings({ model: m })}
+                        disabled={isLoading}
+                        useProfileContext={useProfileContext}
+                        onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                        composerShine={composerShine}
+                        onClearComposerShine={clearComposerShine}
+                        settings={settings}
+                        onSettingsChange={updateSettings}
+                        raiseForOnboarding={onboardingOpen}
+                        showToast={showToast}
+                        onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                    />
+                </>
+            )}
 
             {resumeApplyOfferId && !jobPanelOpen && (
                 <div className="pointer-events-none fixed inset-x-0 bottom-[5.75rem] z-[36] flex justify-center px-3 sm:bottom-[6.25rem]">
@@ -2057,26 +2485,9 @@ export default function AICareerAssistantChat() {
                 </div>
             )}
 
-            {/* Always keep ChatInput visible */}
-            <ChatInput
-                value={input}
-                onChange={setInput}
-                onSend={handleSend}
-                onFileAttach={handleFileAttach}
-                attachedFiles={attachedFiles}
-                onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                model={settings.model}
-                onModelChange={(m) => updateSettings({ model: m })}
-                disabled={isLoading}
-                useProfileContext={useProfileContext}
-                onToggleProfileContext={() => setUseProfileContext((v) => !v)}
-                composerShine={composerShine}
-                onClearComposerShine={clearComposerShine}
-                settings={settings}
-                onSettingsChange={updateSettings}
-                raiseForOnboarding={onboardingOpen}
-                showToast={showToast}
-                onOpenMcpDialog={() => setMcpDialogOpen(true)}
+            <OnboardingModal
+                open={onboardingGateOpen}
+                onOpenChange={setOnboardingGateOpen}
             />
             </div>
         </InfiniteGridBackground>

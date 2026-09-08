@@ -127,27 +127,39 @@ export function parseChainOfThought(
   }
   raw = raw.replace(xmlToolRegex, "");
 
-  // Also check if thinking contains tool markers like [Tool: search_jobs] or `tool:search_jobs`
+  // Also check if thinking contains tool markers like [Tool: search_jobs] or `tool:search_jobs` or Using tool: XYZ
   if (thinkingText) {
-    const inlineToolRegex = /(?:using tool|calling tool|tool:)\s*`?([a-z0-9_-]+)`?/gi;
+    const inlineToolRegex = /(?:using tool|calling tool|tool:|invoking tool|executing tool:?)\s*`?([a-zA-Z0-9_-]+)`?/gi;
     let inlineMatch: RegExpExecArray | null;
+    const knownTools = [
+      "search_jobs",
+      "scrape_job_posting",
+      "scrape_github_profile",
+      "scrape_linkedin_profile",
+      "web_scraper",
+      "job_scraper",
+      "chart_generator",
+      "generate_chart",
+      "generate_resume_pdf",
+      "generate_cover_letter_pdf",
+      "list_templates",
+      "calculate_ats_score",
+      "cv_scorer",
+      "prepare_job_application_package",
+      "auto_apply",
+      "neo4j_career_graph",
+      "github_encrypted_sync",
+      "gitlab_encrypted_sync",
+      "memory_vault_ingest",
+      "compile_latex",
+      "mcp_tool",
+    ];
     while ((inlineMatch = inlineToolRegex.exec(thinkingText)) !== null) {
-      const toolName = inlineMatch[1];
-      if (
-        [
-          "search_jobs",
-          "scrape_job_posting",
-          "scrape_github_profile",
-          "scrape_linkedin_profile",
-          "generate_resume_pdf",
-          "generate_cover_letter_pdf",
-          "list_templates",
-          "prepare_job_application_package",
-        ].includes(toolName) &&
-        !tools.some((t) => t.name === toolName)
-      ) {
+      const toolName = inlineMatch[1].toLowerCase();
+      const matched = knownTools.find((kt) => kt.toLowerCase() === toolName) || toolName;
+      if (!tools.some((t) => t.name.toLowerCase() === matched.toLowerCase())) {
         tools.push({
-          name: toolName,
+          name: matched,
           status: isThinkingActive ? "active" : "complete",
         });
       }

@@ -43,6 +43,10 @@ const ResumeLatexArtifact = dynamic(
   () => import("./resume-latex-artifact").then((m) => m.ResumeLatexArtifact),
   { loading },
 );
+const ChartViewer = dynamic(
+  () => import("./components/chart-viewer").then((m) => m.ChartViewer),
+  { loading },
+);
 
 export type ComponentType =
   | "resume"
@@ -50,6 +54,7 @@ export type ComponentType =
   | "cv-score"
   | "job-recommendations"
   | "job-scraper"
+  | "chart"
   | "auto-applier"
   | "coding-challenge"
   | "learning-resources"
@@ -224,6 +229,8 @@ export function ComponentRenderer({
         />
       );
     }
+    case "chart":
+      return <ChartViewer data={data as any} />;
     case "auto-applier":
       return <AutoApplier />;
     case "coding-challenge":
