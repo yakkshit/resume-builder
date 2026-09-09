@@ -5,7 +5,7 @@ import { DatabaseService } from '@/lib/db/plsql-storage'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
-  const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET
+  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET
 
   if (!WEBHOOK_SECRET) {
     console.error('Please add WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local')

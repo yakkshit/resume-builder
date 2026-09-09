@@ -279,6 +279,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          clerkId: user.id,
           email: data.email,
           name: data.name,
           bio: data.bio,
@@ -318,6 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          clerkId: user.id,
           email: user.email,
           githubSyncEnabled: true,
           preferences: {
@@ -344,6 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            clerkId: user.id,
             email: user.email,
             apiKeys: keys,
           }),

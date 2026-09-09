@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "2.11.2",
+  "version": "2.11.3",
   "private": true,
   "packageManager": "pnpm@10.5.2",
   "overrides": {
@@ -26,7 +26,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:reset": "tsx scripts/migrate.ts --reset",
     "db:studio": "drizzle-kit studio",
-    "init": "git pull origin main && pnpm install"
+    "init": "git pull origin main && pnpm install",
+    "postinstall": "npx playwright install chromium"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.58",

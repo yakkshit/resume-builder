@@ -176,33 +176,7 @@ export function OnboardingModal({ open, onOpenChange }: OnboardingModalProps) {
         {/* STEP 1: Profile Information */}
         {step === 1 && (
           <div className="space-y-4 py-2">
-            <div className="p-3 rounded-xl bg-muted/40 border border-border/80 flex items-center justify-between gap-3">
-              <div className="space-y-0.5">
-                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <Github className="h-3.5 w-3.5 text-primary" />
-                  Instant 1-Click Setup
-                </p>
-                <p className="text-[11px] text-muted-foreground">
-                  Skip manual forms and start immediately with zero friction
-                </p>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  await completeOnboarding({
-                    name: name || "Developer",
-                    email: email || "developer@github.com",
-                    targetRoles: ["AI Engineer", "Full-Stack Developer"],
-                  });
-                  onOpenChange(false);
-                }}
-                className="h-8 text-xs font-semibold border-primary/40 hover:bg-primary hover:text-primary-foreground transition-all shrink-0"
-              >
-                1-Click Start
-              </Button>
-            </div>
+
 
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold flex items-center gap-1.5">
