@@ -77,7 +77,7 @@ import { Plug } from "lucide-react";
 import { GitHubSyncService } from "@/lib/github/sync";
 import { getStoredProfile, ProfileSettingsDialog } from "./profile-settings-dialog";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { OnboardingModal } from "@/components/auth/onboarding-modal";
+
 import { ChatFeedback } from "./chat-feedback";
 import { ChromiumWebview } from "./chromium-webview";
 import { ComponentStage, type StageComponentInfo } from "./components/component-stage";
@@ -2178,10 +2178,21 @@ export default function AICareerAssistantChat() {
                 onOpenChange={setMcpDialogOpen}
             />
             <ProfileSettingsDialog
-                open={profileSettingsOpen}
-                onOpenChange={setProfileSettingsOpen}
+                open={profileSettingsOpen || onboardingGateOpen}
+                onOpenChange={(v) => {
+                    if (onboardingGateOpen) {
+                        if (!v && user.isOnboarded) setOnboardingGateOpen(false);
+                    } else {
+                        setProfileSettingsOpen(v);
+                    }
+                }}
                 settings={settings}
                 onSettingsChange={updateSettings}
+                isOnboarding={onboardingGateOpen}
+                onSkipOnboarding={() => {
+                    setIncognitoMode(true);
+                    setOnboardingGateOpen(false);
+                }}
             />
             <Toaster ref={toasterRef} />
 
@@ -2590,10 +2601,7 @@ export default function AICareerAssistantChat() {
                 </div>
             )}
 
-            <OnboardingModal
-                open={onboardingGateOpen}
-                onOpenChange={setOnboardingGateOpen}
-            />
+
             </div>
         </div>
         </TooltipProvider>

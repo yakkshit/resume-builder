@@ -28,6 +28,26 @@ async function getBrowser(): Promise<Browser> {
   // Try to use system-installed Chromium via playwright-core
   const { chromium } = await import("playwright-core");
 
+  if (process.env.VERCEL || process.env.NEXT_PUBLIC_VERCEL_ENV) {
+    try {
+      const sparticuz = (await import("@sparticuz/chromium")).default || await import("@sparticuz/chromium");
+      browser = await chromium.launch({
+        args: sparticuz.args,
+        executablePath: await sparticuz.executablePath(),
+        headless: true,
+      });
+
+      browser.on("disconnected", () => {
+        browser = null;
+        sessions.clear();
+      });
+
+      return browser;
+    } catch (err) {
+      console.warn("Failed to launch @sparticuz/chromium. Falling back...", err);
+    }
+  }
+
   // Find system Chrome/Chromium binary
   const possiblePaths = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",

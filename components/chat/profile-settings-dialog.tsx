@@ -30,6 +30,8 @@ import { ProfilePhotoCropDialog } from "@/components/chat/profile-photo-crop-dia
 import { EMAIL_PROVIDER_LABELS, normalizeDefaultEmailProvider, type EmailProviderId } from "@/lib/email-compose-urls";
 import { TRANSLATION_LANGUAGES } from "@/lib/translation";
 import { GitHubSyncService, type GitHubSyncConfig } from "@/lib/github/sync";
+import { useAuth } from "@/lib/auth/auth-provider";
+import { Eye, EyeOff, Download } from "lucide-react";
 
 export type UserProfile = {
   name: string;
@@ -54,6 +56,7 @@ export type UserProfile = {
   githubToken?: string;
   githubRepo?: string;
   autoSyncGithub?: boolean;
+  encryptionPassphrase?: string;
 };
 
 export const PROFILE_STORE_ID = "ai-chat-profile";
@@ -79,6 +82,7 @@ const EMPTY_PROFILE: UserProfile = {
   githubToken: "",
   githubRepo: "career-agent-backup",
   autoSyncGithub: false,
+  encryptionPassphrase: "",
 };
 
 export interface ProviderKeys {
@@ -134,6 +138,7 @@ function loadProfile(): UserProfile {
       githubToken: p.githubToken || "",
       githubRepo: p.githubRepo || "career-agent-backup",
       autoSyncGithub: Boolean(p.autoSyncGithub),
+      encryptionPassphrase: p.encryptionPassphrase || "",
     };
   } catch {
     return { ...EMPTY_PROFILE };
@@ -155,11 +160,15 @@ export function ProfileSettingsDialog({
   onOpenChange,
   settings,
   onSettingsChange,
+  isOnboarding,
+  onSkipOnboarding,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   settings: ChatSettings;
   onSettingsChange: (patch: Partial<ChatSettings>) => void;
+  isOnboarding?: boolean;
+  onSkipOnboarding?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState("profile");
   const [profile, setProfile] = useState<UserProfile>({ ...EMPTY_PROFILE });
@@ -170,8 +179,10 @@ export function ProfileSettingsDialog({
   const [githubTesting, setGithubTesting] = useState(false);
   const [githubStatus, setGithubStatus] = useState<{ success?: boolean; message?: string } | null>(null);
   const [dbStatus, setDbStatus] = useState<string>("Checking...");
+  const [showPassphrase, setShowPassphrase] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { completeOnboarding, setEncryptionPassphrase } = useAuth();
 
   useEffect(() => {
     if (!open) return;
@@ -210,34 +221,57 @@ export function ProfileSettingsDialog({
     setSaving(true);
     saveProfile(profile);
     saveProviderKeys(keys);
+    
+    if (profile.encryptionPassphrase) {
+      setEncryptionPassphrase(profile.encryptionPassphrase);
+    }
 
-    // Sync with PostgreSQL backend if authenticated
     try {
-      await fetch("/api/user/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      if (isOnboarding) {
+        await completeOnboarding({
           name: profile.name,
-          avatarUrl: profile.profilePicture,
-          githubUsername: profile.github,
-          githubRepo: profile.githubRepo,
-          githubToken: profile.githubToken,
+          email: profile.email,
           bio: profile.careerNotes,
-        }),
-      });
+          targetRoles: profile.targetRoles.split(",").map((r) => r.trim()).filter(Boolean),
+          apiKeys: Object.entries(keys).reduce((acc, [k, v]) => {
+            if (v) acc[k] = v;
+            return acc;
+          }, {} as Record<string, string>),
+          github: (profile.github && profile.githubToken) ? {
+            username: profile.github,
+            token: profile.githubToken,
+            repo: profile.githubRepo || "career-agent-backup",
+          } : undefined,
+          encryptionPassphrase: profile.encryptionPassphrase,
+        });
+      } else {
+        // Sync with PostgreSQL backend if authenticated
+        await fetch("/api/user/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: profile.name,
+            avatarUrl: profile.profilePicture,
+            githubUsername: profile.github,
+            githubRepo: profile.githubRepo,
+            githubToken: profile.githubToken,
+            bio: profile.careerNotes,
+          }),
+        });
 
-      // Save custom API keys to DB
-      for (const [provider, keyVal] of Object.entries(keys)) {
-        if (keyVal) {
-          await fetch("/api/user/keys", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              provider,
-              apiKey: keyVal,
-              modelName: provider === "ollama" ? "local" : "default",
-            }),
-          });
+        // Save custom API keys to DB
+        for (const [provider, keyVal] of Object.entries(keys)) {
+          if (keyVal) {
+            await fetch("/api/user/keys", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                provider,
+                apiKey: keyVal,
+                modelName: provider === "local" ? "local" : "default",
+              }),
+            });
+          }
         }
       }
     } catch {
@@ -298,8 +332,36 @@ export function ProfileSettingsDialog({
     toast({ title: "Photo Updated", description: "Profile photo saved." });
   };
 
+  const generatePassphrase = () => {
+    const array = new Uint32Array(4);
+    window.crypto.getRandomValues(array);
+    const key = Array.from(array, dec => dec.toString(16).padStart(8, "0")).join("");
+    setProfile(p => ({ ...p, encryptionPassphrase: key }));
+    toast({ title: "Key Generated", description: "A secure passphrase has been generated." });
+  };
+
+  const downloadPassphrase = () => {
+    if (!profile.encryptionPassphrase) {
+      toast({ variant: "destructive", title: "No Passphrase", description: "Generate or enter a passphrase first." });
+      return;
+    }
+    const blob = new Blob([`Career Assistant AI - Master Encryption Passphrase\n\n${profile.encryptionPassphrase}\n\nKeep this safe! If you lose this, you cannot decrypt your data on a new device.`], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "career_ai_encryption_key.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(v) => {
+      // Prevent closing during onboarding unless they click cancel/skip
+      if (isOnboarding && !v) return;
+      onOpenChange(v);
+    }}>
       <DialogContent className="max-w-2xl max-h-[88dvh] overflow-y-auto rounded-2xl border-border/70 bg-background/95 backdrop-blur-xl p-6">
         <DialogHeader className="space-y-1">
           <div className="flex items-center gap-2 text-primary font-semibold text-xs tracking-wider uppercase">
@@ -605,6 +667,44 @@ export function ProfileSettingsDialog({
               />
             </div>
 
+            <div className="space-y-1">
+              <Label className="text-xs font-semibold flex items-center justify-between">
+                <span>Master Encryption Passphrase</span>
+                <div className="flex items-center gap-3">
+                   <button
+                    type="button"
+                    onClick={() => setShowPassphrase(!showPassphrase)}
+                    className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
+                   >
+                     {showPassphrase ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                     {showPassphrase ? "Hide" : "Show"}
+                   </button>
+                   <button
+                     type="button"
+                     onClick={generatePassphrase}
+                     className="text-[10px] text-primary hover:underline flex items-center gap-1"
+                   >
+                     Auto Generate
+                   </button>
+                </div>
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  type={showPassphrase ? "text" : "password"}
+                  placeholder="Create or generate a strong secret passphrase..."
+                  value={profile.encryptionPassphrase || ""}
+                  onChange={(e) => setProfile((p) => ({ ...p, encryptionPassphrase: e.target.value }))}
+                  className="h-9 text-xs flex-1"
+                />
+                <Button type="button" variant="outline" size="sm" className="h-9 px-3 shrink-0" onClick={downloadPassphrase}>
+                  <Download className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Remember this passphrase to decrypt past chats. We strongly recommend downloading it.
+              </p>
+            </div>
+
             <div className="flex items-center justify-between pt-1">
               <Button
                 type="button"
@@ -629,14 +729,31 @@ export function ProfileSettingsDialog({
         </Tabs>
 
         <div className="flex gap-2 pt-4 border-t border-border/60">
-          <Button type="button" variant="outline" className="flex-1 text-xs h-9" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
-          </Button>
+          {isOnboarding ? (
+             <Button
+                type="button"
+                variant="ghost"
+                className="flex-1 text-xs h-9 text-muted-foreground"
+                onClick={() => {
+                   if (onSkipOnboarding) onSkipOnboarding();
+                   else onOpenChange(false);
+                }}
+                disabled={saving}
+              >
+                Skip & Use Incognito Mode
+              </Button>
+          ) : (
+             <Button type="button" variant="outline" className="flex-1 text-xs h-9" onClick={() => onOpenChange(false)} disabled={saving}>
+               Cancel
+             </Button>
+          )}
           <Button type="button" className="flex-1 text-xs h-9 font-semibold" onClick={handleSaveAll} disabled={saving}>
             {saving ? (
               <span className="inline-flex items-center gap-1.5">
                 <Loader2 className="h-4 w-4 animate-spin" /> Saving Changes...
               </span>
+            ) : isOnboarding ? (
+              "Complete Setup & Launch"
             ) : (
               "Save & Apply"
             )}
