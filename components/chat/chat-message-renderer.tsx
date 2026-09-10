@@ -359,14 +359,28 @@ export function ChatMessageRenderer({
                         }
                       }
                     }
+                    let isReactCode = false;
+                    let rawReactCode = "";
+                    if (cls.includes("language-jsx") || cls.includes("language-tsx") || cls.includes("language-html")) {
+                      isReactCode = true;
+                      rawReactCode = codeEl ? codeChildrenToString(codeEl.props.children) : "";
+                    }
+
                     return (
-                      <pre
-                        className={cn(
-                          "not-prose rounded-lg border border-border p-3 my-2 overflow-x-auto text-sm bg-muted text-foreground dark:border-white/10 dark:bg-[#1a1a1e] dark:text-[#e0e0e5]"
+                      <div className="group relative my-4 flex flex-col gap-2 w-full max-w-2xl">
+                        {isReactCode && (
+                           <div className="w-full">
+                              {renderChatComponent("reactPreview", { jsx: rawReactCode }, { cv: cvContext })}
+                           </div>
                         )}
-                      >
-                        {children}
-                      </pre>
+                        <pre
+                          className={cn(
+                            "not-prose rounded-lg border border-border p-3 overflow-x-auto text-sm bg-muted text-foreground dark:border-white/10 dark:bg-[#1a1a1e] dark:text-[#e0e0e5]"
+                          )}
+                        >
+                          {children}
+                        </pre>
+                      </div>
                     );
                   },
                   code: ({ className, children, ...props }) => {

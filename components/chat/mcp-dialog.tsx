@@ -111,6 +111,7 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
   const [harnessPrompt, setHarnessPrompt] = useState("");
   const [harnessTools, setHarnessTools] = useState<string[]>(["search_jobs", "scrape_job_posting", "generate_resume_pdf"]);
   const [isSavingHarness, setIsSavingHarness] = useState(false);
+  const [newServerHeaders, setNewServerHeaders] = useState("");
 
   // Live origin for sharing
   const [origin, setOrigin] = useState<string>("http://localhost:3000");
@@ -176,6 +177,14 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
     saveMCPServers(updated);
     onServersUpdated?.(updated);
     toast.success(enableAll ? "Enabled all tools" : "Disabled all tools");
+  };
+
+  const handleDeleteServer = (id: string) => {
+    const updated = servers.filter((s) => s.id !== id);
+    setServers(updated);
+    saveMCPServers(updated);
+    onServersUpdated?.(updated);
+    toast.success("External server deleted");
   };
 
   const handleCreateHarness = async (e: React.FormEvent) => {
@@ -247,6 +256,16 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
       return;
     }
 
+    let parsedHeaders = undefined;
+    if (newServerHeaders.trim()) {
+      try {
+        parsedHeaders = JSON.parse(newServerHeaders.trim());
+      } catch (e) {
+        toast.error("Invalid JSON in headers");
+        return;
+      }
+    }
+
     setIsTesting(true);
     const newServer: MCPServerConfig = {
       id: `custom-${Date.now()}`,
@@ -255,6 +274,7 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
       type: "http",
       enabled: true,
       apiKey: newServerKey.trim() || undefined,
+      headers: parsedHeaders,
       status: "connecting",
     };
 
@@ -273,6 +293,7 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
       setNewServerName("");
       setNewServerUrl("");
       setNewServerKey("");
+      setNewServerHeaders("");
       toast.success(`Connected to ${newServer.name} (${tools.length} tools discovered)`);
     } catch (err: any) {
       newServer.status = "error";
@@ -869,6 +890,17 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
                     />
                   </div>
                 </div>
+                <div className="grid gap-3 sm:grid-cols-12">
+                  <div className="sm:col-span-12">
+                    <Label className="text-[11px] text-muted-foreground">Custom Headers (JSON, optional)</Label>
+                    <Input
+                      value={newServerHeaders}
+                      onChange={(e) => setNewServerHeaders(e.target.value)}
+                      placeholder='e.g. {"X-API-Key": "your-key"}'
+                      className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs font-mono"
+                    />
+                  </div>
+                </div>
                 <div className="flex justify-end gap-2 pt-1">
                   <Button
                     type="submit"
@@ -904,6 +936,14 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
                             onCheckedChange={(checked) => handleToggleServer(s.id, checked)}
                             className="data-[state=checked]:bg-indigo-500"
                           />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDeleteServer(s.id)}
+                            className="h-7 w-7 p-0 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-1.5 pt-1">

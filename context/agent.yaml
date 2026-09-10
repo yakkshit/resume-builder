@@ -1,19 +1,16 @@
 version: 1.0.0
-generatedAt: '2026-08-31T05:55:27.282Z'
+generatedAt: '2026-09-09T09:56:46.438Z'
 projectPath: /Users/yakkshit/Downloads/project/resume/cv-main
 overview: >-
-  README-INTERVIEW-LAB.md: This repo is a Next.js application that combines: - Resume Builder (build and export a
-  resume) - Career Assistant Chat (multi-model chat with session-only API keys) - Cover Letter workflow - Interview Lab
-  (mock interview rounds, coding tests, and live coaching) This document is the “one stop” guide for running the app,
-  configuring Integrations, and understanding Interview Lab architecture. README-MCP.md: This project provides a Model
-  Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor, ChatGPT, Custom Agents) to list
-  templates and generate Resume & Cover Letter PDFs. It supports both: 1. Stdio mode (local CLI / desktop clients) 2.
-  Hosted HTTP JSON-RPC Endpoint (/api/mcp for cloud/remote agent hosting) ---
+  This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor,
+  ChatGPT, Custom Agents) to list templates and generate Resume & Cover Letter PDFs. It supports both: 1. Stdio mode
+  (local CLI / desktop clients) 2. Hosted HTTP JSON-RPC Endpoint (/api/mcp for cloud/remote agent hosting) ---
 techStack:
   - TypeScript
-  - JSON
   - React (TSX)
+  - JSON
   - CSS
+  - SQL
   - JavaScript
   - Markdown
   - YAML
@@ -25,20 +22,41 @@ techStack:
 directoryStructure: |-
   └── cv-main/
       ├── __tests__/
+      │   ├── all-chat-components-resilience.test.ts
+      │   ├── autonomous-browser-mcp.test.tsx
+      │   ├── chat-feedback.test.ts
+      │   ├── chat-keyboard-shortcuts.test.ts
       │   ├── chat-onboarding-video.test.ts
       │   ├── chat-textarea.test.ts
+      │   ├── component-stage-and-proxy.test.tsx
+      │   ├── cover-letter-resilience.test.ts
+      │   ├── database-migration.test.ts
       │   ├── dependency-check.test.ts
       │   ├── email-draft-errors.test.ts
+      │   ├── encryption.test.ts
       │   ├── extract-resume-json.test.ts
-      │   ├── interview-lab-support.test.ts
+      │   ├── github-sync-encrypted.test.ts
+      │   ├── github-sync-service.test.ts
+      │   ├── gitlab-sync.test.ts
       │   ├── job-scraper.test.ts
       │   ├── linkedin-outreach.test.ts
+      │   ├── lockfile-sync.test.ts
+      │   ├── master-rag-vault.test.ts
+      │   ├── mcp-protocol.test.ts
+      │   ├── memory-vault.test.ts
+      │   ├── neo4j-graph.test.ts
       │   ├── normalize-attached-file.test.ts
+      │   ├── onboarding-db.test.ts
       │   ├── pdf-template-resilience.test.ts
+      │   ├── persona-and-auth-sync.test.tsx
+      │   ├── prod-leak-prevention.test.ts
+      │   ├── profile-scrapers.test.ts
+      │   ├── resume-schema.test.ts
       │   ├── resume-skills-safety.test.ts
       │   ├── sanitize-resume-data.test.ts
       │   ├── security-audit.test.ts
       │   ├── streaming-chat-content.test.ts
+      │   ├── thinking-and-tools.test.ts
       │   └── user-knowledge-context.test.ts
       ├── .agents/
       │   └── mcp_config.json
@@ -71,7 +89,7 @@ directoryStructure: |-
       │   │   │   └── ...
       │   │   ├── generate-pdf/
       │   │   │   └── ...
-      │   │   ├── interview-lab/
+      │   │   ├── github/
       │   │   │   └── ...
       │   │   ├── job-search/
       │   │   │   └── ...
@@ -79,13 +97,19 @@ directoryStructure: |-
       │   │   │   └── ...
       │   │   ├── mcp/
       │   │   │   └── ...
+      │   │   ├── memory-vault/
+      │   │   │   └── ...
       │   │   ├── openapi/
       │   │   │   └── ...
       │   │   ├── pdf/
       │   │   │   └── ...
       │   │   ├── translate/
       │   │   │   └── ...
-      │   │   └── webhooks/
+      │   │   ├── user/
+      │   │   │   └── ...
+      │   │   ├── webhooks/
+      │   │   │   └── ...
+      │   │   └── webview/
       │   │       └── ...
       │   ├── bg/
       │   │   └── page.tsx
@@ -106,16 +130,39 @@ directoryStructure: |-
       │   │   ├── layout.tsx
       │   │   ├── loading.tsx
       │   │   └── page.tsx
+      │   ├── sign-in/
+      │   │   └── [[...sign-in]]/
+      │   │       └── ...
+      │   ├── sign-up/
+      │   │   └── [[...sign-up]]/
+      │   │       └── ...
       │   ├── globals.css
       │   ├── icon.svg
       │   ├── layout.tsx
       │   ├── loading.tsx
       │   └── page.tsx
+      ├── applications/
+      │   ├── 21X_Software_Engineer_C.pdf
+      │   ├── 21X_Software_Engineer_CV.pdf
+      │   ├── Master_AI_Robotics_FullStack_CV.pdf
+      │   ├── Software_Engineer_Java_React_C.pdf
+      │   ├── Software_Engineer_Java_React_CV.pdf
+      │   ├── Vagas_Senior_Fullstack_Python_C.pdf
+      │   └── Vagas_Senior_Fullstack_Python_CV.pdf
       ├── components/
       │   ├── ai-elements/
+      │   │   ├── agent.tsx
       │   │   ├── attachments.tsx
+      │   │   ├── chain-of-thought.tsx
+      │   │   ├── index.ts
+      │   │   ├── jsx-preview.tsx
+      │   │   ├── persona.tsx
       │   │   ├── reasoning.tsx
-      │   │   └── shimmer.tsx
+      │   │   ├── shimmer.tsx
+      │   │   └── web-preview.tsx
+      │   ├── auth/
+      │   │   ├── auth-modal.tsx
+      │   │   └── user-menu.tsx
       │   ├── chat/
       │   │   ├── components/
       │   │   │   └── ...
@@ -125,18 +172,19 @@ directoryStructure: |-
       │   │   ├── chat-artifact-chrome.tsx
       │   │   ├── chat-component-registry.tsx
       │   │   ├── chat-cv-tabs.tsx
+      │   │   ├── chat-feedback.tsx
       │   │   ├── chat-input.tsx
       │   │   ├── chat-message-renderer.tsx
       │   │   ├── chat-onboarding.tsx
       │   │   ├── chat-sidebar.tsx
       │   │   ├── chat-store.tsx
+      │   │   ├── chromium-webview.tsx
       │   │   ├── component-renderer.tsx
       │   │   ├── context-window.tsx
-      │   │   ├── interview-lab-panel.tsx
       │   │   ├── job-profile-dialog.tsx
       │   │   ├── job-suggestions-panel.tsx
       │   │   ├── markdown-renderer.tsx
-      │   │   ├── mock-interview-interactive.tsx
+      │   │   ├── mcp-dialog.tsx
       │   │   ├── profile-photo-crop-dialog.tsx
       │   │   ├── profile-settings-dialog.tsx
       │   │   ├── resume-latex-artifact.tsx
@@ -233,15 +281,50 @@ directoryStructure: |-
       │   │   └── use-toast.ts
       │   ├── app-nav.tsx
       │   ├── cookie-banner.tsx
-      │   └── package-manager-ui.tsx
+      │   ├── package-manager-ui.tsx
+      │   └── theme-toggle.tsx
       ├── database/
       │   └── migrations.ts
+      ├── drizzle/
+      │   ├── meta/
+      │   │   ├── _journal.json
+      │   │   ├── 0000_snapshot.json
+      │   │   └── 0001_snapshot.json
+      │   ├── 0000_optimal_fallen_one.sql
+      │   └── 0001_wandering_starjammers.sql
       ├── hooks/
       │   ├── use-mobile.tsx
       │   └── use-toast.ts
       ├── lib/
+      │   ├── auth/
+      │   │   ├── auth-provider.tsx
+      │   │   └── clerk-config.ts
+      │   ├── browser/
+      │   │   └── playwright-service.ts
+      │   ├── cache/
+      │   │   └── redis.ts
+      │   ├── crypto/
+      │   │   └── encryption.ts
+      │   ├── db/
+      │   │   ├── index.ts
+      │   │   ├── plsql-storage.ts
+      │   │   └── schema.ts
+      │   ├── email/
+      │   │   └── resend.ts
+      │   ├── github/
+      │   │   └── sync.ts
       │   ├── job-scraper/
-      │   │   └── google-jobs.ts
+      │   │   ├── google-jobs.ts
+      │   │   └── live-scraper.ts
+      │   ├── mcp/
+      │   │   └── mcp-manager.ts
+      │   ├── neo4j/
+      │   │   ├── driver.ts
+      │   │   └── graph-service.ts
+      │   ├── scrapers/
+      │   │   └── profile-scrapers.ts
+      │   ├── storage/
+      │   │   └── r2.ts
       │   ├── api-auth.ts
       │   ├── bergamot-translator-client.ts
       │   ├── bolt-models.tsx
@@ -260,9 +343,10 @@ directoryStructure: |-
       │   ├── extract-resume-json.ts
       │   ├── faq.ts
       │   ├── gallery-data.ts
-      │   ├── interview-lab-model-support.ts
       │   ├── linkedin-outreach.ts
+      │   ├── mcp-client.ts
       │   ├── memory-store.ts
+      │   ├── memory-vault.ts
       │   ├── message-utils.ts
       │   ├── model-provider-icon.tsx
       │   ├── multi-model-docs.ts
@@ -271,7 +355,9 @@ directoryStructure: |-
       │   ├── pdf-generator.ts
       │   ├── pdf-generator.tsx
       │   ├── redact-resume-pii.ts
+      │   ├── resume-schema.ts
       │   ├── safe-local-storage.ts
+      │   ├── sanitize-cover-letter-data.ts
       │   ├── sanitize-resume-data.ts
       │   ├── streaming-chat-content.ts
       │   ├── translation.ts
@@ -284,43 +370,64 @@ directoryStructure: |-
       │   │   ├── bergamot-translator-worker.wasm
       │   │   └── translator-worker.js
       │   ├── deepmind-picture-2.jpg
+      │   ├── icon.svg
       │   └── placeholder.svg
       ├── scripts/
+      │   ├── build-accenture-a2.js
+      │   ├── build-accenture-application.js
       │   ├── build-application-packages.ts
+      │   ├── build-hws-application.js
+      │   ├── build-project-template-applications.js
       │   ├── compile-applications.ts
+      │   ├── drop-agent-harnesses.ts
+      │   ├── generate-21x-package.ts
+      │   ├── generate-application-pdfs.js
+      │   ├── generate-java-react-package.ts
+      │   ├── generate-master-cv.ts
       │   ├── generate-pdf.ts
+      │   ├── generate-vagas-package.ts
       │   ├── mcp-server.ts
+      │   ├── migrate.mjs
+      │   ├── migrate.ts
       │   ├── test-pdf-endpoints.ts
       │   └── workflow.ts
       ├── styles/
       │   └── globals.css
       ├── .gitignore
-      ├── 1.4.9.pdf
+      ├── .npmrc
       ├── about.md
-      ├── AI_SDK_5_MIGRATION.md
-      ├── API_KEYS_SETUP.md
-      ├── bugs.md
       ├── cjs-shim.ts
       ├── components.json
+      ├── declarations.d.ts
+      ├── drizzle.config.ts
       ├── eslint.config.mjs
       ├── next.config.mjs
       ├── package-lock.json
       ├── package.json
       ├── pnpm-lock.yaml
+      ├── pnpm-workspace.yaml
       ├── postcss.config.mjs
-      ├── README-INTERVIEW-LAB.md
+      ├── proxy.ts
       ├── README-MCP.md
       ├── tailwind.config.ts
       ├── test-render.tsx
-      ├── TESTING.md
       ├── ts_errors.txt
       ├── tsconfig.json
-      └── vitest.config.ts
+      ├── vitest.config.ts
+      └── walkthrough.md
 keyFiles:
   - path: .agents/mcp_config.json
     description: Environment or tool configuration.
+  - path: components/ai-elements/index.ts
+    description: UI or modular structural component.
   - path: components/pdf-templates/index.tsx
     description: UI or modular structural component.
+  - path: lib/auth/clerk-config.ts
+    description: Exports `isClerkConfigured` function.
+  - path: lib/db/index.ts
+    description: Exports `db` definition.
+  - path: drizzle.config.ts
+    description: Exports default `defineConfig` component/module.
   - path: eslint.config.mjs
     description: ESLint code linting and formatting rules.
   - path: next.config.mjs
@@ -329,8 +436,6 @@ keyFiles:
     description: Project manifest, metadata, dependencies, and script definitions.
   - path: postcss.config.mjs
     description: PostCSS configuration for CSS transformations.
-  - path: README-INTERVIEW-LAB.md
-    description: Project documentation and overview.
   - path: README-MCP.md
     description: Project documentation and overview.
   - path: tailwind.config.ts
@@ -339,14 +444,8 @@ keyFiles:
     description: TypeScript compiler options and path aliases configuration.
   - path: vitest.config.ts
     description: Vitest testing framework configuration.
-  - path: __tests__/chat-onboarding-video.test.ts
-    description: Automated test suite.
-  - path: __tests__/chat-textarea.test.ts
-    description: Automated test suite.
-  - path: __tests__/dependency-check.test.ts
-    description: Automated test suite.
-  - path: __tests__/email-draft-errors.test.ts
-    description: Automated test suite.
+  - path: __tests__/all-chat-components-resilience.test.ts
+    description: UI or modular structural component.
 dependencies:
   production:
     '@ai-sdk/anthropic': ^3.0.58
@@ -356,9 +455,11 @@ dependencies:
     '@ai-sdk/react': ^3.0.118
     '@ai-sdk/ui-utils': ^1.2.11
     '@browsermt/bergamot-translator': ^0.4.9
+    '@clerk/nextjs': ^7.9.1
     '@dnd-kit/core': ^6.3.1
     '@dnd-kit/sortable': ^10.0.0
     '@dnd-kit/utilities': ^3.2.2
+    '@sparticuz/chromium': ^133.0.0
     '@google/genai': ^1.16.0
     '@google/generative-ai': ^0.21.0
     '@hookform/resolvers': ^3.9.1
@@ -407,6 +508,8 @@ dependencies:
     clsx: ^2.1.1
     cmdk: ^1.0.4
     date-fns: ^4.1.0
+    dotenv: ^17.4.2
+    drizzle-orm: ^0.45.2
     embla-carousel-react: ^8.5.1
     framer-motion: ^11.11.17
     franc-min: ^6.2.0
@@ -420,16 +523,20 @@ dependencies:
     mime: ^4.0.7
     motion: ^12.38.0
     multer: ^2.0.2
+    neo4j-driver: ^6.2.0
     next: ^16.1.6
     next-themes: ^0.4.4
     pdf-parse: ^1.1.1
     pdfjs-dist: ^5.4.54
+    playwright-core: ^1.63.0
+    postgres: ^3.4.9
     radix-ui: ^1.4.3
     react: ^19.0.0
     react-day-picker: ^9.4.4
     react-dom: ^19.0.0
     react-easy-crop: ^5.5.7
     react-hook-form: ^7.54.1
+    react-jsx-parser: ^2.4.1
     react-markdown: ^10.1.0
     react-resizable-panels: ^2.1.7
     recharts: ^2.15.0
@@ -440,12 +547,14 @@ dependencies:
     remark-math: ^6.0.0
     sonner: ^1.7.4
     streamdown: ^2.5.0
+    svix: ^2.3.0
     tailwind-merge: ^2.5.5
     tailwindcss-animate: ^1.0.7
     tsx: ^4.21.0
     vaul: ^1.1.1
     zod: ^4.3.6
   development:
+    '@playwright/test': ^1.49.1
     '@scalar/nextjs-api-reference': 0.4.106
     '@types/katex': ^0.16.8
     '@types/multer': ^2.0.0
@@ -453,6 +562,7 @@ dependencies:
     '@types/pdf-parse': ^1.1.5
     '@types/react': ^19.0.0
     '@types/react-dom': ^19.0.0
+    drizzle-kit: ^0.31.10
     eslint: ^9.39.4
     eslint-config-next: ^16.2.2
     postcss: ^8.4.47
@@ -461,19 +571,47 @@ dependencies:
     vitest: ^2.1.0
 entryPoints:
   - components/chat/ai-chat.tsx
+  - components/ai-elements/index.ts
   - components/resume-coverletter/cover-letter-preview.tsx
+  - scripts/generate-21x-package.ts
+  - scripts/generate-java-react-package.ts
+  - scripts/generate-vagas-package.ts
   - lib/pdf-generator.tsx
-  - scripts/build-application-packages.ts
-  - scripts/compile-applications.ts
-  - scripts/generate-pdf.ts
-  - app/layout.tsx
 dependencyGraph:
   nodes:
+    - file: __tests__/all-chat-components-resilience.test.ts
+      type: component
+      imports: []
+      importedBy: []
+    - file: __tests__/autonomous-browser-mcp.test.tsx
+      type: component
+      imports: []
+      importedBy: []
+    - file: __tests__/chat-feedback.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/chat-keyboard-shortcuts.test.ts
+      type: module
+      imports: []
+      importedBy: []
     - file: __tests__/chat-onboarding-video.test.ts
       type: module
       imports: []
       importedBy: []
     - file: __tests__/chat-textarea.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/component-stage-and-proxy.test.tsx
+      type: component
+      imports: []
+      importedBy: []
+    - file: __tests__/cover-letter-resilience.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/database-migration.test.ts
       type: module
       imports: []
       importedBy: []
@@ -485,11 +623,11 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
-    - file: __tests__/extract-resume-json.test.ts
+    - file: __tests__/encryption.test.ts
       type: module
       imports: []
       importedBy: []
-    - file: __tests__/interview-lab-support.test.ts
+    - file: __tests__/extract-resume-json.test.ts
       type: module
       imports: []
       importedBy: []
@@ -501,13 +639,54 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: __tests__/lockfile-sync.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/master-rag-vault.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/mcp-protocol.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/memory-vault.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/neo4j-graph.test.ts
+      type: module
+      imports: []
+      importedBy: []
     - file: __tests__/normalize-attached-file.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/onboarding-db.test.ts
       type: module
       imports: []
       importedBy: []
     - file: __tests__/pdf-template-resilience.test.ts
       type: module
       imports: []
+      importedBy: []
+    - file: __tests__/persona-and-auth-sync.test.tsx
+      type: component
+      imports: []
+      importedBy: []
+    - file: __tests__/prod-leak-prevention.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/profile-scrapers.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: __tests__/resume-schema.test.ts
+      type: module
+      imports:
+        - lib/resume-schema.ts
       importedBy: []
     - file: __tests__/resume-skills-safety.test.ts
       type: module
@@ -525,7 +704,17 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: __tests__/thinking-and-tools.test.ts
+      type: entry
+      imports:
+        - lib/streaming-chat-content.ts
+        - lib/extract-resume-json.ts
+      importedBy: []
     - file: __tests__/user-knowledge-context.test.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/chat/feedback/route.ts
       type: module
       imports: []
       importedBy: []
@@ -569,19 +758,7 @@ dependencyGraph:
       type: component
       imports: []
       importedBy: []
-    - file: app/api/interview-lab/sandbox/route.ts
-      type: module
-      imports: []
-      importedBy: []
-    - file: app/api/interview-lab/sandbox-run/route.ts
-      type: module
-      imports: []
-      importedBy: []
-    - file: app/api/interview-lab/transcribe/route.ts
-      type: module
-      imports: []
-      importedBy: []
-    - file: app/api/interview-lab/route.ts
+    - file: app/api/github/sync/route.ts
       type: module
       imports: []
       importedBy: []
@@ -593,7 +770,15 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: app/api/mcp/harness/route.ts
+      type: module
+      imports: []
+      importedBy: []
     - file: app/api/mcp/route.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/memory-vault/parse/route.ts
       type: module
       imports: []
       importedBy: []
@@ -609,6 +794,22 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: app/api/user/keys/route.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/user/profile/route.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/user/resumes/route.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/webhooks/clerk/route.ts
+      type: module
+      imports: []
+      importedBy: []
     - file: app/api/webhooks/cover-letter-completed/route.ts
       type: module
       imports: []
@@ -618,6 +819,18 @@ dependencyGraph:
       imports: []
       importedBy: []
     - file: app/api/webhooks/pdf-completed/route.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/webview/browser/route.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/webview/check-headers/route.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/webview/proxy/route.ts
       type: module
       imports: []
       importedBy: []
@@ -669,6 +882,14 @@ dependencyGraph:
       type: entry
       imports: []
       importedBy: []
+    - file: app/sign-in/[[...sign-in]]/page.tsx
+      type: entry
+      imports: []
+      importedBy: []
+    - file: app/sign-up/[[...sign-up]]/page.tsx
+      type: entry
+      imports: []
+      importedBy: []
     - file: app/layout.tsx
       type: entry
       imports:
@@ -682,21 +903,79 @@ dependencyGraph:
       type: entry
       imports: []
       importedBy: []
+    - file: components/ai-elements/agent.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/ai-elements/index.ts
     - file: components/ai-elements/attachments.tsx
       type: component
       imports: []
+      importedBy:
+        - components/ai-elements/index.ts
+    - file: components/ai-elements/chain-of-thought.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/ai-elements/index.ts
+    - file: components/ai-elements/index.ts
+      type: entry
+      imports:
+        - components/ai-elements/agent.tsx
+        - components/ai-elements/attachments.tsx
+        - components/ai-elements/chain-of-thought.tsx
+        - components/ai-elements/jsx-preview.tsx
+        - components/ai-elements/reasoning.tsx
+        - components/ai-elements/shimmer.tsx
+        - components/ai-elements/web-preview.tsx
+        - components/ai-elements/persona.tsx
       importedBy: []
+    - file: components/ai-elements/jsx-preview.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/ai-elements/index.ts
+    - file: components/ai-elements/persona.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/ai-elements/index.ts
     - file: components/ai-elements/reasoning.tsx
       type: component
       imports:
         - components/ai-elements/shimmer.tsx
-      importedBy: []
+      importedBy:
+        - components/ai-elements/index.ts
     - file: components/ai-elements/shimmer.tsx
+      type: util
+      imports: []
+      importedBy:
+        - components/ai-elements/index.ts
+        - components/ai-elements/reasoning.tsx
+    - file: components/ai-elements/web-preview.tsx
       type: component
       imports: []
       importedBy:
-        - components/ai-elements/reasoning.tsx
+        - components/ai-elements/index.ts
+    - file: components/auth/auth-modal.tsx
+      type: component
+      imports: []
+      importedBy: []
+    - file: components/auth/user-menu.tsx
+      type: component
+      imports: []
+      importedBy: []
     - file: components/chat/components/auto-applier.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/chat/component-renderer.tsx
+    - file: components/chat/components/browser-controller.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/chat/component-renderer.tsx
+    - file: components/chat/components/chart-viewer.tsx
       type: component
       imports: []
       importedBy:
@@ -706,16 +985,23 @@ dependencyGraph:
       imports: []
       importedBy:
         - components/chat/component-renderer.tsx
+    - file: components/chat/components/component-stage.tsx
+      type: component
+      imports:
+        - components/chat/component-renderer.tsx
+      importedBy:
+        - components/chat/ai-chat.tsx
     - file: components/chat/components/cover-letter-single-block-editor.tsx
       type: component
       imports: []
       importedBy:
         - components/chat/components/cover-letter-viewer.tsx
     - file: components/chat/components/cover-letter-viewer.tsx
-      type: component
+      type: util
       imports:
         - components/chat/components/cover-letter-single-block-editor.tsx
       importedBy:
+        - components/chat/chat-component-registry.tsx
         - components/chat/component-renderer.tsx
     - file: components/chat/components/cv-score.tsx
       type: component
@@ -732,17 +1018,18 @@ dependencyGraph:
       imports: []
       importedBy:
         - components/chat/component-renderer.tsx
+    - file: components/chat/components/job-scraper-card.tsx
+      type: util
+      imports: []
+      importedBy:
+        - components/chat/chat-component-registry.tsx
+        - components/chat/component-renderer.tsx
     - file: components/chat/components/learning-resources.tsx
       type: component
       imports: []
       importedBy:
         - components/chat/component-renderer.tsx
     - file: components/chat/components/linkedin-dm-panel.tsx
-      type: component
-      imports: []
-      importedBy:
-        - components/chat/component-renderer.tsx
-    - file: components/chat/components/mock-interview.tsx
       type: component
       imports: []
       importedBy:
@@ -762,10 +1049,14 @@ dependencyGraph:
         - components/chat/markdown-renderer.tsx
         - components/chat/component-renderer.tsx
         - components/chat/chat-store.tsx
+        - components/chat/profile-settings-dialog.tsx
+        - components/chat/chat-feedback.tsx
+        - components/chat/chromium-webview.tsx
+        - components/chat/components/component-stage.tsx
         - components/chat/sidebar.tsx
         - components/chat/job-suggestions-panel.tsx
         - components/chat/chat-onboarding.tsx
-        - components/chat/interview-lab-panel.tsx
+        - components/chat/mcp-dialog.tsx
       importedBy: []
     - file: components/chat/chat-ambient.tsx
       type: component
@@ -778,13 +1069,19 @@ dependencyGraph:
     - file: components/chat/chat-component-registry.tsx
       type: component
       imports:
-        - components/chat/mock-interview-interactive.tsx
+        - components/chat/components/job-scraper-card.tsx
+        - components/chat/components/cover-letter-viewer.tsx
       importedBy:
         - components/chat/chat-message-renderer.tsx
     - file: components/chat/chat-cv-tabs.tsx
       type: component
       imports: []
       importedBy: []
+    - file: components/chat/chat-feedback.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/chat/ai-chat.tsx
     - file: components/chat/chat-input.tsx
       type: component
       imports: []
@@ -812,6 +1109,11 @@ dependencyGraph:
         - components/chat/profile-settings-dialog.tsx
         - components/chat/sidebar-integrations-accordion.tsx
         - components/chat/sidebar.tsx
+    - file: components/chat/chromium-webview.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/chat/ai-chat.tsx
     - file: components/chat/component-renderer.tsx
       type: component
       imports:
@@ -819,27 +1121,23 @@ dependencyGraph:
         - components/chat/components/cv-score.tsx
         - components/chat/components/job-recommendations.tsx
         - components/chat/components/auto-applier.tsx
-        - components/chat/components/mock-interview.tsx
         - components/chat/components/coding-challenge.tsx
         - components/chat/components/learning-resources.tsx
         - components/chat/components/cover-letter-viewer.tsx
         - components/chat/components/email-hr-panel.tsx
         - components/chat/components/linkedin-dm-panel.tsx
-        - components/chat/interview-lab-panel.tsx
+        - components/chat/components/job-scraper-card.tsx
         - components/chat/resume-latex-artifact.tsx
+        - components/chat/components/chart-viewer.tsx
+        - components/chat/components/browser-controller.tsx
       importedBy:
+        - components/chat/components/component-stage.tsx
         - components/chat/ai-chat.tsx
     - file: components/chat/context-window.tsx
       type: component
       imports: []
       importedBy:
         - components/chat/chat-sidebar.tsx
-    - file: components/chat/interview-lab-panel.tsx
-      type: util
-      imports: []
-      importedBy:
-        - components/chat/ai-chat.tsx
-        - components/chat/component-renderer.tsx
     - file: components/chat/job-profile-dialog.tsx
       type: component
       imports: []
@@ -856,20 +1154,22 @@ dependencyGraph:
       imports: []
       importedBy:
         - components/chat/ai-chat.tsx
-    - file: components/chat/mock-interview-interactive.tsx
-      type: component
+    - file: components/chat/mcp-dialog.tsx
+      type: util
       imports: []
       importedBy:
-        - components/chat/chat-component-registry.tsx
+        - components/chat/ai-chat.tsx
+        - components/chat/sidebar-integrations-accordion.tsx
     - file: components/chat/profile-photo-crop-dialog.tsx
       type: component
       imports: []
       importedBy: []
     - file: components/chat/profile-settings-dialog.tsx
-      type: component
+      type: util
       imports:
         - components/chat/chat-store.tsx
       importedBy:
+        - components/chat/ai-chat.tsx
         - components/chat/sidebar.tsx
     - file: components/chat/resume-latex-artifact.tsx
       type: component
@@ -877,17 +1177,16 @@ dependencyGraph:
       importedBy:
         - components/chat/component-renderer.tsx
     - file: components/chat/sidebar-integrations-accordion.tsx
-      type: component
+      type: entry
       imports:
         - components/chat/chat-store.tsx
-      importedBy:
-        - components/chat/sidebar.tsx
+        - components/chat/mcp-dialog.tsx
+      importedBy: []
     - file: components/chat/sidebar.tsx
       type: component
       imports:
         - components/chat/chat-store.tsx
         - components/chat/profile-settings-dialog.tsx
-        - components/chat/sidebar-integrations-accordion.tsx
       importedBy:
         - components/chat/ai-chat.tsx
     - file: components/chat/text-selection-popover.tsx
@@ -964,10 +1263,11 @@ dependencyGraph:
         - components/pdf-templates/index.tsx
         - components/resume-coverletter/cover-letter-preview.tsx
     - file: components/pdf-templates/coverletter/german-anschreiben-template.tsx
-      type: component
+      type: util
       imports: []
       importedBy:
         - components/pdf-templates/index.tsx
+        - scripts/build-project-template-applications.js
     - file: components/pdf-templates/coverletter/gradient-cover-letter-template.tsx
       type: util
       imports: []
@@ -980,10 +1280,12 @@ dependencyGraph:
       importedBy:
         - components/pdf-templates/index.tsx
     - file: components/pdf-templates/coverletter/modern-cover-letter-template.tsx
-      type: component
+      type: util
       imports: []
       importedBy:
         - components/pdf-templates/index.tsx
+        - scripts/build-accenture-a2.js
+        - scripts/build-project-template-applications.js
     - file: components/pdf-templates/coverletter/professional-cover-letter-template.tsx
       type: util
       imports: []
@@ -1024,6 +1326,11 @@ dependencyGraph:
         - components/logos/logos.ts
       importedBy:
         - components/pdf-templates/index.tsx
+    - file: components/pdf-templates/cv/general-resumes/ivy-league-pdf-template.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/pdf-templates/index.tsx
     - file: components/pdf-templates/cv/general-resumes/minimal-clean-pdf-template.tsx
       type: component
       imports: []
@@ -1035,10 +1342,12 @@ dependencyGraph:
       importedBy:
         - components/pdf-templates/index.tsx
     - file: components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
-      type: component
+      type: util
       imports: []
       importedBy:
         - components/pdf-templates/index.tsx
+        - scripts/build-accenture-a2.js
+        - scripts/build-project-template-applications.js
     - file: components/pdf-templates/cv/general-resumes/professional-pdf-template.tsx
       type: component
       imports: []
@@ -1055,12 +1364,37 @@ dependencyGraph:
         - components/logos/logos.ts
       importedBy:
         - components/pdf-templates/index.tsx
+    - file: components/pdf-templates/cv/german-templates/GermanBurgundyDualTemplate.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/pdf-templates/index.tsx
     - file: components/pdf-templates/cv/german-templates/GermanLebenslaufTemplate.tsx
       type: component
       imports: []
       importedBy:
         - components/pdf-templates/index.tsx
     - file: components/pdf-templates/cv/german-templates/GermanModernLebenslaufTemplate.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/pdf-templates/index.tsx
+    - file: components/pdf-templates/cv/german-templates/GermanRoseGoldTemplate.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/pdf-templates/index.tsx
+    - file: components/pdf-templates/cv/german-templates/GermanSlateSplitTemplate.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/pdf-templates/index.tsx
+    - file: components/pdf-templates/cv/german-templates/GermanTealWaveTemplate.tsx
+      type: component
+      imports: []
+      importedBy:
+        - components/pdf-templates/index.tsx
+    - file: components/pdf-templates/cv/german-templates/GermanTimelineMinimalTemplate.tsx
       type: component
       imports: []
       importedBy:
@@ -1091,6 +1425,12 @@ dependencyGraph:
         - components/pdf-templates/coverletter/gradient-cover-letter-template.tsx
         - components/pdf-templates/cv/german-templates/GermanLebenslaufTemplate.tsx
         - components/pdf-templates/cv/german-templates/GermanModernLebenslaufTemplate.tsx
+        - components/pdf-templates/cv/german-templates/GermanTealWaveTemplate.tsx
+        - components/pdf-templates/cv/german-templates/GermanSlateSplitTemplate.tsx
+        - components/pdf-templates/cv/german-templates/GermanRoseGoldTemplate.tsx
+        - components/pdf-templates/cv/german-templates/GermanTimelineMinimalTemplate.tsx
+        - components/pdf-templates/cv/german-templates/GermanBurgundyDualTemplate.tsx
+        - components/pdf-templates/cv/general-resumes/ivy-league-pdf-template.tsx
         - components/pdf-templates/cv/other-resume/RandomColourTemplate.tsx
         - components/pdf-templates/cv/general-resumes/minimal-clean-pdf-template.tsx
         - components/pdf-templates/cv/general-resumes/tech-modern-pdf-template.tsx
@@ -1100,7 +1440,11 @@ dependencyGraph:
         - lib/pdf-generator.tsx
         - scripts/build-application-packages.ts
         - scripts/compile-applications.ts
+        - scripts/generate-21x-package.ts
+        - scripts/generate-java-react-package.ts
+        - scripts/generate-master-cv.ts
         - scripts/generate-pdf.ts
+        - scripts/generate-vagas-package.ts
         - scripts/mcp-server.ts
     - file: components/resume-coverletter/cover-letter-chat.tsx
       type: component
@@ -1396,6 +1740,10 @@ dependencyGraph:
       type: component
       imports: []
       importedBy: []
+    - file: components/theme-toggle.tsx
+      type: component
+      imports: []
+      importedBy: []
     - file: database/migrations.ts
       type: module
       imports: []
@@ -1408,7 +1756,83 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: lib/auth/auth-provider.tsx
+      type: component
+      imports: []
+      importedBy: []
+    - file: lib/auth/clerk-config.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: lib/browser/playwright-service.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: lib/cache/redis.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: lib/crypto/encryption.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: lib/db/index.ts
+      type: entry
+      imports:
+        - lib/db/schema.ts
+      importedBy:
+        - lib/db/plsql-storage.ts
+    - file: lib/db/plsql-storage.ts
+      type: entry
+      imports:
+        - lib/db/index.ts
+        - lib/db/schema.ts
+      importedBy: []
+    - file: lib/db/schema.ts
+      type: util
+      imports: []
+      importedBy:
+        - lib/db/index.ts
+        - lib/db/plsql-storage.ts
+    - file: lib/email/resend.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: lib/github/sync.ts
+      type: module
+      imports: []
+      importedBy: []
     - file: lib/job-scraper/google-jobs.ts
+      type: util
+      imports: []
+      importedBy:
+        - lib/job-scraper/live-scraper.ts
+        - scripts/mcp-server.ts
+    - file: lib/job-scraper/live-scraper.ts
+      type: module
+      imports:
+        - lib/job-scraper/google-jobs.ts
+      importedBy: []
+    - file: lib/mcp/mcp-manager.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: lib/neo4j/driver.ts
+      type: module
+      imports: []
+      importedBy:
+        - lib/neo4j/graph-service.ts
+    - file: lib/neo4j/graph-service.ts
+      type: module
+      imports:
+        - lib/neo4j/driver.ts
+      importedBy: []
+    - file: lib/scrapers/profile-scrapers.ts
+      type: module
+      imports: []
+      importedBy:
+        - scripts/mcp-server.ts
+    - file: lib/storage/r2.ts
       type: module
       imports: []
       importedBy: []
@@ -1459,16 +1883,21 @@ dependencyGraph:
       importedBy:
         - scripts/build-application-packages.ts
         - scripts/compile-applications.ts
+        - scripts/generate-21x-package.ts
+        - scripts/generate-java-react-package.ts
+        - scripts/generate-vagas-package.ts
     - file: lib/default-cover-letter.ts
       type: module
       imports:
         - lib/types.ts
-      importedBy: []
+      importedBy:
+        - lib/sanitize-cover-letter-data.ts
     - file: lib/default-resume-data.ts
-      type: module
+      type: util
       imports:
         - lib/types.ts
       importedBy:
+        - lib/resume-schema.ts
         - lib/sanitize-resume-data.ts
     - file: lib/email-compose-urls.ts
       type: module
@@ -1481,7 +1910,8 @@ dependencyGraph:
     - file: lib/extract-resume-json.ts
       type: module
       imports: []
-      importedBy: []
+      importedBy:
+        - __tests__/thinking-and-tools.test.ts
     - file: lib/faq.ts
       type: module
       imports: []
@@ -1490,15 +1920,19 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
-    - file: lib/interview-lab-model-support.ts
-      type: module
-      imports: []
-      importedBy: []
     - file: lib/linkedin-outreach.ts
       type: module
       imports: []
       importedBy: []
+    - file: lib/mcp-client.ts
+      type: module
+      imports: []
+      importedBy: []
     - file: lib/memory-store.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: lib/memory-vault.ts
       type: module
       imports: []
       importedBy: []
@@ -1537,24 +1971,47 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: lib/resume-schema.ts
+      type: module
+      imports:
+        - lib/types.ts
+        - lib/default-resume-data.ts
+        - lib/sanitize-resume-data.ts
+      importedBy:
+        - __tests__/resume-schema.test.ts
+        - lib/sanitize-resume-data.ts
     - file: lib/safe-local-storage.ts
       type: module
       imports: []
+      importedBy: []
+    - file: lib/sanitize-cover-letter-data.ts
+      type: entry
+      imports:
+        - lib/types.ts
+        - lib/default-cover-letter.ts
       importedBy: []
     - file: lib/sanitize-resume-data.ts
       type: module
       imports:
         - lib/types.ts
         - lib/default-resume-data.ts
+        - lib/resume-schema.ts
       importedBy:
         - lib/pdf-generator.tsx
+        - lib/resume-schema.ts
+        - lib/utils.ts
         - scripts/build-application-packages.ts
         - scripts/compile-applications.ts
+        - scripts/generate-21x-package.ts
+        - scripts/generate-java-react-package.ts
+        - scripts/generate-master-cv.ts
         - scripts/generate-pdf.ts
+        - scripts/generate-vagas-package.ts
     - file: lib/streaming-chat-content.ts
       type: module
       imports: []
-      importedBy: []
+      importedBy:
+        - __tests__/thinking-and-tools.test.ts
     - file: lib/translation.ts
       type: module
       imports: []
@@ -1567,15 +2024,22 @@ dependencyGraph:
         - lib/default-cover-letter.ts
         - lib/default-resume-data.ts
         - lib/pdf-generator.tsx
+        - lib/resume-schema.ts
+        - lib/sanitize-cover-letter-data.ts
         - lib/sanitize-resume-data.ts
+        - scripts/generate-21x-package.ts
+        - scripts/generate-java-react-package.ts
+        - scripts/generate-master-cv.ts
         - scripts/generate-pdf.ts
+        - scripts/generate-vagas-package.ts
     - file: lib/user-knowledge-context.ts
       type: module
       imports: []
       importedBy: []
     - file: lib/utils.ts
       type: util
-      imports: []
+      imports:
+        - lib/sanitize-resume-data.ts
       importedBy: []
     - file: public/bergamot/bergamot-translator-worker.js
       type: module
@@ -1585,12 +2049,35 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: scripts/build-accenture-a2.js
+      type: entry
+      imports:
+        - components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
+        - components/pdf-templates/coverletter/modern-cover-letter-template.tsx
+      importedBy: []
+    - file: scripts/build-accenture-application.js
+      type: module
+      imports:
+        - scripts/generate-application-pdfs.js
+      importedBy: []
     - file: scripts/build-application-packages.ts
       type: entry
       imports:
         - lib/cover-letter-pdf-generator.tsx
         - lib/sanitize-resume-data.ts
         - components/pdf-templates/index.tsx
+      importedBy: []
+    - file: scripts/build-hws-application.js
+      type: module
+      imports:
+        - scripts/generate-application-pdfs.js
+      importedBy: []
+    - file: scripts/build-project-template-applications.js
+      type: entry
+      imports:
+        - components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
+        - components/pdf-templates/coverletter/german-anschreiben-template.tsx
+        - components/pdf-templates/coverletter/modern-cover-letter-template.tsx
       importedBy: []
     - file: scripts/compile-applications.ts
       type: entry
@@ -1599,6 +2086,39 @@ dependencyGraph:
         - lib/cover-letter-pdf-generator.tsx
         - components/pdf-templates/index.tsx
       importedBy: []
+    - file: scripts/drop-agent-harnesses.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: scripts/generate-21x-package.ts
+      type: entry
+      imports:
+        - lib/cover-letter-pdf-generator.tsx
+        - lib/sanitize-resume-data.ts
+        - components/pdf-templates/index.tsx
+        - lib/types.ts
+      importedBy: []
+    - file: scripts/generate-application-pdfs.js
+      type: util
+      imports: []
+      importedBy:
+        - scripts/build-accenture-application.js
+        - scripts/build-hws-application.js
+    - file: scripts/generate-java-react-package.ts
+      type: entry
+      imports:
+        - lib/cover-letter-pdf-generator.tsx
+        - lib/sanitize-resume-data.ts
+        - components/pdf-templates/index.tsx
+        - lib/types.ts
+      importedBy: []
+    - file: scripts/generate-master-cv.ts
+      type: entry
+      imports:
+        - lib/sanitize-resume-data.ts
+        - components/pdf-templates/index.tsx
+        - lib/types.ts
+      importedBy: []
     - file: scripts/generate-pdf.ts
       type: entry
       imports:
@@ -1606,10 +2126,28 @@ dependencyGraph:
         - lib/sanitize-resume-data.ts
         - lib/types.ts
       importedBy: []
+    - file: scripts/generate-vagas-package.ts
+      type: entry
+      imports:
+        - lib/cover-letter-pdf-generator.tsx
+        - lib/sanitize-resume-data.ts
+        - components/pdf-templates/index.tsx
+        - lib/types.ts
+      importedBy: []
     - file: scripts/mcp-server.ts
-      type: module
+      type: entry
       imports:
         - components/pdf-templates/index.tsx
+        - lib/job-scraper/google-jobs.ts
+        - lib/scrapers/profile-scrapers.ts
+      importedBy: []
+    - file: scripts/migrate.mjs
+      type: module
+      imports: []
+      importedBy: []
+    - file: scripts/migrate.ts
+      type: module
+      imports: []
       importedBy: []
     - file: scripts/test-pdf-endpoints.ts
       type: module
@@ -1623,6 +2161,14 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: declarations.d.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: drizzle.config.ts
+      type: module
+      imports: []
+      importedBy: []
     - file: eslint.config.mjs
       type: module
       imports: []
@@ -1632,6 +2178,10 @@ dependencyGraph:
       imports: []
       importedBy: []
     - file: postcss.config.mjs
+      type: module
+      imports: []
+      importedBy: []
+    - file: proxy.ts
       type: module
       imports: []
       importedBy: []
@@ -1649,11 +2199,47 @@ dependencyGraph:
       imports: []
       importedBy: []
   edges:
+    - from: __tests__/resume-schema.test.ts
+      to: lib/resume-schema.ts
+      type: import
+    - from: __tests__/thinking-and-tools.test.ts
+      to: lib/streaming-chat-content.ts
+      type: import
+    - from: __tests__/thinking-and-tools.test.ts
+      to: lib/extract-resume-json.ts
+      type: import
     - from: app/layout.tsx
       to: app/globals.css
       type: import
+    - from: components/ai-elements/index.ts
+      to: components/ai-elements/agent.tsx
+      type: export
+    - from: components/ai-elements/index.ts
+      to: components/ai-elements/attachments.tsx
+      type: export
+    - from: components/ai-elements/index.ts
+      to: components/ai-elements/chain-of-thought.tsx
+      type: export
+    - from: components/ai-elements/index.ts
+      to: components/ai-elements/jsx-preview.tsx
+      type: export
+    - from: components/ai-elements/index.ts
+      to: components/ai-elements/reasoning.tsx
+      type: export
+    - from: components/ai-elements/index.ts
+      to: components/ai-elements/shimmer.tsx
+      type: export
+    - from: components/ai-elements/index.ts
+      to: components/ai-elements/web-preview.tsx
+      type: export
+    - from: components/ai-elements/index.ts
+      to: components/ai-elements/persona.tsx
+      type: export
     - from: components/ai-elements/reasoning.tsx
       to: components/ai-elements/shimmer.tsx
+      type: import
+    - from: components/chat/components/component-stage.tsx
+      to: components/chat/component-renderer.tsx
       type: import
     - from: components/chat/components/cover-letter-viewer.tsx
       to: components/chat/components/cover-letter-single-block-editor.tsx
@@ -1668,6 +2254,18 @@ dependencyGraph:
       to: components/chat/chat-store.tsx
       type: import
     - from: components/chat/ai-chat.tsx
+      to: components/chat/profile-settings-dialog.tsx
+      type: import
+    - from: components/chat/ai-chat.tsx
+      to: components/chat/chat-feedback.tsx
+      type: import
+    - from: components/chat/ai-chat.tsx
+      to: components/chat/chromium-webview.tsx
+      type: import
+    - from: components/chat/ai-chat.tsx
+      to: components/chat/components/component-stage.tsx
+      type: import
+    - from: components/chat/ai-chat.tsx
       to: components/chat/sidebar.tsx
       type: import
     - from: components/chat/ai-chat.tsx
@@ -1677,10 +2275,13 @@ dependencyGraph:
       to: components/chat/chat-onboarding.tsx
       type: import
     - from: components/chat/ai-chat.tsx
-      to: components/chat/interview-lab-panel.tsx
+      to: components/chat/mcp-dialog.tsx
       type: import
     - from: components/chat/chat-component-registry.tsx
-      to: components/chat/mock-interview-interactive.tsx
+      to: components/chat/components/job-scraper-card.tsx
+      type: import
+    - from: components/chat/chat-component-registry.tsx
+      to: components/chat/components/cover-letter-viewer.tsx
       type: import
     - from: components/chat/chat-message-renderer.tsx
       to: components/chat/chat-component-registry.tsx
@@ -1701,9 +2302,6 @@ dependencyGraph:
       to: components/chat/components/auto-applier.tsx
       type: import
     - from: components/chat/component-renderer.tsx
-      to: components/chat/components/mock-interview.tsx
-      type: import
-    - from: components/chat/component-renderer.tsx
       to: components/chat/components/coding-challenge.tsx
       type: import
     - from: components/chat/component-renderer.tsx
@@ -1719,10 +2317,16 @@ dependencyGraph:
       to: components/chat/components/linkedin-dm-panel.tsx
       type: import
     - from: components/chat/component-renderer.tsx
-      to: components/chat/interview-lab-panel.tsx
+      to: components/chat/components/job-scraper-card.tsx
       type: import
     - from: components/chat/component-renderer.tsx
       to: components/chat/resume-latex-artifact.tsx
+      type: import
+    - from: components/chat/component-renderer.tsx
+      to: components/chat/components/chart-viewer.tsx
+      type: import
+    - from: components/chat/component-renderer.tsx
+      to: components/chat/components/browser-controller.tsx
       type: import
     - from: components/chat/job-suggestions-panel.tsx
       to: components/chat/job-profile-dialog.tsx
@@ -1733,14 +2337,14 @@ dependencyGraph:
     - from: components/chat/sidebar-integrations-accordion.tsx
       to: components/chat/chat-store.tsx
       type: import
+    - from: components/chat/sidebar-integrations-accordion.tsx
+      to: components/chat/mcp-dialog.tsx
+      type: import
     - from: components/chat/sidebar.tsx
       to: components/chat/chat-store.tsx
       type: import
     - from: components/chat/sidebar.tsx
       to: components/chat/profile-settings-dialog.tsx
-      type: import
-    - from: components/chat/sidebar.tsx
-      to: components/chat/sidebar-integrations-accordion.tsx
       type: import
     - from: components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx
       to: components/logos/logos.ts
@@ -1809,6 +2413,24 @@ dependencyGraph:
       to: components/pdf-templates/cv/german-templates/GermanModernLebenslaufTemplate.tsx
       type: import
     - from: components/pdf-templates/index.tsx
+      to: components/pdf-templates/cv/german-templates/GermanTealWaveTemplate.tsx
+      type: import
+    - from: components/pdf-templates/index.tsx
+      to: components/pdf-templates/cv/german-templates/GermanSlateSplitTemplate.tsx
+      type: import
+    - from: components/pdf-templates/index.tsx
+      to: components/pdf-templates/cv/german-templates/GermanRoseGoldTemplate.tsx
+      type: import
+    - from: components/pdf-templates/index.tsx
+      to: components/pdf-templates/cv/german-templates/GermanTimelineMinimalTemplate.tsx
+      type: import
+    - from: components/pdf-templates/index.tsx
+      to: components/pdf-templates/cv/german-templates/GermanBurgundyDualTemplate.tsx
+      type: import
+    - from: components/pdf-templates/index.tsx
+      to: components/pdf-templates/cv/general-resumes/ivy-league-pdf-template.tsx
+      type: import
+    - from: components/pdf-templates/index.tsx
       to: components/pdf-templates/cv/other-resume/RandomColourTemplate.tsx
       type: import
     - from: components/pdf-templates/index.tsx
@@ -1838,6 +2460,21 @@ dependencyGraph:
     - from: components/resume-coverletter/resume-editor.tsx
       to: components/resume-coverletter/debug-profile-image.tsx
       type: import
+    - from: lib/db/index.ts
+      to: lib/db/schema.ts
+      type: import
+    - from: lib/db/plsql-storage.ts
+      to: lib/db/index.ts
+      type: import
+    - from: lib/db/plsql-storage.ts
+      to: lib/db/schema.ts
+      type: import
+    - from: lib/job-scraper/live-scraper.ts
+      to: lib/job-scraper/google-jobs.ts
+      type: import
+    - from: lib/neo4j/graph-service.ts
+      to: lib/neo4j/driver.ts
+      type: import
     - from: lib/cover-letter-pdf-generator.tsx
       to: lib/types.ts
       type: import
@@ -1856,12 +2493,45 @@ dependencyGraph:
     - from: lib/pdf-generator.tsx
       to: lib/sanitize-resume-data.ts
       type: import
+    - from: lib/resume-schema.ts
+      to: lib/types.ts
+      type: import
+    - from: lib/resume-schema.ts
+      to: lib/default-resume-data.ts
+      type: import
+    - from: lib/resume-schema.ts
+      to: lib/sanitize-resume-data.ts
+      type: import
+    - from: lib/sanitize-cover-letter-data.ts
+      to: lib/types.ts
+      type: import
+    - from: lib/sanitize-cover-letter-data.ts
+      to: lib/default-cover-letter.ts
+      type: import
     - from: lib/sanitize-resume-data.ts
       to: lib/types.ts
       type: import
     - from: lib/sanitize-resume-data.ts
       to: lib/default-resume-data.ts
       type: import
+    - from: lib/sanitize-resume-data.ts
+      to: lib/resume-schema.ts
+      type: import
+    - from: lib/sanitize-resume-data.ts
+      to: lib/resume-schema.ts
+      type: export
+    - from: lib/utils.ts
+      to: lib/sanitize-resume-data.ts
+      type: import
+    - from: scripts/build-accenture-a2.js
+      to: components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
+      type: import
+    - from: scripts/build-accenture-a2.js
+      to: components/pdf-templates/coverletter/modern-cover-letter-template.tsx
+      type: import
+    - from: scripts/build-accenture-application.js
+      to: scripts/generate-application-pdfs.js
+      type: import
     - from: scripts/build-application-packages.ts
       to: lib/cover-letter-pdf-generator.tsx
       type: import
@@ -1871,6 +2541,18 @@ dependencyGraph:
     - from: scripts/build-application-packages.ts
       to: components/pdf-templates/index.tsx
       type: import
+    - from: scripts/build-hws-application.js
+      to: scripts/generate-application-pdfs.js
+      type: import
+    - from: scripts/build-project-template-applications.js
+      to: components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
+      type: import
+    - from: scripts/build-project-template-applications.js
+      to: components/pdf-templates/coverletter/german-anschreiben-template.tsx
+      type: import
+    - from: scripts/build-project-template-applications.js
+      to: components/pdf-templates/coverletter/modern-cover-letter-template.tsx
+      type: import
     - from: scripts/compile-applications.ts
       to: lib/sanitize-resume-data.ts
       type: import
@@ -1879,6 +2561,39 @@ dependencyGraph:
       type: import
     - from: scripts/compile-applications.ts
       to: components/pdf-templates/index.tsx
+      type: import
+    - from: scripts/generate-21x-package.ts
+      to: lib/cover-letter-pdf-generator.tsx
+      type: import
+    - from: scripts/generate-21x-package.ts
+      to: lib/sanitize-resume-data.ts
+      type: import
+    - from: scripts/generate-21x-package.ts
+      to: components/pdf-templates/index.tsx
+      type: import
+    - from: scripts/generate-21x-package.ts
+      to: lib/types.ts
+      type: import
+    - from: scripts/generate-java-react-package.ts
+      to: lib/cover-letter-pdf-generator.tsx
+      type: import
+    - from: scripts/generate-java-react-package.ts
+      to: lib/sanitize-resume-data.ts
+      type: import
+    - from: scripts/generate-java-react-package.ts
+      to: components/pdf-templates/index.tsx
+      type: import
+    - from: scripts/generate-java-react-package.ts
+      to: lib/types.ts
+      type: import
+    - from: scripts/generate-master-cv.ts
+      to: lib/sanitize-resume-data.ts
+      type: import
+    - from: scripts/generate-master-cv.ts
+      to: components/pdf-templates/index.tsx
+      type: import
+    - from: scripts/generate-master-cv.ts
+      to: lib/types.ts
       type: import
     - from: scripts/generate-pdf.ts
       to: components/pdf-templates/index.tsx
@@ -1889,68 +2604,98 @@ dependencyGraph:
     - from: scripts/generate-pdf.ts
       to: lib/types.ts
       type: import
+    - from: scripts/generate-vagas-package.ts
+      to: lib/cover-letter-pdf-generator.tsx
+      type: import
+    - from: scripts/generate-vagas-package.ts
+      to: lib/sanitize-resume-data.ts
+      type: import
+    - from: scripts/generate-vagas-package.ts
+      to: components/pdf-templates/index.tsx
+      type: import
+    - from: scripts/generate-vagas-package.ts
+      to: lib/types.ts
+      type: import
     - from: scripts/mcp-server.ts
       to: components/pdf-templates/index.tsx
+      type: import
+    - from: scripts/mcp-server.ts
+      to: lib/job-scraper/google-jobs.ts
+      type: import
+    - from: scripts/mcp-server.ts
+      to: lib/scrapers/profile-scrapers.ts
       type: import
     - from: test-render.tsx
       to: components/pdf-templates/coverletter/standard-cover-letter-template.tsx
       type: import
   coreModules:
+    - components/ai-elements/reasoning.tsx
+    - components/ai-elements/shimmer.tsx
+    - components/chat/components/component-stage.tsx
     - components/chat/components/cover-letter-viewer.tsx
+    - components/chat/components/job-scraper-card.tsx
     - components/chat/chat-component-registry.tsx
     - components/chat/chat-store.tsx
     - components/chat/component-renderer.tsx
-    - components/chat/interview-lab-panel.tsx
     - components/chat/job-suggestions-panel.tsx
+    - components/chat/mcp-dialog.tsx
     - components/chat/profile-settings-dialog.tsx
-    - components/chat/sidebar-integrations-accordion.tsx
     - components/chat/sidebar.tsx
     - components/logos/logos.ts
     - components/pdf-templates/coverletter/dark-cover-letter-template.tsx
     - components/pdf-templates/coverletter/elegant-cover-letter-template.tsx
+    - components/pdf-templates/coverletter/german-anschreiben-template.tsx
     - components/pdf-templates/coverletter/gradient-cover-letter-template.tsx
+    - components/pdf-templates/coverletter/modern-cover-letter-template.tsx
     - components/pdf-templates/coverletter/professional-cover-letter-template.tsx
     - components/pdf-templates/coverletter/standard-cover-letter-template.tsx
     - components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx
     - components/pdf-templates/cv/general-resumes/gradient-gray-pdf-template.tsx
     - components/pdf-templates/cv/general-resumes/gradient-pdf-template.tsx
+    - components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
     - components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx
     - components/pdf-templates/index.tsx
+    - lib/db/index.ts
+    - lib/db/schema.ts
+    - lib/job-scraper/google-jobs.ts
     - lib/cover-letter-pdf-generator.tsx
+    - lib/default-cover-letter.ts
     - lib/default-resume-data.ts
+    - lib/resume-schema.ts
     - lib/sanitize-resume-data.ts
     - lib/types.ts
+    - scripts/generate-application-pdfs.js
   utilities:
     - lib/types.ts
+    - lib/cover-letter-pdf-generator.tsx
     - components/chat/chat-store.tsx
     - components/logos/logos.ts
-    - components/chat/interview-lab-panel.tsx
-    - components/pdf-templates/coverletter/dark-cover-letter-template.tsx
-    - components/pdf-templates/coverletter/elegant-cover-letter-template.tsx
-    - components/pdf-templates/coverletter/gradient-cover-letter-template.tsx
-    - components/pdf-templates/coverletter/professional-cover-letter-template.tsx
-    - components/pdf-templates/coverletter/standard-cover-letter-template.tsx
-    - lib/cover-letter-pdf-generator.tsx
+    - components/pdf-templates/coverletter/modern-cover-letter-template.tsx
+    - components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
+    - components/ai-elements/shimmer.tsx
+    - components/chat/components/cover-letter-viewer.tsx
+    - components/chat/components/job-scraper-card.tsx
+    - components/chat/mcp-dialog.tsx
 recentCommits:
-  - hash: 9abc8e2
-    message: 'feat: new feature update 2.9.0'
-    date: 3 weeks ago
+  - hash: e63aa53
+    message: 'fix: bugfix update to 2.11.4'
+    date: 3 hours ago
     author: yakkshit
-  - hash: 08b229b
-    message: 'feat: new feature update 2.8.0'
-    date: 4 weeks ago
+  - hash: cdcb158
+    message: 'fix: bugfix update to 2.11.3'
+    date: 4 hours ago
     author: yakkshit
-  - hash: af36e2d
-    message: 'feat: new feature update 2.7.0'
-    date: 8 weeks ago
+  - hash: '4340454'
+    message: 'fix: bugfix update to 2.11.2'
+    date: 11 hours ago
     author: yakkshit
-  - hash: bb06e38
-    message: 'fix: bugfix update to 2.6.7'
-    date: 8 weeks ago
+  - hash: 433c6a3
+    message: 'fix: bugfix update to 2.11.1'
+    date: 21 hours ago
     author: yakkshit
-  - hash: e3c1dc0
-    message: 'fix: bugfix update to 2.6.6'
-    date: 8 weeks ago
+  - hash: b03a2cf
+    message: 'feat: new feature update 2.11.0'
+    date: 22 hours ago
     author: yakkshit
 quickNotes:
   - 'Execution Context: Refer to the entry points to understand application bootstrap.'

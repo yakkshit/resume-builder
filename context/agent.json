@@ -1,13 +1,14 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-08-31T05:55:27.277Z",
+  "generatedAt": "2026-09-09T09:56:46.436Z",
   "projectPath": "/Users/yakkshit/Downloads/project/resume/cv-main",
-  "overview": "README-INTERVIEW-LAB.md: This repo is a Next.js application that combines: - Resume Builder (build and export a resume) - Career Assistant Chat (multi-model chat with session-only API keys) - Cover Letter workflow - Interview Lab (mock interview rounds, coding tests, and live coaching) This document is the “one stop” guide for running the app, configuring Integrations, and understanding Interview Lab architecture. README-MCP.md: This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor, ChatGPT, Custom Agents) to list templates and generate Resume & Cover Letter PDFs. It supports both: 1. Stdio mode (local CLI / desktop clients) 2. Hosted HTTP JSON-RPC Endpoint (/api/mcp for cloud/remote agent hosting) ---",
+  "overview": "This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor, ChatGPT, Custom Agents) to list templates and generate Resume & Cover Letter PDFs. It supports both: 1. Stdio mode (local CLI / desktop clients) 2. Hosted HTTP JSON-RPC Endpoint (/api/mcp for cloud/remote agent hosting) ---",
   "techStack": [
     "TypeScript",
-    "JSON",
     "React (TSX)",
+    "JSON",
     "CSS",
+    "SQL",
     "JavaScript",
     "Markdown",
     "YAML",
@@ -17,15 +18,31 @@
     "Vitest",
     "Node.js"
   ],
-  "directoryStructure": "└── cv-main/\n    ├── __tests__/\n    │   ├── chat-onboarding-video.test.ts\n    │   ├── chat-textarea.test.ts\n    │   ├── dependency-check.test.ts\n    │   ├── email-draft-errors.test.ts\n    │   ├── extract-resume-json.test.ts\n    │   ├── interview-lab-support.test.ts\n    │   ├── job-scraper.test.ts\n    │   ├── linkedin-outreach.test.ts\n    │   ├── normalize-attached-file.test.ts\n    │   ├── pdf-template-resilience.test.ts\n    │   ├── resume-skills-safety.test.ts\n    │   ├── sanitize-resume-data.test.ts\n    │   ├── security-audit.test.ts\n    │   ├── streaming-chat-content.test.ts\n    │   └── user-knowledge-context.test.ts\n    ├── .agents/\n    │   └── mcp_config.json\n    ├── .pnpm-store/\n    │   └── v10/\n    │       ├── files/\n    │       │   └── ...\n    │       └── index/\n    │           └── ...\n    ├── .vscode/\n    │   ├── launch.json\n    │   └── mcp.json\n    ├── app/\n    │   ├── api/\n    │   │   ├── chat/\n    │   │   │   └── ...\n    │   │   ├── chat-assistant/\n    │   │   │   └── ...\n    │   │   ├── code-run/\n    │   │   │   └── ...\n    │   │   ├── cover-letter/\n    │   │   │   └── ...\n    │   │   ├── cover-letter-chat/\n    │   │   │   └── ...\n    │   │   ├── doc/\n    │   │   │   └── ...\n    │   │   ├── email-draft/\n    │   │   │   └── ...\n    │   │   ├── feedback/\n    │   │   │   └── ...\n    │   │   ├── generate-pdf/\n    │   │   │   └── ...\n    │   │   ├── interview-lab/\n    │   │   │   └── ...\n    │   │   ├── job-search/\n    │   │   │   └── ...\n    │   │   ├── latex-pdf/\n    │   │   │   └── ...\n    │   │   ├── mcp/\n    │   │   │   └── ...\n    │   │   ├── openapi/\n    │   │   │   └── ...\n    │   │   ├── pdf/\n    │   │   │   └── ...\n    │   │   ├── translate/\n    │   │   │   └── ...\n    │   │   └── webhooks/\n    │   │       └── ...\n    │   ├── bg/\n    │   │   └── page.tsx\n    │   ├── chat/\n    │   │   ├── error.tsx\n    │   │   ├── layout.tsx\n    │   │   └── page.tsx\n    │   ├── cover-letter/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── donate/\n    │   │   └── page.tsx\n    │   ├── feedback/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── price/\n    │   │   ├── globals.css\n    │   │   ├── layout.tsx\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── globals.css\n    │   ├── icon.svg\n    │   ├── layout.tsx\n    │   ├── loading.tsx\n    │   └── page.tsx\n    ├── components/\n    │   ├── ai-elements/\n    │   │   ├── attachments.tsx\n    │   │   ├── reasoning.tsx\n    │   │   └── shimmer.tsx\n    │   ├── chat/\n    │   │   ├── components/\n    │   │   │   └── ...\n    │   │   ├── ai-chat-career.tsx\n    │   │   ├── ai-chat.tsx\n    │   │   ├── chat-ambient.tsx\n    │   │   ├── chat-artifact-chrome.tsx\n    │   │   ├── chat-component-registry.tsx\n    │   │   ├── chat-cv-tabs.tsx\n    │   │   ├── chat-input.tsx\n    │   │   ├── chat-message-renderer.tsx\n    │   │   ├── chat-onboarding.tsx\n    │   │   ├── chat-sidebar.tsx\n    │   │   ├── chat-store.tsx\n    │   │   ├── component-renderer.tsx\n    │   │   ├── context-window.tsx\n    │   │   ├── interview-lab-panel.tsx\n    │   │   ├── job-profile-dialog.tsx\n    │   │   ├── job-suggestions-panel.tsx\n    │   │   ├── markdown-renderer.tsx\n    │   │   ├── mock-interview-interactive.tsx\n    │   │   ├── profile-photo-crop-dialog.tsx\n    │   │   ├── profile-settings-dialog.tsx\n    │   │   ├── resume-latex-artifact.tsx\n    │   │   ├── sidebar-integrations-accordion.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── text-selection-popover.tsx\n    │   │   ├── thinking-indicator.tsx\n    │   │   └── translation-controls.tsx\n    │   ├── donation/\n    │   │   ├── animations/\n    │   │   │   └── ...\n    │   │   ├── donation-widget.tsx\n    │   │   ├── faq-section.tsx\n    │   │   ├── impact-section.tsx\n    │   │   └── testimonials-section.tsx\n    │   ├── logos/\n    │   │   └── logos.ts\n    │   ├── pdf-templates/\n    │   │   ├── coverletter/\n    │   │   │   └── ...\n    │   │   ├── cv/\n    │   │   │   └── ...\n    │   │   └── index.tsx\n    │   ├── resume-coverletter/\n    │   │   ├── cover-letter-chat.tsx\n    │   │   ├── cover-letter-editor.tsx\n    │   │   ├── cover-letter-pdf-viewer.tsx\n    │   │   ├── cover-letter-preview.tsx\n    │   │   ├── debug-profile-image.tsx\n    │   │   ├── enhanced-chat.tsx\n    │   │   ├── loading-screen.tsx\n    │   │   ├── pdf-renderer.tsx\n    │   │   ├── pdf-viewer.tsx\n    │   │   ├── resume-editor.tsx\n    │   │   └── theme-provider.tsx\n    │   ├── ui/\n    │   │   ├── accordion.tsx\n    │   │   ├── alert-dialog.tsx\n    │   │   ├── alert.tsx\n    │   │   ├── aspect-ratio.tsx\n    │   │   ├── avatar.tsx\n    │   │   ├── badge.tsx\n    │   │   ├── bolt-style-chat.tsx\n    │   │   ├── breadcrumb.tsx\n    │   │   ├── button-1.tsx\n    │   │   ├── button.tsx\n    │   │   ├── calendar.tsx\n    │   │   ├── card.tsx\n    │   │   ├── carousel.tsx\n    │   │   ├── chart.tsx\n    │   │   ├── checkbox.tsx\n    │   │   ├── collapsible.tsx\n    │   │   ├── command.tsx\n    │   │   ├── context-menu.tsx\n    │   │   ├── dialog.tsx\n    │   │   ├── drawer.tsx\n    │   │   ├── dropdown-menu.tsx\n    │   │   ├── enhanced-marquee.tsx\n    │   │   ├── form.tsx\n    │   │   ├── hover-card.tsx\n    │   │   ├── infinite-marquee.tsx\n    │   │   ├── input-otp.tsx\n    │   │   ├── input.tsx\n    │   │   ├── label.tsx\n    │   │   ├── menubar.tsx\n    │   │   ├── navigation-menu.tsx\n    │   │   ├── pagination.tsx\n    │   │   ├── particle-text-effect.tsx\n    │   │   ├── popover.tsx\n    │   │   ├── progress.tsx\n    │   │   ├── radio-group.tsx\n    │   │   ├── resizable.tsx\n    │   │   ├── scroll-area.tsx\n    │   │   ├── select.tsx\n    │   │   ├── separator.tsx\n    │   │   ├── sheet.tsx\n    │   │   ├── shine-border.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── skeleton.tsx\n    │   │   ├── slider.tsx\n    │   │   ├── sonner.tsx\n    │   │   ├── stepper.tsx\n    │   │   ├── switch.tsx\n    │   │   ├── table.tsx\n    │   │   ├── tabs.tsx\n    │   │   ├── textarea.tsx\n    │   │   ├── the-infinite-grid.tsx\n    │   │   ├── toast.tsx\n    │   │   ├── toaster.tsx\n    │   │   ├── toggle-group.tsx\n    │   │   ├── toggle.tsx\n    │   │   ├── tooltip.tsx\n    │   │   ├── use-mobile.tsx\n    │   │   └── use-toast.ts\n    │   ├── app-nav.tsx\n    │   ├── cookie-banner.tsx\n    │   └── package-manager-ui.tsx\n    ├── database/\n    │   └── migrations.ts\n    ├── hooks/\n    │   ├── use-mobile.tsx\n    │   └── use-toast.ts\n    ├── lib/\n    │   ├── job-scraper/\n    │   │   └── google-jobs.ts\n    │   ├── api-auth.ts\n    │   ├── bergamot-translator-client.ts\n    │   ├── bolt-models.tsx\n    │   ├── chat-history.ts\n    │   ├── chat-models.ts\n    │   ├── chat-onboarding-video.ts\n    │   ├── chat-provider-settings.ts\n    │   ├── chat-resume-context.ts\n    │   ├── chat-textarea.ts\n    │   ├── clipboard.ts\n    │   ├── cover-letter-pdf-generator.tsx\n    │   ├── default-cover-letter.ts\n    │   ├── default-resume-data.ts\n    │   ├── email-compose-urls.ts\n    │   ├── email-draft-errors.ts\n    │   ├── extract-resume-json.ts\n    │   ├── faq.ts\n    │   ├── gallery-data.ts\n    │   ├── interview-lab-model-support.ts\n    │   ├── linkedin-outreach.ts\n    │   ├── memory-store.ts\n    │   ├── message-utils.ts\n    │   ├── model-provider-icon.tsx\n    │   ├── multi-model-docs.ts\n    │   ├── normalize-attached-file.ts\n    │   ├── normalize-sections-resume.ts\n    │   ├── pdf-generator.ts\n    │   ├── pdf-generator.tsx\n    │   ├── redact-resume-pii.ts\n    │   ├── safe-local-storage.ts\n    │   ├── sanitize-resume-data.ts\n    │   ├── streaming-chat-content.ts\n    │   ├── translation.ts\n    │   ├── types.ts\n    │   ├── user-knowledge-context.ts\n    │   └── utils.ts\n    ├── public/\n    │   ├── bergamot/\n    │   │   ├── bergamot-translator-worker.js\n    │   │   ├── bergamot-translator-worker.wasm\n    │   │   └── translator-worker.js\n    │   ├── deepmind-picture-2.jpg\n    │   └── placeholder.svg\n    ├── scripts/\n    │   ├── build-application-packages.ts\n    │   ├── compile-applications.ts\n    │   ├── generate-pdf.ts\n    │   ├── mcp-server.ts\n    │   ├── test-pdf-endpoints.ts\n    │   └── workflow.ts\n    ├── styles/\n    │   └── globals.css\n    ├── .gitignore\n    ├── 1.4.9.pdf\n    ├── about.md\n    ├── AI_SDK_5_MIGRATION.md\n    ├── API_KEYS_SETUP.md\n    ├── bugs.md\n    ├── cjs-shim.ts\n    ├── components.json\n    ├── eslint.config.mjs\n    ├── next.config.mjs\n    ├── package-lock.json\n    ├── package.json\n    ├── pnpm-lock.yaml\n    ├── postcss.config.mjs\n    ├── README-INTERVIEW-LAB.md\n    ├── README-MCP.md\n    ├── tailwind.config.ts\n    ├── test-render.tsx\n    ├── TESTING.md\n    ├── ts_errors.txt\n    ├── tsconfig.json\n    └── vitest.config.ts",
+  "directoryStructure": "└── cv-main/\n    ├── __tests__/\n    │   ├── all-chat-components-resilience.test.ts\n    │   ├── autonomous-browser-mcp.test.tsx\n    │   ├── chat-feedback.test.ts\n    │   ├── chat-keyboard-shortcuts.test.ts\n    │   ├── chat-onboarding-video.test.ts\n    │   ├── chat-textarea.test.ts\n    │   ├── component-stage-and-proxy.test.tsx\n    │   ├── cover-letter-resilience.test.ts\n    │   ├── database-migration.test.ts\n    │   ├── dependency-check.test.ts\n    │   ├── email-draft-errors.test.ts\n    │   ├── encryption.test.ts\n    │   ├── extract-resume-json.test.ts\n    │   ├── github-sync-encrypted.test.ts\n    │   ├── github-sync-service.test.ts\n    │   ├── gitlab-sync.test.ts\n    │   ├── job-scraper.test.ts\n    │   ├── linkedin-outreach.test.ts\n    │   ├── lockfile-sync.test.ts\n    │   ├── master-rag-vault.test.ts\n    │   ├── mcp-protocol.test.ts\n    │   ├── memory-vault.test.ts\n    │   ├── neo4j-graph.test.ts\n    │   ├── normalize-attached-file.test.ts\n    │   ├── onboarding-db.test.ts\n    │   ├── pdf-template-resilience.test.ts\n    │   ├── persona-and-auth-sync.test.tsx\n    │   ├── prod-leak-prevention.test.ts\n    │   ├── profile-scrapers.test.ts\n    │   ├── resume-schema.test.ts\n    │   ├── resume-skills-safety.test.ts\n    │   ├── sanitize-resume-data.test.ts\n    │   ├── security-audit.test.ts\n    │   ├── streaming-chat-content.test.ts\n    │   ├── thinking-and-tools.test.ts\n    │   └── user-knowledge-context.test.ts\n    ├── .agents/\n    │   └── mcp_config.json\n    ├── .pnpm-store/\n    │   └── v10/\n    │       ├── files/\n    │       │   └── ...\n    │       └── index/\n    │           └── ...\n    ├── .vscode/\n    │   ├── launch.json\n    │   └── mcp.json\n    ├── app/\n    │   ├── api/\n    │   │   ├── chat/\n    │   │   │   └── ...\n    │   │   ├── chat-assistant/\n    │   │   │   └── ...\n    │   │   ├── code-run/\n    │   │   │   └── ...\n    │   │   ├── cover-letter/\n    │   │   │   └── ...\n    │   │   ├── cover-letter-chat/\n    │   │   │   └── ...\n    │   │   ├── doc/\n    │   │   │   └── ...\n    │   │   ├── email-draft/\n    │   │   │   └── ...\n    │   │   ├── feedback/\n    │   │   │   └── ...\n    │   │   ├── generate-pdf/\n    │   │   │   └── ...\n    │   │   ├── github/\n    │   │   │   └── ...\n    │   │   ├── job-search/\n    │   │   │   └── ...\n    │   │   ├── latex-pdf/\n    │   │   │   └── ...\n    │   │   ├── mcp/\n    │   │   │   └── ...\n    │   │   ├── memory-vault/\n    │   │   │   └── ...\n    │   │   ├── openapi/\n    │   │   │   └── ...\n    │   │   ├── pdf/\n    │   │   │   └── ...\n    │   │   ├── translate/\n    │   │   │   └── ...\n    │   │   ├── user/\n    │   │   │   └── ...\n    │   │   ├── webhooks/\n    │   │   │   └── ...\n    │   │   └── webview/\n    │   │       └── ...\n    │   ├── bg/\n    │   │   └── page.tsx\n    │   ├── chat/\n    │   │   ├── error.tsx\n    │   │   ├── layout.tsx\n    │   │   └── page.tsx\n    │   ├── cover-letter/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── donate/\n    │   │   └── page.tsx\n    │   ├── feedback/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── price/\n    │   │   ├── globals.css\n    │   │   ├── layout.tsx\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── sign-in/\n    │   │   └── [[...sign-in]]/\n    │   │       └── ...\n    │   ├── sign-up/\n    │   │   └── [[...sign-up]]/\n    │   │       └── ...\n    │   ├── globals.css\n    │   ├── icon.svg\n    │   ├── layout.tsx\n    │   ├── loading.tsx\n    │   └── page.tsx\n    ├── applications/\n    │   ├── 21X_Software_Engineer_C.pdf\n    │   ├── 21X_Software_Engineer_CV.pdf\n    │   ├── Master_AI_Robotics_FullStack_CV.pdf\n    │   ├── Software_Engineer_Java_React_C.pdf\n    │   ├── Software_Engineer_Java_React_CV.pdf\n    │   ├── Vagas_Senior_Fullstack_Python_C.pdf\n    │   └── Vagas_Senior_Fullstack_Python_CV.pdf\n    ├── components/\n    │   ├── ai-elements/\n    │   │   ├── agent.tsx\n    │   │   ├── attachments.tsx\n    │   │   ├── chain-of-thought.tsx\n    │   │   ├── index.ts\n    │   │   ├── jsx-preview.tsx\n    │   │   ├── persona.tsx\n    │   │   ├── reasoning.tsx\n    │   │   ├── shimmer.tsx\n    │   │   └── web-preview.tsx\n    │   ├── auth/\n    │   │   ├── auth-modal.tsx\n    │   │   └── user-menu.tsx\n    │   ├── chat/\n    │   │   ├── components/\n    │   │   │   └── ...\n    │   │   ├── ai-chat-career.tsx\n    │   │   ├── ai-chat.tsx\n    │   │   ├── chat-ambient.tsx\n    │   │   ├── chat-artifact-chrome.tsx\n    │   │   ├── chat-component-registry.tsx\n    │   │   ├── chat-cv-tabs.tsx\n    │   │   ├── chat-feedback.tsx\n    │   │   ├── chat-input.tsx\n    │   │   ├── chat-message-renderer.tsx\n    │   │   ├── chat-onboarding.tsx\n    │   │   ├── chat-sidebar.tsx\n    │   │   ├── chat-store.tsx\n    │   │   ├── chromium-webview.tsx\n    │   │   ├── component-renderer.tsx\n    │   │   ├── context-window.tsx\n    │   │   ├── job-profile-dialog.tsx\n    │   │   ├── job-suggestions-panel.tsx\n    │   │   ├── markdown-renderer.tsx\n    │   │   ├── mcp-dialog.tsx\n    │   │   ├── profile-photo-crop-dialog.tsx\n    │   │   ├── profile-settings-dialog.tsx\n    │   │   ├── resume-latex-artifact.tsx\n    │   │   ├── sidebar-integrations-accordion.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── text-selection-popover.tsx\n    │   │   ├── thinking-indicator.tsx\n    │   │   └── translation-controls.tsx\n    │   ├── donation/\n    │   │   ├── animations/\n    │   │   │   └── ...\n    │   │   ├── donation-widget.tsx\n    │   │   ├── faq-section.tsx\n    │   │   ├── impact-section.tsx\n    │   │   └── testimonials-section.tsx\n    │   ├── logos/\n    │   │   └── logos.ts\n    │   ├── pdf-templates/\n    │   │   ├── coverletter/\n    │   │   │   └── ...\n    │   │   ├── cv/\n    │   │   │   └── ...\n    │   │   └── index.tsx\n    │   ├── resume-coverletter/\n    │   │   ├── cover-letter-chat.tsx\n    │   │   ├── cover-letter-editor.tsx\n    │   │   ├── cover-letter-pdf-viewer.tsx\n    │   │   ├── cover-letter-preview.tsx\n    │   │   ├── debug-profile-image.tsx\n    │   │   ├── enhanced-chat.tsx\n    │   │   ├── loading-screen.tsx\n    │   │   ├── pdf-renderer.tsx\n    │   │   ├── pdf-viewer.tsx\n    │   │   ├── resume-editor.tsx\n    │   │   └── theme-provider.tsx\n    │   ├── ui/\n    │   │   ├── accordion.tsx\n    │   │   ├── alert-dialog.tsx\n    │   │   ├── alert.tsx\n    │   │   ├── aspect-ratio.tsx\n    │   │   ├── avatar.tsx\n    │   │   ├── badge.tsx\n    │   │   ├── bolt-style-chat.tsx\n    │   │   ├── breadcrumb.tsx\n    │   │   ├── button-1.tsx\n    │   │   ├── button.tsx\n    │   │   ├── calendar.tsx\n    │   │   ├── card.tsx\n    │   │   ├── carousel.tsx\n    │   │   ├── chart.tsx\n    │   │   ├── checkbox.tsx\n    │   │   ├── collapsible.tsx\n    │   │   ├── command.tsx\n    │   │   ├── context-menu.tsx\n    │   │   ├── dialog.tsx\n    │   │   ├── drawer.tsx\n    │   │   ├── dropdown-menu.tsx\n    │   │   ├── enhanced-marquee.tsx\n    │   │   ├── form.tsx\n    │   │   ├── hover-card.tsx\n    │   │   ├── infinite-marquee.tsx\n    │   │   ├── input-otp.tsx\n    │   │   ├── input.tsx\n    │   │   ├── label.tsx\n    │   │   ├── menubar.tsx\n    │   │   ├── navigation-menu.tsx\n    │   │   ├── pagination.tsx\n    │   │   ├── particle-text-effect.tsx\n    │   │   ├── popover.tsx\n    │   │   ├── progress.tsx\n    │   │   ├── radio-group.tsx\n    │   │   ├── resizable.tsx\n    │   │   ├── scroll-area.tsx\n    │   │   ├── select.tsx\n    │   │   ├── separator.tsx\n    │   │   ├── sheet.tsx\n    │   │   ├── shine-border.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── skeleton.tsx\n    │   │   ├── slider.tsx\n    │   │   ├── sonner.tsx\n    │   │   ├── stepper.tsx\n    │   │   ├── switch.tsx\n    │   │   ├── table.tsx\n    │   │   ├── tabs.tsx\n    │   │   ├── textarea.tsx\n    │   │   ├── the-infinite-grid.tsx\n    │   │   ├── toast.tsx\n    │   │   ├── toaster.tsx\n    │   │   ├── toggle-group.tsx\n    │   │   ├── toggle.tsx\n    │   │   ├── tooltip.tsx\n    │   │   ├── use-mobile.tsx\n    │   │   └── use-toast.ts\n    │   ├── app-nav.tsx\n    │   ├── cookie-banner.tsx\n    │   ├── package-manager-ui.tsx\n    │   └── theme-toggle.tsx\n    ├── database/\n    │   └── migrations.ts\n    ├── drizzle/\n    │   ├── meta/\n    │   │   ├── _journal.json\n    │   │   ├── 0000_snapshot.json\n    │   │   └── 0001_snapshot.json\n    │   ├── 0000_optimal_fallen_one.sql\n    │   └── 0001_wandering_starjammers.sql\n    ├── hooks/\n    │   ├── use-mobile.tsx\n    │   └── use-toast.ts\n    ├── lib/\n    │   ├── auth/\n    │   │   ├── auth-provider.tsx\n    │   │   └── clerk-config.ts\n    │   ├── browser/\n    │   │   └── playwright-service.ts\n    │   ├── cache/\n    │   │   └── redis.ts\n    │   ├── crypto/\n    │   │   └── encryption.ts\n    │   ├── db/\n    │   │   ├── index.ts\n    │   │   ├── plsql-storage.ts\n    │   │   └── schema.ts\n    │   ├── email/\n    │   │   └── resend.ts\n    │   ├── github/\n    │   │   └── sync.ts\n    │   ├── job-scraper/\n    │   │   ├── google-jobs.ts\n    │   │   └── live-scraper.ts\n    │   ├── mcp/\n    │   │   └── mcp-manager.ts\n    │   ├── neo4j/\n    │   │   ├── driver.ts\n    │   │   └── graph-service.ts\n    │   ├── scrapers/\n    │   │   └── profile-scrapers.ts\n    │   ├── storage/\n    │   │   └── r2.ts\n    │   ├── api-auth.ts\n    │   ├── bergamot-translator-client.ts\n    │   ├── bolt-models.tsx\n    │   ├── chat-history.ts\n    │   ├── chat-models.ts\n    │   ├── chat-onboarding-video.ts\n    │   ├── chat-provider-settings.ts\n    │   ├── chat-resume-context.ts\n    │   ├── chat-textarea.ts\n    │   ├── clipboard.ts\n    │   ├── cover-letter-pdf-generator.tsx\n    │   ├── default-cover-letter.ts\n    │   ├── default-resume-data.ts\n    │   ├── email-compose-urls.ts\n    │   ├── email-draft-errors.ts\n    │   ├── extract-resume-json.ts\n    │   ├── faq.ts\n    │   ├── gallery-data.ts\n    │   ├── linkedin-outreach.ts\n    │   ├── mcp-client.ts\n    │   ├── memory-store.ts\n    │   ├── memory-vault.ts\n    │   ├── message-utils.ts\n    │   ├── model-provider-icon.tsx\n    │   ├── multi-model-docs.ts\n    │   ├── normalize-attached-file.ts\n    │   ├── normalize-sections-resume.ts\n    │   ├── pdf-generator.ts\n    │   ├── pdf-generator.tsx\n    │   ├── redact-resume-pii.ts\n    │   ├── resume-schema.ts\n    │   ├── safe-local-storage.ts\n    │   ├── sanitize-cover-letter-data.ts\n    │   ├── sanitize-resume-data.ts\n    │   ├── streaming-chat-content.ts\n    │   ├── translation.ts\n    │   ├── types.ts\n    │   ├── user-knowledge-context.ts\n    │   └── utils.ts\n    ├── public/\n    │   ├── bergamot/\n    │   │   ├── bergamot-translator-worker.js\n    │   │   ├── bergamot-translator-worker.wasm\n    │   │   └── translator-worker.js\n    │   ├── deepmind-picture-2.jpg\n    │   ├── icon.svg\n    │   └── placeholder.svg\n    ├── scripts/\n    │   ├── build-accenture-a2.js\n    │   ├── build-accenture-application.js\n    │   ├── build-application-packages.ts\n    │   ├── build-hws-application.js\n    │   ├── build-project-template-applications.js\n    │   ├── compile-applications.ts\n    │   ├── drop-agent-harnesses.ts\n    │   ├── generate-21x-package.ts\n    │   ├── generate-application-pdfs.js\n    │   ├── generate-java-react-package.ts\n    │   ├── generate-master-cv.ts\n    │   ├── generate-pdf.ts\n    │   ├── generate-vagas-package.ts\n    │   ├── mcp-server.ts\n    │   ├── migrate.mjs\n    │   ├── migrate.ts\n    │   ├── test-pdf-endpoints.ts\n    │   └── workflow.ts\n    ├── styles/\n    │   └── globals.css\n    ├── .gitignore\n    ├── .npmrc\n    ├── about.md\n    ├── cjs-shim.ts\n    ├── components.json\n    ├── declarations.d.ts\n    ├── drizzle.config.ts\n    ├── eslint.config.mjs\n    ├── next.config.mjs\n    ├── package-lock.json\n    ├── package.json\n    ├── pnpm-lock.yaml\n    ├── pnpm-workspace.yaml\n    ├── postcss.config.mjs\n    ├── proxy.ts\n    ├── README-MCP.md\n    ├── tailwind.config.ts\n    ├── test-render.tsx\n    ├── ts_errors.txt\n    ├── tsconfig.json\n    ├── vitest.config.ts\n    └── walkthrough.md",
   "keyFiles": [
     {
       "path": ".agents/mcp_config.json",
       "description": "Environment or tool configuration."
     },
     {
+      "path": "components/ai-elements/index.ts",
+      "description": "UI or modular structural component."
+    },
+    {
       "path": "components/pdf-templates/index.tsx",
       "description": "UI or modular structural component."
+    },
+    {
+      "path": "lib/auth/clerk-config.ts",
+      "description": "Exports `isClerkConfigured` function."
+    },
+    {
+      "path": "lib/db/index.ts",
+      "description": "Exports `db` definition."
+    },
+    {
+      "path": "drizzle.config.ts",
+      "description": "Exports default `defineConfig` component/module."
     },
     {
       "path": "eslint.config.mjs",
@@ -44,10 +61,6 @@
       "description": "PostCSS configuration for CSS transformations."
     },
     {
-      "path": "README-INTERVIEW-LAB.md",
-      "description": "Project documentation and overview."
-    },
-    {
       "path": "README-MCP.md",
       "description": "Project documentation and overview."
     },
@@ -64,20 +77,8 @@
       "description": "Vitest testing framework configuration."
     },
     {
-      "path": "__tests__/chat-onboarding-video.test.ts",
-      "description": "Automated test suite."
-    },
-    {
-      "path": "__tests__/chat-textarea.test.ts",
-      "description": "Automated test suite."
-    },
-    {
-      "path": "__tests__/dependency-check.test.ts",
-      "description": "Automated test suite."
-    },
-    {
-      "path": "__tests__/email-draft-errors.test.ts",
-      "description": "Automated test suite."
+      "path": "__tests__/all-chat-components-resilience.test.ts",
+      "description": "UI or modular structural component."
     }
   ],
   "dependencies": {
@@ -89,9 +90,11 @@
       "@ai-sdk/react": "^3.0.118",
       "@ai-sdk/ui-utils": "^1.2.11",
       "@browsermt/bergamot-translator": "^0.4.9",
+      "@clerk/nextjs": "^7.9.1",
       "@dnd-kit/core": "^6.3.1",
       "@dnd-kit/sortable": "^10.0.0",
       "@dnd-kit/utilities": "^3.2.2",
+      "@sparticuz/chromium": "^133.0.0",
       "@google/genai": "^1.16.0",
       "@google/generative-ai": "^0.21.0",
       "@hookform/resolvers": "^3.9.1",
@@ -140,6 +143,8 @@
       "clsx": "^2.1.1",
       "cmdk": "^1.0.4",
       "date-fns": "^4.1.0",
+      "dotenv": "^17.4.2",
+      "drizzle-orm": "^0.45.2",
       "embla-carousel-react": "^8.5.1",
       "framer-motion": "^11.11.17",
       "franc-min": "^6.2.0",
@@ -153,16 +158,20 @@
       "mime": "^4.0.7",
       "motion": "^12.38.0",
       "multer": "^2.0.2",
+      "neo4j-driver": "^6.2.0",
       "next": "^16.1.6",
       "next-themes": "^0.4.4",
       "pdf-parse": "^1.1.1",
       "pdfjs-dist": "^5.4.54",
+      "playwright-core": "^1.63.0",
+      "postgres": "^3.4.9",
       "radix-ui": "^1.4.3",
       "react": "^19.0.0",
       "react-day-picker": "^9.4.4",
       "react-dom": "^19.0.0",
       "react-easy-crop": "^5.5.7",
       "react-hook-form": "^7.54.1",
+      "react-jsx-parser": "^2.4.1",
       "react-markdown": "^10.1.0",
       "react-resizable-panels": "^2.1.7",
       "recharts": "^2.15.0",
@@ -173,6 +182,7 @@
       "remark-math": "^6.0.0",
       "sonner": "^1.7.4",
       "streamdown": "^2.5.0",
+      "svix": "^2.3.0",
       "tailwind-merge": "^2.5.5",
       "tailwindcss-animate": "^1.0.7",
       "tsx": "^4.21.0",
@@ -180,6 +190,7 @@
       "zod": "^4.3.6"
     },
     "development": {
+      "@playwright/test": "^1.49.1",
       "@scalar/nextjs-api-reference": "0.4.106",
       "@types/katex": "^0.16.8",
       "@types/multer": "^2.0.0",
@@ -187,6 +198,7 @@
       "@types/pdf-parse": "^1.1.5",
       "@types/react": "^19.0.0",
       "@types/react-dom": "^19.0.0",
+      "drizzle-kit": "^0.31.10",
       "eslint": "^9.39.4",
       "eslint-config-next": "^16.2.2",
       "postcss": "^8.4.47",
@@ -197,15 +209,39 @@
   },
   "entryPoints": [
     "components/chat/ai-chat.tsx",
+    "components/ai-elements/index.ts",
     "components/resume-coverletter/cover-letter-preview.tsx",
-    "lib/pdf-generator.tsx",
-    "scripts/build-application-packages.ts",
-    "scripts/compile-applications.ts",
-    "scripts/generate-pdf.ts",
-    "app/layout.tsx"
+    "scripts/generate-21x-package.ts",
+    "scripts/generate-java-react-package.ts",
+    "scripts/generate-vagas-package.ts",
+    "lib/pdf-generator.tsx"
   ],
   "dependencyGraph": {
     "nodes": [
+      {
+        "file": "__tests__/all-chat-components-resilience.test.ts",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/autonomous-browser-mcp.test.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/chat-feedback.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/chat-keyboard-shortcuts.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
       {
         "file": "__tests__/chat-onboarding-video.test.ts",
         "type": "module",
@@ -214,6 +250,24 @@
       },
       {
         "file": "__tests__/chat-textarea.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/component-stage-and-proxy.test.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/cover-letter-resilience.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/database-migration.test.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -231,13 +285,13 @@
         "importedBy": []
       },
       {
-        "file": "__tests__/extract-resume-json.test.ts",
+        "file": "__tests__/encryption.test.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
       },
       {
-        "file": "__tests__/interview-lab-support.test.ts",
+        "file": "__tests__/extract-resume-json.test.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -255,7 +309,43 @@
         "importedBy": []
       },
       {
+        "file": "__tests__/lockfile-sync.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/master-rag-vault.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/mcp-protocol.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/memory-vault.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/neo4j-graph.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "__tests__/normalize-attached-file.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/onboarding-db.test.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -264,6 +354,32 @@
         "file": "__tests__/pdf-template-resilience.test.ts",
         "type": "module",
         "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/persona-and-auth-sync.test.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/prod-leak-prevention.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/profile-scrapers.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "__tests__/resume-schema.test.ts",
+        "type": "module",
+        "imports": [
+          "lib/resume-schema.ts"
+        ],
         "importedBy": []
       },
       {
@@ -291,7 +407,22 @@
         "importedBy": []
       },
       {
+        "file": "__tests__/thinking-and-tools.test.ts",
+        "type": "entry",
+        "imports": [
+          "lib/streaming-chat-content.ts",
+          "lib/extract-resume-json.ts"
+        ],
+        "importedBy": []
+      },
+      {
         "file": "__tests__/user-knowledge-context.test.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/chat/feedback/route.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -357,25 +488,7 @@
         "importedBy": []
       },
       {
-        "file": "app/api/interview-lab/sandbox/route.ts",
-        "type": "module",
-        "imports": [],
-        "importedBy": []
-      },
-      {
-        "file": "app/api/interview-lab/sandbox-run/route.ts",
-        "type": "module",
-        "imports": [],
-        "importedBy": []
-      },
-      {
-        "file": "app/api/interview-lab/transcribe/route.ts",
-        "type": "module",
-        "imports": [],
-        "importedBy": []
-      },
-      {
-        "file": "app/api/interview-lab/route.ts",
+        "file": "app/api/github/sync/route.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -393,7 +506,19 @@
         "importedBy": []
       },
       {
+        "file": "app/api/mcp/harness/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "app/api/mcp/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/memory-vault/parse/route.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -417,6 +542,30 @@
         "importedBy": []
       },
       {
+        "file": "app/api/user/keys/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/user/profile/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/user/resumes/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/webhooks/clerk/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "app/api/webhooks/cover-letter-completed/route.ts",
         "type": "module",
         "imports": [],
@@ -430,6 +579,24 @@
       },
       {
         "file": "app/api/webhooks/pdf-completed/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/webview/browser/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/webview/check-headers/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/webview/proxy/route.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -507,6 +674,18 @@
         "importedBy": []
       },
       {
+        "file": "app/sign-in/[[...sign-in]]/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/sign-up/[[...sign-up]]/page.tsx",
+        "type": "entry",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "app/layout.tsx",
         "type": "entry",
         "imports": [
@@ -527,10 +706,59 @@
         "importedBy": []
       },
       {
+        "file": "components/ai-elements/agent.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/ai-elements/index.ts"
+        ]
+      },
+      {
         "file": "components/ai-elements/attachments.tsx",
         "type": "component",
         "imports": [],
+        "importedBy": [
+          "components/ai-elements/index.ts"
+        ]
+      },
+      {
+        "file": "components/ai-elements/chain-of-thought.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/ai-elements/index.ts"
+        ]
+      },
+      {
+        "file": "components/ai-elements/index.ts",
+        "type": "entry",
+        "imports": [
+          "components/ai-elements/agent.tsx",
+          "components/ai-elements/attachments.tsx",
+          "components/ai-elements/chain-of-thought.tsx",
+          "components/ai-elements/jsx-preview.tsx",
+          "components/ai-elements/reasoning.tsx",
+          "components/ai-elements/shimmer.tsx",
+          "components/ai-elements/web-preview.tsx",
+          "components/ai-elements/persona.tsx"
+        ],
         "importedBy": []
+      },
+      {
+        "file": "components/ai-elements/jsx-preview.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/ai-elements/index.ts"
+        ]
+      },
+      {
+        "file": "components/ai-elements/persona.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/ai-elements/index.ts"
+        ]
       },
       {
         "file": "components/ai-elements/reasoning.tsx",
@@ -538,18 +766,57 @@
         "imports": [
           "components/ai-elements/shimmer.tsx"
         ],
-        "importedBy": []
+        "importedBy": [
+          "components/ai-elements/index.ts"
+        ]
       },
       {
         "file": "components/ai-elements/shimmer.tsx",
-        "type": "component",
+        "type": "util",
         "imports": [],
         "importedBy": [
+          "components/ai-elements/index.ts",
           "components/ai-elements/reasoning.tsx"
         ]
       },
       {
+        "file": "components/ai-elements/web-preview.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/ai-elements/index.ts"
+        ]
+      },
+      {
+        "file": "components/auth/auth-modal.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "components/auth/user-menu.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "components/chat/components/auto-applier.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/browser-controller.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
+        "file": "components/chat/components/chart-viewer.tsx",
         "type": "component",
         "imports": [],
         "importedBy": [
@@ -565,6 +832,16 @@
         ]
       },
       {
+        "file": "components/chat/components/component-stage.tsx",
+        "type": "component",
+        "imports": [
+          "components/chat/component-renderer.tsx"
+        ],
+        "importedBy": [
+          "components/chat/ai-chat.tsx"
+        ]
+      },
+      {
         "file": "components/chat/components/cover-letter-single-block-editor.tsx",
         "type": "component",
         "imports": [],
@@ -574,11 +851,12 @@
       },
       {
         "file": "components/chat/components/cover-letter-viewer.tsx",
-        "type": "component",
+        "type": "util",
         "imports": [
           "components/chat/components/cover-letter-single-block-editor.tsx"
         ],
         "importedBy": [
+          "components/chat/chat-component-registry.tsx",
           "components/chat/component-renderer.tsx"
         ]
       },
@@ -607,6 +885,15 @@
         ]
       },
       {
+        "file": "components/chat/components/job-scraper-card.tsx",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "components/chat/chat-component-registry.tsx",
+          "components/chat/component-renderer.tsx"
+        ]
+      },
+      {
         "file": "components/chat/components/learning-resources.tsx",
         "type": "component",
         "imports": [],
@@ -616,14 +903,6 @@
       },
       {
         "file": "components/chat/components/linkedin-dm-panel.tsx",
-        "type": "component",
-        "imports": [],
-        "importedBy": [
-          "components/chat/component-renderer.tsx"
-        ]
-      },
-      {
-        "file": "components/chat/components/mock-interview.tsx",
         "type": "component",
         "imports": [],
         "importedBy": [
@@ -651,10 +930,14 @@
           "components/chat/markdown-renderer.tsx",
           "components/chat/component-renderer.tsx",
           "components/chat/chat-store.tsx",
+          "components/chat/profile-settings-dialog.tsx",
+          "components/chat/chat-feedback.tsx",
+          "components/chat/chromium-webview.tsx",
+          "components/chat/components/component-stage.tsx",
           "components/chat/sidebar.tsx",
           "components/chat/job-suggestions-panel.tsx",
           "components/chat/chat-onboarding.tsx",
-          "components/chat/interview-lab-panel.tsx"
+          "components/chat/mcp-dialog.tsx"
         ],
         "importedBy": []
       },
@@ -674,7 +957,8 @@
         "file": "components/chat/chat-component-registry.tsx",
         "type": "component",
         "imports": [
-          "components/chat/mock-interview-interactive.tsx"
+          "components/chat/components/job-scraper-card.tsx",
+          "components/chat/components/cover-letter-viewer.tsx"
         ],
         "importedBy": [
           "components/chat/chat-message-renderer.tsx"
@@ -685,6 +969,14 @@
         "type": "component",
         "imports": [],
         "importedBy": []
+      },
+      {
+        "file": "components/chat/chat-feedback.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/ai-chat.tsx"
+        ]
       },
       {
         "file": "components/chat/chat-input.tsx",
@@ -728,6 +1020,14 @@
         ]
       },
       {
+        "file": "components/chat/chromium-webview.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/chat/ai-chat.tsx"
+        ]
+      },
+      {
         "file": "components/chat/component-renderer.tsx",
         "type": "component",
         "imports": [
@@ -735,16 +1035,18 @@
           "components/chat/components/cv-score.tsx",
           "components/chat/components/job-recommendations.tsx",
           "components/chat/components/auto-applier.tsx",
-          "components/chat/components/mock-interview.tsx",
           "components/chat/components/coding-challenge.tsx",
           "components/chat/components/learning-resources.tsx",
           "components/chat/components/cover-letter-viewer.tsx",
           "components/chat/components/email-hr-panel.tsx",
           "components/chat/components/linkedin-dm-panel.tsx",
-          "components/chat/interview-lab-panel.tsx",
-          "components/chat/resume-latex-artifact.tsx"
+          "components/chat/components/job-scraper-card.tsx",
+          "components/chat/resume-latex-artifact.tsx",
+          "components/chat/components/chart-viewer.tsx",
+          "components/chat/components/browser-controller.tsx"
         ],
         "importedBy": [
+          "components/chat/components/component-stage.tsx",
           "components/chat/ai-chat.tsx"
         ]
       },
@@ -754,15 +1056,6 @@
         "imports": [],
         "importedBy": [
           "components/chat/chat-sidebar.tsx"
-        ]
-      },
-      {
-        "file": "components/chat/interview-lab-panel.tsx",
-        "type": "util",
-        "imports": [],
-        "importedBy": [
-          "components/chat/ai-chat.tsx",
-          "components/chat/component-renderer.tsx"
         ]
       },
       {
@@ -792,11 +1085,12 @@
         ]
       },
       {
-        "file": "components/chat/mock-interview-interactive.tsx",
-        "type": "component",
+        "file": "components/chat/mcp-dialog.tsx",
+        "type": "util",
         "imports": [],
         "importedBy": [
-          "components/chat/chat-component-registry.tsx"
+          "components/chat/ai-chat.tsx",
+          "components/chat/sidebar-integrations-accordion.tsx"
         ]
       },
       {
@@ -807,11 +1101,12 @@
       },
       {
         "file": "components/chat/profile-settings-dialog.tsx",
-        "type": "component",
+        "type": "util",
         "imports": [
           "components/chat/chat-store.tsx"
         ],
         "importedBy": [
+          "components/chat/ai-chat.tsx",
           "components/chat/sidebar.tsx"
         ]
       },
@@ -825,21 +1120,19 @@
       },
       {
         "file": "components/chat/sidebar-integrations-accordion.tsx",
-        "type": "component",
+        "type": "entry",
         "imports": [
-          "components/chat/chat-store.tsx"
+          "components/chat/chat-store.tsx",
+          "components/chat/mcp-dialog.tsx"
         ],
-        "importedBy": [
-          "components/chat/sidebar.tsx"
-        ]
+        "importedBy": []
       },
       {
         "file": "components/chat/sidebar.tsx",
         "type": "component",
         "imports": [
           "components/chat/chat-store.tsx",
-          "components/chat/profile-settings-dialog.tsx",
-          "components/chat/sidebar-integrations-accordion.tsx"
+          "components/chat/profile-settings-dialog.tsx"
         ],
         "importedBy": [
           "components/chat/ai-chat.tsx"
@@ -956,10 +1249,11 @@
       },
       {
         "file": "components/pdf-templates/coverletter/german-anschreiben-template.tsx",
-        "type": "component",
+        "type": "util",
         "imports": [],
         "importedBy": [
-          "components/pdf-templates/index.tsx"
+          "components/pdf-templates/index.tsx",
+          "scripts/build-project-template-applications.js"
         ]
       },
       {
@@ -981,10 +1275,12 @@
       },
       {
         "file": "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
-        "type": "component",
+        "type": "util",
         "imports": [],
         "importedBy": [
-          "components/pdf-templates/index.tsx"
+          "components/pdf-templates/index.tsx",
+          "scripts/build-accenture-a2.js",
+          "scripts/build-project-template-applications.js"
         ]
       },
       {
@@ -1052,6 +1348,14 @@
         ]
       },
       {
+        "file": "components/pdf-templates/cv/general-resumes/ivy-league-pdf-template.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
         "file": "components/pdf-templates/cv/general-resumes/minimal-clean-pdf-template.tsx",
         "type": "component",
         "imports": [],
@@ -1069,10 +1373,12 @@
       },
       {
         "file": "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
-        "type": "component",
+        "type": "util",
         "imports": [],
         "importedBy": [
-          "components/pdf-templates/index.tsx"
+          "components/pdf-templates/index.tsx",
+          "scripts/build-accenture-a2.js",
+          "scripts/build-project-template-applications.js"
         ]
       },
       {
@@ -1102,6 +1408,14 @@
         ]
       },
       {
+        "file": "components/pdf-templates/cv/german-templates/GermanBurgundyDualTemplate.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
         "file": "components/pdf-templates/cv/german-templates/GermanLebenslaufTemplate.tsx",
         "type": "component",
         "imports": [],
@@ -1111,6 +1425,38 @@
       },
       {
         "file": "components/pdf-templates/cv/german-templates/GermanModernLebenslaufTemplate.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/german-templates/GermanRoseGoldTemplate.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/german-templates/GermanSlateSplitTemplate.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/german-templates/GermanTealWaveTemplate.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": [
+          "components/pdf-templates/index.tsx"
+        ]
+      },
+      {
+        "file": "components/pdf-templates/cv/german-templates/GermanTimelineMinimalTemplate.tsx",
         "type": "component",
         "imports": [],
         "importedBy": [
@@ -1147,6 +1493,12 @@
           "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
           "components/pdf-templates/cv/german-templates/GermanLebenslaufTemplate.tsx",
           "components/pdf-templates/cv/german-templates/GermanModernLebenslaufTemplate.tsx",
+          "components/pdf-templates/cv/german-templates/GermanTealWaveTemplate.tsx",
+          "components/pdf-templates/cv/german-templates/GermanSlateSplitTemplate.tsx",
+          "components/pdf-templates/cv/german-templates/GermanRoseGoldTemplate.tsx",
+          "components/pdf-templates/cv/german-templates/GermanTimelineMinimalTemplate.tsx",
+          "components/pdf-templates/cv/german-templates/GermanBurgundyDualTemplate.tsx",
+          "components/pdf-templates/cv/general-resumes/ivy-league-pdf-template.tsx",
           "components/pdf-templates/cv/other-resume/RandomColourTemplate.tsx",
           "components/pdf-templates/cv/general-resumes/minimal-clean-pdf-template.tsx",
           "components/pdf-templates/cv/general-resumes/tech-modern-pdf-template.tsx",
@@ -1157,7 +1509,11 @@
           "lib/pdf-generator.tsx",
           "scripts/build-application-packages.ts",
           "scripts/compile-applications.ts",
+          "scripts/generate-21x-package.ts",
+          "scripts/generate-java-react-package.ts",
+          "scripts/generate-master-cv.ts",
           "scripts/generate-pdf.ts",
+          "scripts/generate-vagas-package.ts",
           "scripts/mcp-server.ts"
         ]
       },
@@ -1603,6 +1959,12 @@
         "importedBy": []
       },
       {
+        "file": "components/theme-toggle.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "database/migrations.ts",
         "type": "module",
         "imports": [],
@@ -1621,7 +1983,124 @@
         "importedBy": []
       },
       {
+        "file": "lib/auth/auth-provider.tsx",
+        "type": "component",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/auth/clerk-config.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/browser/playwright-service.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/cache/redis.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/crypto/encryption.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/db/index.ts",
+        "type": "entry",
+        "imports": [
+          "lib/db/schema.ts"
+        ],
+        "importedBy": [
+          "lib/db/plsql-storage.ts"
+        ]
+      },
+      {
+        "file": "lib/db/plsql-storage.ts",
+        "type": "entry",
+        "imports": [
+          "lib/db/index.ts",
+          "lib/db/schema.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "lib/db/schema.ts",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "lib/db/index.ts",
+          "lib/db/plsql-storage.ts"
+        ]
+      },
+      {
+        "file": "lib/email/resend.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/github/sync.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "lib/job-scraper/google-jobs.ts",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "lib/job-scraper/live-scraper.ts",
+          "scripts/mcp-server.ts"
+        ]
+      },
+      {
+        "file": "lib/job-scraper/live-scraper.ts",
+        "type": "module",
+        "imports": [
+          "lib/job-scraper/google-jobs.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "lib/mcp/mcp-manager.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/neo4j/driver.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": [
+          "lib/neo4j/graph-service.ts"
+        ]
+      },
+      {
+        "file": "lib/neo4j/graph-service.ts",
+        "type": "module",
+        "imports": [
+          "lib/neo4j/driver.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "lib/scrapers/profile-scrapers.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": [
+          "scripts/mcp-server.ts"
+        ]
+      },
+      {
+        "file": "lib/storage/r2.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -1694,7 +2173,10 @@
         ],
         "importedBy": [
           "scripts/build-application-packages.ts",
-          "scripts/compile-applications.ts"
+          "scripts/compile-applications.ts",
+          "scripts/generate-21x-package.ts",
+          "scripts/generate-java-react-package.ts",
+          "scripts/generate-vagas-package.ts"
         ]
       },
       {
@@ -1703,15 +2185,18 @@
         "imports": [
           "lib/types.ts"
         ],
-        "importedBy": []
+        "importedBy": [
+          "lib/sanitize-cover-letter-data.ts"
+        ]
       },
       {
         "file": "lib/default-resume-data.ts",
-        "type": "module",
+        "type": "util",
         "imports": [
           "lib/types.ts"
         ],
         "importedBy": [
+          "lib/resume-schema.ts",
           "lib/sanitize-resume-data.ts"
         ]
       },
@@ -1731,7 +2216,9 @@
         "file": "lib/extract-resume-json.ts",
         "type": "module",
         "imports": [],
-        "importedBy": []
+        "importedBy": [
+          "__tests__/thinking-and-tools.test.ts"
+        ]
       },
       {
         "file": "lib/faq.ts",
@@ -1746,19 +2233,25 @@
         "importedBy": []
       },
       {
-        "file": "lib/interview-lab-model-support.ts",
-        "type": "module",
-        "imports": [],
-        "importedBy": []
-      },
-      {
         "file": "lib/linkedin-outreach.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
       },
       {
+        "file": "lib/mcp-client.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "lib/memory-store.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/memory-vault.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -1816,9 +2309,31 @@
         "importedBy": []
       },
       {
+        "file": "lib/resume-schema.ts",
+        "type": "module",
+        "imports": [
+          "lib/types.ts",
+          "lib/default-resume-data.ts",
+          "lib/sanitize-resume-data.ts"
+        ],
+        "importedBy": [
+          "__tests__/resume-schema.test.ts",
+          "lib/sanitize-resume-data.ts"
+        ]
+      },
+      {
         "file": "lib/safe-local-storage.ts",
         "type": "module",
         "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "lib/sanitize-cover-letter-data.ts",
+        "type": "entry",
+        "imports": [
+          "lib/types.ts",
+          "lib/default-cover-letter.ts"
+        ],
         "importedBy": []
       },
       {
@@ -1826,20 +2341,29 @@
         "type": "module",
         "imports": [
           "lib/types.ts",
-          "lib/default-resume-data.ts"
+          "lib/default-resume-data.ts",
+          "lib/resume-schema.ts"
         ],
         "importedBy": [
           "lib/pdf-generator.tsx",
+          "lib/resume-schema.ts",
+          "lib/utils.ts",
           "scripts/build-application-packages.ts",
           "scripts/compile-applications.ts",
-          "scripts/generate-pdf.ts"
+          "scripts/generate-21x-package.ts",
+          "scripts/generate-java-react-package.ts",
+          "scripts/generate-master-cv.ts",
+          "scripts/generate-pdf.ts",
+          "scripts/generate-vagas-package.ts"
         ]
       },
       {
         "file": "lib/streaming-chat-content.ts",
         "type": "module",
         "imports": [],
-        "importedBy": []
+        "importedBy": [
+          "__tests__/thinking-and-tools.test.ts"
+        ]
       },
       {
         "file": "lib/translation.ts",
@@ -1856,8 +2380,14 @@
           "lib/default-cover-letter.ts",
           "lib/default-resume-data.ts",
           "lib/pdf-generator.tsx",
+          "lib/resume-schema.ts",
+          "lib/sanitize-cover-letter-data.ts",
           "lib/sanitize-resume-data.ts",
-          "scripts/generate-pdf.ts"
+          "scripts/generate-21x-package.ts",
+          "scripts/generate-java-react-package.ts",
+          "scripts/generate-master-cv.ts",
+          "scripts/generate-pdf.ts",
+          "scripts/generate-vagas-package.ts"
         ]
       },
       {
@@ -1869,7 +2399,9 @@
       {
         "file": "lib/utils.ts",
         "type": "util",
-        "imports": [],
+        "imports": [
+          "lib/sanitize-resume-data.ts"
+        ],
         "importedBy": []
       },
       {
@@ -1885,12 +2417,47 @@
         "importedBy": []
       },
       {
+        "file": "scripts/build-accenture-a2.js",
+        "type": "entry",
+        "imports": [
+          "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+          "components/pdf-templates/coverletter/modern-cover-letter-template.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/build-accenture-application.js",
+        "type": "module",
+        "imports": [
+          "scripts/generate-application-pdfs.js"
+        ],
+        "importedBy": []
+      },
+      {
         "file": "scripts/build-application-packages.ts",
         "type": "entry",
         "imports": [
           "lib/cover-letter-pdf-generator.tsx",
           "lib/sanitize-resume-data.ts",
           "components/pdf-templates/index.tsx"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/build-hws-application.js",
+        "type": "module",
+        "imports": [
+          "scripts/generate-application-pdfs.js"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/build-project-template-applications.js",
+        "type": "entry",
+        "imports": [
+          "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+          "components/pdf-templates/coverletter/german-anschreiben-template.tsx",
+          "components/pdf-templates/coverletter/modern-cover-letter-template.tsx"
         ],
         "importedBy": []
       },
@@ -1905,6 +2472,53 @@
         "importedBy": []
       },
       {
+        "file": "scripts/drop-agent-harnesses.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/generate-21x-package.ts",
+        "type": "entry",
+        "imports": [
+          "lib/cover-letter-pdf-generator.tsx",
+          "lib/sanitize-resume-data.ts",
+          "components/pdf-templates/index.tsx",
+          "lib/types.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/generate-application-pdfs.js",
+        "type": "util",
+        "imports": [],
+        "importedBy": [
+          "scripts/build-accenture-application.js",
+          "scripts/build-hws-application.js"
+        ]
+      },
+      {
+        "file": "scripts/generate-java-react-package.ts",
+        "type": "entry",
+        "imports": [
+          "lib/cover-letter-pdf-generator.tsx",
+          "lib/sanitize-resume-data.ts",
+          "components/pdf-templates/index.tsx",
+          "lib/types.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/generate-master-cv.ts",
+        "type": "entry",
+        "imports": [
+          "lib/sanitize-resume-data.ts",
+          "components/pdf-templates/index.tsx",
+          "lib/types.ts"
+        ],
+        "importedBy": []
+      },
+      {
         "file": "scripts/generate-pdf.ts",
         "type": "entry",
         "imports": [
@@ -1915,11 +2529,36 @@
         "importedBy": []
       },
       {
-        "file": "scripts/mcp-server.ts",
-        "type": "module",
+        "file": "scripts/generate-vagas-package.ts",
+        "type": "entry",
         "imports": [
-          "components/pdf-templates/index.tsx"
+          "lib/cover-letter-pdf-generator.tsx",
+          "lib/sanitize-resume-data.ts",
+          "components/pdf-templates/index.tsx",
+          "lib/types.ts"
         ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/mcp-server.ts",
+        "type": "entry",
+        "imports": [
+          "components/pdf-templates/index.tsx",
+          "lib/job-scraper/google-jobs.ts",
+          "lib/scrapers/profile-scrapers.ts"
+        ],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/migrate.mjs",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "scripts/migrate.ts",
+        "type": "module",
+        "imports": [],
         "importedBy": []
       },
       {
@@ -1941,6 +2580,18 @@
         "importedBy": []
       },
       {
+        "file": "declarations.d.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "drizzle.config.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
         "file": "eslint.config.mjs",
         "type": "module",
         "imports": [],
@@ -1954,6 +2605,12 @@
       },
       {
         "file": "postcss.config.mjs",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "proxy.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -1981,13 +2638,73 @@
     ],
     "edges": [
       {
+        "from": "__tests__/resume-schema.test.ts",
+        "to": "lib/resume-schema.ts",
+        "type": "import"
+      },
+      {
+        "from": "__tests__/thinking-and-tools.test.ts",
+        "to": "lib/streaming-chat-content.ts",
+        "type": "import"
+      },
+      {
+        "from": "__tests__/thinking-and-tools.test.ts",
+        "to": "lib/extract-resume-json.ts",
+        "type": "import"
+      },
+      {
         "from": "app/layout.tsx",
         "to": "app/globals.css",
         "type": "import"
       },
       {
+        "from": "components/ai-elements/index.ts",
+        "to": "components/ai-elements/agent.tsx",
+        "type": "export"
+      },
+      {
+        "from": "components/ai-elements/index.ts",
+        "to": "components/ai-elements/attachments.tsx",
+        "type": "export"
+      },
+      {
+        "from": "components/ai-elements/index.ts",
+        "to": "components/ai-elements/chain-of-thought.tsx",
+        "type": "export"
+      },
+      {
+        "from": "components/ai-elements/index.ts",
+        "to": "components/ai-elements/jsx-preview.tsx",
+        "type": "export"
+      },
+      {
+        "from": "components/ai-elements/index.ts",
+        "to": "components/ai-elements/reasoning.tsx",
+        "type": "export"
+      },
+      {
+        "from": "components/ai-elements/index.ts",
+        "to": "components/ai-elements/shimmer.tsx",
+        "type": "export"
+      },
+      {
+        "from": "components/ai-elements/index.ts",
+        "to": "components/ai-elements/web-preview.tsx",
+        "type": "export"
+      },
+      {
+        "from": "components/ai-elements/index.ts",
+        "to": "components/ai-elements/persona.tsx",
+        "type": "export"
+      },
+      {
         "from": "components/ai-elements/reasoning.tsx",
         "to": "components/ai-elements/shimmer.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/components/component-stage.tsx",
+        "to": "components/chat/component-renderer.tsx",
         "type": "import"
       },
       {
@@ -2012,6 +2729,26 @@
       },
       {
         "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/profile-settings-dialog.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/chat-feedback.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/chromium-webview.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
+        "to": "components/chat/components/component-stage.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/ai-chat.tsx",
         "to": "components/chat/sidebar.tsx",
         "type": "import"
       },
@@ -2027,12 +2764,17 @@
       },
       {
         "from": "components/chat/ai-chat.tsx",
-        "to": "components/chat/interview-lab-panel.tsx",
+        "to": "components/chat/mcp-dialog.tsx",
         "type": "import"
       },
       {
         "from": "components/chat/chat-component-registry.tsx",
-        "to": "components/chat/mock-interview-interactive.tsx",
+        "to": "components/chat/components/job-scraper-card.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/chat-component-registry.tsx",
+        "to": "components/chat/components/cover-letter-viewer.tsx",
         "type": "import"
       },
       {
@@ -2067,11 +2809,6 @@
       },
       {
         "from": "components/chat/component-renderer.tsx",
-        "to": "components/chat/components/mock-interview.tsx",
-        "type": "import"
-      },
-      {
-        "from": "components/chat/component-renderer.tsx",
         "to": "components/chat/components/coding-challenge.tsx",
         "type": "import"
       },
@@ -2097,12 +2834,22 @@
       },
       {
         "from": "components/chat/component-renderer.tsx",
-        "to": "components/chat/interview-lab-panel.tsx",
+        "to": "components/chat/components/job-scraper-card.tsx",
         "type": "import"
       },
       {
         "from": "components/chat/component-renderer.tsx",
         "to": "components/chat/resume-latex-artifact.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/chart-viewer.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/chat/component-renderer.tsx",
+        "to": "components/chat/components/browser-controller.tsx",
         "type": "import"
       },
       {
@@ -2121,6 +2868,11 @@
         "type": "import"
       },
       {
+        "from": "components/chat/sidebar-integrations-accordion.tsx",
+        "to": "components/chat/mcp-dialog.tsx",
+        "type": "import"
+      },
+      {
         "from": "components/chat/sidebar.tsx",
         "to": "components/chat/chat-store.tsx",
         "type": "import"
@@ -2128,11 +2880,6 @@
       {
         "from": "components/chat/sidebar.tsx",
         "to": "components/chat/profile-settings-dialog.tsx",
-        "type": "import"
-      },
-      {
-        "from": "components/chat/sidebar.tsx",
-        "to": "components/chat/sidebar-integrations-accordion.tsx",
         "type": "import"
       },
       {
@@ -2247,6 +2994,36 @@
       },
       {
         "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/german-templates/GermanTealWaveTemplate.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/german-templates/GermanSlateSplitTemplate.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/german-templates/GermanRoseGoldTemplate.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/german-templates/GermanTimelineMinimalTemplate.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/german-templates/GermanBurgundyDualTemplate.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
+        "to": "components/pdf-templates/cv/general-resumes/ivy-league-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "components/pdf-templates/index.tsx",
         "to": "components/pdf-templates/cv/other-resume/RandomColourTemplate.tsx",
         "type": "import"
       },
@@ -2296,6 +3073,31 @@
         "type": "import"
       },
       {
+        "from": "lib/db/index.ts",
+        "to": "lib/db/schema.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/db/plsql-storage.ts",
+        "to": "lib/db/index.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/db/plsql-storage.ts",
+        "to": "lib/db/schema.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/job-scraper/live-scraper.ts",
+        "to": "lib/job-scraper/google-jobs.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/neo4j/graph-service.ts",
+        "to": "lib/neo4j/driver.ts",
+        "type": "import"
+      },
+      {
         "from": "lib/cover-letter-pdf-generator.tsx",
         "to": "lib/types.ts",
         "type": "import"
@@ -2326,6 +3128,31 @@
         "type": "import"
       },
       {
+        "from": "lib/resume-schema.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/resume-schema.ts",
+        "to": "lib/default-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/resume-schema.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/sanitize-cover-letter-data.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/sanitize-cover-letter-data.ts",
+        "to": "lib/default-cover-letter.ts",
+        "type": "import"
+      },
+      {
         "from": "lib/sanitize-resume-data.ts",
         "to": "lib/types.ts",
         "type": "import"
@@ -2336,6 +3163,36 @@
         "type": "import"
       },
       {
+        "from": "lib/sanitize-resume-data.ts",
+        "to": "lib/resume-schema.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/sanitize-resume-data.ts",
+        "to": "lib/resume-schema.ts",
+        "type": "export"
+      },
+      {
+        "from": "lib/utils.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-accenture-a2.js",
+        "to": "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-accenture-a2.js",
+        "to": "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-accenture-application.js",
+        "to": "scripts/generate-application-pdfs.js",
+        "type": "import"
+      },
+      {
         "from": "scripts/build-application-packages.ts",
         "to": "lib/cover-letter-pdf-generator.tsx",
         "type": "import"
@@ -2351,6 +3208,26 @@
         "type": "import"
       },
       {
+        "from": "scripts/build-hws-application.js",
+        "to": "scripts/generate-application-pdfs.js",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-project-template-applications.js",
+        "to": "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-project-template-applications.js",
+        "to": "components/pdf-templates/coverletter/german-anschreiben-template.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/build-project-template-applications.js",
+        "to": "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
+        "type": "import"
+      },
+      {
         "from": "scripts/compile-applications.ts",
         "to": "lib/sanitize-resume-data.ts",
         "type": "import"
@@ -2363,6 +3240,61 @@
       {
         "from": "scripts/compile-applications.ts",
         "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-21x-package.ts",
+        "to": "lib/cover-letter-pdf-generator.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-21x-package.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-21x-package.ts",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-21x-package.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-java-react-package.ts",
+        "to": "lib/cover-letter-pdf-generator.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-java-react-package.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-java-react-package.ts",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-java-react-package.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-master-cv.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-master-cv.ts",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-master-cv.ts",
+        "to": "lib/types.ts",
         "type": "import"
       },
       {
@@ -2381,8 +3313,38 @@
         "type": "import"
       },
       {
+        "from": "scripts/generate-vagas-package.ts",
+        "to": "lib/cover-letter-pdf-generator.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-vagas-package.ts",
+        "to": "lib/sanitize-resume-data.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-vagas-package.ts",
+        "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/generate-vagas-package.ts",
+        "to": "lib/types.ts",
+        "type": "import"
+      },
+      {
         "from": "scripts/mcp-server.ts",
         "to": "components/pdf-templates/index.tsx",
+        "type": "import"
+      },
+      {
+        "from": "scripts/mcp-server.ts",
+        "to": "lib/job-scraper/google-jobs.ts",
+        "type": "import"
+      },
+      {
+        "from": "scripts/mcp-server.ts",
+        "to": "lib/scrapers/profile-scrapers.ts",
         "type": "import"
       },
       {
@@ -2392,73 +3354,85 @@
       }
     ],
     "coreModules": [
+      "components/ai-elements/reasoning.tsx",
+      "components/ai-elements/shimmer.tsx",
+      "components/chat/components/component-stage.tsx",
       "components/chat/components/cover-letter-viewer.tsx",
+      "components/chat/components/job-scraper-card.tsx",
       "components/chat/chat-component-registry.tsx",
       "components/chat/chat-store.tsx",
       "components/chat/component-renderer.tsx",
-      "components/chat/interview-lab-panel.tsx",
       "components/chat/job-suggestions-panel.tsx",
+      "components/chat/mcp-dialog.tsx",
       "components/chat/profile-settings-dialog.tsx",
-      "components/chat/sidebar-integrations-accordion.tsx",
       "components/chat/sidebar.tsx",
       "components/logos/logos.ts",
       "components/pdf-templates/coverletter/dark-cover-letter-template.tsx",
       "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/german-anschreiben-template.tsx",
       "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
+      "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
       "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
       "components/pdf-templates/coverletter/standard-cover-letter-template.tsx",
       "components/pdf-templates/cv/general-resumes/dark-pdf-template.tsx",
       "components/pdf-templates/cv/general-resumes/gradient-gray-pdf-template.tsx",
       "components/pdf-templates/cv/general-resumes/gradient-pdf-template.tsx",
+      "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
       "components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx",
       "components/pdf-templates/index.tsx",
+      "lib/db/index.ts",
+      "lib/db/schema.ts",
+      "lib/job-scraper/google-jobs.ts",
       "lib/cover-letter-pdf-generator.tsx",
+      "lib/default-cover-letter.ts",
       "lib/default-resume-data.ts",
+      "lib/resume-schema.ts",
       "lib/sanitize-resume-data.ts",
-      "lib/types.ts"
+      "lib/types.ts",
+      "scripts/generate-application-pdfs.js"
     ],
     "utilities": [
       "lib/types.ts",
+      "lib/cover-letter-pdf-generator.tsx",
       "components/chat/chat-store.tsx",
       "components/logos/logos.ts",
-      "components/chat/interview-lab-panel.tsx",
-      "components/pdf-templates/coverletter/dark-cover-letter-template.tsx",
-      "components/pdf-templates/coverletter/elegant-cover-letter-template.tsx",
-      "components/pdf-templates/coverletter/gradient-cover-letter-template.tsx",
-      "components/pdf-templates/coverletter/professional-cover-letter-template.tsx",
-      "components/pdf-templates/coverletter/standard-cover-letter-template.tsx",
-      "lib/cover-letter-pdf-generator.tsx"
+      "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
+      "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+      "components/ai-elements/shimmer.tsx",
+      "components/chat/components/cover-letter-viewer.tsx",
+      "components/chat/components/job-scraper-card.tsx",
+      "components/chat/mcp-dialog.tsx"
     ]
   },
   "recentCommits": [
     {
-      "hash": "9abc8e2",
-      "message": "feat: new feature update 2.9.0",
-      "date": "3 weeks ago",
+      "hash": "e63aa53",
+      "message": "fix: bugfix update to 2.11.4",
+      "date": "3 hours ago",
       "author": "yakkshit"
     },
     {
-      "hash": "08b229b",
-      "message": "feat: new feature update 2.8.0",
-      "date": "4 weeks ago",
+      "hash": "cdcb158",
+      "message": "fix: bugfix update to 2.11.3",
+      "date": "4 hours ago",
       "author": "yakkshit"
     },
     {
-      "hash": "af36e2d",
-      "message": "feat: new feature update 2.7.0",
-      "date": "8 weeks ago",
+      "hash": "4340454",
+      "message": "fix: bugfix update to 2.11.2",
+      "date": "11 hours ago",
       "author": "yakkshit"
     },
     {
-      "hash": "bb06e38",
-      "message": "fix: bugfix update to 2.6.7",
-      "date": "8 weeks ago",
+      "hash": "433c6a3",
+      "message": "fix: bugfix update to 2.11.1",
+      "date": "21 hours ago",
       "author": "yakkshit"
     },
     {
-      "hash": "e3c1dc0",
-      "message": "fix: bugfix update to 2.6.6",
-      "date": "8 weeks ago",
+      "hash": "b03a2cf",
+      "message": "feat: new feature update 2.11.0",
+      "date": "22 hours ago",
       "author": "yakkshit"
     }
   ],

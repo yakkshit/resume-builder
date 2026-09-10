@@ -358,8 +358,6 @@ export function ProfileSettingsDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => {
-      // Prevent closing during onboarding unless they click cancel/skip
-      if (isOnboarding && !v) return;
       onOpenChange(v);
     }}>
       <DialogContent className="max-w-2xl max-h-[88dvh] overflow-y-auto rounded-2xl border-border/70 bg-background/95 backdrop-blur-xl p-6">

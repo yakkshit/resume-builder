@@ -2,17 +2,16 @@
 
 ## Overview
 
-**README-INTERVIEW-LAB.md**: This repo is a Next.js application that combines: - Resume Builder (build and export a resume) - Career Assistant Chat (multi-model chat with session-only API keys) - Cover Letter workflow - Interview Lab (mock interview rounds, coding tests, and live coaching) This document is the “one stop” guide for running the app, configuring Integrations, and understanding Interview Lab architecture.
-
-**README-MCP.md**: This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor, ChatGPT, Custom Agents) to list templates and generate Resume & Cover Letter PDFs. It supports both: 1. Stdio mode (local CLI / desktop clients) 2. Hosted HTTP JSON-RPC Endpoint (/api/mcp for cloud/remote agent hosting) ---
+This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor, ChatGPT, Custom Agents) to list templates and generate Resume & Cover Letter PDFs. It supports both: 1. Stdio mode (local CLI / desktop clients) 2. Hosted HTTP JSON-RPC Endpoint (/api/mcp for cloud/remote agent hosting) ---
 
 
 ## Tech Stack
 
 - TypeScript
-- JSON
 - React (TSX)
+- JSON
 - CSS
+- SQL
 - JavaScript
 - Markdown
 - YAML
@@ -28,20 +27,41 @@
 ```text
 └── cv-main/
     ├── __tests__/
+    │   ├── all-chat-components-resilience.test.ts
+    │   ├── autonomous-browser-mcp.test.tsx
+    │   ├── chat-feedback.test.ts
+    │   ├── chat-keyboard-shortcuts.test.ts
     │   ├── chat-onboarding-video.test.ts
     │   ├── chat-textarea.test.ts
+    │   ├── component-stage-and-proxy.test.tsx
+    │   ├── cover-letter-resilience.test.ts
+    │   ├── database-migration.test.ts
     │   ├── dependency-check.test.ts
     │   ├── email-draft-errors.test.ts
+    │   ├── encryption.test.ts
     │   ├── extract-resume-json.test.ts
-    │   ├── interview-lab-support.test.ts
+    │   ├── github-sync-encrypted.test.ts
+    │   ├── github-sync-service.test.ts
+    │   ├── gitlab-sync.test.ts
     │   ├── job-scraper.test.ts
     │   ├── linkedin-outreach.test.ts
+    │   ├── lockfile-sync.test.ts
+    │   ├── master-rag-vault.test.ts
+    │   ├── mcp-protocol.test.ts
+    │   ├── memory-vault.test.ts
+    │   ├── neo4j-graph.test.ts
     │   ├── normalize-attached-file.test.ts
+    │   ├── onboarding-db.test.ts
     │   ├── pdf-template-resilience.test.ts
+    │   ├── persona-and-auth-sync.test.tsx
+    │   ├── prod-leak-prevention.test.ts
+    │   ├── profile-scrapers.test.ts
+    │   ├── resume-schema.test.ts
     │   ├── resume-skills-safety.test.ts
     │   ├── sanitize-resume-data.test.ts
     │   ├── security-audit.test.ts
     │   ├── streaming-chat-content.test.ts
+    │   ├── thinking-and-tools.test.ts
     │   └── user-knowledge-context.test.ts
     ├── .agents/
     │   └── mcp_config.json
@@ -74,7 +94,7 @@
     │   │   │   └── ...
     │   │   ├── generate-pdf/
     │   │   │   └── ...
-    │   │   ├── interview-lab/
+    │   │   ├── github/
     │   │   │   └── ...
     │   │   ├── job-search/
     │   │   │   └── ...
@@ -82,13 +102,19 @@
     │   │   │   └── ...
     │   │   ├── mcp/
     │   │   │   └── ...
+    │   │   ├── memory-vault/
+    │   │   │   └── ...
     │   │   ├── openapi/
     │   │   │   └── ...
     │   │   ├── pdf/
     │   │   │   └── ...
     │   │   ├── translate/
     │   │   │   └── ...
-    │   │   └── webhooks/
+    │   │   ├── user/
+    │   │   │   └── ...
+    │   │   ├── webhooks/
+    │   │   │   └── ...
+    │   │   └── webview/
     │   │       └── ...
     │   ├── bg/
     │   │   └── page.tsx
@@ -109,16 +135,39 @@
     │   │   ├── layout.tsx
     │   │   ├── loading.tsx
     │   │   └── page.tsx
+    │   ├── sign-in/
+    │   │   └── [[...sign-in]]/
+    │   │       └── ...
+    │   ├── sign-up/
+    │   │   └── [[...sign-up]]/
+    │   │       └── ...
     │   ├── globals.css
     │   ├── icon.svg
     │   ├── layout.tsx
     │   ├── loading.tsx
     │   └── page.tsx
+    ├── applications/
+    │   ├── 21X_Software_Engineer_C.pdf
+    │   ├── 21X_Software_Engineer_CV.pdf
+    │   ├── Master_AI_Robotics_FullStack_CV.pdf
+    │   ├── Software_Engineer_Java_React_C.pdf
+    │   ├── Software_Engineer_Java_React_CV.pdf
+    │   ├── Vagas_Senior_Fullstack_Python_C.pdf
+    │   └── Vagas_Senior_Fullstack_Python_CV.pdf
     ├── components/
     │   ├── ai-elements/
+    │   │   ├── agent.tsx
     │   │   ├── attachments.tsx
+    │   │   ├── chain-of-thought.tsx
+    │   │   ├── index.ts
+    │   │   ├── jsx-preview.tsx
+    │   │   ├── persona.tsx
     │   │   ├── reasoning.tsx
-    │   │   └── shimmer.tsx
+    │   │   ├── shimmer.tsx
+    │   │   └── web-preview.tsx
+    │   ├── auth/
+    │   │   ├── auth-modal.tsx
+    │   │   └── user-menu.tsx
     │   ├── chat/
     │   │   ├── components/
     │   │   │   └── ...
@@ -128,18 +177,19 @@
     │   │   ├── chat-artifact-chrome.tsx
     │   │   ├── chat-component-registry.tsx
     │   │   ├── chat-cv-tabs.tsx
+    │   │   ├── chat-feedback.tsx
     │   │   ├── chat-input.tsx
     │   │   ├── chat-message-renderer.tsx
     │   │   ├── chat-onboarding.tsx
     │   │   ├── chat-sidebar.tsx
     │   │   ├── chat-store.tsx
+    │   │   ├── chromium-webview.tsx
     │   │   ├── component-renderer.tsx
     │   │   ├── context-window.tsx
-    │   │   ├── interview-lab-panel.tsx
     │   │   ├── job-profile-dialog.tsx
     │   │   ├── job-suggestions-panel.tsx
     │   │   ├── markdown-renderer.tsx
-    │   │   ├── mock-interview-interactive.tsx
+    │   │   ├── mcp-dialog.tsx
     │   │   ├── profile-photo-crop-dialog.tsx
     │   │   ├── profile-settings-dialog.tsx
     │   │   ├── resume-latex-artifact.tsx
@@ -236,15 +286,50 @@
     │   │   └── use-toast.ts
     │   ├── app-nav.tsx
     │   ├── cookie-banner.tsx
-    │   └── package-manager-ui.tsx
+    │   ├── package-manager-ui.tsx
+    │   └── theme-toggle.tsx
     ├── database/
     │   └── migrations.ts
+    ├── drizzle/
+    │   ├── meta/
+    │   │   ├── _journal.json
+    │   │   ├── 0000_snapshot.json
+    │   │   └── 0001_snapshot.json
+    │   ├── 0000_optimal_fallen_one.sql
+    │   └── 0001_wandering_starjammers.sql
     ├── hooks/
     │   ├── use-mobile.tsx
     │   └── use-toast.ts
     ├── lib/
+    │   ├── auth/
+    │   │   ├── auth-provider.tsx
+    │   │   └── clerk-config.ts
+    │   ├── browser/
+    │   │   └── playwright-service.ts
+    │   ├── cache/
+    │   │   └── redis.ts
+    │   ├── crypto/
+    │   │   └── encryption.ts
+    │   ├── db/
+    │   │   ├── index.ts
+    │   │   ├── plsql-storage.ts
+    │   │   └── schema.ts
+    │   ├── email/
+    │   │   └── resend.ts
+    │   ├── github/
+    │   │   └── sync.ts
     │   ├── job-scraper/
-    │   │   └── google-jobs.ts
+    │   │   ├── google-jobs.ts
+    │   │   └── live-scraper.ts
+    │   ├── mcp/
+    │   │   └── mcp-manager.ts
+    │   ├── neo4j/
+    │   │   ├── driver.ts
+    │   │   └── graph-service.ts
+    │   ├── scrapers/
+    │   │   └── profile-scrapers.ts
+    │   ├── storage/
+    │   │   └── r2.ts
     │   ├── api-auth.ts
     │   ├── bergamot-translator-client.ts
     │   ├── bolt-models.tsx
@@ -263,9 +348,10 @@
     │   ├── extract-resume-json.ts
     │   ├── faq.ts
     │   ├── gallery-data.ts
-    │   ├── interview-lab-model-support.ts
     │   ├── linkedin-outreach.ts
+    │   ├── mcp-client.ts
     │   ├── memory-store.ts
+    │   ├── memory-vault.ts
     │   ├── message-utils.ts
     │   ├── model-provider-icon.tsx
     │   ├── multi-model-docs.ts
@@ -274,7 +360,9 @@
     │   ├── pdf-generator.ts
     │   ├── pdf-generator.tsx
     │   ├── redact-resume-pii.ts
+    │   ├── resume-schema.ts
     │   ├── safe-local-storage.ts
+    │   ├── sanitize-cover-letter-data.ts
     │   ├── sanitize-resume-data.ts
     │   ├── streaming-chat-content.ts
     │   ├── translation.ts
@@ -287,57 +375,70 @@
     │   │   ├── bergamot-translator-worker.wasm
     │   │   └── translator-worker.js
     │   ├── deepmind-picture-2.jpg
+    │   ├── icon.svg
     │   └── placeholder.svg
     ├── scripts/
+    │   ├── build-accenture-a2.js
+    │   ├── build-accenture-application.js
     │   ├── build-application-packages.ts
+    │   ├── build-hws-application.js
+    │   ├── build-project-template-applications.js
     │   ├── compile-applications.ts
+    │   ├── drop-agent-harnesses.ts
+    │   ├── generate-21x-package.ts
+    │   ├── generate-application-pdfs.js
+    │   ├── generate-java-react-package.ts
+    │   ├── generate-master-cv.ts
     │   ├── generate-pdf.ts
+    │   ├── generate-vagas-package.ts
     │   ├── mcp-server.ts
+    │   ├── migrate.mjs
+    │   ├── migrate.ts
     │   ├── test-pdf-endpoints.ts
     │   └── workflow.ts
     ├── styles/
     │   └── globals.css
     ├── .gitignore
-    ├── 1.4.9.pdf
+    ├── .npmrc
     ├── about.md
-    ├── AI_SDK_5_MIGRATION.md
-    ├── API_KEYS_SETUP.md
-    ├── bugs.md
     ├── cjs-shim.ts
     ├── components.json
+    ├── declarations.d.ts
+    ├── drizzle.config.ts
     ├── eslint.config.mjs
     ├── next.config.mjs
     ├── package-lock.json
     ├── package.json
     ├── pnpm-lock.yaml
+    ├── pnpm-workspace.yaml
     ├── postcss.config.mjs
-    ├── README-INTERVIEW-LAB.md
+    ├── proxy.ts
     ├── README-MCP.md
     ├── tailwind.config.ts
     ├── test-render.tsx
-    ├── TESTING.md
     ├── ts_errors.txt
     ├── tsconfig.json
-    └── vitest.config.ts
+    ├── vitest.config.ts
+    └── walkthrough.md
 ```
 
 ## Key Files
 
 - **`.agents/mcp_config.json`**: Environment or tool configuration.
+- **`components/ai-elements/index.ts`**: UI or modular structural component.
 - **`components/pdf-templates/index.tsx`**: UI or modular structural component.
+- **`lib/auth/clerk-config.ts`**: Exports `isClerkConfigured` function.
+- **`lib/db/index.ts`**: Exports `db` definition.
+- **`drizzle.config.ts`**: Exports default `defineConfig` component/module.
 - **`eslint.config.mjs`**: ESLint code linting and formatting rules.
 - **`next.config.mjs`**: Next.js framework runtime configuration and routing redirects.
 - **`package.json`**: Project manifest, metadata, dependencies, and script definitions.
 - **`postcss.config.mjs`**: PostCSS configuration for CSS transformations.
-- **`README-INTERVIEW-LAB.md`**: Project documentation and overview.
 - **`README-MCP.md`**: Project documentation and overview.
 - **`tailwind.config.ts`**: Tailwind CSS theme tokens and layout styling configuration.
 - **`tsconfig.json`**: TypeScript compiler options and path aliases configuration.
 - **`vitest.config.ts`**: Vitest testing framework configuration.
-- **`__tests__/chat-onboarding-video.test.ts`**: Automated test suite.
-- **`__tests__/chat-textarea.test.ts`**: Automated test suite.
-- **`__tests__/dependency-check.test.ts`**: Automated test suite.
-- **`__tests__/email-draft-errors.test.ts`**: Automated test suite.
+- **`__tests__/all-chat-components-resilience.test.ts`**: UI or modular structural component.
 
 
 ## Dependencies
@@ -350,9 +451,11 @@
 - `@ai-sdk/react@^3.0.118`
 - `@ai-sdk/ui-utils@^1.2.11`
 - `@browsermt/bergamot-translator@^0.4.9`
+- `@clerk/nextjs@^7.9.1`
 - `@dnd-kit/core@^6.3.1`
 - `@dnd-kit/sortable@^10.0.0`
 - `@dnd-kit/utilities@^3.2.2`
+- `@sparticuz/chromium@^133.0.0`
 - `@google/genai@^1.16.0`
 - `@google/generative-ai@^0.21.0`
 - `@hookform/resolvers@^3.9.1`
@@ -371,9 +474,8 @@
 - `@radix-ui/react-label@^2.1.1`
 - `@radix-ui/react-menubar@^1.1.4`
 - `@radix-ui/react-navigation-menu@^1.2.3`
-- `@radix-ui/react-popover@^1.1.15`
-- `@radix-ui/react-progress@^1.1.1`
 ### Development Dependencies
+- `@playwright/test@^1.49.1`
 - `@scalar/nextjs-api-reference@0.4.106`
 - `@types/katex@^0.16.8`
 - `@types/multer@^2.0.0`
@@ -381,6 +483,7 @@
 - `@types/pdf-parse@^1.1.5`
 - `@types/react@^19.0.0`
 - `@types/react-dom@^19.0.0`
+- `drizzle-kit@^0.31.10`
 - `eslint@^9.39.4`
 - `eslint-config-next@^16.2.2`
 - `postcss@^8.4.47`
@@ -399,57 +502,57 @@
 
 ### Entry Points
 - `components/chat/ai-chat.tsx` (main entry)
+- `components/ai-elements/index.ts` (main entry)
 - `components/resume-coverletter/cover-letter-preview.tsx` (main entry)
+- `scripts/generate-21x-package.ts` (main entry)
+- `scripts/generate-java-react-package.ts` (main entry)
+- `scripts/generate-vagas-package.ts` (main entry)
 - `lib/pdf-generator.tsx` (main entry)
-- `scripts/build-application-packages.ts` (main entry)
-- `scripts/compile-applications.ts` (main entry)
-- `scripts/generate-pdf.ts` (main entry)
-- `app/layout.tsx` (main entry)
 
 ### Core Modules
-- `components/chat/components/cover-letter-viewer.tsx` (imported by 1 file)
+- `components/ai-elements/reasoning.tsx` (imported by 1 file)
+- `components/ai-elements/shimmer.tsx` (imported by 2 files)
+- `components/chat/components/component-stage.tsx` (imported by 1 file)
+- `components/chat/components/cover-letter-viewer.tsx` (imported by 2 files)
+- `components/chat/components/job-scraper-card.tsx` (imported by 2 files)
 - `components/chat/chat-component-registry.tsx` (imported by 1 file)
 - `components/chat/chat-store.tsx` (imported by 4 files)
-- `components/chat/component-renderer.tsx` (imported by 1 file)
-- `components/chat/interview-lab-panel.tsx` (imported by 2 files)
+- `components/chat/component-renderer.tsx` (imported by 2 files)
 - `components/chat/job-suggestions-panel.tsx` (imported by 1 file)
-- `components/chat/profile-settings-dialog.tsx` (imported by 1 file)
-- `components/chat/sidebar-integrations-accordion.tsx` (imported by 1 file)
-- `components/chat/sidebar.tsx` (imported by 1 file)
-- `components/logos/logos.ts` (imported by 4 files)
+- `components/chat/mcp-dialog.tsx` (imported by 2 files)
 
 ### Utilities
 - `lib/types.ts` (shared helper)
+- `lib/cover-letter-pdf-generator.tsx` (shared helper)
 - `components/chat/chat-store.tsx` (shared helper)
 - `components/logos/logos.ts` (shared helper)
-- `components/chat/interview-lab-panel.tsx` (shared helper)
-- `components/pdf-templates/coverletter/dark-cover-letter-template.tsx` (shared helper)
-- `components/pdf-templates/coverletter/elegant-cover-letter-template.tsx` (shared helper)
-- `components/pdf-templates/coverletter/gradient-cover-letter-template.tsx` (shared helper)
-- `components/pdf-templates/coverletter/professional-cover-letter-template.tsx` (shared helper)
-- `components/pdf-templates/coverletter/standard-cover-letter-template.tsx` (shared helper)
-- `lib/cover-letter-pdf-generator.tsx` (shared helper)
+- `components/pdf-templates/coverletter/modern-cover-letter-template.tsx` (shared helper)
+- `components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx` (shared helper)
+- `components/ai-elements/shimmer.tsx` (shared helper)
+- `components/chat/components/cover-letter-viewer.tsx` (shared helper)
+- `components/chat/components/job-scraper-card.tsx` (shared helper)
+- `components/chat/mcp-dialog.tsx` (shared helper)
 
 ### Key Relationships
+- `__tests__/resume-schema.test.ts` → `lib/resume-schema.ts`
+- `__tests__/thinking-and-tools.test.ts` → `lib/streaming-chat-content.ts`
+- `__tests__/thinking-and-tools.test.ts` → `lib/extract-resume-json.ts`
 - `app/layout.tsx` → `app/globals.css`
-- `components/ai-elements/reasoning.tsx` → `components/ai-elements/shimmer.tsx`
-- `components/chat/components/cover-letter-viewer.tsx` → `components/chat/components/cover-letter-single-block-editor.tsx`
-- `components/chat/ai-chat.tsx` → `components/chat/markdown-renderer.tsx`
-- `components/chat/ai-chat.tsx` → `components/chat/component-renderer.tsx`
-- `components/chat/ai-chat.tsx` → `components/chat/chat-store.tsx`
-- `components/chat/ai-chat.tsx` → `components/chat/sidebar.tsx`
-- `components/chat/ai-chat.tsx` → `components/chat/job-suggestions-panel.tsx`
-- `components/chat/ai-chat.tsx` → `components/chat/chat-onboarding.tsx`
-- `components/chat/ai-chat.tsx` → `components/chat/interview-lab-panel.tsx`
+- `components/ai-elements/index.ts` → `components/ai-elements/agent.tsx`
+- `components/ai-elements/index.ts` → `components/ai-elements/attachments.tsx`
+- `components/ai-elements/index.ts` → `components/ai-elements/chain-of-thought.tsx`
+- `components/ai-elements/index.ts` → `components/ai-elements/jsx-preview.tsx`
+- `components/ai-elements/index.ts` → `components/ai-elements/reasoning.tsx`
+- `components/ai-elements/index.ts` → `components/ai-elements/shimmer.tsx`
 
 
 ## Recent Git Commits
 
-- `9abc8e2`: feat: new feature update 2.9.0 (3 weeks ago by yakkshit)
-- `08b229b`: feat: new feature update 2.8.0 (4 weeks ago by yakkshit)
-- `af36e2d`: feat: new feature update 2.7.0 (8 weeks ago by yakkshit)
-- `bb06e38`: fix: bugfix update to 2.6.7 (8 weeks ago by yakkshit)
-- `e3c1dc0`: fix: bugfix update to 2.6.6 (8 weeks ago by yakkshit)
+- `e63aa53`: fix: bugfix update to 2.11.4 (3 hours ago by yakkshit)
+- `cdcb158`: fix: bugfix update to 2.11.3 (4 hours ago by yakkshit)
+- `4340454`: fix: bugfix update to 2.11.2 (11 hours ago by yakkshit)
+- `433c6a3`: fix: bugfix update to 2.11.1 (21 hours ago by yakkshit)
+- `b03a2cf`: feat: new feature update 2.11.0 (22 hours ago by yakkshit)
 
 
 ## Quick Notes for the LLM

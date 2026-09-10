@@ -33,6 +33,7 @@ import {
   ListChecks,
   Link2,
   CheckCircle2,
+  Layout,
 } from "lucide-react";
 import { JobScraperCard } from "./components/job-scraper-card";
 import type { ResumeData, Template } from "@/lib/types";
@@ -41,6 +42,7 @@ import ResumeEditor from "@/components/resume-coverletter/resume-editor";
 import { resumeTemplates } from "@/components/pdf-templates";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
+import { JSXPreview } from "@/components/ai-elements/jsx-preview";
 
 /** Shared shell for chat-embedded artifacts */
 const CHAT_ARTIFACT = cn(
@@ -88,6 +90,7 @@ export interface ComponentPropsMap {
   hrNote: { subject: string; body: string; to?: string };
   jobApplySimulator: { steps: Array<{ action: string; status: "pending" | "done" | "current" | "failed"; details?: string }> };
   memoryVault: { title?: string; content: string; source?: string };
+  reactPreview: { jsx: string; title?: string; dependencies?: string[] };
 }
 
 export type ComponentType = keyof ComponentPropsMap;
@@ -765,6 +768,29 @@ function MemoryVaultComponent({
   );
 }
 
+function ReactPreviewComponent({ jsx, title }: ComponentPropsMap["reactPreview"]) {
+  return (
+    <div className="w-full max-w-2xl py-2">
+      <ChatArtifactWindow
+        variant="dark"
+        cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
+        headerClassName={cn(CHAT_ARTIFACT_HEADER, "py-2")}
+        contentClassName="space-y-0 p-3 pt-0"
+        title={
+          <div className="flex items-center gap-2 text-sm text-white">
+            <Layout className="h-4 w-4 text-emerald-400" />
+            {title || "Live React Preview"}
+          </div>
+        }
+      >
+        <div className="mt-2 min-h-[200px] w-full rounded-lg bg-black/20 p-2">
+          <JSXPreview jsx={jsx} isStreaming={false} />
+        </div>
+      </ChatArtifactWindow>
+    </div>
+  );
+}
+
 export const CHAT_COMPONENT_REGISTRY: {
   [K in ComponentType]: (props: ComponentPropsMap[K]) => React.ReactElement;
 } = {
@@ -777,6 +803,7 @@ export const CHAT_COMPONENT_REGISTRY: {
   hrNote: HRNoteComponent,
   jobApplySimulator: JobApplySimulatorComponent,
   memoryVault: MemoryVaultComponent,
+  reactPreview: ReactPreviewComponent as (p: ComponentPropsMap["reactPreview"]) => React.ReactElement,
 };
 
 export interface CvComponentContext {

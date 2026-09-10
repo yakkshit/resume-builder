@@ -1133,7 +1133,6 @@ export default function AICareerAssistantChat() {
     const { user, setIncognitoMode } = useAuth();
     const [input, setInput] = useState("");
     const [onboardingOpen, setOnboardingOpen] = useState(false);
-    const [onboardingGateOpen, setOnboardingGateOpen] = useState(false);
     const [composerShine, setComposerShine] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -1369,6 +1368,8 @@ export default function AICareerAssistantChat() {
 
     const toasterRef = useRef<ToasterRef>(null);
     const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+    const [showScrollButton, setShowScrollButton] = useState(false);
+    
     const showToast = (variant: 'default' | 'success' | 'error' | 'warning', msg: string) => {
         toasterRef.current?.show({
             title: variant.charAt(0).toUpperCase() + variant.slice(1),
@@ -1467,16 +1468,6 @@ export default function AICareerAssistantChat() {
     // History sessions management
     const [sessions, setSessions] = useState<any[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string>("");
-
-    // Trigger onboarding gate if user hasn't onboarded and hasn't selected Incognito mode
-    useEffect(() => {
-        if (typeof window === "undefined") return;
-        if (!user.isOnboarded && !user.isIncognito) {
-            setOnboardingGateOpen(true);
-        } else {
-            setOnboardingGateOpen(false);
-        }
-    }, [user.isOnboarded, user.isIncognito]);
 
     useEffect(() => {
         const saved = tryLocalStorageGet("chat_sessions");
@@ -1722,7 +1713,9 @@ export default function AICareerAssistantChat() {
         if (!scrollRef.current) return;
         const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
         // User is considered at bottom if within 120px of bottom
-        isAtBottomRef.current = scrollHeight - (scrollTop + clientHeight) < 120;
+        const isAtBottom = scrollHeight - (scrollTop + clientHeight) < 120;
+        isAtBottomRef.current = isAtBottom;
+        setShowScrollButton(!isAtBottom);
     }, []);
 
     const handleNewSession = useCallback(() => {
@@ -2178,21 +2171,12 @@ export default function AICareerAssistantChat() {
                 onOpenChange={setMcpDialogOpen}
             />
             <ProfileSettingsDialog
-                open={profileSettingsOpen || onboardingGateOpen}
+                open={profileSettingsOpen}
                 onOpenChange={(v) => {
-                    if (onboardingGateOpen) {
-                        if (!v && user.isOnboarded) setOnboardingGateOpen(false);
-                    } else {
-                        setProfileSettingsOpen(v);
-                    }
+                    setProfileSettingsOpen(v);
                 }}
                 settings={settings}
                 onSettingsChange={updateSettings}
-                isOnboarding={onboardingGateOpen}
-                onSkipOnboarding={() => {
-                    setIncognitoMode(true);
-                    setOnboardingGateOpen(false);
-                }}
             />
             <Toaster ref={toasterRef} />
 
