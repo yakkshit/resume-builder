@@ -38,7 +38,7 @@ const nextConfig = {
         headers: [
           {
             key: 'Content-Security-Policy',
-            value: "frame-src *; child-src *;",
+            value: "frame-src * blob: data:; child-src * blob: data:;",
           },
         ],
       },
@@ -65,6 +65,9 @@ const nextConfig = {
     'pdfkit',
     'pdf-parse',
     'pdfjs-dist',
+    'selenium-webdriver',
+    'playwright',
+    'playwright-core'
   ],
   experimental: {},
   turbopack: {},

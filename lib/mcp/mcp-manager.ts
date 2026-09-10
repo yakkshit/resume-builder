@@ -63,6 +63,20 @@ export const BUILTIN_MCP_SERVERS: MCPServerConfig[] = [
         },
       },
       {
+        name: "search_web",
+        description: "Search the web for up-to-date information, news, documentation, or facts.",
+        serverName: "Career Agent MCP",
+        serverId: "builtin-career-agent",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "Search query" },
+            maxResults: { type: "number", description: "Max results (default: 5)" },
+          },
+          required: ["query"],
+        },
+      },
+      {
         name: "search_jobs",
         description: "Search for live jobs and openings based on keywords, role, company, or location.",
         serverName: "Career Agent MCP",
@@ -382,11 +396,27 @@ export async function discoverMCPTools(server: MCPServerConfig): Promise<MCPTool
       params: {},
     };
 
-    const res = await fetch(server.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-    });
+    let res: Response;
+    const isBuiltin = server.type === "builtin" || server.url.startsWith("/");
+
+    if (isBuiltin) {
+      res = await fetch(server.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+    } else {
+      // Use proxy for external servers to bypass CORS
+      res = await fetch("/api/mcp/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: server.url,
+          headers,
+          payload,
+        }),
+      });
+    }
 
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -435,11 +465,27 @@ export async function executeMCPTool(
     },
   };
 
-  const res = await fetch(server.url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
+  let res: Response;
+  const isBuiltin = server.type === "builtin" || server.url.startsWith("/");
+
+  if (isBuiltin) {
+    res = await fetch(server.url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+  } else {
+    // Use proxy for external servers to bypass CORS
+    res = await fetch("/api/mcp/proxy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: server.url,
+        headers,
+        payload,
+      }),
+    });
+  }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");

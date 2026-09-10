@@ -31,6 +31,18 @@ const TOOLS = [
     },
   },
   {
+    name: "search_web",
+    description: "Search the web for up-to-date information, news, documentation, or facts.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" },
+        maxResults: { type: "number", description: "Max results (default: 5)" },
+      },
+      required: ["query"],
+    },
+  },
+  {
     name: "search_jobs",
     description: "Search for live jobs and openings based on keywords, role, company, or location.",
     inputSchema: {
@@ -379,6 +391,73 @@ async function renderPdf(payload: { type: "resume" | "coverletter"; data: any; t
 }
 
 async function handleToolCall(name: string, args: any) {
+  if (name === "search_web") {
+    const { query, maxResults = 5 } = args || {};
+    if (!query) throw new Error("Missing required argument: query");
+
+    const apiKey = process.env.SERPAPI_KEY || process.env.SERPER_API_KEY || "";
+    let results: any[] = [];
+
+    if (apiKey) {
+      try {
+        const qs = new URLSearchParams({
+          engine: "google",
+          api_key: apiKey,
+          q: query,
+        });
+        const res = await fetch(`https://serpapi.com/search.json?${qs.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          results = (data.organic_results || []).slice(0, maxResults).map((r: any) => ({
+            title: r.title,
+            url: r.link,
+            snippet: r.snippet,
+          }));
+        }
+      } catch (e) {
+        console.warn("SerpAPI search failed, trying fallback", e);
+      }
+    }
+
+    if (!results || results.length === 0) {
+      try {
+        const ddgRes = await fetch("https://lite.duckduckgo.com/lite/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+          },
+          body: `q=${encodeURIComponent(query)}`,
+        });
+        const html = await ddgRes.text();
+        
+        // Very basic parsing for DDG Lite
+        const titleRegex = /<a rel="nofollow" href="([^"]+)" class="result-url">([^<]+)<\/a>/g;
+        const snippetRegex = /<td class="result-snippet">([\s\S]*?)<\/td>/g;
+        
+        let m1, m2;
+        while ((m1 = titleRegex.exec(html)) !== null && (m2 = snippetRegex.exec(html)) !== null && results.length < maxResults) {
+          results.push({
+            title: m1[2].trim(),
+            url: m1[1],
+            snippet: m2[1].replace(/<[^>]+>/g, "").trim(),
+          });
+        }
+      } catch (e) {
+        console.warn("DDG search failed", e);
+      }
+    }
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({ query, total: results.length, results }, null, 2),
+        },
+      ],
+    };
+  }
+
   if (name === "search_jobs") {
     const { query, location = "Remote", maxResults = 10 } = args || {};
     if (!query) throw new Error("Missing required argument: query");

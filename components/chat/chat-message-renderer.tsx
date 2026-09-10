@@ -13,6 +13,11 @@ import {
   ChainOfThoughtStep,
   ChainOfThoughtTool,
 } from "@/components/ai-elements/chain-of-thought";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
 import { renderChatComponent, type ComponentType, type CvComponentContext } from "./chat-component-registry";
 
 /** HAST / React can pass className as string or string[] — normalize for language checks */
@@ -215,28 +220,26 @@ export function ChatMessageRenderer({
     if (hasCoT) {
       return (
         <div className={cn("space-y-3", className)}>
-          <ChainOfThought defaultOpen={isStreaming || cotResult.isThinkingActive}>
-            <ChainOfThoughtHeader isStreaming={isStreaming && cotResult.isThinkingActive} toolCount={cotResult.tools.length}>
-              {cotResult.isThinkingActive ? "Thinking & Executing Tools…" : "Reasoning & Tools"}
-            </ChainOfThoughtHeader>
-            <ChainOfThoughtContent>
-              {cotResult.tools.length > 0 && (
+          {cotResult.thinkingText && (
+            <Reasoning className="w-full" isStreaming={isStreaming && cotResult.isThinkingActive}>
+              <ReasoningTrigger />
+              <ReasoningContent>{cotResult.thinkingText}</ReasoningContent>
+            </Reasoning>
+          )}
+          {cotResult.tools.length > 0 && (
+            <ChainOfThought defaultOpen={isStreaming || cotResult.isThinkingActive}>
+              <ChainOfThoughtHeader isStreaming={isStreaming && cotResult.isThinkingActive} toolCount={cotResult.tools.length}>
+                {cotResult.isThinkingActive ? "Executing Tools…" : "Tools Used"}
+              </ChainOfThoughtHeader>
+              <ChainOfThoughtContent>
                 <div className="space-y-1.5 pt-1">
                   {cotResult.tools.map((t, idx) => (
                     <ChainOfThoughtTool key={idx} name={t.name} args={t.args} status={t.status} output={t.output} />
                   ))}
                 </div>
-              )}
-              {cotResult.thinkingText && (
-                <div className="rounded-lg bg-background/60 p-2.5 text-xs text-muted-foreground whitespace-pre-wrap font-mono border border-border/40 max-h-60 overflow-y-auto leading-relaxed mt-1">
-                  {cotResult.thinkingText}
-                  {cotResult.isThinkingActive && (
-                    <span className="inline-block w-1.5 h-3 ml-1 bg-sky-400 animate-pulse align-middle" />
-                  )}
-                </div>
-              )}
-            </ChainOfThoughtContent>
-          </ChainOfThought>
+              </ChainOfThoughtContent>
+            </ChainOfThought>
+          )}
           {isStreaming && !cotResult.isThinkingActive && <StreamingStructuredPlaceholder />}
         </div>
       );
@@ -275,28 +278,28 @@ export function ChatMessageRenderer({
   return (
     <div className={cn("space-y-4", className)}>
       {hasCoT && (
-        <ChainOfThought defaultOpen={isStreaming || cotResult.isThinkingActive}>
-          <ChainOfThoughtHeader isStreaming={isStreaming && cotResult.isThinkingActive} toolCount={cotResult.tools.length}>
-            {cotResult.isThinkingActive ? "Thinking & Executing Tools…" : "Reasoning & Tools"}
-          </ChainOfThoughtHeader>
-          <ChainOfThoughtContent>
-            {cotResult.tools.length > 0 && (
-              <div className="space-y-1.5 pt-1">
-                {cotResult.tools.map((t, idx) => (
-                  <ChainOfThoughtTool key={idx} name={t.name} args={t.args} status={t.status} output={t.output} />
-                ))}
-              </div>
-            )}
-            {cotResult.thinkingText && (
-              <div className="rounded-lg bg-background/60 p-2.5 text-xs text-muted-foreground whitespace-pre-wrap font-mono border border-border/40 max-h-60 overflow-y-auto leading-relaxed mt-1">
-                {cotResult.thinkingText}
-                {cotResult.isThinkingActive && (
-                  <span className="inline-block w-1.5 h-3 ml-1 bg-sky-400 animate-pulse align-middle" />
-                )}
-              </div>
-            )}
-          </ChainOfThoughtContent>
-        </ChainOfThought>
+        <>
+          {cotResult.thinkingText && (
+            <Reasoning className="w-full mb-2" isStreaming={isStreaming && cotResult.isThinkingActive}>
+              <ReasoningTrigger />
+              <ReasoningContent>{cotResult.thinkingText}</ReasoningContent>
+            </Reasoning>
+          )}
+          {cotResult.tools.length > 0 && (
+            <ChainOfThought defaultOpen={isStreaming || cotResult.isThinkingActive}>
+              <ChainOfThoughtHeader isStreaming={isStreaming && cotResult.isThinkingActive} toolCount={cotResult.tools.length}>
+                {cotResult.isThinkingActive ? "Executing Tools…" : "Tools Used"}
+              </ChainOfThoughtHeader>
+              <ChainOfThoughtContent>
+                <div className="space-y-1.5 pt-1">
+                  {cotResult.tools.map((t, idx) => (
+                    <ChainOfThoughtTool key={idx} name={t.name} args={t.args} status={t.status} output={t.output} />
+                  ))}
+                </div>
+              </ChainOfThoughtContent>
+            </ChainOfThought>
+          )}
+        </>
       )}
       {parts.map((part, i) => {
         if (part.type === "markdown") {
@@ -327,6 +330,29 @@ export function ChatMessageRenderer({
                   li: ({ children }) => (
                     <li className="leading-relaxed [&>p]:mb-1 [&>p]:mt-0 [&>p]:last:mb-0">{children}</li>
                   ),
+                  a: ({ href, children }) => {
+                    // Check if it's an inline citation like [1], [^1], [2], etc.
+                    const text = String(children);
+                    const isCitation = /^\[?\^?\d+\]?$/.test(text) || /^\d+$/.test(text);
+                    if (isCitation) {
+                      return (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center min-w-[1.2rem] h-[1.2rem] px-1 text-[10px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 rounded-full no-underline mx-0.5 align-text-top translate-y-[-2px] transition-colors"
+                          title={href}
+                        >
+                          {text.replace(/\[|\]|\^/g, "")}
+                        </a>
+                      );
+                    }
+                    return (
+                      <a href={href} target="_blank" rel="noreferrer" className="font-medium text-primary underline underline-offset-4 hover:text-primary/80">
+                        {children}
+                      </a>
+                    );
+                  },
                   strong: ({ children }) => (
                     <strong className="font-semibold text-foreground">{children}</strong>
                   ),

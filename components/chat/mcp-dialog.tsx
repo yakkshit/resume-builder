@@ -112,6 +112,8 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
   const [harnessTools, setHarnessTools] = useState<string[]>(["search_jobs", "scrape_job_posting", "generate_resume_pdf"]);
   const [isSavingHarness, setIsSavingHarness] = useState(false);
   const [newServerHeaders, setNewServerHeaders] = useState("");
+  const [quickConnectJson, setQuickConnectJson] = useState("");
+  const [connectMode, setConnectMode] = useState<"quick" | "manual">("quick");
 
   // Live origin for sharing
   const [origin, setOrigin] = useState<string>("http://localhost:3000");
@@ -299,6 +301,66 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
       newServer.status = "error";
       newServer.error = err.message;
       toast.error(`Connection failed: ${err.message}`);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleQuickConnect = async () => {
+    if (!quickConnectJson.trim()) {
+      toast.error("Please paste your MCP JSON configuration");
+      return;
+    }
+
+    try {
+      const config = JSON.parse(quickConnectJson);
+      let serversObj = config.mcpServers;
+      if (!serversObj) {
+        toast.error("Invalid JSON: Missing 'mcpServers' object");
+        return;
+      }
+
+      setIsTesting(true);
+      const newServersAdded: MCPServerConfig[] = [];
+
+      for (const [key, value] of Object.entries<any>(serversObj)) {
+        if (!value.url) {
+          toast.error(`Skipping '${key}': Missing URL. Stdio connections are not supported in browser.`);
+          continue;
+        }
+
+        const newServer: MCPServerConfig = {
+          id: `custom-${key}-${Date.now()}`,
+          name: key,
+          url: value.url,
+          type: "http",
+          enabled: true,
+          headers: value.headers || undefined,
+          status: "connecting",
+        };
+
+        try {
+          const tools = await discoverMCPTools(newServer);
+          newServer.tools = tools;
+          newServer.enabledTools = tools.map((t) => t.name);
+          newServer.status = "connected";
+          newServersAdded.push(newServer);
+          toast.success(`Connected to ${key} (${tools.length} tools)`);
+        } catch (err: any) {
+          toast.error(`Failed to connect to ${key}: ${err.message}`);
+        }
+      }
+
+      if (newServersAdded.length > 0) {
+        const updated = [...servers, ...newServersAdded];
+        setServers(updated);
+        saveMCPServers(updated);
+        onServersUpdated?.(updated);
+        setShowAddForm(false);
+        setQuickConnectJson("");
+      }
+    } catch (err: any) {
+      toast.error(`Invalid JSON: ${err.message}`);
     } finally {
       setIsTesting(false);
     }
@@ -857,63 +919,109 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
               </Button>
             </div>
 
-            {showAddForm && (
-              <form onSubmit={handleAddServer} className="border border-white/10 bg-indigo-950/20 rounded-xl p-4 space-y-3">
-                <h4 className="text-xs font-semibold text-indigo-200">Connect New Remote MCP Server</h4>
-                <div className="grid gap-3 sm:grid-cols-12">
-                  <div className="sm:col-span-4">
-                    <Label className="text-[11px] text-muted-foreground">Server Name</Label>
-                    <Input
-                      value={newServerName}
-                      onChange={(e) => setNewServerName(e.target.value)}
-                      placeholder="e.g. GitHub MCP / Brave Search"
-                      className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
-                    />
-                  </div>
-                  <div className="sm:col-span-5">
-                    <Label className="text-[11px] text-muted-foreground">Endpoint URL</Label>
-                    <Input
-                      value={newServerUrl}
-                      onChange={(e) => setNewServerUrl(e.target.value)}
-                      placeholder="https://... or http://localhost:8080/mcp"
-                      className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
-                    />
-                  </div>
-                  <div className="sm:col-span-3">
-                    <Label className="text-[11px] text-muted-foreground">API Key (optional)</Label>
-                    <Input
-                      type="password"
-                      value={newServerKey}
-                      onChange={(e) => setNewServerKey(e.target.value)}
-                      placeholder="Bearer token"
-                      className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
-                    />
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-12">
-                  <div className="sm:col-span-12">
-                    <Label className="text-[11px] text-muted-foreground">Custom Headers (JSON, optional)</Label>
-                    <Input
-                      value={newServerHeaders}
-                      onChange={(e) => setNewServerHeaders(e.target.value)}
-                      placeholder='e.g. {"X-API-Key": "your-key"}'
-                      className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs font-mono"
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2 pt-1">
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={isTesting}
-                    className="h-8 rounded-lg bg-indigo-500 text-xs font-semibold text-indigo-950 hover:bg-indigo-400"
+              <div className="border border-indigo-500/30 bg-indigo-950/20 rounded-xl overflow-hidden">
+                <div className="flex border-b border-indigo-500/20 bg-indigo-950/40">
+                  <button
+                    onClick={() => setConnectMode("quick")}
+                    className={`flex-1 py-2 text-xs font-semibold transition-colors ${
+                      connectMode === "quick" ? "bg-indigo-500/20 text-indigo-200" : "text-indigo-200/50 hover:text-indigo-200/80 hover:bg-white/5"
+                    }`}
                   >
-                    {isTesting ? <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1.5 h-3.5 w-3.5" />}
-                    Connect & Discover Tools
-                  </Button>
+                    Quick Connect (JSON)
+                  </button>
+                  <button
+                    onClick={() => setConnectMode("manual")}
+                    className={`flex-1 py-2 text-xs font-semibold transition-colors border-l border-indigo-500/20 ${
+                      connectMode === "manual" ? "bg-indigo-500/20 text-indigo-200" : "text-indigo-200/50 hover:text-indigo-200/80 hover:bg-white/5"
+                    }`}
+                  >
+                    Manual Configuration
+                  </button>
                 </div>
-              </form>
-            )}
+                
+                <div className="p-4 space-y-3">
+                  {connectMode === "quick" ? (
+                    <div className="space-y-3">
+                      <Label className="text-[11px] text-indigo-200 flex items-center justify-between">
+                        Paste Cursor / Claude mcp.json config
+                        <span className="text-neutral-500 font-normal">HTTP/SSE URLs only</span>
+                      </Label>
+                      <Textarea
+                        value={quickConnectJson}
+                        onChange={(e) => setQuickConnectJson(e.target.value)}
+                        placeholder='{"mcpServers": {"my-server": {"url": "https://..."}}}'
+                        className="min-h-[120px] bg-black/60 border-white/10 text-xs font-mono text-indigo-100 placeholder:text-neutral-600 focus-visible:ring-indigo-500/50"
+                      />
+                      <div className="flex justify-end gap-2 pt-1">
+                        <Button
+                          onClick={handleQuickConnect}
+                          size="sm"
+                          disabled={isTesting}
+                          className="h-8 rounded-lg bg-indigo-500 text-xs font-semibold text-indigo-950 hover:bg-indigo-400"
+                        >
+                          {isTesting ? <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Plug className="mr-1.5 h-3.5 w-3.5" />}
+                          Connect from JSON
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleAddServer} className="space-y-3">
+                      <div className="grid gap-3 sm:grid-cols-12">
+                        <div className="sm:col-span-4">
+                          <Label className="text-[11px] text-indigo-200">Server Name</Label>
+                          <Input
+                            value={newServerName}
+                            onChange={(e) => setNewServerName(e.target.value)}
+                            placeholder="e.g. GitHub MCP / Brave Search"
+                            className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
+                          />
+                        </div>
+                        <div className="sm:col-span-5">
+                          <Label className="text-[11px] text-indigo-200">Endpoint URL</Label>
+                          <Input
+                            value={newServerUrl}
+                            onChange={(e) => setNewServerUrl(e.target.value)}
+                            placeholder="https://... or http://localhost:8080/mcp"
+                            className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
+                          />
+                        </div>
+                        <div className="sm:col-span-3">
+                          <Label className="text-[11px] text-indigo-200">API Key (optional)</Label>
+                          <Input
+                            type="password"
+                            value={newServerKey}
+                            onChange={(e) => setNewServerKey(e.target.value)}
+                            placeholder="Bearer token"
+                            className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-12">
+                        <div className="sm:col-span-12">
+                          <Label className="text-[11px] text-indigo-200">Custom Headers (JSON, optional)</Label>
+                          <Input
+                            value={newServerHeaders}
+                            onChange={(e) => setNewServerHeaders(e.target.value)}
+                            placeholder='e.g. {"X-API-Key": "your-key"}'
+                            className="mt-1 h-8 rounded-lg border-white/10 bg-black/40 text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2 pt-1">
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={isTesting}
+                          className="h-8 rounded-lg bg-indigo-500 text-xs font-semibold text-indigo-950 hover:bg-indigo-400"
+                        >
+                          {isTesting ? <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Plus className="mr-1.5 h-3.5 w-3.5" />}
+                          Connect & Discover Tools
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
 
             <div className="space-y-3">
               {servers.filter((s) => s.type !== "builtin").length === 0 ? (
