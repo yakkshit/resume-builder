@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-09-09T09:56:46.436Z",
+  "generatedAt": "2026-09-13T20:59:19.475Z",
   "projectPath": "/Users/yakkshit/Downloads/project/resume/cv-main",
   "overview": "This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor, ChatGPT, Custom Agents) to list templates and generate Resume & Cover Letter PDFs. It supports both: 1. Stdio mode (local CLI / desktop clients) 2. Hosted HTTP JSON-RPC Endpoint (/api/mcp for cloud/remote agent hosting) ---",
   "techStack": [
@@ -18,7 +18,7 @@
     "Vitest",
     "Node.js"
   ],
-  "directoryStructure": "└── cv-main/\n    ├── __tests__/\n    │   ├── all-chat-components-resilience.test.ts\n    │   ├── autonomous-browser-mcp.test.tsx\n    │   ├── chat-feedback.test.ts\n    │   ├── chat-keyboard-shortcuts.test.ts\n    │   ├── chat-onboarding-video.test.ts\n    │   ├── chat-textarea.test.ts\n    │   ├── component-stage-and-proxy.test.tsx\n    │   ├── cover-letter-resilience.test.ts\n    │   ├── database-migration.test.ts\n    │   ├── dependency-check.test.ts\n    │   ├── email-draft-errors.test.ts\n    │   ├── encryption.test.ts\n    │   ├── extract-resume-json.test.ts\n    │   ├── github-sync-encrypted.test.ts\n    │   ├── github-sync-service.test.ts\n    │   ├── gitlab-sync.test.ts\n    │   ├── job-scraper.test.ts\n    │   ├── linkedin-outreach.test.ts\n    │   ├── lockfile-sync.test.ts\n    │   ├── master-rag-vault.test.ts\n    │   ├── mcp-protocol.test.ts\n    │   ├── memory-vault.test.ts\n    │   ├── neo4j-graph.test.ts\n    │   ├── normalize-attached-file.test.ts\n    │   ├── onboarding-db.test.ts\n    │   ├── pdf-template-resilience.test.ts\n    │   ├── persona-and-auth-sync.test.tsx\n    │   ├── prod-leak-prevention.test.ts\n    │   ├── profile-scrapers.test.ts\n    │   ├── resume-schema.test.ts\n    │   ├── resume-skills-safety.test.ts\n    │   ├── sanitize-resume-data.test.ts\n    │   ├── security-audit.test.ts\n    │   ├── streaming-chat-content.test.ts\n    │   ├── thinking-and-tools.test.ts\n    │   └── user-knowledge-context.test.ts\n    ├── .agents/\n    │   └── mcp_config.json\n    ├── .pnpm-store/\n    │   └── v10/\n    │       ├── files/\n    │       │   └── ...\n    │       └── index/\n    │           └── ...\n    ├── .vscode/\n    │   ├── launch.json\n    │   └── mcp.json\n    ├── app/\n    │   ├── api/\n    │   │   ├── chat/\n    │   │   │   └── ...\n    │   │   ├── chat-assistant/\n    │   │   │   └── ...\n    │   │   ├── code-run/\n    │   │   │   └── ...\n    │   │   ├── cover-letter/\n    │   │   │   └── ...\n    │   │   ├── cover-letter-chat/\n    │   │   │   └── ...\n    │   │   ├── doc/\n    │   │   │   └── ...\n    │   │   ├── email-draft/\n    │   │   │   └── ...\n    │   │   ├── feedback/\n    │   │   │   └── ...\n    │   │   ├── generate-pdf/\n    │   │   │   └── ...\n    │   │   ├── github/\n    │   │   │   └── ...\n    │   │   ├── job-search/\n    │   │   │   └── ...\n    │   │   ├── latex-pdf/\n    │   │   │   └── ...\n    │   │   ├── mcp/\n    │   │   │   └── ...\n    │   │   ├── memory-vault/\n    │   │   │   └── ...\n    │   │   ├── openapi/\n    │   │   │   └── ...\n    │   │   ├── pdf/\n    │   │   │   └── ...\n    │   │   ├── translate/\n    │   │   │   └── ...\n    │   │   ├── user/\n    │   │   │   └── ...\n    │   │   ├── webhooks/\n    │   │   │   └── ...\n    │   │   └── webview/\n    │   │       └── ...\n    │   ├── bg/\n    │   │   └── page.tsx\n    │   ├── chat/\n    │   │   ├── error.tsx\n    │   │   ├── layout.tsx\n    │   │   └── page.tsx\n    │   ├── cover-letter/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── donate/\n    │   │   └── page.tsx\n    │   ├── feedback/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── price/\n    │   │   ├── globals.css\n    │   │   ├── layout.tsx\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── sign-in/\n    │   │   └── [[...sign-in]]/\n    │   │       └── ...\n    │   ├── sign-up/\n    │   │   └── [[...sign-up]]/\n    │   │       └── ...\n    │   ├── globals.css\n    │   ├── icon.svg\n    │   ├── layout.tsx\n    │   ├── loading.tsx\n    │   └── page.tsx\n    ├── applications/\n    │   ├── 21X_Software_Engineer_C.pdf\n    │   ├── 21X_Software_Engineer_CV.pdf\n    │   ├── Master_AI_Robotics_FullStack_CV.pdf\n    │   ├── Software_Engineer_Java_React_C.pdf\n    │   ├── Software_Engineer_Java_React_CV.pdf\n    │   ├── Vagas_Senior_Fullstack_Python_C.pdf\n    │   └── Vagas_Senior_Fullstack_Python_CV.pdf\n    ├── components/\n    │   ├── ai-elements/\n    │   │   ├── agent.tsx\n    │   │   ├── attachments.tsx\n    │   │   ├── chain-of-thought.tsx\n    │   │   ├── index.ts\n    │   │   ├── jsx-preview.tsx\n    │   │   ├── persona.tsx\n    │   │   ├── reasoning.tsx\n    │   │   ├── shimmer.tsx\n    │   │   └── web-preview.tsx\n    │   ├── auth/\n    │   │   ├── auth-modal.tsx\n    │   │   └── user-menu.tsx\n    │   ├── chat/\n    │   │   ├── components/\n    │   │   │   └── ...\n    │   │   ├── ai-chat-career.tsx\n    │   │   ├── ai-chat.tsx\n    │   │   ├── chat-ambient.tsx\n    │   │   ├── chat-artifact-chrome.tsx\n    │   │   ├── chat-component-registry.tsx\n    │   │   ├── chat-cv-tabs.tsx\n    │   │   ├── chat-feedback.tsx\n    │   │   ├── chat-input.tsx\n    │   │   ├── chat-message-renderer.tsx\n    │   │   ├── chat-onboarding.tsx\n    │   │   ├── chat-sidebar.tsx\n    │   │   ├── chat-store.tsx\n    │   │   ├── chromium-webview.tsx\n    │   │   ├── component-renderer.tsx\n    │   │   ├── context-window.tsx\n    │   │   ├── job-profile-dialog.tsx\n    │   │   ├── job-suggestions-panel.tsx\n    │   │   ├── markdown-renderer.tsx\n    │   │   ├── mcp-dialog.tsx\n    │   │   ├── profile-photo-crop-dialog.tsx\n    │   │   ├── profile-settings-dialog.tsx\n    │   │   ├── resume-latex-artifact.tsx\n    │   │   ├── sidebar-integrations-accordion.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── text-selection-popover.tsx\n    │   │   ├── thinking-indicator.tsx\n    │   │   └── translation-controls.tsx\n    │   ├── donation/\n    │   │   ├── animations/\n    │   │   │   └── ...\n    │   │   ├── donation-widget.tsx\n    │   │   ├── faq-section.tsx\n    │   │   ├── impact-section.tsx\n    │   │   └── testimonials-section.tsx\n    │   ├── logos/\n    │   │   └── logos.ts\n    │   ├── pdf-templates/\n    │   │   ├── coverletter/\n    │   │   │   └── ...\n    │   │   ├── cv/\n    │   │   │   └── ...\n    │   │   └── index.tsx\n    │   ├── resume-coverletter/\n    │   │   ├── cover-letter-chat.tsx\n    │   │   ├── cover-letter-editor.tsx\n    │   │   ├── cover-letter-pdf-viewer.tsx\n    │   │   ├── cover-letter-preview.tsx\n    │   │   ├── debug-profile-image.tsx\n    │   │   ├── enhanced-chat.tsx\n    │   │   ├── loading-screen.tsx\n    │   │   ├── pdf-renderer.tsx\n    │   │   ├── pdf-viewer.tsx\n    │   │   ├── resume-editor.tsx\n    │   │   └── theme-provider.tsx\n    │   ├── ui/\n    │   │   ├── accordion.tsx\n    │   │   ├── alert-dialog.tsx\n    │   │   ├── alert.tsx\n    │   │   ├── aspect-ratio.tsx\n    │   │   ├── avatar.tsx\n    │   │   ├── badge.tsx\n    │   │   ├── bolt-style-chat.tsx\n    │   │   ├── breadcrumb.tsx\n    │   │   ├── button-1.tsx\n    │   │   ├── button.tsx\n    │   │   ├── calendar.tsx\n    │   │   ├── card.tsx\n    │   │   ├── carousel.tsx\n    │   │   ├── chart.tsx\n    │   │   ├── checkbox.tsx\n    │   │   ├── collapsible.tsx\n    │   │   ├── command.tsx\n    │   │   ├── context-menu.tsx\n    │   │   ├── dialog.tsx\n    │   │   ├── drawer.tsx\n    │   │   ├── dropdown-menu.tsx\n    │   │   ├── enhanced-marquee.tsx\n    │   │   ├── form.tsx\n    │   │   ├── hover-card.tsx\n    │   │   ├── infinite-marquee.tsx\n    │   │   ├── input-otp.tsx\n    │   │   ├── input.tsx\n    │   │   ├── label.tsx\n    │   │   ├── menubar.tsx\n    │   │   ├── navigation-menu.tsx\n    │   │   ├── pagination.tsx\n    │   │   ├── particle-text-effect.tsx\n    │   │   ├── popover.tsx\n    │   │   ├── progress.tsx\n    │   │   ├── radio-group.tsx\n    │   │   ├── resizable.tsx\n    │   │   ├── scroll-area.tsx\n    │   │   ├── select.tsx\n    │   │   ├── separator.tsx\n    │   │   ├── sheet.tsx\n    │   │   ├── shine-border.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── skeleton.tsx\n    │   │   ├── slider.tsx\n    │   │   ├── sonner.tsx\n    │   │   ├── stepper.tsx\n    │   │   ├── switch.tsx\n    │   │   ├── table.tsx\n    │   │   ├── tabs.tsx\n    │   │   ├── textarea.tsx\n    │   │   ├── the-infinite-grid.tsx\n    │   │   ├── toast.tsx\n    │   │   ├── toaster.tsx\n    │   │   ├── toggle-group.tsx\n    │   │   ├── toggle.tsx\n    │   │   ├── tooltip.tsx\n    │   │   ├── use-mobile.tsx\n    │   │   └── use-toast.ts\n    │   ├── app-nav.tsx\n    │   ├── cookie-banner.tsx\n    │   ├── package-manager-ui.tsx\n    │   └── theme-toggle.tsx\n    ├── database/\n    │   └── migrations.ts\n    ├── drizzle/\n    │   ├── meta/\n    │   │   ├── _journal.json\n    │   │   ├── 0000_snapshot.json\n    │   │   └── 0001_snapshot.json\n    │   ├── 0000_optimal_fallen_one.sql\n    │   └── 0001_wandering_starjammers.sql\n    ├── hooks/\n    │   ├── use-mobile.tsx\n    │   └── use-toast.ts\n    ├── lib/\n    │   ├── auth/\n    │   │   ├── auth-provider.tsx\n    │   │   └── clerk-config.ts\n    │   ├── browser/\n    │   │   └── playwright-service.ts\n    │   ├── cache/\n    │   │   └── redis.ts\n    │   ├── crypto/\n    │   │   └── encryption.ts\n    │   ├── db/\n    │   │   ├── index.ts\n    │   │   ├── plsql-storage.ts\n    │   │   └── schema.ts\n    │   ├── email/\n    │   │   └── resend.ts\n    │   ├── github/\n    │   │   └── sync.ts\n    │   ├── job-scraper/\n    │   │   ├── google-jobs.ts\n    │   │   └── live-scraper.ts\n    │   ├── mcp/\n    │   │   └── mcp-manager.ts\n    │   ├── neo4j/\n    │   │   ├── driver.ts\n    │   │   └── graph-service.ts\n    │   ├── scrapers/\n    │   │   └── profile-scrapers.ts\n    │   ├── storage/\n    │   │   └── r2.ts\n    │   ├── api-auth.ts\n    │   ├── bergamot-translator-client.ts\n    │   ├── bolt-models.tsx\n    │   ├── chat-history.ts\n    │   ├── chat-models.ts\n    │   ├── chat-onboarding-video.ts\n    │   ├── chat-provider-settings.ts\n    │   ├── chat-resume-context.ts\n    │   ├── chat-textarea.ts\n    │   ├── clipboard.ts\n    │   ├── cover-letter-pdf-generator.tsx\n    │   ├── default-cover-letter.ts\n    │   ├── default-resume-data.ts\n    │   ├── email-compose-urls.ts\n    │   ├── email-draft-errors.ts\n    │   ├── extract-resume-json.ts\n    │   ├── faq.ts\n    │   ├── gallery-data.ts\n    │   ├── linkedin-outreach.ts\n    │   ├── mcp-client.ts\n    │   ├── memory-store.ts\n    │   ├── memory-vault.ts\n    │   ├── message-utils.ts\n    │   ├── model-provider-icon.tsx\n    │   ├── multi-model-docs.ts\n    │   ├── normalize-attached-file.ts\n    │   ├── normalize-sections-resume.ts\n    │   ├── pdf-generator.ts\n    │   ├── pdf-generator.tsx\n    │   ├── redact-resume-pii.ts\n    │   ├── resume-schema.ts\n    │   ├── safe-local-storage.ts\n    │   ├── sanitize-cover-letter-data.ts\n    │   ├── sanitize-resume-data.ts\n    │   ├── streaming-chat-content.ts\n    │   ├── translation.ts\n    │   ├── types.ts\n    │   ├── user-knowledge-context.ts\n    │   └── utils.ts\n    ├── public/\n    │   ├── bergamot/\n    │   │   ├── bergamot-translator-worker.js\n    │   │   ├── bergamot-translator-worker.wasm\n    │   │   └── translator-worker.js\n    │   ├── deepmind-picture-2.jpg\n    │   ├── icon.svg\n    │   └── placeholder.svg\n    ├── scripts/\n    │   ├── build-accenture-a2.js\n    │   ├── build-accenture-application.js\n    │   ├── build-application-packages.ts\n    │   ├── build-hws-application.js\n    │   ├── build-project-template-applications.js\n    │   ├── compile-applications.ts\n    │   ├── drop-agent-harnesses.ts\n    │   ├── generate-21x-package.ts\n    │   ├── generate-application-pdfs.js\n    │   ├── generate-java-react-package.ts\n    │   ├── generate-master-cv.ts\n    │   ├── generate-pdf.ts\n    │   ├── generate-vagas-package.ts\n    │   ├── mcp-server.ts\n    │   ├── migrate.mjs\n    │   ├── migrate.ts\n    │   ├── test-pdf-endpoints.ts\n    │   └── workflow.ts\n    ├── styles/\n    │   └── globals.css\n    ├── .gitignore\n    ├── .npmrc\n    ├── about.md\n    ├── cjs-shim.ts\n    ├── components.json\n    ├── declarations.d.ts\n    ├── drizzle.config.ts\n    ├── eslint.config.mjs\n    ├── next.config.mjs\n    ├── package-lock.json\n    ├── package.json\n    ├── pnpm-lock.yaml\n    ├── pnpm-workspace.yaml\n    ├── postcss.config.mjs\n    ├── proxy.ts\n    ├── README-MCP.md\n    ├── tailwind.config.ts\n    ├── test-render.tsx\n    ├── ts_errors.txt\n    ├── tsconfig.json\n    ├── vitest.config.ts\n    └── walkthrough.md",
+  "directoryStructure": "└── cv-main/\n    ├── __tests__/\n    │   ├── all-chat-components-resilience.test.ts\n    │   ├── autonomous-browser-mcp.test.tsx\n    │   ├── chat-feedback.test.ts\n    │   ├── chat-keyboard-shortcuts.test.ts\n    │   ├── chat-onboarding-video.test.ts\n    │   ├── chat-textarea.test.ts\n    │   ├── component-stage-and-proxy.test.tsx\n    │   ├── cover-letter-resilience.test.ts\n    │   ├── database-migration.test.ts\n    │   ├── dependency-check.test.ts\n    │   ├── email-draft-errors.test.ts\n    │   ├── encryption.test.ts\n    │   ├── extract-resume-json.test.ts\n    │   ├── github-sync-encrypted.test.ts\n    │   ├── github-sync-service.test.ts\n    │   ├── gitlab-sync.test.ts\n    │   ├── job-scraper.test.ts\n    │   ├── linkedin-outreach.test.ts\n    │   ├── lockfile-sync.test.ts\n    │   ├── master-rag-vault.test.ts\n    │   ├── mcp-protocol.test.ts\n    │   ├── memory-vault.test.ts\n    │   ├── neo4j-graph.test.ts\n    │   ├── normalize-attached-file.test.ts\n    │   ├── onboarding-db.test.ts\n    │   ├── pdf-template-resilience.test.ts\n    │   ├── persona-and-auth-sync.test.tsx\n    │   ├── prod-leak-prevention.test.ts\n    │   ├── profile-scrapers.test.ts\n    │   ├── resume-schema.test.ts\n    │   ├── resume-skills-safety.test.ts\n    │   ├── sanitize-resume-data.test.ts\n    │   ├── security-audit.test.ts\n    │   ├── streaming-chat-content.test.ts\n    │   ├── thinking-and-tools.test.ts\n    │   └── user-knowledge-context.test.ts\n    ├── .agents/\n    │   └── mcp_config.json\n    ├── .pnpm-store/\n    │   └── v10/\n    │       ├── files/\n    │       │   └── ...\n    │       └── index/\n    │           └── ...\n    ├── .vscode/\n    │   ├── launch.json\n    │   └── mcp.json\n    ├── app/\n    │   ├── api/\n    │   │   ├── chat/\n    │   │   │   └── ...\n    │   │   ├── chat-assistant/\n    │   │   │   └── ...\n    │   │   ├── code-run/\n    │   │   │   └── ...\n    │   │   ├── cover-letter/\n    │   │   │   └── ...\n    │   │   ├── cover-letter-chat/\n    │   │   │   └── ...\n    │   │   ├── doc/\n    │   │   │   └── ...\n    │   │   ├── email-draft/\n    │   │   │   └── ...\n    │   │   ├── feedback/\n    │   │   │   └── ...\n    │   │   ├── generate-pdf/\n    │   │   │   └── ...\n    │   │   ├── github/\n    │   │   │   └── ...\n    │   │   ├── job-search/\n    │   │   │   └── ...\n    │   │   ├── latex-pdf/\n    │   │   │   └── ...\n    │   │   ├── mcp/\n    │   │   │   └── ...\n    │   │   ├── memory-vault/\n    │   │   │   └── ...\n    │   │   ├── openapi/\n    │   │   │   └── ...\n    │   │   ├── pdf/\n    │   │   │   └── ...\n    │   │   ├── translate/\n    │   │   │   └── ...\n    │   │   ├── user/\n    │   │   │   └── ...\n    │   │   ├── webhooks/\n    │   │   │   └── ...\n    │   │   └── webview/\n    │   │       └── ...\n    │   ├── bg/\n    │   │   └── page.tsx\n    │   ├── chat/\n    │   │   ├── error.tsx\n    │   │   ├── layout.tsx\n    │   │   └── page.tsx\n    │   ├── cover-letter/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── donate/\n    │   │   └── page.tsx\n    │   ├── feedback/\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── price/\n    │   │   ├── globals.css\n    │   │   ├── layout.tsx\n    │   │   ├── loading.tsx\n    │   │   └── page.tsx\n    │   ├── sign-in/\n    │   │   └── [[...sign-in]]/\n    │   │       └── ...\n    │   ├── sign-up/\n    │   │   └── [[...sign-up]]/\n    │   │       └── ...\n    │   ├── globals.css\n    │   ├── icon.svg\n    │   ├── layout.tsx\n    │   ├── loading.tsx\n    │   └── page.tsx\n    ├── applications/\n    │   ├── 21X_Software_Engineer_C.pdf\n    │   ├── 21X_Software_Engineer_CV.pdf\n    │   ├── Master_AI_Robotics_FullStack_CV.pdf\n    │   ├── Software_Engineer_Java_React_C.pdf\n    │   ├── Software_Engineer_Java_React_CV.pdf\n    │   ├── Vagas_Senior_Fullstack_Python_C.pdf\n    │   └── Vagas_Senior_Fullstack_Python_CV.pdf\n    ├── components/\n    │   ├── ai-elements/\n    │   │   ├── agent.tsx\n    │   │   ├── attachments.tsx\n    │   │   ├── chain-of-thought.tsx\n    │   │   ├── index.ts\n    │   │   ├── jsx-preview.tsx\n    │   │   ├── persona.tsx\n    │   │   ├── reasoning.tsx\n    │   │   ├── shimmer.tsx\n    │   │   └── web-preview.tsx\n    │   ├── auth/\n    │   │   ├── auth-modal.tsx\n    │   │   └── user-menu.tsx\n    │   ├── chat/\n    │   │   ├── components/\n    │   │   │   └── ...\n    │   │   ├── ai-chat-career.tsx\n    │   │   ├── ai-chat.tsx\n    │   │   ├── chat-ambient.tsx\n    │   │   ├── chat-artifact-chrome.tsx\n    │   │   ├── chat-component-registry.tsx\n    │   │   ├── chat-cv-tabs.tsx\n    │   │   ├── chat-feedback.tsx\n    │   │   ├── chat-input.tsx\n    │   │   ├── chat-message-renderer.tsx\n    │   │   ├── chat-onboarding.tsx\n    │   │   ├── chat-sidebar.tsx\n    │   │   ├── chat-store.tsx\n    │   │   ├── chromium-webview.tsx\n    │   │   ├── component-renderer.tsx\n    │   │   ├── context-window.tsx\n    │   │   ├── job-profile-dialog.tsx\n    │   │   ├── job-suggestions-panel.tsx\n    │   │   ├── markdown-renderer.tsx\n    │   │   ├── mcp-dialog.tsx\n    │   │   ├── profile-photo-crop-dialog.tsx\n    │   │   ├── profile-settings-dialog.tsx\n    │   │   ├── resume-latex-artifact.tsx\n    │   │   ├── sidebar-integrations-accordion.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── text-selection-popover.tsx\n    │   │   ├── thinking-indicator.tsx\n    │   │   └── translation-controls.tsx\n    │   ├── donation/\n    │   │   ├── animations/\n    │   │   │   └── ...\n    │   │   ├── donation-widget.tsx\n    │   │   ├── faq-section.tsx\n    │   │   ├── impact-section.tsx\n    │   │   └── testimonials-section.tsx\n    │   ├── logos/\n    │   │   └── logos.ts\n    │   ├── pdf-templates/\n    │   │   ├── coverletter/\n    │   │   │   └── ...\n    │   │   ├── cv/\n    │   │   │   └── ...\n    │   │   └── index.tsx\n    │   ├── resume-coverletter/\n    │   │   ├── cover-letter-chat.tsx\n    │   │   ├── cover-letter-editor.tsx\n    │   │   ├── cover-letter-pdf-viewer.tsx\n    │   │   ├── cover-letter-preview.tsx\n    │   │   ├── debug-profile-image.tsx\n    │   │   ├── enhanced-chat.tsx\n    │   │   ├── loading-screen.tsx\n    │   │   ├── pdf-renderer.tsx\n    │   │   ├── pdf-viewer.tsx\n    │   │   ├── resume-editor.tsx\n    │   │   └── theme-provider.tsx\n    │   ├── ui/\n    │   │   ├── accordion.tsx\n    │   │   ├── alert-dialog.tsx\n    │   │   ├── alert.tsx\n    │   │   ├── aspect-ratio.tsx\n    │   │   ├── avatar.tsx\n    │   │   ├── badge.tsx\n    │   │   ├── bolt-style-chat.tsx\n    │   │   ├── breadcrumb.tsx\n    │   │   ├── button-1.tsx\n    │   │   ├── button.tsx\n    │   │   ├── calendar.tsx\n    │   │   ├── card.tsx\n    │   │   ├── carousel.tsx\n    │   │   ├── chart.tsx\n    │   │   ├── checkbox.tsx\n    │   │   ├── collapsible.tsx\n    │   │   ├── command.tsx\n    │   │   ├── context-menu.tsx\n    │   │   ├── dialog.tsx\n    │   │   ├── drawer.tsx\n    │   │   ├── dropdown-menu.tsx\n    │   │   ├── enhanced-marquee.tsx\n    │   │   ├── form.tsx\n    │   │   ├── hover-card.tsx\n    │   │   ├── infinite-marquee.tsx\n    │   │   ├── input-otp.tsx\n    │   │   ├── input.tsx\n    │   │   ├── label.tsx\n    │   │   ├── menubar.tsx\n    │   │   ├── navigation-menu.tsx\n    │   │   ├── pagination.tsx\n    │   │   ├── particle-text-effect.tsx\n    │   │   ├── popover.tsx\n    │   │   ├── progress.tsx\n    │   │   ├── radio-group.tsx\n    │   │   ├── resizable.tsx\n    │   │   ├── scroll-area.tsx\n    │   │   ├── select.tsx\n    │   │   ├── separator.tsx\n    │   │   ├── sheet.tsx\n    │   │   ├── shine-border.tsx\n    │   │   ├── sidebar.tsx\n    │   │   ├── skeleton.tsx\n    │   │   ├── slider.tsx\n    │   │   ├── sonner.tsx\n    │   │   ├── stepper.tsx\n    │   │   ├── switch.tsx\n    │   │   ├── table.tsx\n    │   │   ├── tabs.tsx\n    │   │   ├── textarea.tsx\n    │   │   ├── the-infinite-grid.tsx\n    │   │   ├── toast.tsx\n    │   │   ├── toaster.tsx\n    │   │   ├── toggle-group.tsx\n    │   │   ├── toggle.tsx\n    │   │   ├── tooltip.tsx\n    │   │   ├── use-mobile.tsx\n    │   │   └── use-toast.ts\n    │   ├── app-nav.tsx\n    │   ├── cookie-banner.tsx\n    │   ├── package-manager-ui.tsx\n    │   └── theme-toggle.tsx\n    ├── database/\n    │   └── migrations.ts\n    ├── drizzle/\n    │   ├── meta/\n    │   │   ├── _journal.json\n    │   │   ├── 0000_snapshot.json\n    │   │   └── 0001_snapshot.json\n    │   ├── 0000_optimal_fallen_one.sql\n    │   └── 0001_wandering_starjammers.sql\n    ├── hooks/\n    │   ├── use-mobile.tsx\n    │   └── use-toast.ts\n    ├── lib/\n    │   ├── auth/\n    │   │   ├── auth-provider.tsx\n    │   │   └── clerk-config.ts\n    │   ├── browser/\n    │   │   ├── browser-driver.ts\n    │   │   ├── playwright-driver.ts\n    │   │   ├── playwright-service.ts\n    │   │   └── selenium-driver.ts\n    │   ├── cache/\n    │   │   └── redis.ts\n    │   ├── crypto/\n    │   │   └── encryption.ts\n    │   ├── db/\n    │   │   ├── index.ts\n    │   │   ├── plsql-storage.ts\n    │   │   └── schema.ts\n    │   ├── email/\n    │   │   └── resend.ts\n    │   ├── github/\n    │   │   └── sync.ts\n    │   ├── job-scraper/\n    │   │   ├── google-jobs.ts\n    │   │   └── live-scraper.ts\n    │   ├── mcp/\n    │   │   └── mcp-manager.ts\n    │   ├── neo4j/\n    │   │   ├── driver.ts\n    │   │   └── graph-service.ts\n    │   ├── scrapers/\n    │   │   └── profile-scrapers.ts\n    │   ├── storage/\n    │   │   └── r2.ts\n    │   ├── api-auth.ts\n    │   ├── bergamot-translator-client.ts\n    │   ├── bolt-models.tsx\n    │   ├── chat-history.ts\n    │   ├── chat-models.ts\n    │   ├── chat-onboarding-video.ts\n    │   ├── chat-provider-settings.ts\n    │   ├── chat-resume-context.ts\n    │   ├── chat-textarea.ts\n    │   ├── clipboard.ts\n    │   ├── cover-letter-pdf-generator.tsx\n    │   ├── default-cover-letter.ts\n    │   ├── default-resume-data.ts\n    │   ├── email-compose-urls.ts\n    │   ├── email-draft-errors.ts\n    │   ├── extract-resume-json.ts\n    │   ├── faq.ts\n    │   ├── gallery-data.ts\n    │   ├── linkedin-outreach.ts\n    │   ├── mcp-client.ts\n    │   ├── memory-store.ts\n    │   ├── memory-vault.ts\n    │   ├── message-utils.ts\n    │   ├── model-provider-icon.tsx\n    │   ├── multi-model-docs.ts\n    │   ├── normalize-attached-file.ts\n    │   ├── normalize-sections-resume.ts\n    │   ├── pdf-generator.ts\n    │   ├── pdf-generator.tsx\n    │   ├── redact-resume-pii.ts\n    │   ├── resume-schema.ts\n    │   ├── safe-local-storage.ts\n    │   ├── sanitize-cover-letter-data.ts\n    │   ├── sanitize-resume-data.ts\n    │   ├── streaming-chat-content.ts\n    │   ├── translation.ts\n    │   ├── types.ts\n    │   ├── user-knowledge-context.ts\n    │   └── utils.ts\n    ├── public/\n    │   ├── bergamot/\n    │   │   ├── bergamot-translator-worker.js\n    │   │   ├── bergamot-translator-worker.wasm\n    │   │   └── translator-worker.js\n    │   ├── deepmind-picture-2.jpg\n    │   ├── icon.svg\n    │   └── placeholder.svg\n    ├── scripts/\n    │   ├── build-accenture-a2.js\n    │   ├── build-accenture-application.js\n    │   ├── build-application-packages.ts\n    │   ├── build-hws-application.js\n    │   ├── build-project-template-applications.js\n    │   ├── compile-applications.ts\n    │   ├── drop-agent-harnesses.ts\n    │   ├── generate-21x-package.ts\n    │   ├── generate-application-pdfs.js\n    │   ├── generate-java-react-package.ts\n    │   ├── generate-master-cv.ts\n    │   ├── generate-pdf.ts\n    │   ├── generate-vagas-package.ts\n    │   ├── mcp-server.ts\n    │   ├── migrate.mjs\n    │   ├── migrate.ts\n    │   ├── test-pdf-endpoints.ts\n    │   └── workflow.ts\n    ├── styles/\n    │   └── globals.css\n    ├── .gitignore\n    ├── .npmrc\n    ├── about.md\n    ├── cjs-shim.ts\n    ├── components.json\n    ├── declarations.d.ts\n    ├── drizzle.config.ts\n    ├── eslint.config.mjs\n    ├── next.config.mjs\n    ├── package-lock.json\n    ├── package.json\n    ├── pnpm-lock.yaml\n    ├── pnpm-workspace.yaml\n    ├── postcss.config.mjs\n    ├── proxy.ts\n    ├── README-MCP.md\n    ├── tailwind.config.ts\n    ├── test-render.tsx\n    ├── ts_errors.txt\n    ├── tsconfig.json\n    ├── vitest.config.ts\n    └── walkthrough.md",
   "keyFiles": [
     {
       "path": ".agents/mcp_config.json",
@@ -94,7 +94,6 @@
       "@dnd-kit/core": "^6.3.1",
       "@dnd-kit/sortable": "^10.0.0",
       "@dnd-kit/utilities": "^3.2.2",
-      "@sparticuz/chromium": "^133.0.0",
       "@google/genai": "^1.16.0",
       "@google/generative-ai": "^0.21.0",
       "@hookform/resolvers": "^3.9.1",
@@ -129,6 +128,7 @@
       "@radix-ui/react-tooltip": "^1.1.6",
       "@radix-ui/react-use-controllable-state": "^1.2.2",
       "@react-pdf/renderer": "^4.3.2",
+      "@sparticuz/chromium": "^133.0.0",
       "@streamdown/cjk": "^1.0.3",
       "@streamdown/code": "^1.1.1",
       "@streamdown/math": "^1.0.2",
@@ -180,6 +180,7 @@
       "rehype-raw": "^7.0.0",
       "remark-gfm": "^4.0.1",
       "remark-math": "^6.0.0",
+      "selenium-webdriver": "^4.48.0",
       "sonner": "^1.7.4",
       "streamdown": "^2.5.0",
       "svix": "^2.3.0",
@@ -198,6 +199,7 @@
       "@types/pdf-parse": "^1.1.5",
       "@types/react": "^19.0.0",
       "@types/react-dom": "^19.0.0",
+      "@types/selenium-webdriver": "^4.35.6",
       "drizzle-kit": "^0.31.10",
       "eslint": "^9.39.4",
       "eslint-config-next": "^16.2.2",
@@ -214,7 +216,7 @@
     "scripts/generate-21x-package.ts",
     "scripts/generate-java-react-package.ts",
     "scripts/generate-vagas-package.ts",
-    "lib/pdf-generator.tsx"
+    "lib/browser/playwright-service.ts"
   ],
   "dependencyGraph": {
     "nodes": [
@@ -507,6 +509,12 @@
       },
       {
         "file": "app/api/mcp/harness/route.ts",
+        "type": "module",
+        "imports": [],
+        "importedBy": []
+      },
+      {
+        "file": "app/api/mcp/proxy/route.ts",
         "type": "module",
         "imports": [],
         "importedBy": []
@@ -1995,10 +2003,44 @@
         "importedBy": []
       },
       {
-        "file": "lib/browser/playwright-service.ts",
-        "type": "module",
+        "file": "lib/browser/browser-driver.ts",
+        "type": "util",
         "imports": [],
+        "importedBy": [
+          "lib/browser/playwright-driver.ts",
+          "lib/browser/playwright-service.ts",
+          "lib/browser/selenium-driver.ts"
+        ]
+      },
+      {
+        "file": "lib/browser/playwright-driver.ts",
+        "type": "module",
+        "imports": [
+          "lib/browser/browser-driver.ts"
+        ],
+        "importedBy": [
+          "lib/browser/playwright-service.ts"
+        ]
+      },
+      {
+        "file": "lib/browser/playwright-service.ts",
+        "type": "entry",
+        "imports": [
+          "lib/browser/playwright-driver.ts",
+          "lib/browser/selenium-driver.ts",
+          "lib/browser/browser-driver.ts"
+        ],
         "importedBy": []
+      },
+      {
+        "file": "lib/browser/selenium-driver.ts",
+        "type": "module",
+        "imports": [
+          "lib/browser/browser-driver.ts"
+        ],
+        "importedBy": [
+          "lib/browser/playwright-service.ts"
+        ]
       },
       {
         "file": "lib/cache/redis.ts",
@@ -3073,6 +3115,31 @@
         "type": "import"
       },
       {
+        "from": "lib/browser/playwright-driver.ts",
+        "to": "lib/browser/browser-driver.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/browser/playwright-service.ts",
+        "to": "lib/browser/playwright-driver.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/browser/playwright-service.ts",
+        "to": "lib/browser/selenium-driver.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/browser/playwright-service.ts",
+        "to": "lib/browser/browser-driver.ts",
+        "type": "import"
+      },
+      {
+        "from": "lib/browser/selenium-driver.ts",
+        "to": "lib/browser/browser-driver.ts",
+        "type": "import"
+      },
+      {
         "from": "lib/db/index.ts",
         "to": "lib/db/schema.ts",
         "type": "import"
@@ -3380,6 +3447,9 @@
       "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
       "components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx",
       "components/pdf-templates/index.tsx",
+      "lib/browser/browser-driver.ts",
+      "lib/browser/playwright-driver.ts",
+      "lib/browser/selenium-driver.ts",
       "lib/db/index.ts",
       "lib/db/schema.ts",
       "lib/job-scraper/google-jobs.ts",
@@ -3398,41 +3468,41 @@
       "components/logos/logos.ts",
       "components/pdf-templates/coverletter/modern-cover-letter-template.tsx",
       "components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx",
+      "lib/browser/browser-driver.ts",
       "components/ai-elements/shimmer.tsx",
       "components/chat/components/cover-letter-viewer.tsx",
-      "components/chat/components/job-scraper-card.tsx",
-      "components/chat/mcp-dialog.tsx"
+      "components/chat/components/job-scraper-card.tsx"
     ]
   },
   "recentCommits": [
     {
+      "hash": "d57850f",
+      "message": "fix: bugfix update to 2.11.6",
+      "date": "3 days ago",
+      "author": "yakkshit"
+    },
+    {
+      "hash": "abf6130",
+      "message": "fix: bugfix update to 2.11.5",
+      "date": "4 days ago",
+      "author": "yakkshit"
+    },
+    {
       "hash": "e63aa53",
       "message": "fix: bugfix update to 2.11.4",
-      "date": "3 hours ago",
+      "date": "5 days ago",
       "author": "yakkshit"
     },
     {
       "hash": "cdcb158",
       "message": "fix: bugfix update to 2.11.3",
-      "date": "4 hours ago",
+      "date": "5 days ago",
       "author": "yakkshit"
     },
     {
       "hash": "4340454",
       "message": "fix: bugfix update to 2.11.2",
-      "date": "11 hours ago",
-      "author": "yakkshit"
-    },
-    {
-      "hash": "433c6a3",
-      "message": "fix: bugfix update to 2.11.1",
-      "date": "21 hours ago",
-      "author": "yakkshit"
-    },
-    {
-      "hash": "b03a2cf",
-      "message": "feat: new feature update 2.11.0",
-      "date": "22 hours ago",
+      "date": "5 days ago",
       "author": "yakkshit"
     }
   ],

@@ -102,70 +102,96 @@ function CvComponent({
   setTemplate,
 }: ComponentPropsMap["cv"]) {
   const isEditable = !!setResumeData;
+  const [localRd, setLocalRd] = useState(resumeData);
+  const [localTpl, setLocalTpl] = useState(template);
+  const prevPropRd = React.useRef(resumeData);
+
+  useEffect(() => {
+    if (JSON.stringify(prevPropRd.current) !== JSON.stringify(resumeData)) {
+      setLocalRd(resumeData);
+      prevPropRd.current = resumeData;
+    }
+  }, [resumeData]);
+
+  useEffect(() => {
+    setLocalTpl(template);
+  }, [template]);
+
+  const handleSetRd = (data: any) => {
+    setLocalRd(data);
+    setResumeData?.(data);
+  };
+
+  const handleSetTpl = (t: Template) => {
+    setLocalTpl(t);
+    setTemplate?.(t);
+  };
 
   if (isEditable) {
     return (
       <ChatArtifactWindow
         variant="dark"
-        cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
-        headerClassName={cn(CHAT_ARTIFACT_HEADER, "!flex-row !items-center flex-wrap gap-2 py-2")}
-        contentClassName="space-y-0 p-3 pt-0"
+        cardClassName={cn(CHAT_ARTIFACT, "border-white/10 shadow-[0_8px_32px_-12px_rgba(77,165,252,0.3)] bg-gradient-to-b from-[#1a1a24] to-[#121218]")}
+        headerClassName={cn(CHAT_ARTIFACT_HEADER, "!flex-row !items-center flex-wrap gap-2 py-3 bg-white/[0.02]")}
+        contentClassName="space-y-0 p-4 pt-2"
         title={
           <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-sm flex items-center gap-2 text-white">
+            <CardTitle className="text-[15px] flex items-center gap-2 text-white tracking-wide font-medium">
               <FileText className="h-4 w-4 text-[#4da5fc]" />
-              CV Builder
+              Interactive CV Builder
             </CardTitle>
-            <p className="text-[11px] text-[#8a8a8f] sm:max-w-[55%] sm:text-right">
-              Use the <span className="text-white/80">Editor</span> tab to edit fields; changes save to your chat resume.
+            <p className="text-xs text-[#8a8a8f] sm:max-w-[60%] sm:text-right">
+              Use the <span className="text-white/90 font-medium">Editor</span> tab to customize fields.
             </p>
           </div>
         }
       >
           <Tabs defaultValue="pdf" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="pdf" className="flex items-center gap-2">
+            <TabsList className="grid w-full grid-cols-3 bg-[#0a0a0e]/60 border border-white/5 p-1 rounded-xl mb-4 shadow-inner">
+              <TabsTrigger value="pdf" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4da5fc] data-[state=active]:to-[#1172e2] data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300">
                 <FileText className="h-4 w-4" />
-                PDF View
+                PDF Preview
               </TabsTrigger>
-              <TabsTrigger value="editor" className="flex items-center gap-2">
+              <TabsTrigger value="editor" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4da5fc] data-[state=active]:to-[#1172e2] data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300">
                 <Pencil className="h-4 w-4" />
                 Editor
               </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
+              <TabsTrigger value="settings" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-gradient-to-r data-[state=active]:from-[#4da5fc] data-[state=active]:to-[#1172e2] data-[state=active]:text-white data-[state=active]:shadow-md transition-all duration-300">
                 <Settings className="h-4 w-4" />
-                Template
+                Customize
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="pdf" className="mt-3">
-              <div className="h-[380px] rounded-lg overflow-hidden border">
-                <PdfPreviewClient resumeData={resumeData} template={template} />
+            
+            <TabsContent value="pdf" className="mt-0 outline-none">
+              <div className="h-[420px] rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-white/5 backdrop-blur-sm">
+                <PdfPreviewClient resumeData={localRd} template={localTpl} />
               </div>
             </TabsContent>
-            <TabsContent value="editor" className="mt-3">
-              <div className="max-h-[400px] overflow-y-auto rounded-lg border p-4">
+            
+            <TabsContent value="editor" className="mt-0 outline-none">
+              <div className="max-h-[420px] overflow-y-auto rounded-xl border border-white/10 bg-[#0f0f13]/80 p-5 shadow-inner custom-scrollbar">
                 <ResumeEditor
-                  resumeData={resumeData}
-                  setResumeData={setResumeData!}
+                  resumeData={localRd}
+                  setResumeData={handleSetRd}
                 />
               </div>
             </TabsContent>
-            <TabsContent value="settings" className="mt-3">
-              <div className="space-y-4 p-2">
-                <div>
-                  <Label>Select Template</Label>
+            
+            <TabsContent value="settings" className="mt-0 outline-none">
+              <div className="space-y-4 p-5 rounded-xl border border-white/10 bg-[#0f0f13]/80 shadow-inner">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium text-white/90">Select Template Design</Label>
                   <Select
-                    value={template}
-                    onValueChange={(v) => setTemplate?.(v as Template)}
+                    value={localTpl}
+                    onValueChange={(v) => handleSetTpl(v as Template)}
                   >
-                    <SelectTrigger className="mt-2">
+                    <SelectTrigger className="mt-2 w-full bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
                       <SelectValue placeholder="Choose template" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-[#1a1a24] border-white/10 text-white shadow-xl">
                       {Object.keys(resumeTemplates).map((key) => (
-                        <SelectItem key={key} value={key}>
-                          {key.charAt(0).toUpperCase() +
-                            key.slice(1).replace(/-/g, " ")}
+                        <SelectItem key={key} value={key} className="focus:bg-[#4da5fc]/20 focus:text-white cursor-pointer">
+                          {key.charAt(0).toUpperCase() + key.slice(1).replace(/-/g, " ")}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -181,8 +207,8 @@ function CvComponent({
   return (
     <ChatArtifactWindow
       variant="dark"
-      cardClassName={cn(CHAT_ARTIFACT, "border-white/10")}
-      headerClassName={cn(CHAT_ARTIFACT_HEADER, "py-2")}
+      cardClassName={cn(CHAT_ARTIFACT, "border-white/10 shadow-lg shadow-[#4da5fc]/10")}
+      headerClassName={cn(CHAT_ARTIFACT_HEADER, "py-3")}
       contentClassName="p-0"
       title={
         <CardTitle className="text-sm flex items-center gap-2 text-white">
@@ -191,8 +217,8 @@ function CvComponent({
         </CardTitle>
       }
     >
-      <div className="h-[400px]">
-        <PdfPreviewClient resumeData={resumeData} template={template} />
+      <div className="h-[420px] bg-white/5">
+        <PdfPreviewClient resumeData={localRd} template={localTpl} />
       </div>
     </ChatArtifactWindow>
   );
@@ -823,9 +849,9 @@ export function renderChatComponent(
   try {
     let mergedProps = { ...(props as Record<string, unknown>) };
     if (type === "cv") {
-      // Live React state must win over frozen JSON from the assistant message, or edits never apply.
-      const rawRd = context?.cv?.resumeData ?? mergedProps.resumeData;
-      const rawTpl = context?.cv?.template ?? mergedProps.template;
+      // Allow AI generated resume to take precedence if available, with CvComponent handling local state overrides for edits
+      const rawRd = mergedProps.resumeData ?? context?.cv?.resumeData;
+      const rawTpl = mergedProps.template ?? context?.cv?.template;
       const tplStr = typeof rawTpl === "string" ? rawTpl : "modern";
       const safeTemplate = (tplStr in resumeTemplates ? tplStr : "modern") as Template;
       mergedProps = {

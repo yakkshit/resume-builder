@@ -1,5 +1,5 @@
 version: 1.0.0
-generatedAt: '2026-09-09T09:56:46.438Z'
+generatedAt: '2026-09-13T20:59:19.480Z'
 projectPath: /Users/yakkshit/Downloads/project/resume/cv-main
 overview: >-
   This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor,
@@ -300,7 +300,10 @@ directoryStructure: |-
       │   │   ├── auth-provider.tsx
       │   │   └── clerk-config.ts
       │   ├── browser/
-      │   │   └── playwright-service.ts
+      │   │   ├── browser-driver.ts
+      │   │   ├── playwright-driver.ts
+      │   │   ├── playwright-service.ts
+      │   │   └── selenium-driver.ts
       │   ├── cache/
       │   │   └── redis.ts
       │   ├── crypto/
@@ -459,7 +462,6 @@ dependencies:
     '@dnd-kit/core': ^6.3.1
     '@dnd-kit/sortable': ^10.0.0
     '@dnd-kit/utilities': ^3.2.2
-    '@sparticuz/chromium': ^133.0.0
     '@google/genai': ^1.16.0
     '@google/generative-ai': ^0.21.0
     '@hookform/resolvers': ^3.9.1
@@ -494,6 +496,7 @@ dependencies:
     '@radix-ui/react-tooltip': ^1.1.6
     '@radix-ui/react-use-controllable-state': ^1.2.2
     '@react-pdf/renderer': ^4.3.2
+    '@sparticuz/chromium': ^133.0.0
     '@streamdown/cjk': ^1.0.3
     '@streamdown/code': ^1.1.1
     '@streamdown/math': ^1.0.2
@@ -545,6 +548,7 @@ dependencies:
     rehype-raw: ^7.0.0
     remark-gfm: ^4.0.1
     remark-math: ^6.0.0
+    selenium-webdriver: ^4.48.0
     sonner: ^1.7.4
     streamdown: ^2.5.0
     svix: ^2.3.0
@@ -562,6 +566,7 @@ dependencies:
     '@types/pdf-parse': ^1.1.5
     '@types/react': ^19.0.0
     '@types/react-dom': ^19.0.0
+    '@types/selenium-webdriver': ^4.35.6
     drizzle-kit: ^0.31.10
     eslint: ^9.39.4
     eslint-config-next: ^16.2.2
@@ -576,7 +581,7 @@ entryPoints:
   - scripts/generate-21x-package.ts
   - scripts/generate-java-react-package.ts
   - scripts/generate-vagas-package.ts
-  - lib/pdf-generator.tsx
+  - lib/browser/playwright-service.ts
 dependencyGraph:
   nodes:
     - file: __tests__/all-chat-components-resilience.test.ts
@@ -771,6 +776,10 @@ dependencyGraph:
       imports: []
       importedBy: []
     - file: app/api/mcp/harness/route.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: app/api/mcp/proxy/route.ts
       type: module
       imports: []
       importedBy: []
@@ -1764,10 +1773,32 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
-    - file: lib/browser/playwright-service.ts
-      type: module
+    - file: lib/browser/browser-driver.ts
+      type: util
       imports: []
+      importedBy:
+        - lib/browser/playwright-driver.ts
+        - lib/browser/playwright-service.ts
+        - lib/browser/selenium-driver.ts
+    - file: lib/browser/playwright-driver.ts
+      type: module
+      imports:
+        - lib/browser/browser-driver.ts
+      importedBy:
+        - lib/browser/playwright-service.ts
+    - file: lib/browser/playwright-service.ts
+      type: entry
+      imports:
+        - lib/browser/playwright-driver.ts
+        - lib/browser/selenium-driver.ts
+        - lib/browser/browser-driver.ts
       importedBy: []
+    - file: lib/browser/selenium-driver.ts
+      type: module
+      imports:
+        - lib/browser/browser-driver.ts
+      importedBy:
+        - lib/browser/playwright-service.ts
     - file: lib/cache/redis.ts
       type: module
       imports: []
@@ -2460,6 +2491,21 @@ dependencyGraph:
     - from: components/resume-coverletter/resume-editor.tsx
       to: components/resume-coverletter/debug-profile-image.tsx
       type: import
+    - from: lib/browser/playwright-driver.ts
+      to: lib/browser/browser-driver.ts
+      type: import
+    - from: lib/browser/playwright-service.ts
+      to: lib/browser/playwright-driver.ts
+      type: import
+    - from: lib/browser/playwright-service.ts
+      to: lib/browser/selenium-driver.ts
+      type: import
+    - from: lib/browser/playwright-service.ts
+      to: lib/browser/browser-driver.ts
+      type: import
+    - from: lib/browser/selenium-driver.ts
+      to: lib/browser/browser-driver.ts
+      type: import
     - from: lib/db/index.ts
       to: lib/db/schema.ts
       type: import
@@ -2655,6 +2701,9 @@ dependencyGraph:
     - components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
     - components/pdf-templates/cv/general-resumes/two-column-pdf-template.tsx
     - components/pdf-templates/index.tsx
+    - lib/browser/browser-driver.ts
+    - lib/browser/playwright-driver.ts
+    - lib/browser/selenium-driver.ts
     - lib/db/index.ts
     - lib/db/schema.ts
     - lib/job-scraper/google-jobs.ts
@@ -2672,30 +2721,30 @@ dependencyGraph:
     - components/logos/logos.ts
     - components/pdf-templates/coverletter/modern-cover-letter-template.tsx
     - components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx
+    - lib/browser/browser-driver.ts
     - components/ai-elements/shimmer.tsx
     - components/chat/components/cover-letter-viewer.tsx
     - components/chat/components/job-scraper-card.tsx
-    - components/chat/mcp-dialog.tsx
 recentCommits:
+  - hash: d57850f
+    message: 'fix: bugfix update to 2.11.6'
+    date: 3 days ago
+    author: yakkshit
+  - hash: abf6130
+    message: 'fix: bugfix update to 2.11.5'
+    date: 4 days ago
+    author: yakkshit
   - hash: e63aa53
     message: 'fix: bugfix update to 2.11.4'
-    date: 3 hours ago
+    date: 5 days ago
     author: yakkshit
   - hash: cdcb158
     message: 'fix: bugfix update to 2.11.3'
-    date: 4 hours ago
+    date: 5 days ago
     author: yakkshit
   - hash: '4340454'
     message: 'fix: bugfix update to 2.11.2'
-    date: 11 hours ago
-    author: yakkshit
-  - hash: 433c6a3
-    message: 'fix: bugfix update to 2.11.1'
-    date: 21 hours ago
-    author: yakkshit
-  - hash: b03a2cf
-    message: 'feat: new feature update 2.11.0'
-    date: 22 hours ago
+    date: 5 days ago
     author: yakkshit
 quickNotes:
   - 'Execution Context: Refer to the entry points to understand application bootstrap.'

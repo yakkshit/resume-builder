@@ -305,7 +305,10 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
     │   │   ├── auth-provider.tsx
     │   │   └── clerk-config.ts
     │   ├── browser/
-    │   │   └── playwright-service.ts
+    │   │   ├── browser-driver.ts
+    │   │   ├── playwright-driver.ts
+    │   │   ├── playwright-service.ts
+    │   │   └── selenium-driver.ts
     │   ├── cache/
     │   │   └── redis.ts
     │   ├── crypto/
@@ -455,7 +458,6 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
 - `@dnd-kit/core@^6.3.1`
 - `@dnd-kit/sortable@^10.0.0`
 - `@dnd-kit/utilities@^3.2.2`
-- `@sparticuz/chromium@^133.0.0`
 - `@google/genai@^1.16.0`
 - `@google/generative-ai@^0.21.0`
 - `@hookform/resolvers@^3.9.1`
@@ -474,6 +476,7 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
 - `@radix-ui/react-label@^2.1.1`
 - `@radix-ui/react-menubar@^1.1.4`
 - `@radix-ui/react-navigation-menu@^1.2.3`
+- `@radix-ui/react-popover@^1.1.15`
 ### Development Dependencies
 - `@playwright/test@^1.49.1`
 - `@scalar/nextjs-api-reference@0.4.106`
@@ -483,6 +486,7 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
 - `@types/pdf-parse@^1.1.5`
 - `@types/react@^19.0.0`
 - `@types/react-dom@^19.0.0`
+- `@types/selenium-webdriver@^4.35.6`
 - `drizzle-kit@^0.31.10`
 - `eslint@^9.39.4`
 - `eslint-config-next@^16.2.2`
@@ -507,7 +511,7 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
 - `scripts/generate-21x-package.ts` (main entry)
 - `scripts/generate-java-react-package.ts` (main entry)
 - `scripts/generate-vagas-package.ts` (main entry)
-- `lib/pdf-generator.tsx` (main entry)
+- `lib/browser/playwright-service.ts` (main entry)
 
 ### Core Modules
 - `components/ai-elements/reasoning.tsx` (imported by 1 file)
@@ -528,10 +532,10 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
 - `components/logos/logos.ts` (shared helper)
 - `components/pdf-templates/coverletter/modern-cover-letter-template.tsx` (shared helper)
 - `components/pdf-templates/cv/general-resumes/modern-pdf-template.tsx` (shared helper)
+- `lib/browser/browser-driver.ts` (shared helper)
 - `components/ai-elements/shimmer.tsx` (shared helper)
 - `components/chat/components/cover-letter-viewer.tsx` (shared helper)
 - `components/chat/components/job-scraper-card.tsx` (shared helper)
-- `components/chat/mcp-dialog.tsx` (shared helper)
 
 ### Key Relationships
 - `__tests__/resume-schema.test.ts` → `lib/resume-schema.ts`
@@ -548,11 +552,11 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
 
 ## Recent Git Commits
 
-- `e63aa53`: fix: bugfix update to 2.11.4 (3 hours ago by yakkshit)
-- `cdcb158`: fix: bugfix update to 2.11.3 (4 hours ago by yakkshit)
-- `4340454`: fix: bugfix update to 2.11.2 (11 hours ago by yakkshit)
-- `433c6a3`: fix: bugfix update to 2.11.1 (21 hours ago by yakkshit)
-- `b03a2cf`: feat: new feature update 2.11.0 (22 hours ago by yakkshit)
+- `d57850f`: fix: bugfix update to 2.11.6 (3 days ago by yakkshit)
+- `abf6130`: fix: bugfix update to 2.11.5 (4 days ago by yakkshit)
+- `e63aa53`: fix: bugfix update to 2.11.4 (5 days ago by yakkshit)
+- `cdcb158`: fix: bugfix update to 2.11.3 (5 days ago by yakkshit)
+- `4340454`: fix: bugfix update to 2.11.2 (5 days ago by yakkshit)
 
 
 ## Quick Notes for the LLM
