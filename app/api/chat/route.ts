@@ -224,6 +224,9 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "huggingface-streaming": { provider: "huggingface", modelId: "streaming", apiKey: process.env.HUGGINGFACE_API_KEY },
   "huggingface-provider": { provider: "huggingface", modelId: "provider", apiKey: process.env.HUGGINGFACE_API_KEY },
 
+  // FcukOff AI
+  "cedz-hr-qwen": { provider: "fcukoffai", modelId: "cedz-hr-qwen", apiKey: process.env.CEDZ_LLM_API },
+
   // Local / Custom
   "local-custom": { provider: "local", modelId: "local-custom" },
   "ollama-local": { provider: "ollama", modelId: "ollama" },
@@ -350,6 +353,14 @@ export async function POST(req: NextRequest) {
     preferredLanguage?: string
   }
 
+  // If using a model with a small 4096 token limit, compress the context sizes
+  const isSmallContext = model === "cedz-hr-qwen"
+
+  const MAX_CONTEXT_TEXT_CHARS = isSmallContext ? 1500 : 12_000
+  const MAX_MEMORY_CONTEXT_CHARS = isSmallContext ? 1500 : 10_000
+  const MAX_RETRIEVAL_CONTEXT_CHARS = isSmallContext ? 1500 : 12_000
+  const MAX_PROFILE_JSON_CHARS = isSmallContext ? 3000 : 16_000
+
   // Create a system message based on the mode
   let systemMessage = "";
 
@@ -412,11 +423,12 @@ LaTeX components — use ONLY when the user clearly asks for LaTeX, academic / p
 - LaTeX cover letter: \`\`\`component:coverLetterLatex\n{"latex":"...full compilable .tex..."}\n\`\`\`
 Escape backslashes and newlines inside JSON strings so the fence stays valid.`
 
-  if (typeof resumeLatex === "string" && resumeLatex.trim()) {
+  // Omit massive LaTeX source code for small context models to avoid 400 errors
+  if (!isSmallContext && typeof resumeLatex === "string" && resumeLatex.trim()) {
     const clip = resumeLatex.length > 200_000 ? resumeLatex.slice(0, 200_000) + "\n% …truncated" : resumeLatex
     systemMessage += `\n\nThe user’s current résumé LaTeX (from the chat editor; revise when they ask):\n\n\`\`\`tex\n${clip}\n\`\`\``
   }
-  if (typeof coverLetterLatex === "string" && coverLetterLatex.trim()) {
+  if (!isSmallContext && typeof coverLetterLatex === "string" && coverLetterLatex.trim()) {
     const clip = coverLetterLatex.length > 200_000 ? coverLetterLatex.slice(0, 200_000) + "\n% …truncated" : coverLetterLatex
     systemMessage += `\n\nThe user’s current cover letter LaTeX (from the chat editor):\n\n\`\`\`tex\n${clip}\n\`\`\``
   }
@@ -677,6 +689,22 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
 
   // Format the conversation for the AI
   const messagesList = Array.isArray(messages) ? messages : []
+  
+  if (messagesList.length > 0) {
+    const lastMsg = messagesList[messagesList.length - 1]
+    if (lastMsg.role === "user") {
+      const reminder = `\n\n[SYSTEM REMINDER: You MUST use the interactive markdown components (e.g. \`\`\`component:cv\n{...}\n\`\`\`, \`\`\`component:cover-letter\`, \`\`\`component:job-scraper\`, etc.) to fulfill the request. If generating a resume, output the full \`component:cv\` JSON. Do not just ask for information you already have in the Profile/Memory Vault. Complete the task instantly.]`
+      if (typeof lastMsg.content === "string") {
+        lastMsg.content += reminder
+      }
+      if (Array.isArray(lastMsg.parts)) {
+        const textPart = lastMsg.parts.find((p: any) => p.type === "text")
+        if (textPart) textPart.text += reminder
+        else lastMsg.parts.push({ type: "text", text: reminder })
+      }
+    }
+  }
+
   const formattedMessages = [{ role: "system", content: systemMessage }, ...messagesList]
 
   const { id: resolvedModelId, config: modelConfig } = resolveModelRouting(model)
@@ -860,9 +888,25 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
             apiKey,
             customEndpoint,
             customModel,
+            messagesList,
           )
         } catch (error: any) {
           console.error("Error with OpenAI-like model:", error)
+          throw error
+        }
+
+      case "fcukoffai":
+        try {
+          return await handleWithOpenAILike(
+            formattedMessages,
+            modelConfig.modelId,
+            apiKey || process.env.CEDZ_LLM_API,
+            "https://api.fcukoffai.com",
+            modelConfig.modelId,
+            messagesList,
+          )
+        } catch (error: any) {
+          console.error("Error with FcukOff AI model:", error)
           throw error
         }
 
@@ -874,6 +918,7 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
             apiKey || process.env.XAI_API_KEY,
             "https://api.x.ai/v1",
             modelConfig.modelId,
+            messagesList,
           )
         } catch (error: any) {
           console.error("Error with xAI model:", error)
@@ -888,6 +933,7 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
             apiKey || process.env.MOONSHOT_API_KEY,
             "https://api.moonshot.cn/v1",
             modelConfig.modelId,
+            messagesList,
           )
         } catch (error: any) {
           console.error("Error with Moonshot AI model:", error)
@@ -923,12 +969,21 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
       default:
         throw new Error(`Unsupported model provider: ${modelConfig.provider}`)
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating response:", error)
+    
+    const errorMessage = error.message || ""
+    let userMessage = errorMessage || "There was an error processing your request. Please try again later."
+    
+    if (errorMessage.includes("exceeds the available context size") || errorMessage.includes("context length") || errorMessage.includes("tokens) exceeds")) {
+      userMessage = "This request exceeds the model's maximum context size. Please switch to a model with a larger context window (like GPT-4o or Gemini 1.5 Pro) for this task."
+    }
+
     return new Response(
       JSON.stringify({
         error: "Failed to generate response",
-        message: "There was an error processing your request. Please try again later.",
+        message: userMessage,
+        log: errorMessage // printing the response log in the payload
       }),
       {
         status: 500,
@@ -1943,6 +1998,7 @@ async function handleWithOpenAILike(
   apiKey: string | undefined,
   customEndpoint?: string,
   customModel?: string,
+  clientMessages?: unknown[],
 ) {
   try {
     const endpoint = customEndpoint || "http://localhost:8000"
@@ -1963,14 +2019,16 @@ async function handleWithOpenAILike(
         model: model,
         messages: messages.map(msg => ({
           role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
-          content: getMsgText(msg),
+          content: getMsgText(msg) || " ",
         })),
         stream: true,
       }),
     })
 
     if (!response.ok) {
-      throw new Error(`OpenAI-like API error: ${response.status}`)
+      const errorText = await response.text()
+      console.error(`OpenAI-like API error ${response.status}:`, errorText)
+      throw new Error(`OpenAI-like API error: ${response.status} - ${errorText}`)
     }
 
     return streamTextToResponse(async (write) => {
@@ -1995,7 +2053,7 @@ async function handleWithOpenAILike(
           }
         }
       }
-    })
+    }, clientMessages)
   } catch (error) {
     console.error("Error with OpenAI-like model:", error)
     throw error

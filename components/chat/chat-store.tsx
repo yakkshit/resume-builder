@@ -126,6 +126,7 @@ export const AVAILABLE_MODELS = [
   { value: "command-r-plus", label: "Command R+", provider: "Cohere" },
 
   // Local & Custom
+  { value: "cedz-hr-qwen", label: "Cedz HR Qwen", provider: "FcukOff AI" },
   { value: "ollama-local", label: "Ollama (Local)", provider: "Ollama" },
   { value: "openai-compatible-aisdk", label: "OpenAI-Compatible / Custom", provider: "OpenAI Compatible" },
 ];

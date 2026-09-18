@@ -42,7 +42,6 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   const configured = isClerkConfigured();
-  const publishableKey = getClerkPublishableKey();
 
   const htmlContent = (
     <html lang="en" suppressHydrationWarning>
@@ -62,7 +61,7 @@ export default function RootLayout({
 
   if (configured) {
     return (
-      <ClerkProvider publishableKey={publishableKey}>
+      <ClerkProvider>
         {htmlContent}
       </ClerkProvider>
     );
