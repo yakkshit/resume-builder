@@ -397,7 +397,11 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
     │   ├── mcp-server.ts
     │   ├── migrate.mjs
     │   ├── migrate.ts
+    │   ├── test-fcukoffai.ts
+    │   ├── test-large-ctx.ts
+    │   ├── test-large.ts
     │   ├── test-pdf-endpoints.ts
+    │   ├── test-route.ts
     │   └── workflow.ts
     ├── styles/
     │   └── globals.css
@@ -418,6 +422,7 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
     ├── proxy.ts
     ├── README-MCP.md
     ├── tailwind.config.ts
+    ├── test_payload.json
     ├── test-render.tsx
     ├── ts_errors.txt
     ├── tsconfig.json
@@ -552,11 +557,11 @@ This project provides a Model Context Protocol (MCP) server that allows AI assis
 
 ## Recent Git Commits
 
-- `d57850f`: fix: bugfix update to 2.11.6 (3 days ago by yakkshit)
-- `abf6130`: fix: bugfix update to 2.11.5 (4 days ago by yakkshit)
-- `e63aa53`: fix: bugfix update to 2.11.4 (5 days ago by yakkshit)
-- `cdcb158`: fix: bugfix update to 2.11.3 (5 days ago by yakkshit)
-- `4340454`: fix: bugfix update to 2.11.2 (5 days ago by yakkshit)
+- `910d7b2`: fix: bugfix update to 2.11.8 (13 hours ago by yakkshit)
+- `e4f2cbd`: fix: bugfix update to 2.11.7 (4 days ago by yakkshit)
+- `d57850f`: fix: bugfix update to 2.11.6 (9 days ago by yakkshit)
+- `abf6130`: fix: bugfix update to 2.11.5 (9 days ago by yakkshit)
+- `e63aa53`: fix: bugfix update to 2.11.4 (10 days ago by yakkshit)
 
 
 ## Quick Notes for the LLM

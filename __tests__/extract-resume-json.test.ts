@@ -124,4 +124,21 @@ describe("extractResumeJsonFromMessage", () => {
       "Backend & Cloud: Python, FastAPI",
     ]);
   });
+
+  it("extracts Muhsin Haseeb resume payload from json code fence", async () => {
+    const text = `\`\`\`json
+{
+  "basicInfo": { "name": "Muhsin Haseeb", "title": "Lead Backend Engineer || Fullstack / AI/ML Integration", "email": "muh1998@gmail.com", "phone": "+91 9906701421", "location": "Kolkata, West Bengal", "linkedin": "linkedin.com/in/muh1998", "website": "https://muhshinx.vercel.app/", "summary": "Adept at solving complex problems with a blend of technical skills and creative thinking.", "languages": ["English", "Arabic", "Persian"] },
+  "skills": ["Node.js", "NextJS", "Go", "AWS"],
+  "experience": [{"company": "Bharat Petroleum Corporation Limited", "position": "Cloud Data & AI Architect", "startDate": "2021-08-26", "endDate": "2023-09-14", "description": "Developed data strategy.", "highlights": ["Led cross-functional team."]}],
+  "education": [{"institution": "National Institute of Technology, Calicut", "degree": "B.Tech in Computer Science & Engineering", "field": "Computer Science", "startDate": "2010-08-06", "endDate": "2015-07-30"}],
+  "projects": [],
+  "achievements": []
+}
+\`\`\``;
+    const out = extractResumeJsonFromMessage(text);
+    expect(out).not.toBeNull();
+    expect((out as any).basicInfo?.name).toBe("Muhsin Haseeb");
+    expect((out as any).skills).toContain("Node.js");
+  });
 });

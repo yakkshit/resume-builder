@@ -72,10 +72,22 @@ function isResumeUpdateShape(obj: unknown): obj is Record<string, unknown> {
 }
 
 function tryParseJsonRecord(str: string): Record<string, unknown> | null {
-  const cleaned = str
+  const trimmed = str.trim()
+  // 1. Try direct parse first - preserves URLs with "https://" and escape characters
+  try {
+    const out = JSON.parse(trimmed) as unknown
+    if (out && typeof out === "object" && !Array.isArray(out)) {
+      return out as Record<string, unknown>
+    }
+  } catch {
+    // Continue to repair below
+  }
+
+  // 2. Repair common model glitches: trailing commas, stray semicolons, comments
+  const cleaned = trimmed
     .replace(/;(\s*[}\]])/g, "$1")
-    .replace(/,(\s*[}\]])/g, "$1")
-    .replace(/\/\/[^\n]*/g, "")
+    .replace(/,\s*([}\]])/g, "$1")
+    .replace(/(?<!:)\/\/[^\n]*/g, "")
     .trim()
   try {
     const out = JSON.parse(cleaned) as unknown
@@ -215,7 +227,137 @@ export function extractResumePayloadFromMessage(content: string): ExtractedResum
     }
   }
 
+  // 4) Markdown formatted resume fallback (if model returned **Professional Profile:** ... **Skills:** ...)
+  const parsedMarkdown = parseMarkdownResumeText(trimmed)
+  if (parsedMarkdown) {
+    return { resume: parsedMarkdown, template: "modern" }
+  }
+
   return { resume: null }
+}
+
+/**
+ * Fallback parser: if an LLM responds with plain markdown headers (e.g. **Professional Profile:**, **Skills:**, **Work History:**)
+ * instead of a JSON code block, parse the structured text into a valid flat ResumeData payload.
+ */
+export function parseMarkdownResumeText(content: string): Record<string, unknown> | null {
+  if (!content || typeof content !== "string") return null
+
+  // Check if content contains typical resume section headers
+  const hasProfile = /\*\*(?:Professional\s+)?(?:Profile|Summary):\*\*/i.test(content) || /(?:Professional\s+)?Profile:/i.test(content)
+  const hasSkills = /\*\*Skills:\*\*/i.test(content) || /Skills:/i.test(content)
+  const hasWork = /\*\*(?:Work\s+History|Professional\s+Experience|Experience):\*\*/i.test(content) || /(?:Work\s+History|Experience):/i.test(content)
+
+  // Must have at least two key sections
+  const matchCount = (hasProfile ? 1 : 0) + (hasSkills ? 1 : 0) + (hasWork ? 1 : 0)
+  if (matchCount < 2) return null
+
+  const result: Record<string, any> = {}
+
+  // 1. Extract Profile / Summary
+  const profileMatch = content.match(/\*\*(?:Professional\s+)?(?:Profile|Summary):\*\*\s*([\s\S]*?)(?=\*\*(?:Skills|Work\s+History|Professional\s+Experience|Experience|Education|Projects|Certifications):|\n##|\n#|$)/i)
+  let summaryText = ""
+  if (profileMatch?.[1]) {
+    summaryText = profileMatch[1].trim()
+  }
+
+  // 2. Extract Skills
+  const skillsMatch = content.match(/\*\*Skills:\*\*\s*([\s\S]*?)(?=\*\*(?:Work\s+History|Professional\s+Experience|Experience|Education|Projects|Certifications|Profile|Summary):|\n##|\n#|$)/i)
+  if (skillsMatch?.[1]) {
+    const rawSkills = skillsMatch[1].trim()
+    const skillList = rawSkills
+      .split(/[,•\n\r|]/)
+      .map((s) => s.replace(/^[-*]\s*/, "").trim())
+      .filter((s) => s.length > 0 && s.length < 50)
+    if (skillList.length > 0) {
+      result.skills = skillList
+    }
+  }
+
+  // 3. Extract Name
+  let extractedName = ""
+  const nameMatch = content.match(/(?:(?:^|\n|\*\*Work\s+History:\*\*|\*\*Experience:\*\*)\s*)([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*[-–—]/)
+  if (nameMatch?.[1] && !/Professional Profile|Work History|Computer Science/i.test(nameMatch[1])) {
+    extractedName = nameMatch[1].trim()
+  }
+
+  // Build basicInfo
+  result.basicInfo = {
+    ...(extractedName ? { name: extractedName } : {}),
+    ...(summaryText ? { summary: summaryText } : {}),
+  }
+
+  // 4. Extract Work History / Experience
+  const workMatch = content.match(/\*\*(?:Work\s+History|Professional\s+Experience|Experience):\*\*\s*([\s\S]*?)(?=\*\*(?:Education|Projects|Certifications|Skills):|\n##|\n#|$)/i)
+  if (workMatch?.[1]) {
+    const rawWork = workMatch[1].trim()
+    const expItems: any[] = []
+
+    const entries = rawWork.split(/(?=(?:[A-Z][A-Za-z0-9\s,.-]+?\s*[-–—]\s*[A-Z][A-Za-z0-9\s,.-]+?\s*(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec|\d{1,2}\/\d{4}|\d{4})))/g)
+
+    if (entries.length > 1) {
+      for (const entry of entries) {
+        const trimmedEntry = entry.trim()
+        if (!trimmedEntry) continue
+        const headerMatch = trimmedEntry.match(/^([A-Za-z0-9\s,.-]+?)\s*[-–—]\s*([A-Za-z0-9\s,.-]+?)(?:,\s*|\s+)(Present|\d{1,2}\/\d{4}|\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*\d{4})\s*[-–—]\s*(Present|\d{1,2}\/\d{4}|\d{4}|(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s*\d{4})?(?:\s*\([^)]*\))?\s*([\s\S]*)$/i)
+        if (headerMatch) {
+          const compOrName = headerMatch[1].trim()
+          const posOrComp = headerMatch[2].trim()
+          const start = headerMatch[3]?.trim() || ""
+          const end = headerMatch[4]?.trim() || ""
+          const desc = headerMatch[5]?.trim() || ""
+
+          let company = compOrName
+          let position = posOrComp
+          if (posOrComp.includes(" at ")) {
+            const parts = posOrComp.split(" at ")
+            position = parts[0].trim()
+            company = parts[1].trim()
+          }
+
+          expItems.push({
+            company,
+            position,
+            startDate: start,
+            endDate: end,
+            description: desc.slice(0, 500),
+            highlights: [],
+          })
+        }
+      }
+    }
+
+    if (expItems.length > 0) {
+      result.experience = expItems
+    } else {
+      result.experience = [
+        {
+          company: "Experience",
+          position: "Software Engineer",
+          startDate: "",
+          endDate: "Present",
+          description: rawWork.slice(0, 1000),
+          highlights: [],
+        },
+      ]
+    }
+  }
+
+  // 5. Extract Education
+  const eduMatch = content.match(/\*\*Education:\*\*\s*([\s\S]*?)(?=\*\*(?:Projects|Certifications|Skills|Experience|Work\s+History):|\n##|\n#|$)/i)
+  if (eduMatch?.[1]) {
+    const rawEdu = eduMatch[1].trim()
+    result.education = [
+      {
+        institution: rawEdu.slice(0, 100),
+        degree: "Degree",
+        startDate: "",
+        endDate: "",
+      },
+    ]
+  }
+
+  return isResumeUpdateShape(result) ? result : null
 }
 
 /**

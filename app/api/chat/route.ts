@@ -40,8 +40,9 @@ function streamTextToResponse(
 
 import { writeFile } from "fs"
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30
+// Allow streaming responses up to 60 seconds
+export const maxDuration = 600
+export const dynamic = 'force-dynamic'
 
 // Define available models with their providers and configurations (aligned with UI selector)
 const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiKey?: string }> = {
@@ -353,21 +354,115 @@ export async function POST(req: NextRequest) {
     preferredLanguage?: string
   }
 
-  // If using a model with a small 4096 token limit, compress the context sizes
-  const isSmallContext = model === "cedz-hr-qwen"
+  // If using a model with a small context or strict upstream timeout (cedz-hr-qwen), optimize context
+  const modelStr = typeof model === "string" ? model : ""
+  const isCedzHrQwen = modelStr === "cedz-hr-qwen" ||
+    (typeof customModel === "string" && customModel.toLowerCase().includes("cedz")) ||
+    (typeof customEndpoint === "string" && customEndpoint.includes("fcukoffai")) ||
+    (typeof process.env.OPENAI_LIKE_BASE_URL === "string" && process.env.OPENAI_LIKE_BASE_URL.includes("fcukoffai"))
+  const isSmallContext = isCedzHrQwen
 
-  const MAX_CONTEXT_TEXT_CHARS = isSmallContext ? 1500 : 12_000
-  const MAX_MEMORY_CONTEXT_CHARS = isSmallContext ? 1500 : 10_000
-  const MAX_RETRIEVAL_CONTEXT_CHARS = isSmallContext ? 1500 : 12_000
-  const MAX_PROFILE_JSON_CHARS = isSmallContext ? 3000 : 16_000
+  const MAX_CONTEXT_TEXT_CHARS = isSmallContext ? 1_500 : 12_000
+  const MAX_MEMORY_CONTEXT_CHARS = isSmallContext ? 0 : 10_000
+  const MAX_RETRIEVAL_CONTEXT_CHARS = isSmallContext ? 0 : 12_000
+  const MAX_PROFILE_JSON_CHARS = isSmallContext ? 1_500 : 16_000
 
   // Create a system message based on the mode
   let systemMessage = "";
 
-  const resumeJson = JSON.stringify(resumeData ?? {})
+  const MAX_RESUME_CHARS = isSmallContext ? 1_000 : 50_000
+  const rawResumeJson = JSON.stringify(resumeData ?? {})
+  const resumeJson = rawResumeJson.length > MAX_RESUME_CHARS ? rawResumeJson.slice(0, MAX_RESUME_CHARS) + '...[truncated]' : rawResumeJson
 
-  if (aiMode) {
-    systemMessage = `You are an AI Resume Assistant. The user will give you their resume data and often a job description or request (e.g. "tailor my resume to this job", "update my summary").
+  if (isSmallContext) {
+    // For small context models (cedz-hr-qwen), use a focused, high-performance system prompt.
+    // Keep payloads concise to avoid upstream prompt evaluation timeouts.
+    const lastUserMsg = (Array.isArray(messages) ? messages : []).filter((m: any) => m.role === 'user').pop()
+    const lastUserText = (lastUserMsg?.content || lastUserMsg?.parts?.find((p: any) => p.type === 'text')?.text || '').toLowerCase()
+    const isCreateOrBuild = /create|build|generate|make|tailor|based\s+on|my\s+profile|cv|resume/i.test(lastUserText)
+    const needsResumeContext = !isCreateOrBuild && /resume|cv|tailor|skill|experience|education|summary|job|position|cover letter|project|achievement|profile|background/i.test(lastUserText)
+
+    systemMessage = `You are an expert AI Resume Assistant powered by Qwen.
+Respond helpfully, politely, and concisely to greetings and general questions.
+
+CRITICAL INSTRUCTIONS FOR RESUMES:
+1. When asked to CREATE, BUILD, GENERATE, or TAILOR a resume (e.g. "create resume based on my profile", "build my resume"):
+   You MUST output a \`\`\`component:cv code block containing the full structured resume JSON so the interactive builder and PDF preview render immediately:
+\`\`\`component:cv
+{
+  "basicInfo": {
+    "name": "Full Name",
+    "title": "Professional Title",
+    "email": "email@example.com",
+    "phone": "+1234567890",
+    "location": "City, Country",
+    "linkedin": "linkedin.com/in/username",
+    "website": "portfolio.com",
+    "summary": "Professional summary...",
+    "languages": ["English"]
+  },
+  "skills": ["Skill 1", "Skill 2"],
+  "experience": [
+    {
+      "company": "Company Name",
+      "position": "Job Title",
+      "startDate": "YYYY-MM",
+      "endDate": "Present",
+      "description": "Role overview...",
+      "highlights": ["Key achievement 1", "Key achievement 2"]
+    }
+  ],
+  "education": [
+    {
+      "institution": "University Name",
+      "degree": "Degree Title",
+      "field": "Field of Study",
+      "startDate": "YYYY",
+      "endDate": "YYYY"
+    }
+  ],
+  "projects": [{ "name": "Project Name", "description": "Details...", "technologies": ["Tech1"] }],
+  "achievements": [{ "title": "Achievement Title", "description": "Details...", "date": "YYYY" }]
+}
+\`\`\`
+   MANDATORY: When creating or generating a resume, you MUST emit this structured \`\`\`component:cv code block. DO NOT just write plain text, bullet points, or markdown summaries.
+
+2. When the user asks for a PARTIAL UPDATE or single edit (e.g. "update my summary", "add skill"):
+   Output a brief 1-2 sentence explanation and a \`\`\`json code block with only the modified fields:
+\`\`\`json
+{
+  "basicInfo": { "summary": "New summary text" }
+}
+\`\`\`
+
+Rules:
+- Never include HTML tags (such as <a>, <p>, <div>) inside JSON strings. Use clean plain text only.
+- Output strictly valid JSON (double quotes for keys/strings, no trailing commas, no comments).`
+
+    let hasProfile = false
+    if (chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)) {
+      const profileJson = clipForPrompt(JSON.stringify(chatGlobalProfile), MAX_PROFILE_JSON_CHARS)
+      if (profileJson && profileJson !== "{}") {
+        systemMessage += `\n\nUser Profile & Background Data (use this data to build the resume):\n${profileJson}`
+        hasProfile = true
+      }
+    }
+
+    // Only append contextText if we didn't already append chatGlobalProfile (avoid duplicating profile data)
+    if (!hasProfile) {
+      const clippedContextText = clipForPrompt(contextText, MAX_CONTEXT_TEXT_CHARS)
+      if (clippedContextText) {
+        systemMessage += `\n\nUser Context:\n${clippedContextText}`
+      }
+    }
+
+    // Only inject existing resumeJson if this is an update request, not when creating a new resume from profile
+    if (needsResumeContext && resumeJson.length > 2 && resumeJson !== "{}") {
+      systemMessage += `\n\nCurrent Resume Data (for context; output only changes):\n${resumeJson}`
+    }
+  } else {
+    if (aiMode) {
+      systemMessage = `You are an AI Resume Assistant. The user will give you their resume data and often a job description or request (e.g. "tailor my resume to this job", "update my summary").
 
 Your response must follow this structure every time you suggest resume changes:
 1. Write a short human-readable explanation (1–3 sentences) before or after the code block.
@@ -382,6 +477,7 @@ Your response must follow this structure every time you suggest resume changes:
   "projects": [{ "name": "...", "description": "...", "technologies": [] }],
   "achievements": [{ "title": "...", "description": "...", "date": "..." }]
 }
+\`\`\`
 
 Rules:
 - Output ONLY the keys and values you are modifying. Omit any section you are not changing.
@@ -392,8 +488,8 @@ Rules:
 - If user asks to create/build/tailor a resume for a job description, you MUST include \`\`\`component:cv ...\`\`\` with resumeData so the app can render the resume tool and PDF preview immediately.
 
 Provided resume data (for context; suggest only changes): ${resumeJson}`
-  } else {
-    systemMessage = `You are an AI Resume Assistant. The user will ask questions about their resume or ask for improvements.
+    } else {
+      systemMessage = `You are an AI Resume Assistant. The user will ask questions about their resume or ask for improvements.
 
 When you suggest specific text or structure changes, you MUST include exactly one JSON code block with only the fields you are changing, in this format:
 
@@ -407,9 +503,9 @@ When you suggest specific text or structure changes, you MUST include exactly on
 - while writing descriptions make sure there is no **bold** or ## heading or any other markdown formatting. just write the plain text.
 
 Resume data: ${resumeJson}`
-  }
+    }
 
-  systemMessage += `\n\nImportant: The resume JSON in this system message is the user’s latest snapshot for this request (their saved editor state plus structured resume content from this chat thread). Treat it as the source of truth when suggesting edits unless they paste new material.
+    systemMessage += `\n\nImportant: The resume JSON in this system message is the user’s latest snapshot for this request (their saved editor state plus structured resume content from this chat thread). Treat it as the source of truth when suggesting edits unless they paste new material.
 
 Structured UI (use when appropriate; always close fenced blocks with \`\`\`):
 - Interactive resume card — use **flat** \`resumeData\` (same keys as the editor / PDF). For \`component:cv\`, emit a complete, tailored snapshot (all sections the user should see on the card). Partial edits alone stay in \`\`\`json\`\`\` blocks as already described above. Example skeleton:
@@ -423,77 +519,79 @@ LaTeX components — use ONLY when the user clearly asks for LaTeX, academic / p
 - LaTeX cover letter: \`\`\`component:coverLetterLatex\n{"latex":"...full compilable .tex..."}\n\`\`\`
 Escape backslashes and newlines inside JSON strings so the fence stays valid.`
 
-  // Omit massive LaTeX source code for small context models to avoid 400 errors
-  if (!isSmallContext && typeof resumeLatex === "string" && resumeLatex.trim()) {
-    const clip = resumeLatex.length > 200_000 ? resumeLatex.slice(0, 200_000) + "\n% …truncated" : resumeLatex
-    systemMessage += `\n\nThe user’s current résumé LaTeX (from the chat editor; revise when they ask):\n\n\`\`\`tex\n${clip}\n\`\`\``
-  }
-  if (!isSmallContext && typeof coverLetterLatex === "string" && coverLetterLatex.trim()) {
-    const clip = coverLetterLatex.length > 200_000 ? coverLetterLatex.slice(0, 200_000) + "\n% …truncated" : coverLetterLatex
-    systemMessage += `\n\nThe user’s current cover letter LaTeX (from the chat editor):\n\n\`\`\`tex\n${clip}\n\`\`\``
-  }
-
-  // If there's attached data, add it to the system message
-  if (attachedData) {
-    try {
-      // If attachedData is a string that contains JSON, parse it
-      const parsedData = typeof attachedData === "string" ? JSON.parse(attachedData) : attachedData
-      systemMessage += `\n\nThe user has also attached additional data: ${JSON.stringify(parsedData)}`
-    } catch (error) {
-      // If it's not valid JSON, just use it as is
-      systemMessage += `\n\nThe user has also attached additional data: ${attachedData}`
+    // Omit massive LaTeX source code for small context models to avoid 400 errors
+    if (typeof resumeLatex === "string" && resumeLatex.trim()) {
+      const clip = resumeLatex.length > 200_000 ? resumeLatex.slice(0, 200_000) + "\n% …truncated" : resumeLatex
+      systemMessage += `\n\nThe user’s current résumé LaTeX (from the chat editor; revise when they ask):\n\n\`\`\`tex\n${clip}\n\`\`\``
     }
-  }
+    if (typeof coverLetterLatex === "string" && coverLetterLatex.trim()) {
+      const clip = coverLetterLatex.length > 200_000 ? coverLetterLatex.slice(0, 200_000) + "\n% …truncated" : coverLetterLatex
+      systemMessage += `\n\nThe user’s current cover letter LaTeX (from the chat editor):\n\n\`\`\`tex\n${clip}\n\`\`\``
+    }
 
-  // If there are attached files, add them to the system message
-  if (attachedFiles && attachedFiles.length > 0) {
-    systemMessage += `\n\nThe user has attached the following files:\n`
-
-    for (const file of attachedFiles) {
-      if (file.contentType === 'pdf') {
-        systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${file.content}\n`
-      } else if (file.contentType === 'document') {
-        systemMessage += `\nDocument File: ${file.name}\nContent: ${file.content}\n`
-      } else if (file.contentType === 'image') {
-        systemMessage += `\nImage File: ${file.name}\nDescription: ${file.content}\n`
-      } else if (file.contentType === 'json') {
-        systemMessage += `\nJSON File: ${file.name}\nData: ${JSON.stringify(file.content)}\n`
-      } else if (file.contentType === 'text' || file.contentType === 'csv') {
-        systemMessage += `\nText/CSV File: ${file.name}\nContent: ${file.content}\n`
-      } else if (file.contentType === 'excel') {
-        systemMessage += `\nExcel File: ${file.name}\nInfo: ${file.content}\n`
-      } else {
-        systemMessage += `\nFile: ${file.name}\nContent: ${file.content}\n`
+    // If there's attached data, add it to the system message
+    if (attachedData) {
+      try {
+        // If attachedData is a string that contains JSON, parse it
+        const parsedData = typeof attachedData === "string" ? JSON.parse(attachedData) : attachedData
+        systemMessage += `\n\nThe user has also attached additional data: ${JSON.stringify(parsedData)}`
+      } catch (error) {
+        // If it's not valid JSON, just use it as is
+        systemMessage += `\n\nThe user has also attached additional data: ${attachedData}`
       }
     }
 
-    systemMessage += `\nPlease analyze these files and use their content to provide relevant assistance.`
-  }
+    // If there are attached files, add them to the system message
+    if (attachedFiles && attachedFiles.length > 0) {
+      systemMessage += `\n\nThe user has attached the following files:\n`
 
-  // If there's context text, add it to the system message
-  const clippedContextText = clipForPrompt(contextText, MAX_CONTEXT_TEXT_CHARS)
-  if (clippedContextText) {
-    systemMessage += `\n\nUser Context: ${clippedContextText}`
-  }
+      for (const file of attachedFiles) {
+        if (file.contentType === 'pdf') {
+          systemMessage += `\nPDF File: ${file.name} (${file.pages} pages)\nContent: ${file.content}\n`
+        } else if (file.contentType === 'document') {
+          systemMessage += `\nDocument File: ${file.name}\nContent: ${file.content}\n`
+        } else if (file.contentType === 'image') {
+          systemMessage += `\nImage File: ${file.name}\nDescription: ${file.content}\n`
+        } else if (file.contentType === 'json') {
+          systemMessage += `\nJSON File: ${file.name}\nData: ${JSON.stringify(file.content)}\n`
+        } else if (file.contentType === 'text' || file.contentType === 'csv') {
+          systemMessage += `\nText/CSV File: ${file.name}\nContent: ${file.content}\n`
+        } else if (file.contentType === 'excel') {
+          systemMessage += `\nExcel File: ${file.name}\nInfo: ${file.content}\n`
+        } else {
+          systemMessage += `\nFile: ${file.name}\nContent: ${file.content}\n`
+        }
+      }
 
-  if (chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)) {
-    const profileJson = clipForPrompt(JSON.stringify(chatGlobalProfile), MAX_PROFILE_JSON_CHARS)
-    if (profileJson) {
-      systemMessage += `\n\nGlobal Master Career Profile & Memory Vault:\n${profileJson}\n\nMaster Memory Vault Grounding Rules:\n- Ground strictly on the user's provided Master Memory Vault / Profile data (career goals, summary, skills, work history, projects, education, certifications, languages). Never hallucinate or assume placeholder data (such as John Doe, Spanish, French, etc.).\n- When the user requests a tailored resume, CV score, cover letter, or job application for ANY specific job description or target role, select and prioritize the most relevant achievements, skills, and projects directly from their Memory Vault.`
+      systemMessage += `\nPlease analyze these files and use their content to provide relevant assistance.`
+    }
+
+    // If there's context text, add it to the system message
+    const clippedContextText = clipForPrompt(contextText, MAX_CONTEXT_TEXT_CHARS)
+    if (clippedContextText) {
+      systemMessage += `\n\nUser Context: ${clippedContextText}`
+    }
+
+    if (chatGlobalProfile && typeof chatGlobalProfile === "object" && !Array.isArray(chatGlobalProfile)) {
+      const profileJson = clipForPrompt(JSON.stringify(chatGlobalProfile), MAX_PROFILE_JSON_CHARS)
+      if (profileJson) {
+        systemMessage += `\n\nGlobal Master Career Profile & Memory Vault:\n${profileJson}\n\nMaster Memory Vault Grounding Rules:\n- Ground strictly on the user's provided Master Memory Vault / Profile data (career goals, summary, skills, work history, projects, education, certifications, languages). Never hallucinate or assume placeholder data (such as John Doe, Spanish, French, etc.).\n- When the user requests a tailored resume, CV score, cover letter, or job application for ANY specific job description or target role, select and prioritize the most relevant achievements, skills, and projects directly from their Memory Vault.`
+      }
+    }
+
+    const clippedMemoryContext = clipForPrompt(memoryContext, MAX_MEMORY_CONTEXT_CHARS)
+    if (clippedMemoryContext) {
+      systemMessage += `\n\nLong-term memory context (AI SDK app memory):\n${clippedMemoryContext}`
+    }
+
+    const clippedRetrievalContext = clipForPrompt(retrievalContext, MAX_RETRIEVAL_CONTEXT_CHARS)
+    if (clippedRetrievalContext) {
+      systemMessage += `\n\nRetrieved conversation/context snippets (Memory Vault):\n${clippedRetrievalContext}`
     }
   }
 
-  const clippedMemoryContext = clipForPrompt(memoryContext, MAX_MEMORY_CONTEXT_CHARS)
-  if (clippedMemoryContext) {
-    systemMessage += `\n\nLong-term memory context (AI SDK app memory):\n${clippedMemoryContext}`
-  }
-
-  const clippedRetrievalContext = clipForPrompt(retrievalContext, MAX_RETRIEVAL_CONTEXT_CHARS)
-  if (clippedRetrievalContext) {
-    systemMessage += `\n\nRetrieved conversation/context snippets (Memory Vault):\n${clippedRetrievalContext}`
-  }
-
-  systemMessage += `\n\nBehavior & Formatting Requirements:
+  if (!isSmallContext) {
+    systemMessage += `\n\nBehavior & Formatting Requirements:
 - **Universal Task Completion Mandate**: You are an expert AI Career Copilot. No matter which task the user asks (resume building, job tailoring, ATS score evaluation, web scraping, chart creation, interview preparation, cover letters, LaTeX compilation, cold outreach, career knowledge graph inspection, or GitHub sync), you MUST fulfill the task completely and accurately in this turn. Never refuse or claim inability.
 - Use the full conversation history provided in this request as the primary source of user intent.
 - Use the user's Master Memory Vault as the ultimate source of truth when tailoring resumes or answering career questions.
@@ -686,21 +784,58 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
   - \`/api/email-draft\`: AI-powered cold recruiter email generator.
   - \`/api/generate-pdf\` & \`/api/latex-pdf\`: PDF and LaTeX rendering services.
   - \`/api/mcp\`: Model Context Protocol server exposing JSON-RPC 2.0 tools.`
+  }
 
   // Format the conversation for the AI
-  const messagesList = Array.isArray(messages) ? messages : []
+  let messagesList = Array.isArray(messages) ? messages : []
   
+  if (isSmallContext) {
+    // Keep last 3 messages to preserve conversation flow without causing 504 on upstream Ollama/Qwen
+    if (messagesList.length > 3) {
+      messagesList = messagesList.slice(-3)
+    }
+    // Trim older history items so massive past profile dumps don't bloat prompt evaluation time
+    messagesList = messagesList.map((m: any, idx: number) => {
+      const isLast = idx === messagesList.length - 1
+      if (!isLast) {
+        const text = getMsgText(m)
+        if (text.length > 400) {
+          return { ...m, content: text.slice(0, 400) + "... [trimmed for brevity]" }
+        }
+      } else {
+        const text = getMsgText(m)
+        if (text.length > 2500) {
+          return { ...m, content: text.slice(0, 2500) }
+        }
+      }
+      return m
+    })
+  }
+
   if (messagesList.length > 0) {
     const lastMsg = messagesList[messagesList.length - 1]
     if (lastMsg.role === "user") {
-      const reminder = `\n\n[SYSTEM REMINDER: You MUST use the interactive markdown components (e.g. \`\`\`component:cv\n{...}\n\`\`\`, \`\`\`component:cover-letter\`, \`\`\`component:job-scraper\`, etc.) to fulfill the request. If generating a resume, output the full \`component:cv\` JSON. Do not just ask for information you already have in the Profile/Memory Vault. Complete the task instantly.]`
-      if (typeof lastMsg.content === "string") {
-        lastMsg.content += reminder
+      const userText = (typeof lastMsg.content === "string" ? lastMsg.content : "").toLowerCase()
+      const isCreateOrBuild = /create|build|generate|make|tailor|based\s+on|my\s+profile|cv|resume/i.test(userText)
+
+      let reminder = ""
+      if (isSmallContext) {
+        if (isCreateOrBuild) {
+          reminder = `\n\n[MANDATORY: Output the complete resume in a \`\`\`component:cv\n{\n  "basicInfo": { "name": "...", "title": "...", "summary": "...", ... },\n  "skills": [...],\n  "experience": [...],\n  "education": [...]\n}\n\`\`\` code block based on the user profile/background so the interactive resume editor and PDF preview render immediately. Do NOT output plain text summary.]`
+        }
+      } else {
+        reminder = `\n\n[SYSTEM REMINDER: You MUST use the interactive markdown components (e.g. \`\`\`component:cv\n{...}\n\`\`\`, \`\`\`component:cover-letter\`, \`\`\`component:job-scraper\`, etc.) to fulfill the request. If generating a resume, output the full \`component:cv\` JSON. Do not just ask for information you already have in the Profile/Memory Vault. Complete the task instantly.]`
       }
-      if (Array.isArray(lastMsg.parts)) {
-        const textPart = lastMsg.parts.find((p: any) => p.type === "text")
-        if (textPart) textPart.text += reminder
-        else lastMsg.parts.push({ type: "text", text: reminder })
+
+      if (reminder) {
+        if (typeof lastMsg.content === "string") {
+          lastMsg.content += reminder
+        }
+        if (Array.isArray(lastMsg.parts)) {
+          const textPart = lastMsg.parts.find((p: any) => p.type === "text")
+          if (textPart) textPart.text += reminder
+          else lastMsg.parts.push({ type: "text", text: reminder })
+        }
       }
     }
   }
@@ -889,6 +1024,8 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
             customEndpoint,
             customModel,
             messagesList,
+            customHeaders as Record<string, string> | undefined,
+            customAuth,
           )
         } catch (error: any) {
           console.error("Error with OpenAI-like model:", error)
@@ -904,6 +1041,8 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
             "https://api.fcukoffai.com",
             modelConfig.modelId,
             messagesList,
+            customHeaders as Record<string, string> | undefined,
+            customAuth,
           )
         } catch (error: any) {
           console.error("Error with FcukOff AI model:", error)
@@ -947,6 +1086,7 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
             modelConfig.modelId,
             apiKey,
             customModel,
+            messagesList,
           )
         } catch (error: any) {
           console.error("Error with Lingo AI model:", error)
@@ -1999,62 +2139,116 @@ async function handleWithOpenAILike(
   customEndpoint?: string,
   customModel?: string,
   clientMessages?: unknown[],
+  customHeaders?: Record<string, string>,
+  customAuth?: string,
 ) {
+  const rawEndpoint = (customEndpoint || "http://localhost:8000").trim().replace(/\/+$/, "")
+  let targetUrl = rawEndpoint
+  if (targetUrl.endsWith("/chat/completions")) {
+    // already full URL
+  } else if (targetUrl.endsWith("/v1")) {
+    targetUrl = `${targetUrl}/chat/completions`
+  } else {
+    targetUrl = `${targetUrl}/v1/chat/completions`
+  }
+
+  const model = customModel || modelId || "local-model"
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(customHeaders || {}),
+  }
+
+  const effectiveAuth = customAuth || (apiKey ? `Bearer ${apiKey}` : "")
+  if (effectiveAuth) {
+    headers["Authorization"] = effectiveAuth.startsWith("Bearer ") || effectiveAuth.startsWith("Basic ")
+      ? effectiveAuth
+      : `Bearer ${effectiveAuth}`
+  }
+
+  const requestBodyStr = JSON.stringify({
+    model: model,
+    messages: messages.map(msg => ({
+      role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
+      content: getMsgText(msg) || " ",
+    })),
+    stream: true,
+  })
+  console.log(`[handleWithOpenAILike] Sending request to ${targetUrl}. Body length: ${requestBodyStr.length} chars`)
+
+  // Add a 180-second timeout to allow upstream Ollama sufficient time during heavy workloads
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 180000)
+
   try {
-    const endpoint = customEndpoint || "http://localhost:8000"
-    const model = customModel || "local-model"
-
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    }
-
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`
-    }
-
-    const response = await fetch(`${endpoint}/v1/chat/completions`, {
+    const response = await fetch(targetUrl, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model: model,
-        messages: messages.map(msg => ({
-          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
-          content: getMsgText(msg) || " ",
-        })),
-        stream: true,
-      }),
+      body: requestBodyStr,
+      signal: controller.signal,
     })
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error(`OpenAI-like API error ${response.status}:`, errorText)
-      throw new Error(`OpenAI-like API error: ${response.status} - ${errorText}`)
+      let cleanError = errorText
+      if (cleanError.includes("<html") || cleanError.includes("504 Gateway")) {
+        cleanError = "The AI provider took too long to respond (Gateway Timeout). Please try again later or select a different model."
+      } else if (cleanError.length > 200) {
+        cleanError = cleanError.substring(0, 200) + "..."
+      }
+      throw new Error(`OpenAI-like API error: ${response.status} - ${cleanError}`)
     }
 
     return streamTextToResponse(async (write) => {
       const reader = response.body?.getReader()
       if (!reader) return
       let partial = ""
+      let fullBodyAccumulator = ""
+      let hasWrittenAnyText = false
+
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         const chunk = new TextDecoder().decode(value)
+        fullBodyAccumulator += chunk
         const lines = (partial + chunk).split("\n")
         partial = lines.pop() || ""
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6).trim()
+          const trimmed = line.trim()
+          if (trimmed.startsWith("data:")) {
+            const data = trimmed.slice(5).trim()
             if (data === "[DONE]") continue
             try {
               const json = JSON.parse(data)
-              const text = json.choices[0]?.delta?.content
-              if (text) write(text)
+              const text = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.text
+              if (text) {
+                write(text)
+                hasWrittenAnyText = true
+              }
             } catch { /* ignore */ }
           }
         }
       }
+
+      // Fallback: if upstream returned a non-streaming JSON payload instead of SSE
+      if (!hasWrittenAnyText && fullBodyAccumulator.trim()) {
+        try {
+          const json = JSON.parse(fullBodyAccumulator.trim())
+          const text = json.choices?.[0]?.message?.content ?? json.choices?.[0]?.text ?? json.response
+          if (text) {
+            write(text)
+          }
+        } catch { /* ignore */ }
+      }
     }, clientMessages)
-  } catch (error) {
+  } catch (error: any) {
+    clearTimeout(timeoutId)
+    if (error.name === 'AbortError') {
+      console.error("OpenAI-like API error: Request timed out after 180 seconds")
+      throw new Error("OpenAI-like API error: 504 - The AI provider took too long to respond (Gateway Timeout). Please try again later or select a different model.")
+    }
     console.error("Error with OpenAI-like model:", error)
     throw error
   }
@@ -2155,6 +2349,7 @@ async function handleWithLingoAI(
   modelId: string,
   apiKey: string | undefined,
   customModel?: string,
+  clientMessages?: unknown[],
 ) {
   try {
     const endpoint = process.env.LINGOAI || "http://model.yakkshit.com/api/chat/completions"
@@ -2196,18 +2391,19 @@ async function handleWithLingoAI(
         const lines = (partial + chunk).split("\n")
         partial = lines.pop() || ""
         for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            const data = line.slice(6).trim()
+          const trimmed = line.trim()
+          if (trimmed.startsWith("data:")) {
+            const data = trimmed.slice(5).trim()
             if (data === "[DONE]") continue
             try {
               const json = JSON.parse(data)
-              const text = json.choices[0]?.delta?.content
+              const text = json.choices?.[0]?.delta?.content ?? json.choices?.[0]?.text ?? json.response
               if (text) write(text)
             } catch { /* ignore */ }
           }
         }
       }
-    })
+    }, clientMessages)
   } catch (error) {
     console.error("Error with Lingo AI model:", error)
     throw error

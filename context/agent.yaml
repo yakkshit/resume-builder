@@ -1,5 +1,5 @@
 version: 1.0.0
-generatedAt: '2026-09-13T20:59:19.480Z'
+generatedAt: '2026-09-19T04:18:27.629Z'
 projectPath: /Users/yakkshit/Downloads/project/resume/cv-main
 overview: >-
   This project provides a Model Context Protocol (MCP) server that allows AI assistants (Claude Desktop, Cursor,
@@ -392,7 +392,11 @@ directoryStructure: |-
       │   ├── mcp-server.ts
       │   ├── migrate.mjs
       │   ├── migrate.ts
+      │   ├── test-fcukoffai.ts
+      │   ├── test-large-ctx.ts
+      │   ├── test-large.ts
       │   ├── test-pdf-endpoints.ts
+      │   ├── test-route.ts
       │   └── workflow.ts
       ├── styles/
       │   └── globals.css
@@ -413,6 +417,7 @@ directoryStructure: |-
       ├── proxy.ts
       ├── README-MCP.md
       ├── tailwind.config.ts
+      ├── test_payload.json
       ├── test-render.tsx
       ├── ts_errors.txt
       ├── tsconfig.json
@@ -2180,7 +2185,23 @@ dependencyGraph:
       type: module
       imports: []
       importedBy: []
+    - file: scripts/test-fcukoffai.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: scripts/test-large-ctx.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: scripts/test-large.ts
+      type: module
+      imports: []
+      importedBy: []
     - file: scripts/test-pdf-endpoints.ts
+      type: module
+      imports: []
+      importedBy: []
+    - file: scripts/test-route.ts
       type: module
       imports: []
       importedBy: []
@@ -2726,25 +2747,25 @@ dependencyGraph:
     - components/chat/components/cover-letter-viewer.tsx
     - components/chat/components/job-scraper-card.tsx
 recentCommits:
+  - hash: 910d7b2
+    message: 'fix: bugfix update to 2.11.8'
+    date: 13 hours ago
+    author: yakkshit
+  - hash: e4f2cbd
+    message: 'fix: bugfix update to 2.11.7'
+    date: 4 days ago
+    author: yakkshit
   - hash: d57850f
     message: 'fix: bugfix update to 2.11.6'
-    date: 3 days ago
+    date: 9 days ago
     author: yakkshit
   - hash: abf6130
     message: 'fix: bugfix update to 2.11.5'
-    date: 4 days ago
+    date: 9 days ago
     author: yakkshit
   - hash: e63aa53
     message: 'fix: bugfix update to 2.11.4'
-    date: 5 days ago
-    author: yakkshit
-  - hash: cdcb158
-    message: 'fix: bugfix update to 2.11.3'
-    date: 5 days ago
-    author: yakkshit
-  - hash: '4340454'
-    message: 'fix: bugfix update to 2.11.2'
-    date: 5 days ago
+    date: 10 days ago
     author: yakkshit
 quickNotes:
   - 'Execution Context: Refer to the entry points to understand application bootstrap.'

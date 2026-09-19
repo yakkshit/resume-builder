@@ -305,6 +305,13 @@ function extractComponents(text: string) {
                 data: { resumeData: flat },
                 isComplete: true,
             });
+            // Clean the JSON code fence out of cleanText so the chat bubble shows clean text instead of the huge raw JSON block
+            cleanText = cleanText
+                .replace(/```(?:json|cv|resume)?\s*\{[\s\S]*?\}\s*```/gi, "")
+                .trim();
+            if (!cleanText) {
+                cleanText = "Here is your customized resume based on your profile:";
+            }
         }
     }
 
@@ -318,6 +325,9 @@ function extractComponents(text: string) {
                 data: { coverLetterData: fallbackCover, template: "modern" },
                 isComplete: true,
             });
+            cleanText = cleanText
+                .replace(/```(?:json|cover-letter|coverletter)?\s*\{[\s\S]*?\}\s*```/gi, "")
+                .trim();
         }
     }
 
@@ -1619,7 +1629,9 @@ export default function AICareerAssistantChat() {
                     /\b(resume|cv|curriculum|latex cv|cover letter|cover-letter|experience|summary|skills)\b/i.test(
                         lastUser,
                     );
-                const hasCvFence = /```\s*component\s*:\s*(cv|resume)\b/i.test(text);
+                const hasCvFence =
+                    /```\s*component\s*:\s*(cv|resume)\b/i.test(text) ||
+                    extractResumeJsonFromMessage(text) != null;
                 const modelId = settingsRef.current.model ?? "";
                 const gemini = modelId.startsWith("gemini-");
                 if (resumeIntent && lastUser.length > 12 && !hasCvFence && !gemini) {

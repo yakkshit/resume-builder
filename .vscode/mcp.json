@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "context-gen": {
-      "url": "https://f20b7cf60160e8.lhr.life/mcp",
+      "url": "https://dfb5195fe10ab8.lhr.life/mcp",
       "headers": {
         "X-API-Key": "0c9bda2c3a86c1184f66ecd86757d368a0395e00610b9b0bc6ce390893ac11a1"
       }
