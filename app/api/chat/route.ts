@@ -41,7 +41,7 @@ function streamTextToResponse(
 import { writeFile } from "fs"
 
 // Allow streaming responses up to 60 seconds
-export const maxDuration = 600
+export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
 // Define available models with their providers and configurations (aligned with UI selector)
