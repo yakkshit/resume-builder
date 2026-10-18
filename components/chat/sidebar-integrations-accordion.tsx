@@ -59,31 +59,6 @@ export function SidebarIntegrationsAccordion({ settings, onSettingsChange }: Pro
             </Button>
           </AccordionContent>
         </AccordionItem>
-
-        <AccordionItem value="job-scraper" className="border-border/40">
-          <AccordionTrigger className="py-2 text-left text-xs font-medium hover:no-underline [&>svg]:text-muted-foreground">
-            <span className="flex flex-1 items-center justify-between pr-2">
-              <span className="flex items-center gap-2">
-                <Briefcase className="h-3.5 w-3.5 shrink-0 text-primary" />
-                Live Job Matching
-              </span>
-              <Badge variant="secondary" className="border-emerald-500/20 bg-emerald-500/10 text-emerald-500 text-[10px]">
-                Live
-              </Badge>
-            </span>
-          </AccordionTrigger>
-          <AccordionContent className="space-y-2 pb-2.5 pt-0 text-[11px] text-muted-foreground">
-            <div className="rounded-lg border border-border/60 bg-muted/30 p-2 text-xs">
-              <p className="flex items-center gap-1.5 font-medium text-foreground">
-                <Sparkles className="h-3 w-3 text-primary" />
-                Quick Search
-              </p>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Type <span className="font-mono text-foreground font-medium">"Find frontend jobs in Remote"</span> to scrape live postings.
-              </p>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
       </Accordion>
 
       <MCPDialog open={mcpDialogOpen} onOpenChange={setMcpDialogOpen} />

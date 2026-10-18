@@ -4,9 +4,10 @@ import { useEffect, useMemo, useId, useState } from "react";
 import dynamic from "next/dynamic";
 import { TRANSLATION_ORIGINAL, translateDataDeep, translateLatexSmart } from "@/lib/translation";
 import { TranslationControls } from "@/components/chat/translation-controls";
+import { Shimmer } from "@/components/ai-elements/shimmer";
 
 const loading = () => (
-  <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+  <div className="shimmer rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
     Loading component...
   </div>
 );
@@ -35,10 +36,6 @@ const LinkedinDmPanel = dynamic(
   () => import("./components/linkedin-dm-panel").then((m) => m.LinkedinDmPanel),
   { loading },
 );
-const JobScraperCard = dynamic(
-  () => import("./components/job-scraper-card").then((m) => m.JobScraperCard),
-  { loading },
-);
 const ResumeLatexArtifact = dynamic(
   () => import("./resume-latex-artifact").then((m) => m.ResumeLatexArtifact),
   { loading },
@@ -51,17 +48,40 @@ const BrowserController = dynamic(
   () => import("./components/browser-controller").then((m) => m.BrowserController),
   { loading },
 );
+const SearchResourcesCard = dynamic(
+  () => import("./search-resources-card").then((m) => m.SearchResourcesCard),
+  { loading },
+);
+const GraphRagViewer = dynamic(
+  () => import("./components/graph-rag-viewer").then((m) => m.GraphRagViewer),
+  { loading },
+);
+const VectorRagViewer = dynamic(
+  () => import("./components/vector-rag-viewer").then((m) => m.VectorRagViewer),
+  { loading },
+);
+const ScraperPlanViewer = dynamic(
+  () => import("./components/scraper-plan-viewer").then((m) => m.ScraperPlanViewer),
+  { loading },
+);
+const GitHubSyncCard = dynamic(
+  () => import("./components/github-sync-card").then((m) => m.GitHubSyncCard),
+  { loading },
+);
+const ImageGeneration = dynamic(
+  () => import("@/components/ai-elements/image-generation").then((m) => m.ImageGeneration),
+  { loading }
+);
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { PanelRightOpen, PanelRightClose, Sparkles, Layout } from "lucide-react";
+import { PanelRightOpen, PanelRightClose, Sparkles, Layout, Network } from "lucide-react";
 
 export type ComponentType =
   | "resume"
   | "cover-letter"
   | "cv-score"
   | "job-recommendations"
-  | "job-scraper"
   | "chart"
   | "auto-applier"
   | "coding-challenge"
@@ -70,7 +90,13 @@ export type ComponentType =
   | "linkedin-dm"
   | "resume-latex"
   | "cover-letter-latex"
-  | "browser";
+  | "browser"
+  | "search-resources"
+  | "graph-rag"
+  | "vector-rag"
+  | "scraper-plan"
+  | "github-sync"
+  | "image-generation";
 
 export const COMPONENT_TITLES: Record<ComponentType, string> = {
   resume: "Resume Preview & Editor",
@@ -79,7 +105,6 @@ export const COMPONENT_TITLES: Record<ComponentType, string> = {
   "cover-letter-latex": "LaTeX Cover Letter",
   "cv-score": "CV Match Score & Insights",
   "job-recommendations": "Recommended Opportunities",
-  "job-scraper": "Live Job Scraper & Matcher",
   chart: "Career Analytics & Metrics",
   "auto-applier": "Autonomous Job Applier",
   "coding-challenge": "Technical Coding Challenge",
@@ -87,6 +112,12 @@ export const COMPONENT_TITLES: Record<ComponentType, string> = {
   "email-hr": "HR Email Outreach Assistant",
   "linkedin-dm": "LinkedIn Networking Messenger",
   browser: "Autonomous Browser Controller",
+  "search-resources": "Live Web Search Resources",
+  "graph-rag": "Neo4j Knowledge Graph RAG",
+  "vector-rag": "LangChain Personal Vector RAG",
+  "scraper-plan": "Scraper Execution Plan & Intel",
+  "github-sync": "Encrypted GitHub Database Sync",
+  "image-generation": "AI Image Generation",
 };
 
 interface ComponentRendererProps {
@@ -139,15 +170,14 @@ export function ComponentRenderer({
   const title = COMPONENT_TITLES[type] || "Interactive Component";
 
   useEffect(() => {
-    setTranslatedData(data);
-  }, [data]);
-
-  useEffect(() => {
     let cancelled = false;
     const run = async () => {
       // Only translate template content (resume and cover-letter documents)
       if (!isTemplateType || !data || targetLanguage === TRANSLATION_ORIGINAL) {
-        if (!cancelled) setTranslatedData(data);
+        if (!cancelled) {
+          setTranslatedData(data);
+          setIsTranslating(false);
+        }
         return;
       }
       setIsTranslating(true);
@@ -300,9 +330,23 @@ export function ComponentRenderer({
     case "resume":
       return (
         <div>
-          {header}
           <ResumeViewer
             data={activeData}
+            targetLanguage={targetLanguage}
+            onLanguageChange={setTargetLanguage}
+            isTranslating={isTranslating}
+            onPopOutToSide={
+              onPopOutToSide && !isInSideStage
+                ? () =>
+                    onPopOutToSide({
+                      id: componentId || `${type}-${Date.now()}`,
+                      type,
+                      data: activeData,
+                      title,
+                    })
+                : undefined
+            }
+            onDockToChat={isInSideStage ? onDockToChat : undefined}
             syncWithGlobalResume={
               resumeSyncsWithGlobal !== false && targetLanguage === TRANSLATION_ORIGINAL
             }
@@ -349,20 +393,6 @@ export function ComponentRenderer({
         <div>
           {header}
           <JobRecommendations data={Array.isArray(d?.links) ? d.links : d?.jobs ?? d} />
-        </div>
-      );
-    }
-    case "job-scraper": {
-      const d = data as any;
-      return (
-        <div>
-          {header}
-          <JobScraperCard
-            initialQuery={d?.query || ""}
-            initialLocation={d?.location || "Remote"}
-            initialJobs={Array.isArray(d?.jobs) ? d.jobs : []}
-            onSendMessage={onSendMessage}
-          />
         </div>
       );
     }
@@ -415,6 +445,104 @@ export function ComponentRenderer({
           <BrowserController data={data as any} onSendMessage={onSendMessage} />
         </div>
       );
+    case "search-resources": {
+      const d = data as any;
+      return (
+        <div className="w-full">
+          <SearchResourcesCard
+            query={d?.query || "Live Web Search"}
+            domains={d?.domains || []}
+            resultsCount={d?.resultsCount ?? (Array.isArray(d?.results) ? d.results.length : 0)}
+            results={Array.isArray(d?.results) ? d.results : []}
+            isLoading={Boolean(d?.isLoading)}
+            onOpenSourcesDrawer={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(
+                  new CustomEvent("open-search-sources-drawer", {
+                    detail: {
+                      query: d?.query || "Search",
+                      results: Array.isArray(d?.results) ? d.results : [],
+                    },
+                  })
+                );
+              }
+            }}
+          />
+        </div>
+      );
+    }
+    case "graph-rag": {
+      return (
+        <div className="w-full">
+          <GraphRagViewer
+            data={data as any}
+            onSendMessage={onSendMessage}
+            onDockToStage={
+              onPopOutToSide && !isInSideStage
+                ? () =>
+                    onPopOutToSide({
+                      id: componentId || `${type}-${Date.now()}`,
+                      type,
+                      data,
+                      title,
+                    })
+                : undefined
+            }
+          />
+        </div>
+      );
+    }
+    case "vector-rag": {
+      return (
+        <div className="w-full">
+          <VectorRagViewer
+            data={data as any}
+            onSendMessage={onSendMessage}
+            onDockToStage={
+              onPopOutToSide && !isInSideStage
+                ? () =>
+                    onPopOutToSide({
+                      id: componentId || `${type}-${Date.now()}`,
+                      type,
+                      data,
+                      title,
+                    })
+                : undefined
+            }
+          />
+        </div>
+      );
+    }
+    case "scraper-plan": {
+      return (
+        <div className="w-full">
+          <ScraperPlanViewer plan={data as any} />
+        </div>
+      );
+    }
+    case "github-sync": {
+      return (
+        <div className="w-full">
+          <GitHubSyncCard
+            repoName={(data?.repoName as string) || "career-agent-database"}
+            branch={(data?.branch as string) || "main"}
+            githubToken={(data?.githubToken as string) || ""}
+            encryptionPassphrase={(data?.encryptionPassphrase as string) || ""}
+            lastSyncResult={(data?.lastSyncResult as any) || null}
+          />
+        </div>
+      );
+    }
+    case "image-generation": {
+      return (
+        <div className="w-full">
+          <ImageGeneration
+            prompt={(data?.prompt as string) || "a calm mountain lake at dawn"}
+            resolution={(data?.resolution as string) || "1024 × 1024"}
+          />
+        </div>
+      );
+    }
     default:
       return null;
   }
@@ -431,6 +559,30 @@ interface GeneratedResponse {
 export function generateAIResponse(userInput: string, _apiKey: string, _model: string): GeneratedResponse {
   const lower = userInput.toLowerCase();
 
+  if (
+    lower.includes("image") ||
+    lower.includes("generate image") ||
+    lower.includes("picture") ||
+    lower.includes("photo") ||
+    lower.includes("visual") ||
+    lower.includes("illustration") ||
+    lower.includes("draw") ||
+    lower.includes("wallpaper")
+  ) {
+    const cleanedPrompt = userInput
+      .replace(/^(can you|could you|please)\s+/i, "")
+      .replace(/generate an image of|generate image of|generate an image|generate image|create an image of|create image|draw a|draw an|draw|picture of|photo of|paint a|paint an|paint/gi, "")
+      .trim() || "a calm mountain lake at dawn";
+    return {
+      text: `Synthesizing neural imagery asset for: “${cleanedPrompt}”...`,
+      componentType: "image-generation",
+      componentData: {
+        prompt: cleanedPrompt,
+        resolution: "1024 × 1024",
+      },
+    };
+  }
+
   if (lower.includes("resume") || lower.includes("cv") || lower.includes("show me")) {
     return {
       text: "Here's your resume preview. You can edit it directly in the **Editor** tab or customize the template in **Settings**.",
@@ -444,10 +596,48 @@ export function generateAIResponse(userInput: string, _apiKey: string, _model: s
       componentData: { score: 85, jobMatch: 78 },
     };
   }
+  if (lower.includes("github sync") || lower.includes("sync github") || lower.includes("backup to github") || lower.includes("token download")) {
+    return {
+      text: "Here is your **Encrypted GitHub Database Sync** dashboard. Personal details and API keys are protected in Firebase, while your career state is encrypted with AES-256-GCM before saving to your GitHub repository.",
+      componentType: "github-sync",
+      componentData: {
+        repoName: "career-agent-database",
+        branch: "main",
+      },
+    };
+  }
+  if (lower.includes("scraper plan") || lower.includes("scrape url") || lower.includes("resilient scrape") || lower.includes("firecrawl") || lower.includes("tavily scrape")) {
+    return {
+      text: "Here is the **Resilient Scraper Execution Plan** with multi-tier fallback (Direct HTTP -> Firecrawl Headless -> Tavily AI Grounding):",
+      componentType: "scraper-plan",
+      componentData: {
+        url: "https://news.ycombinator.com/jobs",
+        status: "completed",
+        chosenProvider: "direct",
+        totalDurationMs: 412,
+        steps: [
+          { stepNumber: 1, name: "Direct HTTP Scrape", provider: "direct", status: "success", latencyMs: 412, details: "Direct fetch and DOM parser succeeded without bot interference." },
+          { stepNumber: 2, name: "Firecrawl Headless Scraper", provider: "firecrawl", status: "pending", latencyMs: 0, details: "Standby fallback if direct scrape is blocked." },
+          { stepNumber: 3, name: "Tavily AI Grounding", provider: "tavily", status: "pending", latencyMs: 0, details: "Standby semantic web fallback." }
+        ],
+        extractedData: {
+          title: "Hacker News Developer Opportunities",
+          summary: "Live technical engineering roles, salary ranges, and tech stack qualifications.",
+          content: "Y Combinator hiring companies looking for Full Stack, Backend, and AI Engineers.",
+          keywords: ["TypeScript", "React", "Python", "Full Stack", "AI"],
+          wordCount: 840,
+          domain: "news.ycombinator.com",
+          timestamp: new Date().toISOString()
+        },
+        confidenceScore: 0.95,
+        userExplanation: "Direct scrape succeeded at high speed."
+      },
+    };
+  }
   if (lower.includes("job") || lower.includes("scrape") || lower.includes("search") || lower.includes("recommend") || lower.includes("opportunit")) {
     return {
-      text: "Based on your target roles and skills, here is the **Live Job Scraper & Matcher** for finding and tailoring roles:",
-      componentType: "job-scraper",
+      text: "Based on your target roles and skills, here are tailored job recommendations:",
+      componentType: "job-recommendations",
     };
   }
   if (lower.includes("apply") || lower.includes("auto") || lower.includes("automat")) {

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Plus, Trash2, Upload, X, LinkIcon, GripVertical } from "lucide-react"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 import {
   DndContext,
   closestCenter,
@@ -61,6 +62,7 @@ function SortableItem({ id, children }: { id: string | number; children: React.R
 
 export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditorProps) {
   const { toast } = useToast()
+  const titles = getResumeSectionTitles(resumeData.language)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showDebug, setShowDebug] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
@@ -534,7 +536,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
     <div className="space-y-6 overflow-y-auto max-h-[800px] pr-2">
       <Accordion type="single" collapsible defaultValue="basic-info">
         <AccordionItem value="basic-info">
-          <AccordionTrigger>Basic Information</AccordionTrigger>
+          <AccordionTrigger>{resumeData.language && resumeData.language !== "en" ? `${titles.contact} / Basic Info` : "Basic Information"}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-4">
               {/* Profile Picture Upload */}
@@ -748,7 +750,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
 
         {/* Experience */}
         <AccordionItem value="experience">
-          <AccordionTrigger>Experience</AccordionTrigger>
+          <AccordionTrigger>{titles.experience}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
               {isMounted ? (
@@ -893,7 +895,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
         </AccordionItem>
 
         <AccordionItem value="education">
-          <AccordionTrigger>Education</AccordionTrigger>
+          <AccordionTrigger>{titles.education}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
               {isMounted ? (
@@ -1047,7 +1049,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
         </AccordionItem>
 
         <AccordionItem value="skills">
-          <AccordionTrigger>Skills</AccordionTrigger>
+          <AccordionTrigger>{titles.skills}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-4">
               {isMounted ? (
@@ -1104,7 +1106,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
         </AccordionItem>
 
         <AccordionItem value="projects">
-          <AccordionTrigger>Projects</AccordionTrigger>
+          <AccordionTrigger>{titles.projects}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
               {isMounted ? (
@@ -1316,7 +1318,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
         </AccordionItem>
 
         <AccordionItem value="achievements">
-          <AccordionTrigger>Achievements</AccordionTrigger>
+          <AccordionTrigger>{titles.achievements}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-6">
               {isMounted ? (
@@ -1440,7 +1442,7 @@ export default function ResumeEditor({ resumeData, setResumeData }: ResumeEditor
         </AccordionItem>
 
         <AccordionItem value="languages">
-          <AccordionTrigger>Languages</AccordionTrigger>
+          <AccordionTrigger>{titles.languages}</AccordionTrigger>
           <AccordionContent>
             <div className="space-y-4">
               {isMounted ? (

@@ -187,7 +187,10 @@ export const resumeDataSchema = z.preprocess(
     const rawProj = root.projects || root.sideProjects || [];
     const rawAch = root.achievements || root.awards || root.honors || [];
 
+    const lang = root.language || (root as any).lang || (basic as any)?.language || "en";
+
     return {
+      language: typeof lang === "string" ? lang : "en",
       basicInfo: typeof basic === "object" && basic !== null ? basic : {},
       experience: Array.isArray(rawExp) ? rawExp : [],
       education: Array.isArray(rawEdu) ? rawEdu : [],
@@ -198,6 +201,7 @@ export const resumeDataSchema = z.preprocess(
   },
   z
     .object({
+      language: safeString("en"),
       basicInfo: basicInfoSchema,
       experience: z.array(experienceSchema).default([]),
       education: z.array(educationSchema).default([]),
@@ -217,6 +221,7 @@ export function validateAndNormalizeResumeData(data: unknown): ResumeData {
   try {
     const parsed = resumeDataSchema.parse(data);
     return {
+      language: parsed.language || "en",
       basicInfo: {
         name: parsed.basicInfo.name || "Your Name",
         title: parsed.basicInfo.title || "",

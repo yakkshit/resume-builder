@@ -34,12 +34,28 @@ import {
   Crosshair,
   Layers,
   Wand2,
+  ChevronDown,
+  KeyRound,
+  Loader2,
 } from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Persona } from "@/components/ai-elements/persona";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { loadProviderKeys, saveProviderKeys } from "@/components/chat/profile-settings-dialog";
+
+export type BrowserEngine = "standard" | "kernel" | "kernel-stealth" | "browserbase" | "steel";
 
 export interface AgentBrowserAction {
   step: number;
@@ -141,6 +157,434 @@ export function ChromiumWebview({
 
   const [iframeBlockReason, setIframeBlockReason] = useState("");
 
+  // Engine Selector State: "standard" | "kernel" | "kernel-stealth" | "browserbase" | "steel"
+  const [browserEngine, setBrowserEngine] = useState<BrowserEngine>("standard");
+
+  // Kernel Cloud Browser State
+  const [kernelApiKey, setKernelApiKey] = useState<string>("");
+  const [kernelSessionId, setKernelSessionId] = useState<string | null>(null);
+  const [kernelLiveViewUrl, setKernelLiveViewUrl] = useState<string | null>(null);
+  const [kernelBooting, setKernelBooting] = useState<boolean>(false);
+  const [kernelError, setKernelError] = useState<string | null>(null);
+
+  // Browserbase Cloud State
+  const [browserbaseApiKey, setBrowserbaseApiKey] = useState<string>("");
+  const [browserbaseSessionId, setBrowserbaseSessionId] = useState<string | null>(null);
+  const [browserbaseLiveViewUrl, setBrowserbaseLiveViewUrl] = useState<string | null>(null);
+  const [browserbaseBooting, setBrowserbaseBooting] = useState<boolean>(false);
+  const [browserbaseError, setBrowserbaseError] = useState<string | null>(null);
+
+  // Steel Cloud State
+  const [steelApiKey, setSteelApiKey] = useState<string>("");
+  const [steelSessionId, setSteelSessionId] = useState<string | null>(null);
+  const [steelLiveViewUrl, setSteelLiveViewUrl] = useState<string | null>(null);
+  const [steelBooting, setSteelBooting] = useState<boolean>(false);
+  const [steelError, setSteelError] = useState<string | null>(null);
+
+  const [inlineKeyInput, setInlineKeyInput] = useState<string>("");
+
+  // Sync API keys from profile settings
+  const refreshKeys = useCallback(() => {
+    const pKeys = loadProviderKeys();
+    if (pKeys.kernel) {
+      setKernelApiKey(pKeys.kernel.trim());
+    }
+    if (pKeys.browserbase) {
+      setBrowserbaseApiKey(pKeys.browserbase.trim());
+    }
+    if (pKeys.steel) {
+      setSteelApiKey(pKeys.steel.trim());
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshKeys();
+    const handleProfileUpdate = () => refreshKeys();
+    window.addEventListener("ai-chat-profile-updated", handleProfileUpdate);
+    return () => window.removeEventListener("ai-chat-profile-updated", handleProfileUpdate);
+  }, [refreshKeys]);
+
+  // Boot Kernel Cloud Browser session (<30ms boot)
+  const bootKernelSession = useCallback(
+    async (engine: "kernel" | "kernel-stealth", targetUrl?: string, customKey?: string) => {
+      const activeKey = customKey || kernelApiKey || loadProviderKeys().kernel || "";
+      const effectiveUrl = targetUrl || currentUrl || "https://www.google.com";
+      const startUrl = effectiveUrl.startsWith("http") ? effectiveUrl : `https://${effectiveUrl}`;
+
+      setKernelBooting(true);
+      setKernelError(null);
+
+      try {
+        const res = await fetch("/api/kernel/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "x-kernel-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "create_session",
+            startUrl,
+            stealth: engine === "kernel-stealth",
+            headless: false,
+            apiKey: activeKey || undefined,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success && data.sessionId && data.browserLiveViewUrl) {
+          setKernelSessionId(data.sessionId);
+          setKernelLiveViewUrl(data.browserLiveViewUrl);
+          setKernelError(null);
+          setAgentLogs((prev) => [
+            ...prev,
+            {
+              step: prev.length + 1,
+              action: "navigate",
+              url: startUrl,
+              desc: `Booted Kernel Cloud Browser (${engine === "kernel-stealth" ? "Stealth Anti-Bot" : "Sandboxed Chromium"}) in <30ms [Session: ${data.sessionId.slice(0, 8)}]`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else {
+          setKernelError(data.error || "Failed to boot Kernel browser session. Check your Kernel API key in Profile.");
+        }
+      } catch (err: any) {
+        setKernelError(err.message || "Network error connecting to Kernel cloud infrastructure.");
+      } finally {
+        setKernelBooting(false);
+      }
+    },
+    [kernelApiKey, currentUrl]
+  );
+
+  // Terminate Kernel Cloud Browser session cleanly
+  const destroyKernelSession = useCallback(
+    async (sessionIdToKill?: string) => {
+      const id = sessionIdToKill || kernelSessionId;
+      if (!id) return;
+      const activeKey = kernelApiKey || loadProviderKeys().kernel || "";
+      try {
+        await fetch("/api/kernel/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "x-kernel-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "destroy_session",
+            sessionId: id,
+            apiKey: activeKey || undefined,
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to terminate Kernel session cleanly:", err);
+      }
+      setKernelSessionId(null);
+      setKernelLiveViewUrl(null);
+      setKernelError(null);
+    },
+    [kernelSessionId, kernelApiKey]
+  );
+
+  // Boot Browserbase Cloud Browser session
+  const bootBrowserbaseSession = useCallback(
+    async (targetUrl?: string, customKey?: string) => {
+      const activeKey = customKey || browserbaseApiKey || loadProviderKeys().browserbase || "";
+      const effectiveUrl = targetUrl || currentUrl || "https://www.google.com";
+      const startUrl = effectiveUrl.startsWith("http") ? effectiveUrl : `https://${effectiveUrl}`;
+
+      setBrowserbaseBooting(true);
+      setBrowserbaseError(null);
+
+      try {
+        const res = await fetch("/api/browserbase/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "x-bb-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "create_session",
+            startUrl,
+            proxies: false,
+            keepAlive: false,
+            apiKey: activeKey || undefined,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success && data.sessionId && data.browserLiveViewUrl) {
+          setBrowserbaseSessionId(data.sessionId);
+          setBrowserbaseLiveViewUrl(data.browserLiveViewUrl);
+          setBrowserbaseError(null);
+          setAgentLogs((prev) => [
+            ...prev,
+            {
+              step: prev.length + 1,
+              action: "navigate",
+              url: startUrl,
+              desc: `Booted Browserbase Cloud Chrome [Session: ${data.sessionId.slice(0, 8)}]`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else {
+          setBrowserbaseError(data.error || "Failed to boot Browserbase session. Check your Browserbase API key in Profile.");
+        }
+      } catch (err: any) {
+        setBrowserbaseError(err.message || "Network error connecting to Browserbase cloud.");
+      } finally {
+        setBrowserbaseBooting(false);
+      }
+    },
+    [browserbaseApiKey, currentUrl]
+  );
+
+  // Terminate Browserbase Cloud Browser session cleanly
+  const destroyBrowserbaseSession = useCallback(
+    async (sessionIdToKill?: string) => {
+      const id = sessionIdToKill || browserbaseSessionId;
+      if (!id) return;
+      const activeKey = browserbaseApiKey || loadProviderKeys().browserbase || "";
+      try {
+        await fetch("/api/browserbase/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "x-bb-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "destroy_session",
+            sessionId: id,
+            apiKey: activeKey || undefined,
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to terminate Browserbase session cleanly:", err);
+      }
+      setBrowserbaseSessionId(null);
+      setBrowserbaseLiveViewUrl(null);
+      setBrowserbaseError(null);
+    },
+    [browserbaseSessionId, browserbaseApiKey]
+  );
+
+  // Boot Steel Cloud Browser session
+  const bootSteelSession = useCallback(
+    async (targetUrl?: string, customKey?: string) => {
+      const activeKey = customKey || steelApiKey || loadProviderKeys().steel || "";
+      const effectiveUrl = targetUrl || currentUrl || "https://www.google.com";
+      const startUrl = effectiveUrl.startsWith("http") ? effectiveUrl : `https://${effectiveUrl}`;
+
+      setSteelBooting(true);
+      setSteelError(null);
+
+      try {
+        const res = await fetch("/api/steel/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "steel-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "create_session",
+            startUrl,
+            apiKey: activeKey || undefined,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success && data.sessionId && data.browserLiveViewUrl) {
+          setSteelSessionId(data.sessionId);
+          setSteelLiveViewUrl(data.browserLiveViewUrl);
+          setSteelError(null);
+          setAgentLogs((prev) => [
+            ...prev,
+            {
+              step: prev.length + 1,
+              action: "navigate",
+              url: startUrl,
+              desc: `Booted Steel Cloud Browser [Session: ${data.sessionId.slice(0, 8)}]`,
+              timestamp: new Date().toLocaleTimeString(),
+            },
+          ]);
+        } else {
+          setSteelError(data.error || "Failed to boot Steel session. Check your Steel API key in Profile.");
+        }
+      } catch (err: any) {
+        setSteelError(err.message || "Network error connecting to Steel cloud infrastructure.");
+      } finally {
+        setSteelBooting(false);
+      }
+    },
+    [steelApiKey, currentUrl]
+  );
+
+  // Terminate Steel Cloud Browser session cleanly
+  const destroySteelSession = useCallback(
+    async (sessionIdToKill?: string) => {
+      const id = sessionIdToKill || steelSessionId;
+      if (!id) return;
+      const activeKey = steelApiKey || loadProviderKeys().steel || "";
+      try {
+        await fetch("/api/steel/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "steel-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "destroy_session",
+            sessionId: id,
+            apiKey: activeKey || undefined,
+          }),
+        });
+      } catch (err) {
+        console.warn("Failed to terminate Steel session cleanly:", err);
+      }
+      setSteelSessionId(null);
+      setSteelLiveViewUrl(null);
+      setSteelError(null);
+    },
+    [steelSessionId, steelApiKey]
+  );
+
+  // Clean up all cloud sessions on unmount
+  useEffect(() => {
+    return () => {
+      if (kernelSessionId) {
+        const activeKey = kernelApiKey || loadProviderKeys().kernel || "";
+        fetch("/api/kernel/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "x-kernel-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "destroy_session",
+            sessionId: kernelSessionId,
+            apiKey: activeKey || undefined,
+          }),
+        }).catch(() => {});
+      }
+      if (browserbaseSessionId) {
+        const activeKey = browserbaseApiKey || loadProviderKeys().browserbase || "";
+        fetch("/api/browserbase/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "x-bb-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "destroy_session",
+            sessionId: browserbaseSessionId,
+            apiKey: activeKey || undefined,
+          }),
+        }).catch(() => {});
+      }
+      if (steelSessionId) {
+        const activeKey = steelApiKey || loadProviderKeys().steel || "";
+        fetch("/api/steel/browser", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeKey ? { "steel-api-key": activeKey } : {}),
+          },
+          body: JSON.stringify({
+            action: "destroy_session",
+            sessionId: steelSessionId,
+            apiKey: activeKey || undefined,
+          }),
+        }).catch(() => {});
+      }
+    };
+  }, [kernelSessionId, kernelApiKey, browserbaseSessionId, browserbaseApiKey, steelSessionId, steelApiKey]);
+
+  // Handle switching browser engine
+  const handleSelectEngine = async (engine: BrowserEngine) => {
+    if (engine === browserEngine) return;
+
+    if (engine === "standard") {
+      setBrowserEngine("standard");
+      return;
+    }
+
+    setBrowserEngine(engine);
+
+    if (engine === "kernel" || engine === "kernel-stealth") {
+      if (browserbaseSessionId) await destroyBrowserbaseSession(browserbaseSessionId);
+      if (steelSessionId) await destroySteelSession(steelSessionId);
+      const effectiveKey = kernelApiKey || loadProviderKeys().kernel || "";
+      if (effectiveKey) {
+        if (kernelSessionId) await destroyKernelSession(kernelSessionId);
+        await bootKernelSession(engine, currentUrl, effectiveKey);
+      }
+    } else if (engine === "browserbase") {
+      if (kernelSessionId) await destroyKernelSession(kernelSessionId);
+      if (steelSessionId) await destroySteelSession(steelSessionId);
+      const effectiveKey = browserbaseApiKey || loadProviderKeys().browserbase || "";
+      if (effectiveKey) {
+        if (browserbaseSessionId) await destroyBrowserbaseSession(browserbaseSessionId);
+        await bootBrowserbaseSession(currentUrl, effectiveKey);
+      }
+    } else if (engine === "steel") {
+      if (kernelSessionId) await destroyKernelSession(kernelSessionId);
+      if (browserbaseSessionId) await destroyBrowserbaseSession(browserbaseSessionId);
+      const effectiveKey = steelApiKey || loadProviderKeys().steel || "";
+      if (effectiveKey) {
+        if (steelSessionId) await destroySteelSession(steelSessionId);
+        await bootSteelSession(currentUrl, effectiveKey);
+      }
+    }
+  };
+
+  const handleConnectInlineKey = async () => {
+    const trimmed = inlineKeyInput.trim();
+    if (!trimmed) return;
+    const currentProviderKeys = loadProviderKeys();
+
+    if (browserEngine === "kernel" || browserEngine === "kernel-stealth") {
+      const updated = { ...currentProviderKeys, kernel: trimmed };
+      saveProviderKeys(updated);
+      setKernelApiKey(trimmed);
+      window.dispatchEvent(new CustomEvent("ai-chat-profile-updated"));
+      await bootKernelSession(browserEngine === "kernel-stealth" ? "kernel-stealth" : "kernel", currentUrl, trimmed);
+    } else if (browserEngine === "browserbase") {
+      const updated = { ...currentProviderKeys, browserbase: trimmed };
+      saveProviderKeys(updated);
+      setBrowserbaseApiKey(trimmed);
+      window.dispatchEvent(new CustomEvent("ai-chat-profile-updated"));
+      await bootBrowserbaseSession(currentUrl, trimmed);
+    } else if (browserEngine === "steel") {
+      const updated = { ...currentProviderKeys, steel: trimmed };
+      saveProviderKeys(updated);
+      setSteelApiKey(trimmed);
+      window.dispatchEvent(new CustomEvent("ai-chat-profile-updated"));
+      await bootSteelSession(currentUrl, trimmed);
+    }
+    setInlineKeyInput("");
+  };
+
+  const handleRebootKernel = async () => {
+    if (kernelSessionId) {
+      await destroyKernelSession(kernelSessionId);
+    }
+    await bootKernelSession(browserEngine === "kernel-stealth" ? "kernel-stealth" : "kernel", currentUrl);
+  };
+
+  const handleRebootBrowserbase = async () => {
+    if (browserbaseSessionId) {
+      await destroyBrowserbaseSession(browserbaseSessionId);
+    }
+    await bootBrowserbaseSession(currentUrl);
+  };
+
+  const handleRebootSteel = async () => {
+    if (steelSessionId) {
+      await destroySteelSession(steelSessionId);
+    }
+    await bootSteelSession(currentUrl);
+  };
+
   const navigateTo = useCallback(
     (target: string, fromAgent = false) => {
       let finalUrl = target.trim();
@@ -160,6 +604,81 @@ export function ChromiumWebview({
         : finalUrl;
       setUrlInput(displayUrl);
       setCurrentUrl(finalUrl);
+
+      // Handle Kernel Cloud Browser Navigation
+      if (browserEngine === "kernel" || browserEngine === "kernel-stealth") {
+        setHistory((prev) => [...prev.slice(0, historyIndex + 1), finalUrl]);
+        setHistoryIndex((prev) => prev + 1);
+        if (kernelSessionId) {
+          const activeKey = kernelApiKey || loadProviderKeys().kernel || "";
+          fetch("/api/kernel/browser", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(activeKey ? { "x-kernel-api-key": activeKey } : {}),
+            },
+            body: JSON.stringify({
+              action: "execute_playwright",
+              sessionId: kernelSessionId,
+              code: `await page.goto(${JSON.stringify(finalUrl)}); return await page.title();`,
+              apiKey: activeKey || undefined,
+            }),
+          }).catch((err) => console.warn("Kernel remote navigation error:", err));
+        } else {
+          bootKernelSession(browserEngine, finalUrl);
+        }
+        setAgentLogs((prev) => [
+          ...prev,
+          {
+            step: prev.length + 1,
+            action: "navigate",
+            url: finalUrl,
+            desc: `Kernel Cloud navigation to ${finalUrl}`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+        return;
+      }
+
+      // Handle Browserbase Cloud Browser Navigation
+      if (browserEngine === "browserbase") {
+        setHistory((prev) => [...prev.slice(0, historyIndex + 1), finalUrl]);
+        setHistoryIndex((prev) => prev + 1);
+        if (!browserbaseSessionId) {
+          bootBrowserbaseSession(finalUrl);
+        }
+        setAgentLogs((prev) => [
+          ...prev,
+          {
+            step: prev.length + 1,
+            action: "navigate",
+            url: finalUrl,
+            desc: `Browserbase Cloud navigation to ${finalUrl}`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+        return;
+      }
+
+      // Handle Steel Cloud Browser Navigation
+      if (browserEngine === "steel") {
+        setHistory((prev) => [...prev.slice(0, historyIndex + 1), finalUrl]);
+        setHistoryIndex((prev) => prev + 1);
+        if (!steelSessionId) {
+          bootSteelSession(finalUrl);
+        }
+        setAgentLogs((prev) => [
+          ...prev,
+          {
+            step: prev.length + 1,
+            action: "navigate",
+            url: finalUrl,
+            desc: `Steel Cloud navigation to ${finalUrl}`,
+            timestamp: new Date().toLocaleTimeString(),
+          },
+        ]);
+        return;
+      }
 
       if (isCloudMode) {
         handleCloudAction({ action: "navigate", url: finalUrl });
@@ -203,7 +722,7 @@ export function ChromiumWebview({
         },
       ]);
     },
-    [historyIndex, isCloudMode, cloudSessionId]
+    [historyIndex, isCloudMode, cloudSessionId, browserEngine, kernelSessionId, kernelApiKey, bootKernelSession]
   );
 
   const handleBack = () => {
@@ -213,7 +732,9 @@ export function ChromiumWebview({
       const displayUrl = prevUrl.startsWith("/api/webview/proxy") ? new URLSearchParams(prevUrl.split("?")[1] || "").get("url") || prevUrl : prevUrl;
       setUrlInput(displayUrl);
       setCurrentUrl(prevUrl);
-      if (isCloudMode) {
+      if (browserEngine === "kernel" || browserEngine === "kernel-stealth" || browserEngine === "browserbase" || browserEngine === "steel") {
+        navigateTo(prevUrl);
+      } else if (isCloudMode) {
         handleCloudAction({ action: "back" });
       } else {
         setIframeBlocked(false);
@@ -229,7 +750,9 @@ export function ChromiumWebview({
       const displayUrl = nextUrl.startsWith("/api/webview/proxy") ? new URLSearchParams(nextUrl.split("?")[1] || "").get("url") || nextUrl : nextUrl;
       setUrlInput(displayUrl);
       setCurrentUrl(nextUrl);
-      if (isCloudMode) {
+      if (browserEngine === "kernel" || browserEngine === "kernel-stealth" || browserEngine === "browserbase" || browserEngine === "steel") {
+        navigateTo(nextUrl);
+      } else if (isCloudMode) {
         handleCloudAction({ action: "forward" });
       } else {
         setIframeBlocked(false);
@@ -239,6 +762,18 @@ export function ChromiumWebview({
   };
 
   const handleReload = () => {
+    if (browserEngine === "kernel" || browserEngine === "kernel-stealth") {
+      handleRebootKernel();
+      return;
+    }
+    if (browserEngine === "browserbase") {
+      handleRebootBrowserbase();
+      return;
+    }
+    if (browserEngine === "steel") {
+      handleRebootSteel();
+      return;
+    }
     if (isCloudMode) {
       handleCloudAction({ action: "navigate", url: currentUrl });
       return;
@@ -603,24 +1138,278 @@ export function ChromiumWebview({
             variant="obsidian"
             className="size-5 shrink-0"
           />
-          <Badge
-            variant={isUserTakingOver ? "destructive" : isAgentAutopilot ? "default" : "secondary"}
-            className="text-[10px] font-semibold tracking-wide px-2 py-0.5 rounded-full"
-          >
-            {isUserTakingOver ? (
+          {/* Engine Selector Dropdown in place of Standard Browser */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide transition-all border outline-none cursor-pointer",
+                  browserEngine === "kernel"
+                    ? "bg-indigo-500/15 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/25"
+                    : browserEngine === "kernel-stealth"
+                    ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25"
+                    : browserEngine === "browserbase"
+                    ? "bg-orange-500/15 text-orange-300 border-orange-500/30 hover:bg-orange-500/25"
+                    : browserEngine === "steel"
+                    ? "bg-cyan-500/15 text-cyan-300 border-cyan-500/30 hover:bg-cyan-500/25"
+                    : "bg-white/5 text-neutral-300 border-white/10 hover:bg-white/10"
+                )}
+              >
+                {browserEngine === "kernel" ? (
+                  <>
+                    <Sparkles className="size-3 text-indigo-400 animate-pulse" />
+                    <span>Kernel Cloud Browser</span>
+                  </>
+                ) : browserEngine === "kernel-stealth" ? (
+                  <>
+                    <ShieldCheck className="size-3 text-emerald-400" />
+                    <span>Kernel Stealth Engine</span>
+                  </>
+                ) : browserEngine === "browserbase" ? (
+                  <>
+                    <Globe className="size-3 text-orange-400" />
+                    <span>Browserbase Cloud</span>
+                  </>
+                ) : browserEngine === "steel" ? (
+                  <>
+                    <ShieldCheck className="size-3 text-cyan-400" />
+                    <span>Steel.dev Cloud</span>
+                  </>
+                ) : (
+                  <>
+                    <Globe className="size-3 text-neutral-400" />
+                    <span>Standard Browser</span>
+                  </>
+                )}
+                <ChevronDown className="size-2.5 opacity-60 ml-0.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72 bg-[#16161a] border-white/10 text-white p-1.5 shadow-2xl rounded-xl z-50">
+              <DropdownMenuLabel className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider px-2 py-1">
+                Select Web Engine
+              </DropdownMenuLabel>
+
+              {/* Standard Browser */}
+              <DropdownMenuItem
+                onClick={() => handleSelectEngine("standard")}
+                className={cn(
+                  "flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors focus:bg-white/5 text-left",
+                  browserEngine === "standard" && "bg-white/[0.08]"
+                )}
+              >
+                <div className="size-7 rounded-md bg-white/10 flex items-center justify-center shrink-0 mt-0.5 text-neutral-300">
+                  <Globe className="size-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-white">Standard Browser</span>
+                    {browserEngine === "standard" && <Check className="size-3 text-emerald-400" />}
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-0.5">In-app sandboxed iframe proxy for standard web browsing.</p>
+                </div>
+              </DropdownMenuItem>
+
+              {/* Kernel Cloud Browser */}
+              <DropdownMenuItem
+                onClick={() => handleSelectEngine("kernel")}
+                className={cn(
+                  "flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors focus:bg-white/5 text-left",
+                  browserEngine === "kernel" && "bg-indigo-500/10 border border-indigo-500/20"
+                )}
+              >
+                <div className="size-7 rounded-md bg-indigo-500/20 flex items-center justify-center shrink-0 mt-0.5 text-indigo-400">
+                  <Sparkles className="size-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-white">Kernel Cloud Browser</span>
+                      <span className="text-[9px] font-semibold px-1 py-0.2 rounded bg-indigo-500/20 text-indigo-300">&lt;30ms</span>
+                    </div>
+                    {browserEngine === "kernel" && <Check className="size-3 text-indigo-400" />}
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-0.5">Instant sandboxed Chromium with interactive live view &amp; CDP.</p>
+                </div>
+              </DropdownMenuItem>
+
+              {/* Kernel Stealth Engine */}
+              <DropdownMenuItem
+                onClick={() => handleSelectEngine("kernel-stealth")}
+                className={cn(
+                  "flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors focus:bg-white/5 text-left",
+                  browserEngine === "kernel-stealth" && "bg-emerald-500/10 border border-emerald-500/20"
+                )}
+              >
+                <div className="size-7 rounded-md bg-emerald-500/20 flex items-center justify-center shrink-0 mt-0.5 text-emerald-400">
+                  <ShieldCheck className="size-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-white">Kernel Stealth Engine</span>
+                      <span className="text-[9px] font-semibold px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-300">Anti-Bot</span>
+                    </div>
+                    {browserEngine === "kernel-stealth" && <Check className="size-3 text-emerald-400" />}
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-0.5">Automated bot-bypass with residential proxy routing.</p>
+                </div>
+              </DropdownMenuItem>
+
+              {/* Browserbase Cloud */}
+              <DropdownMenuItem
+                onClick={() => handleSelectEngine("browserbase")}
+                className={cn(
+                  "flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors focus:bg-white/5 text-left",
+                  browserEngine === "browserbase" && "bg-orange-500/10 border border-orange-500/20"
+                )}
+              >
+                <div className="size-7 rounded-md bg-orange-500/20 flex items-center justify-center shrink-0 mt-0.5 text-orange-400">
+                  <Globe className="size-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-white">Browserbase Cloud</span>
+                      <span className="text-[9px] font-semibold px-1 py-0.2 rounded bg-orange-500/20 text-orange-300">Anti-Bot</span>
+                    </div>
+                    {browserEngine === "browserbase" && <Check className="size-3 text-orange-400" />}
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-0.5">Managed cloud Chrome with Stagehand AI &amp; session replays.</p>
+                </div>
+              </DropdownMenuItem>
+
+              {/* Steel.dev Cloud */}
+              <DropdownMenuItem
+                onClick={() => handleSelectEngine("steel")}
+                className={cn(
+                  "flex items-start gap-2.5 p-2 rounded-lg cursor-pointer transition-colors focus:bg-white/5 text-left",
+                  browserEngine === "steel" && "bg-cyan-500/10 border border-cyan-500/20"
+                )}
+              >
+                <div className="size-7 rounded-md bg-cyan-500/20 flex items-center justify-center shrink-0 mt-0.5 text-cyan-400">
+                  <ShieldCheck className="size-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-medium text-white">Steel.dev Cloud</span>
+                      <span className="text-[9px] font-semibold px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300">Stealth</span>
+                    </div>
+                    {browserEngine === "steel" && <Check className="size-3 text-cyan-400" />}
+                  </div>
+                  <p className="text-[10px] text-neutral-400 mt-0.5">Live session viewer, anti-detect stealth &amp; scraping.</p>
+                </div>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="bg-white/10 my-1" />
+              <div className="px-2 py-1 flex items-center justify-between text-[10px] text-neutral-400">
+                <span className="truncate">
+                  {browserEngine === "browserbase"
+                    ? (browserbaseApiKey || loadProviderKeys().browserbase ? "Browserbase: Connected" : "Browserbase: No Key")
+                    : browserEngine === "steel"
+                    ? (steelApiKey || loadProviderKeys().steel ? "Steel: Connected" : "Steel: No Key")
+                    : (kernelApiKey || loadProviderKeys().kernel ? "Kernel: Connected" : "Kernel: No Key")}
+                </span>
+                <Link href="/profile" className="text-indigo-400 hover:underline flex items-center gap-0.5 shrink-0 ml-2">
+                  Profile Keys <ExternalLink className="size-2.5" />
+                </Link>
+              </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Active Kernel Session Controls */}
+          {(browserEngine === "kernel" || browserEngine === "kernel-stealth") && kernelSessionId && (
+            <div className="flex items-center gap-1.5 animate-in fade-in">
+              <span className="hidden md:flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                session-{kernelSessionId.slice(0, 8)}
+              </span>
+              <button
+                type="button"
+                onClick={handleRebootKernel}
+                title="Reboot Kernel Cloud Browser"
+                className="p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <RotateCcw className="size-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => destroyKernelSession()}
+                title="Terminate Kernel Cloud Session"
+                className="p-1 rounded-md text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Active Browserbase Session Controls */}
+          {browserEngine === "browserbase" && browserbaseSessionId && (
+            <div className="flex items-center gap-1.5 animate-in fade-in">
+              <span className="hidden md:flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-300">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                bb-{browserbaseSessionId.slice(0, 8)}
+              </span>
+              <button
+                type="button"
+                onClick={handleRebootBrowserbase}
+                title="Reboot Browserbase Cloud Browser"
+                className="p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <RotateCcw className="size-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => destroyBrowserbaseSession()}
+                title="Terminate Browserbase Session"
+                className="p-1 rounded-md text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Active Steel Session Controls */}
+          {browserEngine === "steel" && steelSessionId && (
+            <div className="flex items-center gap-1.5 animate-in fade-in">
+              <span className="hidden md:flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
+                <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                steel-{steelSessionId.slice(0, 8)}
+              </span>
+              <button
+                type="button"
+                onClick={handleRebootSteel}
+                title="Reboot Steel Cloud Browser"
+                className="p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <RotateCcw className="size-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => destroySteelSession()}
+                title="Terminate Steel Session"
+                className="p-1 rounded-md text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Autopilot or Takeover Mode Badges if engaged */}
+          {isUserTakingOver ? (
+            <Badge variant="destructive" className="text-[10px] font-semibold px-2 py-0.5 rounded-full">
               <span className="flex items-center gap-1 text-amber-300">
                 <MousePointer className="size-3" /> Manual Browsing
               </span>
-            ) : isAgentAutopilot ? (
-              <span className="flex items-center gap-1 text-emerald-300">
+            </Badge>
+          ) : isAgentAutopilot ? (
+            <Badge variant="default" className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border-emerald-500/30">
+              <span className="flex items-center gap-1">
                 <Bot className="size-3 animate-pulse" /> Agent Assisting
               </span>
-            ) : (
-              <span className="flex items-center gap-1 text-neutral-300">
-                <Globe className="size-3" /> Standard Browser
-              </span>
-            )}
-          </Badge>
+            </Badge>
+          ) : null}
 
           <span className="hidden sm:inline text-[11px] text-neutral-400 truncate max-w-[180px]">
             {isInspectorMode ? "Click any element on the page" : "Browse freely or select to ask AI"}
@@ -1040,7 +1829,361 @@ export function ChromiumWebview({
           )}
         </AnimatePresence>
 
-        {isCloudMode ? (
+        {browserEngine === "browserbase" ? (
+          <div className="relative w-full h-full bg-[#0a0a0c] flex flex-col items-center justify-center overflow-hidden">
+            {browserbaseBooting ? (
+              <div className="flex flex-col items-center gap-4 p-6 text-center max-w-md animate-in fade-in duration-300">
+                <div className="relative">
+                  <div className="size-14 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400 shadow-[0_0_30px_rgba(249,115,22,0.25)]">
+                    <Globe className="size-7 animate-pulse" />
+                  </div>
+                  <div className="absolute -inset-1 rounded-2xl border-2 border-orange-500/30 animate-ping pointer-events-none" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Booting Browserbase Cloud Chrome</h3>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Launching managed cloud browser with residential proxies &amp; Stagehand AI...
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-[11px] text-orange-300 font-mono">
+                  <Loader2 className="size-3 animate-spin" />
+                  <span>Cloud Chrome • Anti-Bot • Live View</span>
+                </div>
+              </div>
+            ) : browserbaseError ? (
+              <div className="flex flex-col items-center gap-4 p-6 text-center max-w-md">
+                <div className="size-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                  <AlertCircle className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Browserbase Notice</h3>
+                  <p className="text-xs text-rose-300/80 mt-1 leading-relaxed bg-rose-950/30 border border-rose-500/20 p-2.5 rounded-xl font-mono text-[11px]">
+                    {browserbaseError}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Button
+                    size="sm"
+                    onClick={handleRebootBrowserbase}
+                    className="h-8 text-xs bg-orange-600 hover:bg-orange-500 text-white rounded-xl gap-1.5"
+                  >
+                    <RotateCcw className="size-3.5" /> Retry Boot
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setBrowserEngine("standard")}
+                    className="h-8 text-xs border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 rounded-xl"
+                  >
+                    Switch to Standard Browser
+                  </Button>
+                </div>
+              </div>
+            ) : !browserbaseApiKey && !loadProviderKeys().browserbase ? (
+              /* Inline Key Setup Card when no Browserbase key configured */
+              <div className="flex flex-col items-center gap-4 p-8 text-center max-w-md bg-[#141418] border border-white/10 rounded-2xl shadow-2xl m-4">
+                <div className="size-12 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                  <Globe className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Browserbase Cloud Browser</h3>
+                  <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                    Browserbase runs managed cloud Chrome with anti-bot bypass, Stagehand AI automation, live view, and session replays.
+                  </p>
+                </div>
+                <div className="w-full space-y-2.5 pt-2">
+                  <div className="relative">
+                    <Input
+                      type="password"
+                      placeholder="Enter Browserbase API Key (bb_...)"
+                      value={inlineKeyInput}
+                      onChange={(e) => setInlineKeyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleConnectInlineKey();
+                      }}
+                      className="h-9 bg-[#1d1d23] border-white/10 font-mono text-xs text-white placeholder:text-neutral-500 pr-10"
+                    />
+                    <KeyRound className="absolute right-3 top-2.5 size-4 text-neutral-500 pointer-events-none" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleConnectInlineKey}
+                      disabled={!inlineKeyInput.trim()}
+                      className="flex-1 h-8 text-xs bg-orange-600 hover:bg-orange-500 text-white rounded-xl gap-1.5"
+                    >
+                      <Sparkles className="size-3.5" /> Connect &amp; Boot
+                    </Button>
+                    <Link
+                      href="/profile"
+                      className="px-3 h-8 flex items-center text-xs text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+                    >
+                      Profile Settings
+                    </Link>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBrowserEngine("standard")}
+                    className="text-[11px] text-neutral-500 hover:text-neutral-300 underline pt-1"
+                  >
+                    Cancel and use Standard Browser
+                  </button>
+                </div>
+              </div>
+            ) : browserbaseLiveViewUrl ? (
+              /* Live Interactive Browserbase Browser View */
+              <div className="w-full h-full relative bg-black flex flex-col">
+                <iframe
+                  src={browserbaseLiveViewUrl}
+                  allow="autoplay; camera; microphone; fullscreen; payment; geolocation; clipboard-read; clipboard-write"
+                  className="w-full h-full border-0 bg-black"
+                  title="Browserbase Cloud Browser Live View"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-neutral-400">
+                <Loader2 className="size-6 animate-spin text-orange-400" />
+                <span className="text-xs">Preparing Browserbase cloud browser...</span>
+              </div>
+            )}
+          </div>
+        ) : browserEngine === "steel" ? (
+          <div className="relative w-full h-full bg-[#0a0a0c] flex flex-col items-center justify-center overflow-hidden">
+            {steelBooting ? (
+              <div className="flex flex-col items-center gap-4 p-6 text-center max-w-md animate-in fade-in duration-300">
+                <div className="relative">
+                  <div className="size-14 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-[0_0_30px_rgba(6,182,212,0.25)]">
+                    <ShieldCheck className="size-7 animate-pulse" />
+                  </div>
+                  <div className="absolute -inset-1 rounded-2xl border-2 border-cyan-500/30 animate-ping pointer-events-none" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Booting Steel.dev Cloud Browser</h3>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Spawning cloud Chromium with interactive session viewer &amp; anti-detect stealth...
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-[11px] text-cyan-300 font-mono">
+                  <Loader2 className="size-3 animate-spin" />
+                  <span>Live Session Viewer • Stealth • Scrape</span>
+                </div>
+              </div>
+            ) : steelError ? (
+              <div className="flex flex-col items-center gap-4 p-6 text-center max-w-md">
+                <div className="size-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                  <AlertCircle className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Steel.dev Notice</h3>
+                  <p className="text-xs text-rose-300/80 mt-1 leading-relaxed bg-rose-950/30 border border-rose-500/20 p-2.5 rounded-xl font-mono text-[11px]">
+                    {steelError}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Button
+                    size="sm"
+                    onClick={handleRebootSteel}
+                    className="h-8 text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl gap-1.5"
+                  >
+                    <RotateCcw className="size-3.5" /> Retry Boot
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setBrowserEngine("standard")}
+                    className="h-8 text-xs border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 rounded-xl"
+                  >
+                    Switch to Standard Browser
+                  </Button>
+                </div>
+              </div>
+            ) : !steelApiKey && !loadProviderKeys().steel ? (
+              /* Inline Key Setup Card when no Steel key configured */
+              <div className="flex flex-col items-center gap-4 p-8 text-center max-w-md bg-[#141418] border border-white/10 rounded-2xl shadow-2xl m-4">
+                <div className="size-12 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <ShieldCheck className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Steel.dev Cloud Browser</h3>
+                  <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                    Steel provides cloud browsers with live interactive viewer, stealth anti-detect, long-lived sessions, and scraping.
+                  </p>
+                </div>
+                <div className="w-full space-y-2.5 pt-2">
+                  <div className="relative">
+                    <Input
+                      type="password"
+                      placeholder="Enter Steel API Key (steel_...)"
+                      value={inlineKeyInput}
+                      onChange={(e) => setInlineKeyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleConnectInlineKey();
+                      }}
+                      className="h-9 bg-[#1d1d23] border-white/10 font-mono text-xs text-white placeholder:text-neutral-500 pr-10"
+                    />
+                    <KeyRound className="absolute right-3 top-2.5 size-4 text-neutral-500 pointer-events-none" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleConnectInlineKey}
+                      disabled={!inlineKeyInput.trim()}
+                      className="flex-1 h-8 text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl gap-1.5"
+                    >
+                      <Sparkles className="size-3.5" /> Connect &amp; Boot
+                    </Button>
+                    <Link
+                      href="/profile"
+                      className="px-3 h-8 flex items-center text-xs text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+                    >
+                      Profile Settings
+                    </Link>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBrowserEngine("standard")}
+                    className="text-[11px] text-neutral-500 hover:text-neutral-300 underline pt-1"
+                  >
+                    Cancel and use Standard Browser
+                  </button>
+                </div>
+              </div>
+            ) : steelLiveViewUrl ? (
+              /* Live Interactive Steel Browser View */
+              <div className="w-full h-full relative bg-black flex flex-col">
+                <iframe
+                  src={steelLiveViewUrl}
+                  allow="autoplay; camera; microphone; fullscreen; payment; geolocation; clipboard-read; clipboard-write"
+                  className="w-full h-full border-0 bg-black"
+                  title="Steel Cloud Browser Live View"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-neutral-400">
+                <Loader2 className="size-6 animate-spin text-cyan-400" />
+                <span className="text-xs">Preparing Steel cloud browser...</span>
+              </div>
+            )}
+          </div>
+        ) : (browserEngine === "kernel" || browserEngine === "kernel-stealth") ? (
+          <div className="relative w-full h-full bg-[#0a0a0c] flex flex-col items-center justify-center overflow-hidden">
+            {kernelBooting ? (
+              <div className="flex flex-col items-center gap-4 p-6 text-center max-w-md animate-in fade-in duration-300">
+                <div className="relative">
+                  <div className="size-14 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_30px_rgba(99,102,241,0.25)]">
+                    <Sparkles className="size-7 animate-pulse" />
+                  </div>
+                  <div className="absolute -inset-1 rounded-2xl border-2 border-indigo-500/30 animate-ping pointer-events-none" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Booting Kernel Cloud Browser</h3>
+                  <p className="text-xs text-neutral-400 mt-1">
+                    Spawning sandboxed Chromium instance in &lt;30ms on Kernel cloud infrastructure...
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300 font-mono">
+                  <Loader2 className="size-3 animate-spin" />
+                  <span>Boot latency &lt;30ms • Live View Stream</span>
+                </div>
+              </div>
+            ) : kernelError ? (
+              <div className="flex flex-col items-center gap-4 p-6 text-center max-w-md">
+                <div className="size-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400">
+                  <AlertCircle className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Kernel Browser Boot Notice</h3>
+                  <p className="text-xs text-rose-300/80 mt-1 leading-relaxed bg-rose-950/30 border border-rose-500/20 p-2.5 rounded-xl font-mono text-[11px]">
+                    {kernelError}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <Button
+                    size="sm"
+                    onClick={handleRebootKernel}
+                    className="h-8 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl gap-1.5"
+                  >
+                    <RotateCcw className="size-3.5" /> Retry Boot
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setBrowserEngine("standard")}
+                    className="h-8 text-xs border-white/10 bg-white/5 hover:bg-white/10 text-neutral-300 rounded-xl"
+                  >
+                    Switch to Standard Browser
+                  </Button>
+                </div>
+              </div>
+            ) : !kernelApiKey && !loadProviderKeys().kernel ? (
+              /* Inline Key Setup Card when no key configured */
+              <div className="flex flex-col items-center gap-4 p-8 text-center max-w-md bg-[#141418] border border-white/10 rounded-2xl shadow-2xl m-4">
+                <div className="size-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                  <Sparkles className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Kernel Cloud Browser Engine</h3>
+                  <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                    Kernel spins up sandboxed cloud Chromium instances in under 30ms with instant interactive Live View, CDP control, and anti-bot stealth.
+                  </p>
+                </div>
+                <div className="w-full space-y-2.5 pt-2">
+                  <div className="relative">
+                    <Input
+                      type="password"
+                      placeholder="Enter Kernel API Key (knl_...)"
+                      value={inlineKeyInput}
+                      onChange={(e) => setInlineKeyInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleConnectInlineKey();
+                      }}
+                      className="h-9 bg-[#1d1d23] border-white/10 font-mono text-xs text-white placeholder:text-neutral-500 pr-10"
+                    />
+                    <KeyRound className="absolute right-3 top-2.5 size-4 text-neutral-500 pointer-events-none" />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleConnectInlineKey}
+                      disabled={!inlineKeyInput.trim()}
+                      className="flex-1 h-8 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl gap-1.5"
+                    >
+                      <Sparkles className="size-3.5" /> Connect &amp; Boot
+                    </Button>
+                    <Link
+                      href="/profile"
+                      className="px-3 h-8 flex items-center text-xs text-neutral-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors"
+                    >
+                      Profile Settings
+                    </Link>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBrowserEngine("standard")}
+                    className="text-[11px] text-neutral-500 hover:text-neutral-300 underline pt-1"
+                  >
+                    Cancel and use Standard Browser
+                  </button>
+                </div>
+              </div>
+            ) : kernelLiveViewUrl ? (
+              /* Live Interactive Kernel Browser View */
+              <div className="w-full h-full relative bg-black flex flex-col">
+                <iframe
+                  src={kernelLiveViewUrl}
+                  allow="autoplay; camera; microphone; fullscreen; payment; geolocation; clipboard-read; clipboard-write"
+                  className="w-full h-full border-0 bg-black"
+                  title="Kernel Cloud Browser Live View"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-3 text-neutral-400">
+                <Loader2 className="size-6 animate-spin text-indigo-400" />
+                <span className="text-xs">Preparing cloud browser session...</span>
+              </div>
+            )}
+          </div>
+        ) : isCloudMode ? (
           <div className="w-full h-full relative bg-white flex justify-center items-center overflow-hidden">
             {cloudImageBase64 ? (
               <img
@@ -1081,10 +2224,10 @@ export function ChromiumWebview({
               <div className="flex gap-2 mt-1">
                 <button
                   type="button"
-                  onClick={() => setIsCloudMode(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all"
+                  onClick={() => handleSelectEngine("kernel")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all"
                 >
-                  <Cloud className="size-3.5" /> Try Cloud Mode
+                  <Sparkles className="size-3.5" /> Try Kernel Cloud
                 </button>
                 <button
                   type="button"

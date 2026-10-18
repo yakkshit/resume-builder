@@ -86,9 +86,9 @@ export function ChatCvTabs({
                   <SelectTrigger className="mt-2">
                     <SelectValue placeholder="Choose template" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-[280px] sm:max-h-[320px] overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
                     {Object.keys(resumeTemplates).map((key) => (
-                      <SelectItem key={key} value={key}>
+                      <SelectItem key={key} value={key} className="cursor-pointer py-1.5 px-2">
                         {key.charAt(0).toUpperCase() +
                           key.slice(1).replace(/-/g, " ")}
                       </SelectItem>

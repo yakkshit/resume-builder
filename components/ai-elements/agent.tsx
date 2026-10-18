@@ -12,11 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Bot, Wrench, Code2, FileText, ChevronRight } from "lucide-react";
 import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
-import { code } from "@streamdown/code";
 import { math } from "@streamdown/math";
-import { mermaid } from "@streamdown/mermaid";
 
-const streamdownPlugins = { cjk, code, math, mermaid };
+const streamdownPlugins = { cjk, math };
 
 export interface AgentProps extends ComponentProps<"div"> {
   children?: ReactNode;

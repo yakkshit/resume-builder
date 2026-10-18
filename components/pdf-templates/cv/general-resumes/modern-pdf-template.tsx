@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Image, Link } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // Define ALL style objects outside the component - this is critical!
 const styles = StyleSheet.create({
@@ -171,49 +172,51 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
   const skills = Array.isArray(resumeData?.skills) ? resumeData.skills : []
   const projects = Array.isArray(resumeData?.projects) ? resumeData.projects : []
   const achievements = Array.isArray(resumeData?.achievements) ? resumeData.achievements : []
+  const titles = getResumeSectionTitles(resumeData?.language)
 
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         {/* Header */}
-        <View style={styles.header}>
+        <View key="k-hdr" style={styles.header}>
           {/* Profile Picture - Removed cache prop for production safety */}
           {basicInfo.profilePicture && (
-            <Image src={basicInfo.profilePicture} style={styles.profileImage} />
+            <Image key="k-pic" src={basicInfo.profilePicture} style={styles.profileImage} />
           )}
 
-          <View style={styles.headerContent}>
-            <Text style={styles.name}>{basicInfo.name || "Your Name"}</Text>
-            {basicInfo.title && <Text style={styles.title}>{basicInfo.title}</Text>}
+          <View key="k-hdr-cnt" style={styles.headerContent}>
+            <Text key="k-name" style={styles.name}>{basicInfo.name || "Your Name"}</Text>
+            {basicInfo.title && <Text key="k-title" style={styles.title}>{basicInfo.title}</Text>}
             
-            <View style={styles.contactInfo}>
+            <View key="k-contact" style={styles.contactInfo}>
               {basicInfo.email && (
-                <View style={styles.contactItem}>
-                  <Text>Email: </Text>
-                  <Link src={`mailto:${basicInfo.email}`} style={styles.linkStyle}>
+                <View key="k-eml" style={styles.contactItem}>
+                  <Text key="k-eml-l">{titles.email} </Text>
+                  <Link key="k-eml-a" src={`mailto:${basicInfo.email}`} style={styles.linkStyle}>
                     <Text>{basicInfo.email}</Text>
                   </Link>
                 </View>
               )}
               
               {basicInfo.phone && (
-                <View style={styles.contactItem}>
-                  <Text>Phone: </Text>
-                  <Link src={`tel:${basicInfo.phone.replace(/[^\d+]/g, "")}`} style={styles.linkStyle}>
+                <View key="k-phn" style={styles.contactItem}>
+                  <Text key="k-phn-l">{titles.phone} </Text>
+                  <Link key="k-phn-a" src={`tel:${basicInfo.phone.replace(/[^\d+]/g, "")}`} style={styles.linkStyle}>
                     <Text>{basicInfo.phone}</Text>
                   </Link>
                 </View>
               )}
               
               {basicInfo.location && (
-                <View style={styles.contactItem}>
-                  <Text>Location: {basicInfo.location}</Text>
+                <View key="k-loc" style={styles.contactItem}>
+                  <Text key="k-loc-l">{titles.location} {basicInfo.location}</Text>
                 </View>
               )}
               
               {basicInfo.linkedin && (
-                <View style={styles.contactItem}>
+                <View key="k-in" style={styles.contactItem}>
                   <Link
+                    key="k-in-a"
                     src={`https://linkedin.com/in/${basicInfo.linkedin}`}
                     style={styles.linkStyle}
                   >
@@ -223,8 +226,9 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
               )}
               
               {basicInfo.website && (
-                <View style={styles.contactItem}>
+                <View key="k-web" style={styles.contactItem}>
                   <Link
+                    key="k-web-a"
                     src={basicInfo.website.startsWith("http") ? basicInfo.website : `https://${basicInfo.website}`}
                     style={styles.linkStyle}
                   >
@@ -236,7 +240,7 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
 
             {/* Portfolio Links */}
             {Array.isArray(basicInfo.portfolioLinks) && basicInfo.portfolioLinks.length > 0 && (
-              <View style={styles.portfolioLinks}>
+              <View key="k-pf-wrap" style={styles.portfolioLinks}>
                 {basicInfo.portfolioLinks.map((link, index) => {
                   const url = link?.url || ""
                   const platform = link?.platform || "Link"
@@ -244,7 +248,7 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
                   const fullUrl = url.startsWith("http") ? url : `https://${url || platform}`
                   
                   return (
-                    <View key={`portfolio-${index}`} style={styles.portfolioLink}>
+                    <View key={`pf-${index}`} style={styles.portfolioLink}>
                       <Link src={fullUrl} style={styles.linkStyle}>
                         <Text>
                           {platform}: {username}
@@ -260,30 +264,30 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
 
         {/* Summary */}
         {basicInfo.summary && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Summary</Text>
-            <Text style={styles.summary}>{basicInfo.summary}</Text>
+          <View key="k-sum" style={styles.section}>
+            <Text key="k-sum-t" style={styles.sectionTitle}>{titles.summary}</Text>
+            <Text key="k-sum-c" style={styles.summary}>{basicInfo.summary}</Text>
           </View>
         )}
 
         {/* Experience */}
         {experience.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Experience</Text>
-            <View style={styles.sectionContent}>
+          <View key="k-exp" style={styles.section}>
+            <Text key="k-exp-t" style={styles.sectionTitle}>{titles.experience}</Text>
+            <View key="k-exp-c" style={styles.sectionContent}>
               {experience.map((exp, index) => (
                 <View key={`exp-${index}`} style={styles.experienceItem}>
-                  <View style={styles.itemHeader}>
-                    <View>
-                      <Text style={styles.itemTitle}>{exp?.position || "Position"}</Text>
-                      <Text style={styles.itemSubtitle}>{exp?.company || "Company"}</Text>
+                  <View key={`eh-${index}`} style={styles.itemHeader}>
+                    <View key={`em-${index}`}>
+                      <Text key={`ep-${index}`} style={styles.itemTitle}>{exp?.position || "Position"}</Text>
+                      <Text key={`ec-${index}`} style={styles.itemSubtitle}>{exp?.company || "Company"}</Text>
                     </View>
-                    <Text style={styles.itemDate}>
-                      {exp?.startDate || ""} - {exp?.endDate || "Present"}
+                    <Text key={`ed-${index}`} style={styles.itemDate}>
+                      {exp?.startDate || ""} - {exp?.endDate || titles.present}
                     </Text>
                   </View>
                   {exp?.description && (
-                    <Text style={styles.itemDescription}>{exp.description}</Text>
+                    <Text key={`exd-${index}`} style={styles.itemDescription}>{exp.description}</Text>
                   )}
                 </View>
               ))}
@@ -293,21 +297,21 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
 
         {/* Projects */}
         {projects.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Projects</Text>
-            <View style={styles.sectionContent}>
+          <View key="k-prj" style={styles.section}>
+            <Text key="k-prj-t" style={styles.sectionTitle}>{titles.projects}</Text>
+            <View key="k-prj-c" style={styles.sectionContent}>
               {projects.map((project, index) => {
                 const technologies = Array.isArray(project?.technologies) ? project.technologies : []
                 
                 return (
                   <View key={`proj-${index}`} style={styles.experienceItem}>
-                    <View style={styles.itemHeader}>
-                      <View>
-                        <Text style={styles.itemTitle}>{project?.name || "Project"}</Text>
+                    <View key={`ph-${index}`} style={styles.itemHeader}>
+                      <View key={`pm-${index}`}>
+                        <Text key={`pn-${index}`} style={styles.itemTitle}>{project?.name || "Project"}</Text>
                         {technologies.length > 0 && (
-                          <View style={styles.projectTech}>
+                          <View key={`pt-${index}`} style={styles.projectTech}>
                             {technologies.map((tech, techIndex) => (
-                              <Text key={`tech-${index}-${techIndex}`} style={styles.techBadge}>
+                              <Text key={`t-${index}-${techIndex}`} style={styles.techBadge}>
                                 {String(tech)}
                               </Text>
                             ))}
@@ -315,13 +319,13 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
                         )}
                       </View>
                       {(project?.startDate || project?.endDate) && (
-                        <Text style={styles.itemDate}>
-                          {project.startDate || ""} - {project.endDate || "Present"}
+                        <Text key={`pd-${index}`} style={styles.itemDate}>
+                          {project.startDate || ""} - {project.endDate || titles.present}
                         </Text>
                       )}
                     </View>
                     {project?.description && (
-                      <Text style={styles.itemDescription}>{project.description}</Text>
+                      <Text key={`pds-${index}`} style={styles.itemDescription}>{project.description}</Text>
                     )}
                   </View>
                 )
@@ -332,25 +336,25 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
 
         {/* Education */}
         {education.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Education</Text>
-            <View style={styles.sectionContent}>
+          <View key="k-edu" style={styles.section}>
+            <Text key="k-edu-t" style={styles.sectionTitle}>{titles.education}</Text>
+            <View key="k-edu-c" style={styles.sectionContent}>
               {education.map((edu, index) => (
                 <View key={`edu-${index}`} style={styles.experienceItem}>
-                  <View style={styles.itemHeader}>
-                    <View>
-                      <Text style={styles.itemTitle}>{edu?.institution || "Institution"}</Text>
-                      <Text style={styles.itemSubtitle}>
+                  <View key={`edh-${index}`} style={styles.itemHeader}>
+                    <View key={`edm-${index}`}>
+                      <Text key={`edi-${index}`} style={styles.itemTitle}>{edu?.institution || "Institution"}</Text>
+                      <Text key={`edd-${index}`} style={styles.itemSubtitle}>
                         {edu?.degree || "Degree"}
                         {edu?.field ? ` in ${edu.field}` : ""}
                       </Text>
                     </View>
-                    <Text style={styles.itemDate}>
-                      {edu?.startDate || ""} - {edu?.endDate || "Present"}
+                    <Text key={`eddt-${index}`} style={styles.itemDate}>
+                      {edu?.startDate || ""} - {edu?.endDate || titles.present}
                     </Text>
                   </View>
                   {edu?.gpa && (
-                    <Text style={styles.itemDescription}>GPA: {edu.gpa}</Text>
+                    <Text key={`edg-${index}`} style={styles.itemDescription}>GPA: {edu.gpa}</Text>
                   )}
                 </View>
               ))}
@@ -360,19 +364,19 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
 
         {/* Achievements */}
         {achievements.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Achievements</Text>
-            <View style={styles.sectionContent}>
+          <View key="k-ach" style={styles.section}>
+            <Text key="k-ach-t" style={styles.sectionTitle}>{titles.achievements}</Text>
+            <View key="k-ach-c" style={styles.sectionContent}>
               {achievements.map((achievement, index) => (
                 <View key={`ach-${index}`} style={styles.experienceItem}>
-                  <View style={styles.itemHeader}>
-                    <Text style={styles.itemTitle}>{achievement?.title || "Achievement"}</Text>
+                  <View key={`achh-${index}`} style={styles.itemHeader}>
+                    <Text key={`acht-${index}`} style={styles.itemTitle}>{achievement?.title || "Achievement"}</Text>
                     {achievement?.date && (
-                      <Text style={styles.itemDate}>{achievement.date}</Text>
+                      <Text key={`achd-${index}`} style={styles.itemDate}>{achievement.date}</Text>
                     )}
                   </View>
                   {achievement?.description && (
-                    <Text style={styles.itemDescription}>{achievement.description}</Text>
+                    <Text key={`achds-${index}`} style={styles.itemDescription}>{achievement.description}</Text>
                   )}
                 </View>
               ))}
@@ -382,9 +386,9 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
 
         {/* Languages */}
         {Array.isArray(basicInfo.languages) && basicInfo.languages.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Languages</Text>
-            <View style={styles.skillsContainer}>
+          <View key="k-lng" style={styles.section}>
+            <Text key="k-lng-t" style={styles.sectionTitle}>{titles.languages}</Text>
+            <View key="k-lng-c" style={styles.skillsContainer}>
               {basicInfo.languages.map((language, index) => (
                 <Text key={`lang-${index}`} style={styles.skillBadge}>
                   {String(language)}
@@ -396,9 +400,9 @@ export const ModernPDFTemplate = ({ resumeData }: ModernPDFTemplateProps) => {
 
         {/* Skills */}
         {skills.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Skills</Text>
-            <View style={styles.skillsContainer}>
+          <View key="k-skl" style={styles.section}>
+            <Text key="k-skl-t" style={styles.sectionTitle}>{titles.skills}</Text>
+            <View key="k-skl-c" style={styles.skillsContainer}>
               {skills.map((skill, index) => (
                 <Text key={`skill-${index}`} style={styles.skillBadge}>
                   {String(skill)}

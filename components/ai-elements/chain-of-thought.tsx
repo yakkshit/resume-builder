@@ -241,8 +241,6 @@ export function ChainOfThoughtTool({
       case "chart_generator":
       case "generate_chart":
         return BarChart3;
-      case "neo4j_career_graph":
-        return Database;
       case "gitlab_encrypted_sync":
         return Lock;
       case "calculate_ats_score":
@@ -281,9 +279,6 @@ export function ChainOfThoughtTool({
     }
     if (name === "calculate_ats_score" || name === "cv_scorer") {
       return "Analyzing ATS score alignment against job requirements";
-    }
-    if (name === "neo4j_career_graph") {
-      return "Querying Neo4j Career Knowledge Graph nodes and relationships";
     }
     return `Arguments: ${JSON.stringify(args)}`;
   };

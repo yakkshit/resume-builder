@@ -82,7 +82,7 @@ async function generateMasterProfileCV() {
         endDate: "2025-07",
         description: "Engineered an AI-driven personal nutrition agent leveraging predictive modeling and Retrieval-Augmented Generation.",
         highlights: [
-          "Architected scalable backend services with Next.js, LangChain, Drizzle ORM, and PostgreSQL with Vector search.",
+          "Architected scalable backend services with Next.js, LangChain, and PostgreSQL with Vector search.",
           "Implemented multi-step RAG pipelines grounding AI recommendations in verified nutritional research datasets.",
           "Built high-performance RESTful APIs and real-time streaming interfaces for seamless mobile and web interaction."
         ]

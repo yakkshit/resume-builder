@@ -375,7 +375,11 @@ export function sanitizeResumeData(data: Partial<ResumeData> | unknown): ResumeD
     })
     .filter((a) => a.title || a.description)
 
+  const rawLang = root.language || (root as any).lang || (rawBasic as any).language || ""
+  const language = safeStr(rawLang).toLowerCase() || "en"
+
   return {
+    language,
     basicInfo,
     experience,
     education,
@@ -398,6 +402,7 @@ export function mergeResumeDataWithDefault(incoming: unknown): ResumeData {
   const base = defaultResumeData
   const sanitizedIncoming = sanitizeResumeData(incoming as Record<string, unknown>)
   const merged = {
+    language: sanitizedIncoming.language || base.language || "en",
     basicInfo: {
       ...base.basicInfo,
       ...sanitizedIncoming.basicInfo,

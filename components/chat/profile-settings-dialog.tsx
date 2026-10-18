@@ -14,7 +14,6 @@ import {
   Loader2, 
   UserRound, 
   Key, 
-  Github, 
   Database, 
   ShieldCheck, 
   Check, 
@@ -29,7 +28,6 @@ import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage
 import { ProfilePhotoCropDialog } from "@/components/chat/profile-photo-crop-dialog";
 import { EMAIL_PROVIDER_LABELS, normalizeDefaultEmailProvider, type EmailProviderId } from "@/lib/email-compose-urls";
 import { TRANSLATION_LANGUAGES } from "@/lib/translation";
-import { GitHubSyncService, type GitHubSyncConfig } from "@/lib/github/sync";
 import { useAuth } from "@/lib/auth/auth-provider";
 import { Eye, EyeOff, Download } from "lucide-react";
 
@@ -57,13 +55,17 @@ export type UserProfile = {
   githubRepo?: string;
   autoSyncGithub?: boolean;
   encryptionPassphrase?: string;
+  // Public profile & handle (from dashboard)
+  handle?: string;
+  links?: string[];
+  isPublicProfile?: boolean;
 };
 
 export const PROFILE_STORE_ID = "ai-chat-profile";
 
-const EMPTY_PROFILE: UserProfile = {
-  name: "",
-  email: "",
+export const EMPTY_PROFILE: UserProfile = {
+  name: "Yakkshit Sai",
+  email: "yakkshit.tactopus@gmail.com",
   phone: "",
   location: "",
   linkedin: "",
@@ -83,6 +85,9 @@ const EMPTY_PROFILE: UserProfile = {
   githubRepo: "career-agent-backup",
   autoSyncGithub: false,
   encryptionPassphrase: "",
+  handle: "",
+  links: [],
+  isPublicProfile: false,
 };
 
 export interface ProviderKeys {
@@ -93,11 +98,20 @@ export interface ProviderKeys {
   groq?: string;
   openrouter?: string;
   ollamaEndpoint?: string;
+  tavily?: string;
+  firecrawl?: string;
+  kernel?: string;
+  browserbase?: string;
+  steel?: string;
+  neo4jUri?: string;
+  neo4jUser?: string;
+  neo4jPassword?: string;
+  neo4jDatabase?: string;
 }
 
-const AI_PROVIDER_CONFIG_STORAGE_ID = "ai-provider-configs";
+export const AI_PROVIDER_CONFIG_STORAGE_ID = "ai-provider-configs";
 
-function loadProviderKeys(): ProviderKeys {
+export function loadProviderKeys(): ProviderKeys {
   if (typeof window === "undefined") return {};
   try {
     const raw = tryLocalStorageGet(AI_PROVIDER_CONFIG_STORAGE_ID);
@@ -107,19 +121,26 @@ function loadProviderKeys(): ProviderKeys {
   }
 }
 
-function saveProviderKeys(keys: ProviderKeys) {
+export function saveProviderKeys(keys: ProviderKeys) {
   tryLocalStorageSet(AI_PROVIDER_CONFIG_STORAGE_ID, JSON.stringify(keys));
 }
 
-function loadProfile(): UserProfile {
+export function loadProfile(): UserProfile {
   if (typeof window === "undefined") return { ...EMPTY_PROFILE };
   try {
     const raw = tryLocalStorageGet(PROFILE_STORE_ID);
     if (!raw) return { ...EMPTY_PROFILE };
     const p = JSON.parse(raw) as Partial<UserProfile>;
+    const resolvedName = (p.name && p.name.trim() && p.name !== "Career Professional" && p.name !== "Guest" && p.name !== "User")
+      ? p.name.trim()
+      : "Yakkshit Sai";
+    const resolvedEmail = (p.email && p.email.includes("@") && !p.email.endsWith("@user.local"))
+      ? p.email.trim()
+      : "yakkshit.tactopus@gmail.com";
+
     return {
-      name: p.name || "",
-      email: p.email || "",
+      name: resolvedName,
+      email: resolvedEmail,
       phone: p.phone || "",
       location: p.location || "",
       linkedin: p.linkedin || "",
@@ -139,13 +160,16 @@ function loadProfile(): UserProfile {
       githubRepo: p.githubRepo || "career-agent-backup",
       autoSyncGithub: Boolean(p.autoSyncGithub),
       encryptionPassphrase: p.encryptionPassphrase || "",
+      handle: p.handle || "",
+      links: Array.isArray(p.links) ? p.links : [],
+      isPublicProfile: Boolean(p.isPublicProfile),
     };
   } catch {
     return { ...EMPTY_PROFILE };
   }
 }
 
-function saveProfile(p: UserProfile): boolean {
+export function saveProfile(p: UserProfile): boolean {
   try {
     tryLocalStorageSet(PROFILE_STORE_ID, JSON.stringify(p));
     window.dispatchEvent(new CustomEvent("ai-chat-profile-updated"));
@@ -176,8 +200,6 @@ export function ProfileSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
   const [imageToCrop, setImageToCrop] = useState<string | null>(null);
-  const [githubTesting, setGithubTesting] = useState(false);
-  const [githubStatus, setGithubStatus] = useState<{ success?: boolean; message?: string } | null>(null);
   const [dbStatus, setDbStatus] = useState<string>("Checking...");
   const [showPassphrase, setShowPassphrase] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -194,7 +216,7 @@ export function ProfileSettingsDialog({
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.isAuthenticated && data.user) {
-          setDbStatus("Connected (PostgreSQL / Xata)");
+          setDbStatus("Connected (Storage)");
           setProfile((prev) => ({
             ...prev,
             name: data.user.name || prev.name,
@@ -293,21 +315,6 @@ export function ProfileSettingsDialog({
     onOpenChange(false);
   };
 
-  const handleTestGithub = async () => {
-    if (!profile.githubToken || !profile.github || !profile.githubRepo) {
-      setGithubStatus({ success: false, message: "Enter GitHub username, repository, and Personal Access Token." });
-      return;
-    }
-    setGithubTesting(true);
-    setGithubStatus(null);
-    const res = await GitHubSyncService.testConnection({
-      token: profile.githubToken,
-      owner: profile.github,
-      repo: profile.githubRepo,
-    });
-    setGithubTesting(false);
-    setGithubStatus(res);
-  };
 
   const onPickPhoto: React.ChangeEventHandler<HTMLInputElement> = (e) => {
     const file = e.target.files?.[0];
@@ -368,12 +375,12 @@ export function ProfileSettingsDialog({
           </div>
           <DialogTitle className="text-xl font-bold">Profile & Model Settings</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Manage your personal profile, custom AI provider API keys, GitHub backup sync, and database storage.
+            Manage your personal profile, custom AI provider API keys, and master career memory vault.
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="pt-2">
-          <TabsList className="grid grid-cols-4 w-full h-9">
+          <TabsList className="grid grid-cols-3 w-full h-9">
             <TabsTrigger value="profile" className="text-xs gap-1">
               <UserRound className="h-3.5 w-3.5" />
               <span>Profile</span>
@@ -385,10 +392,6 @@ export function ProfileSettingsDialog({
             <TabsTrigger value="keys" className="text-xs gap-1">
               <Key className="h-3.5 w-3.5" />
               <span>API Keys</span>
-            </TabsTrigger>
-            <TabsTrigger value="github" className="text-xs gap-1">
-              <Github className="h-3.5 w-3.5" />
-              <span>GitHub</span>
             </TabsTrigger>
           </TabsList>
 
@@ -617,113 +620,7 @@ export function ProfileSettingsDialog({
             </div>
           </TabsContent>
 
-          {/* TAB 4: GITHUB SYNC */}
-          <TabsContent value="github" className="space-y-3 pt-3">
-            <div className="p-3 rounded-xl border border-border/60 bg-muted/30 text-xs text-muted-foreground leading-relaxed">
-              <strong>Zero-Knowledge GitHub Backup</strong> commits your resumes, PDF versions, and chat logs directly to your private GitHub repository for 100% free and private storage.
-            </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className="space-y-1">
-                <Label className="text-xs">GitHub Username</Label>
-                <Input
-                  value={profile.github}
-                  onChange={(e) => setProfile((p) => ({ ...p, github: e.target.value }))}
-                  placeholder="e.g. octocat"
-                  className="h-9 text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Backup Repository Name</Label>
-                <Input
-                  value={profile.githubRepo}
-                  onChange={(e) => setProfile((p) => ({ ...p, githubRepo: e.target.value }))}
-                  placeholder="career-agent-backup"
-                  className="h-9 text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs flex items-center justify-between">
-                <span>GitHub Personal Access Token (Classic / Fine-Grained)</span>
-                <a
-                  href="https://github.com/settings/tokens/new?scopes=repo&description=CareerAgent+Backup"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-[10px] text-primary hover:underline flex items-center gap-0.5"
-                >
-                  Create Token (repo scope) <ExternalLink className="h-2.5 w-2.5" />
-                </a>
-              </Label>
-              <Input
-                type="password"
-                value={profile.githubToken || ""}
-                onChange={(e) => setProfile((p) => ({ ...p, githubToken: e.target.value }))}
-                placeholder="ghp_..."
-                className="h-9 text-xs font-mono"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs font-semibold flex items-center justify-between">
-                <span>Master Encryption Passphrase</span>
-                <div className="flex items-center gap-3">
-                   <button
-                    type="button"
-                    onClick={() => setShowPassphrase(!showPassphrase)}
-                    className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-1"
-                   >
-                     {showPassphrase ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                     {showPassphrase ? "Hide" : "Show"}
-                   </button>
-                   <button
-                     type="button"
-                     onClick={generatePassphrase}
-                     className="text-[10px] text-primary hover:underline flex items-center gap-1"
-                   >
-                     Auto Generate
-                   </button>
-                </div>
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  type={showPassphrase ? "text" : "password"}
-                  placeholder="Create or generate a strong secret passphrase..."
-                  value={profile.encryptionPassphrase || ""}
-                  onChange={(e) => setProfile((p) => ({ ...p, encryptionPassphrase: e.target.value }))}
-                  className="h-9 text-xs flex-1"
-                />
-                <Button type="button" variant="outline" size="sm" className="h-9 px-3 shrink-0" onClick={downloadPassphrase}>
-                  <Download className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-              <p className="text-[10px] text-muted-foreground">
-                Remember this passphrase to decrypt past chats. We strongly recommend downloading it.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="text-xs h-8 gap-1.5"
-                onClick={handleTestGithub}
-                disabled={githubTesting}
-              >
-                {githubTesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-                <span>Test Connection</span>
-              </Button>
-
-              {githubStatus && (
-                <span className={`text-xs font-medium flex items-center gap-1 ${githubStatus.success ? "text-emerald-500" : "text-destructive"}`}>
-                  {githubStatus.success ? <Check className="h-3.5 w-3.5" /> : null}
-                  {githubStatus.message}
-                </span>
-              )}
-            </div>
-          </TabsContent>
         </Tabs>
 
         <div className="flex gap-2 pt-4 border-t border-border/60">

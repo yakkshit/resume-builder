@@ -22,9 +22,9 @@
   - **Dual-Tab Switcher**: Seamlessly toggle between `[ 🌐 Chromium Browser ]` and `[ ⚡ Component Canvas ]` if both are open.
 - **Chat State Placeholder**: When a component is active on the side canvas, the inline message displays a Google Material styled badge *"Active in Side Canvas"* with a quick 1-click *"Bring into Chat"* button.
 
-### 4. Drizzle Database Sync on `pnpm run prod`
-- Updated [`scripts/workflow.ts`](file:///Users/yakkshit/Downloads/project/resume/cv-main/scripts/workflow.ts) to automatically execute the Drizzle database push and schema sync (`pnpm run db:push`) before building and pushing releases.
-- Ensures tables, relations, and database schema migrations are verified prior to production releases.
+### 4. Storage & Build Workflow
+- Updated [`scripts/workflow.ts`](file:///Users/yakkshit/Downloads/project/resume/cv-main/scripts/workflow.ts) to execute a streamlined production release workflow without unnecessary ORM migrations.
+
 
 ### 5. Sidebar Integrations Cleanup
 - Cleaned up [`components/chat/sidebar-integrations-accordion.tsx`](file:///Users/yakkshit/Downloads/project/resume/cv-main/components/chat/sidebar-integrations-accordion.tsx):

@@ -7,14 +7,15 @@
  * Use syncWithGlobalResume=false for older chat bubbles so each stays a snapshot.
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { SetStateAction } from "react";
 import dynamic from "next/dynamic";
-import { FileText, Eye, Edit, Undo2, Redo2 } from "lucide-react";
+import { FileText, Eye, Edit, Undo2, Redo2, PanelRightOpen, PanelRightClose, Gauge, Scissors, CheckCircle2, AlertTriangle, Copy, Check } from "lucide-react";
 import { ArtifactTrafficLights, type ArtifactPanelMode } from "@/components/chat/chat-artifact-chrome";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import Toaster, { ToasterRef } from "@/components/ui/toast";
 import ResumeEditor from "@/components/resume-coverletter/resume-editor";
 import { defaultResumeData } from "@/lib/default-resume-data";
@@ -22,19 +23,16 @@ import type { ResumeData, Template } from "@/lib/types";
 import { resumeTemplates } from "@/components/pdf-templates";
 import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
-import { deepMerge } from "@/lib/utils";
+import { deepMerge, cn } from "@/lib/utils";
 import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume";
+import { TRANSLATION_ORIGINAL } from "@/lib/translation";
+import { validateTemplatePageBudget, type PageBudgetEvaluation } from "@/lib/resume-template-limits";
 
 // PDF viewer loaded dynamically (client-only, heavy)
 const PdfPreviewClient = dynamic(
   () => import("@/components/resume-coverletter/pdf-viewer"),
   { ssr: false, loading: () => <div className="flex items-center justify-center h-40 text-xs text-muted-foreground">Loading preview…</div> }
 );
-
-const TEMPLATE_OPTIONS = (Object.keys(resumeTemplates) as Template[]).map((t) => ({
-  value: t,
-  label: t.charAt(0).toUpperCase() + t.slice(1),
-}));
 
 function stripBoldMarkersDeep(input: any): any {
   if (typeof input === "string") return input.replace(/\*\*/g, "");
@@ -168,12 +166,30 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
 export function ResumeViewer({
   data = {},
   syncWithGlobalResume = true,
+  targetLanguage: propTargetLanguage,
+  onLanguageChange: propOnLanguageChange,
+  isTranslating = false,
+  onPopOutToSide,
+  onDockToChat,
 }: {
   data?: Record<string, any>;
   /** When false, show only this message’s resume JSON; do not read/write shared storage or follow global events. */
   syncWithGlobalResume?: boolean;
+  targetLanguage?: string;
+  onLanguageChange?: (language: string) => void;
+  isTranslating?: boolean;
+  onPopOutToSide?: () => void;
+  onDockToChat?: () => void;
 }) {
   const toasterRef = useRef<ToasterRef>(null);
+
+  const [localLanguage, setLocalLanguage] = useState<string>(() => {
+    if (propTargetLanguage) return propTargetLanguage;
+    const payloadLang = data?.resumeData?.language || data?.language || (data as any)?.lang;
+    return typeof payloadLang === "string" ? payloadLang : TRANSLATION_ORIGINAL;
+  });
+
+  const currentLanguage = propTargetLanguage ?? localLanguage;
 
   const showToast = (variant: 'success' | 'error', msg: string) => {
     toasterRef.current?.show({
@@ -230,6 +246,21 @@ export function ResumeViewer({
   /** macOS-style chrome: expanded = full editor; compact = slim strip; hidden = title bar only */
   const [panelMode, setPanelMode] = useState<ArtifactPanelMode>("expanded");
 
+  const [copiedFeedback, setCopiedFeedback] = useState(false);
+
+  const pageBudget: PageBudgetEvaluation = useMemo(() => {
+    return validateTemplatePageBudget(resumeData, template, 1);
+  }, [resumeData, template]);
+
+  const handleCopyFeedback = useCallback(() => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      navigator.clipboard.writeText(pageBudget.modelSelfTrainingFeedback);
+      setCopiedFeedback(true);
+      setTimeout(() => setCopiedFeedback(false), 2000);
+      showToast("success", "Trimming feedback prompt copied to clipboard");
+    }
+  }, [pageBudget.modelSelfTrainingFeedback]);
+
   /** Local undo/redo for editor + merged assistant updates (not for cross-tab reload). */
   const resumeHistRef = useRef<{ list: ResumeData[]; i: number }>({ list: [], i: 0 });
   const [undoRedoTick, setUndoRedoTick] = useState(0);
@@ -274,6 +305,20 @@ export function ResumeViewer({
     setResumeDataState(h.list[newI]);
     setUndoRedoTick((t) => t + 1);
   };
+
+  const handleLanguageChange = (lang: string) => {
+    setLocalLanguage(lang);
+    if (propOnLanguageChange) {
+      propOnLanguageChange(lang);
+    }
+    const safeCode = lang === TRANSLATION_ORIGINAL ? "en" : lang;
+    setResumeData((prev) => ({
+      ...prev,
+      language: safeCode,
+    }));
+  };
+
+  const effectivePdfLanguage = currentLanguage === TRANSLATION_ORIGINAL ? (resumeData.language || "en") : currentLanguage;
 
   /** Only re-apply assistant JSON when it actually changes — new object refs from extractComponents used to retrigger every render and overwrite edits (incl. profile identity merge). */
   const lastAppliedPayloadJson = useRef<string | null>(null);
@@ -391,68 +436,246 @@ export function ResumeViewer({
     <div className="w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all">
       <Toaster ref={toasterRef} />
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-border/50 bg-white/80 dark:bg-neutral-950/80 gap-3 sm:gap-0">
-        <div className="flex items-center gap-4 min-w-0">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-border/50 bg-white/80 dark:bg-neutral-950/80 gap-2 sm:gap-3 min-h-[48px] overflow-hidden">
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 min-w-0">
           <ArtifactTrafficLights variant="light" panelMode={panelMode} setPanelMode={setPanelMode} />
-          <span className="text-xs font-medium text-foreground flex items-center gap-1.5 opacity-80 truncate">
-            <FileText className="w-4 h-4 shrink-0 text-indigo-500" />
-            CV Document Editor
+          <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 opacity-90 truncate select-none">
+            <FileText className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+            <span className="truncate hidden sm:inline">CV Editor</span>
           </span>
+
+          {/* ── 1-PAGE TEMPLATE CAPACITY METER ── */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all cursor-pointer shrink-0 select-none",
+                  pageBudget.isOnePageCompliant
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20"
+                    : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20 hover:bg-rose-500/20 animate-pulse"
+                )}
+                title="Click to view 1-page character budget & model trimming suggestions"
+              >
+                <Gauge className="w-3 h-3 shrink-0" />
+                <span className="font-semibold">{pageBudget.characterUsagePercent}%</span>
+                <span className="hidden md:inline opacity-80">
+                  ({pageBudget.totalCharacters}/{pageBudget.maxCharacters}c)
+                </span>
+                {pageBudget.isOnePageCompliant ? (
+                  <span className="size-1.5 rounded-full bg-emerald-500 shrink-0" />
+                ) : (
+                  <span className="size-1.5 rounded-full bg-rose-500 shrink-0" />
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              sideOffset={8}
+              className="w-[320px] sm:w-[360px] p-3.5 bg-background/95 backdrop-blur-xl border border-border/80 shadow-2xl rounded-2xl z-50 text-xs space-y-3"
+            >
+              <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                <div>
+                  <h4 className="font-semibold text-foreground text-xs flex items-center gap-1.5">
+                    <Gauge className="w-3.5 h-3.5 text-indigo-500" />
+                    1-Page Template Budget
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground">
+                    Template: <span className="font-medium text-foreground">{pageBudget.templateName}</span>
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-semibold border flex items-center gap-1",
+                    pageBudget.isOnePageCompliant
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20"
+                  )}
+                >
+                  {pageBudget.isOnePageCompliant ? (
+                    <>
+                      <CheckCircle2 className="w-3 h-3" /> Fits 1 Page
+                    </>
+                  ) : (
+                    <>
+                      <AlertTriangle className="w-3 h-3" /> +{pageBudget.overflowCharacters}c Overflow
+                    </>
+                  )}
+                </span>
+              </div>
+
+              {/* Progress Bar */}
+              <div>
+                <div className="flex justify-between text-[11px] font-medium text-muted-foreground mb-1">
+                  <span>Character Usage</span>
+                  <span className="text-foreground font-semibold">
+                    {pageBudget.totalCharacters.toLocaleString()} / {pageBudget.maxCharacters.toLocaleString()} ({pageBudget.characterUsagePercent}%)
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-300",
+                      pageBudget.characterUsagePercent <= 100
+                        ? "bg-emerald-500"
+                        : pageBudget.characterUsagePercent <= 112
+                          ? "bg-amber-500"
+                          : "bg-rose-500"
+                    )}
+                    style={{ width: `${Math.min(100, pageBudget.characterUsagePercent)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Section Breakdown */}
+              <div className="grid grid-cols-2 gap-1.5 text-[10px] bg-muted/40 p-2 rounded-xl border border-border/40">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Summary:</span>
+                  <span className={cn("font-medium", pageBudget.sectionBreakdown.summary.status === "overflow" ? "text-rose-500 font-bold" : "text-foreground")}>
+                    {pageBudget.sectionBreakdown.summary.count}/{pageBudget.sectionBreakdown.summary.max}c
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Experience:</span>
+                  <span className={cn("font-medium", pageBudget.sectionBreakdown.experience.status === "overflow" ? "text-rose-500 font-bold" : "text-foreground")}>
+                    {pageBudget.sectionBreakdown.experience.positions}r ({pageBudget.sectionBreakdown.experience.bullets}b)
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Education:</span>
+                  <span className="font-medium text-foreground">
+                    {pageBudget.sectionBreakdown.education.entries} deg
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Skills:</span>
+                  <span className={cn("font-medium", pageBudget.sectionBreakdown.skills.status === "overflow" ? "text-rose-500 font-bold" : "text-foreground")}>
+                    {pageBudget.sectionBreakdown.skills.skillCount} skills
+                  </span>
+                </div>
+              </div>
+
+              {/* Actionable Trimming Tips */}
+              <div>
+                <span className="text-[10px] font-semibold text-muted-foreground flex items-center gap-1 mb-1">
+                  <Scissors className="w-3 h-3 text-amber-500" /> Actionable Trimming Tips
+                </span>
+                <ul className="space-y-1 text-[10px] text-muted-foreground list-disc list-inside">
+                  {pageBudget.actionableTrimmingSuggestions.slice(0, 3).map((tip, idx) => (
+                    <li key={idx} className="line-clamp-2">
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Copy prompt button */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCopyFeedback}
+                className="w-full h-7 text-[11px] gap-1.5 rounded-lg border-border/60 hover:bg-muted font-medium"
+              >
+                {copiedFeedback ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    <span>Copied Self-Training Prompt</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3 text-muted-foreground" />
+                    <span>Copy 1-Page Trimming Prompt</span>
+                  </>
+                )}
+              </Button>
+            </PopoverContent>
+          </Popover>
         </div>
         
         {panelMode !== "hidden" ? (
-          <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto justify-end">
-            <TabsList className="h-8 rounded-full bg-black/5 dark:bg-white/10 p-0.5 border border-black/5 dark:border-white/5 shadow-inner">
-              <TabsTrigger value="preview" className="text-[11px] h-7 px-3 sm:px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
-                <Eye className="w-3 h-3" /> Preview
+          <div className="flex items-center gap-1.5 sm:gap-2 justify-end shrink-0 py-0.5">
+            <TabsList className="h-8 rounded-lg bg-black/5 dark:bg-white/10 p-0.5 border border-black/5 dark:border-white/5 shadow-inner shrink-0">
+              <TabsTrigger
+                value="preview"
+                className="text-xs h-7 px-2.5 sm:px-3 rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5 font-medium"
+              >
+                <Eye className="w-3 h-3 shrink-0" />
+                <span>Preview</span>
               </TabsTrigger>
-              <TabsTrigger value="editor" className="text-[11px] h-7 px-3 sm:px-4 rounded-full data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5">
-                <Edit className="w-3 h-3" /> Editor
+              <TabsTrigger
+                value="editor"
+                className="text-xs h-7 px-2.5 sm:px-3 rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5 font-medium"
+              >
+                <Edit className="w-3 h-3 shrink-0" />
+                <span>Editor</span>
               </TabsTrigger>
             </TabsList>
             {panelMode === "expanded" ? (
               <>
-                <Select value={template} onValueChange={(v) => setTemplate(v as Template)}>
-                  <SelectTrigger className="h-7 w-[110px] text-[11px] bg-background/50 border-border/60 focus:ring-0 rounded-md">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TEMPLATE_OPTIONS.map((t) => (
-                      <SelectItem key={t.value} value={t.value} className="text-[11px]">
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30"
-                  onClick={undoResume}
-                  disabled={!canUndo}
-                  title="Undo"
-                  aria-label="Undo resume edit"
-                >
-                  <Undo2 className="w-3.5 h-3.5" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-30"
-                  onClick={redoResume}
-                  disabled={!canRedo}
-                  title="Redo"
-                  aria-label="Redo resume edit"
-                >
-                  <Redo2 className="w-3.5 h-3.5" />
-                </Button>
+                {/* Subtle vertical divider */}
+                <div className="h-4 w-px bg-border/60 shrink-0 mx-0.5 hidden sm:block" />
+
+                {/* Undo / Redo */}
+                <div className="flex items-center gap-0.5 bg-black/5 dark:bg-white/5 p-0.5 rounded-lg border border-black/5 dark:border-white/5 shrink-0">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-neutral-800 disabled:opacity-30 rounded-md transition-all"
+                    onClick={undoResume}
+                    disabled={!canUndo}
+                    title="Undo"
+                    aria-label="Undo resume edit"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-neutral-800 disabled:opacity-30 rounded-md transition-all"
+                    onClick={redoResume}
+                    disabled={!canRedo}
+                    title="Redo"
+                    aria-label="Redo resume edit"
+                  >
+                    <Redo2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+
+                {/* Side Panel Popout / Dock */}
+                {onPopOutToSide && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onPopOutToSide}
+                    className="h-8 px-2.5 text-xs gap-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted border border-border/50 shrink-0 transition-colors font-medium"
+                    title="Open in side panel"
+                  >
+                    <PanelRightOpen className="size-3.5 shrink-0" />
+                    <span className="hidden sm:inline">Side Panel</span>
+                  </Button>
+                )}
+                {onDockToChat && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={onDockToChat}
+                    className="h-8 px-2.5 text-xs gap-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted border border-border/50 shrink-0 transition-colors font-medium"
+                    title="Dock to chat"
+                  >
+                    <PanelRightClose className="size-3.5 shrink-0" />
+                    <span className="hidden sm:inline">Dock</span>
+                  </Button>
+                )}
               </>
             ) : (
-              <span className="text-[10px] text-muted-foreground">Green expands · Yellow shrinks</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">Green expands · Yellow shrinks</span>
             )}
           </div>
         ) : (
-          <p className="text-[10px] text-muted-foreground sm:ml-auto">Green dot restores the editor</p>
+          <p className="text-[10px] text-muted-foreground shrink-0">Green dot restores the editor</p>
         )}
       </div>
 
@@ -472,7 +695,15 @@ export function ResumeViewer({
                 }
                 style={{ scrollbarWidth: "thin" }}
               >
-                <PdfPreviewClient resumeData={resumeData} template={template} />
+                <PdfPreviewClient
+                  resumeData={resumeData}
+                  template={template}
+                  language={effectivePdfLanguage}
+                  onTemplateChange={(v) => setTemplate(v as Template)}
+                  onLanguageChange={handleLanguageChange}
+                  currentLanguage={currentLanguage}
+                  isTranslating={isTranslating}
+                />
               </div>
             </div>
           </TabsContent>

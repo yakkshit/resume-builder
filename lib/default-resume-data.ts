@@ -1,6 +1,7 @@
 import type { ResumeData } from "./types"
 
 export const defaultResumeData: ResumeData = {
+  language: "en",
   basicInfo: {
     name: "Alex Johnson",
     title: "Senior Software Engineer",

@@ -15,14 +15,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ exists: false, user: null });
     }
 
+    const safeName = user.name && user.name !== "Career Professional" && user.name !== "Guest"
+      ? user.name
+      : "Yakkshit Sai";
+    const safeEmail = user.email && user.email.includes("@") && !user.email.endsWith("@user.local")
+      ? user.email
+      : "yakkshit.tactopus@gmail.com";
+
     // Return profile (redact sensitive internal DB fields if needed, return keys & settings)
     return NextResponse.json({
       exists: true,
       user: {
         id: user.id,
         clerkId: user.clerkId,
-        name: user.name,
-        email: user.email,
+        name: safeName,
+        email: safeEmail,
         bio: user.bio,
         avatarUrl: user.avatarUrl,
         isOnboarded: user.isOnboarded,

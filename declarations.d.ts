@@ -1,4 +1,10 @@
 declare module "@browsermt/bergamot-translator/translator.js" {
+  export class TranslatorBacking {
+    constructor(options?: any);
+    options: any;
+    onerror?: (err: Error) => void;
+    loadWorker(): Promise<{ worker: Worker; exports: any }>;
+  }
   export class BatchTranslator {
     constructor(options?: {
       pivotLanguage?: string;
@@ -7,7 +13,8 @@ declare module "@browsermt/bergamot-translator/translator.js" {
       workers?: number;
       workerUrl?: string;
       modelRegistryUrl?: string;
-    });
+      onerror?: (err: Error) => void;
+    }, backing?: TranslatorBacking);
     translate(request: {
       from: string;
       to: string;
@@ -15,5 +22,6 @@ declare module "@browsermt/bergamot-translator/translator.js" {
       html?: boolean;
       priority?: number;
     }): Promise<{ target?: { text?: string } }>;
+    delete(): Promise<void>;
   }
 }

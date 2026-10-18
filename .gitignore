@@ -2,8 +2,10 @@
 
 # dependencies
 /node_modules
+node_modules/
 /.pnp
 .pnp.js
+.pnpm-store/
 
 # testing
 /coverage
@@ -14,40 +16,29 @@
 
 # production
 /build
+dist/
 
-# misc
+# misc & OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 *.pem
 
-# debug
+# debug & logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+*.log
+ts_errors.txt
 
-# local env files
+# local env files & secrets
 .env*.local
 .env
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# summary
-summary.md
-/summary/
-/summary/*
-
-# issues
-issues.md
-
-# local agent memory (do not commit)
-/.memory/
-
-./ai-career-assistant*.json
-# context-gen-cli security & secrets
 .env.*
 .env.production
 .env.development
@@ -57,5 +48,46 @@ serviceAccountKey*.json
 *.key
 *.p12
 *.cert
+
+# vercel & build caches
+.vercel
+.turbo/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE & editors
+.vscode/
+.vscode/*
+.idea/
+*.swp
+*.swo
+*~
+
+# context folder & agent notes
+context/
+/context/
+/context/*
+.context-gen*
+note.txt
+
+# summary & issues
+summary.md
+/summary/
+/summary/*
+issues.md
 mcp.md
 
+# local agent memory & artifacts
+/.memory/
+.memory/
+.agents/
+/.agents/
+./ai-career-assistant*.json
+scratch/
+test-render.tsx
+
+# generated application documents / outputs
+applications/
+applications/*

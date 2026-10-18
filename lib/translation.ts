@@ -1,22 +1,26 @@
 export type TranslationLanguage = {
   code: string;
   label: string;
+  flag: string;
 };
 
 export const TRANSLATION_ORIGINAL = "__original__";
 
 export const TRANSLATION_LANGUAGES: TranslationLanguage[] = [
-  { code: "en", label: "English" },
-  { code: "es", label: "Spanish" },
-  { code: "fr", label: "French" },
-  { code: "de", label: "German" },
-  { code: "it", label: "Italian" },
-  { code: "pt", label: "Portuguese" },
-  { code: "hi", label: "Hindi" },
-  { code: "te", label: "Telugu" },
-  { code: "ar", label: "Arabic" },
-  { code: "ja", label: "Japanese" },
-  { code: "zh", label: "Chinese (Simplified)" },
+  { code: "en", label: "English", flag: "🇬🇧" },
+  { code: "de", label: "German", flag: "🇩🇪" },
+  { code: "es", label: "Spanish", flag: "🇪🇸" },
+  { code: "fr", label: "French", flag: "🇫🇷" },
+  { code: "it", label: "Italian", flag: "🇮🇹" },
+  { code: "pt", label: "Portuguese", flag: "🇵🇹" },
+  { code: "nl", label: "Dutch", flag: "🇳🇱" },
+  { code: "pl", label: "Polish", flag: "🇵🇱" },
+  { code: "ru", label: "Russian", flag: "🇷🇺" },
+  { code: "hi", label: "Hindi", flag: "🇮🇳" },
+  { code: "te", label: "Telugu", flag: "🇮🇳" },
+  { code: "ar", label: "Arabic", flag: "🇸🇦" },
+  { code: "ja", label: "Japanese", flag: "🇯🇵" },
+  { code: "zh", label: "Chinese (Simplified)", flag: "🇨🇳" },
 ];
 
 export const DEFAULT_TRANSLATION_LANGUAGE = "en";
@@ -42,7 +46,7 @@ export function canTranslateString(value: string): boolean {
 async function translateInBrowser(strings: string[], targetLanguage: string): Promise<Map<string, string>> {
   try {
     const { translateWithBergamot } = await import("@/lib/bergamot-translator-client");
-    return translateWithBergamot(strings, targetLanguage);
+    return await translateWithBergamot(strings, targetLanguage);
   } catch {
     const map = new Map<string, string>();
     for (const s of strings) map.set(s, s);

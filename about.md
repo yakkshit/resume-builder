@@ -39,7 +39,7 @@ Instead of fragmented tools, CareerAgent unifies **multi-model AI chat assistanc
 - **Free Zero-Knowledge GitHub Sync**: Users can connect a GitHub Personal Access Token to automatically commit and version-control their chats, resumes, and cover letters in their own private repository—offering infinite free storage with 0% vendor lock-in.
 - **PostgreSQL & Edge Storage Layer**: Database schema (`lib/db/schema.ts`, `lib/db/plsql-storage.ts`) for user profile preferences, encrypted credentials, and anonymized telemetry.
 - **In-Browser WASM Translation**: Real-time resume and UI translation using Mozilla Bergamot WebAssembly (`@browsermt/bergamot-translator`) running 100% locally in the browser with 0 API costs and complete data privacy.
-- **Authentication**: Modular Clerk Authentication integration (`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`) alongside a lightweight local authentication layer.
+- **Authentication**: Built-in native authentication with local session persistence, 1-click access, and optional GitHub cloud sync.
 
 ---
 
@@ -84,8 +84,8 @@ Instead of fragmented tools, CareerAgent unifies **multi-model AI chat assistanc
                ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        Data & Sync Infrastructure                      │
-│ • Clerk Authentication (`pk_test_...` / `sk_test_...`)                 │
-│ • PostgreSQL / Xata PLSQL Data Layer (User Profiles & Config)          │
+│ • Native Authentication & 1-Click Access                               │
+│ • Self-Contained Edge & Cloud Storage Layer (User Profiles & Config)   │
 │ • Zero-Knowledge GitHub Cloud Sync (User Private Repository Commits)   │
 └────────────────────────────────────────────────────────────────────────┘
 ```
@@ -98,7 +98,7 @@ Instead of fragmented tools, CareerAgent unifies **multi-model AI chat assistanc
 | **AI Orchestration** | `@ai-sdk/google`, `@ai-sdk/anthropic`, `@ai-sdk/openai-compatible`, `@ai-sdk/react` |
 | **AI UI Elements** | `WebPreview`, `JSXPreview`, `ChainOfThought`, `Shimmer`, Streamdown |
 | **Document Processing** | `@react-pdf/renderer`, `pdfjs-dist`, `pdf-parse`, `mammoth` (DOCX), LaTeX API |
-| **Authentication** | Clerk Auth (`@clerk/nextjs` compatible env keys) + Local Auth Provider |
+| **Authentication** | Native Auth Provider + 1-Click Quick Access + Local Storage |
 | **Data Storage** | PostgreSQL / PLSQL Schema + Private GitHub REST API Backup |
 | **Localization** | Mozilla Bergamot WebAssembly (`@browsermt/bergamot-translator`) |
 | **Testing & Quality** | Vitest (15 Test Suites, 45 Tests), Strict TypeScript (`tsc --noEmit`) |
@@ -116,7 +116,7 @@ Instead of fragmented tools, CareerAgent unifies **multi-model AI chat assistanc
 - `components/ai-elements/`: Rich AI UI widgets (`WebPreview`, `ChainOfThought`, `Shimmer`, `JSXPreview`).
 - `components/pdf-templates/`: Vector ATS resume templates (10+ variants).
 - `components/auth/`: `UserMenu`, `AuthModal`, and session management components.
-- `lib/db/`: PostgreSQL / PLSQL schema definition (`schema.ts`) and data access layer (`plsql-storage.ts`).
+- `lib/db/`: Storage schema definitions (`schema.ts`) and data access layer (`plsql-storage.ts`).
 - `lib/github/`: Zero-knowledge GitHub repository sync service (`sync.ts`).
 - `lib/resume-schema.ts`: Strict Zod validation schemas for crash-proof data integrity.
 - `scripts/mcp-server.ts`: Standalone Model Context Protocol server exposing job tools.

@@ -35,7 +35,6 @@ import {
   CheckCircle2,
   Layout,
 } from "lucide-react";
-import { JobScraperCard } from "./components/job-scraper-card";
 import type { ResumeData, Template } from "@/lib/types";
 import { mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import ResumeEditor from "@/components/resume-coverletter/resume-editor";
@@ -188,9 +187,12 @@ function CvComponent({
                     <SelectTrigger className="mt-2 w-full bg-white/5 border-white/10 hover:bg-white/10 transition-colors">
                       <SelectValue placeholder="Choose template" />
                     </SelectTrigger>
-                    <SelectContent className="bg-[#1a1a24] border-white/10 text-white shadow-xl">
+                    <SelectContent
+                      className="max-h-[280px] sm:max-h-[320px] overflow-y-auto bg-[#1a1a24] border-white/10 text-white shadow-xl"
+                      style={{ scrollbarWidth: "thin" }}
+                    >
                       {Object.keys(resumeTemplates).map((key) => (
-                        <SelectItem key={key} value={key} className="focus:bg-[#4da5fc]/20 focus:text-white cursor-pointer">
+                        <SelectItem key={key} value={key} className="focus:bg-[#4da5fc]/20 focus:text-white cursor-pointer py-1.5 px-2">
                           {key.charAt(0).toUpperCase() + key.slice(1).replace(/-/g, " ")}
                         </SelectItem>
                       ))}
@@ -486,18 +488,8 @@ function CourseComponent({ title, provider, url, skills }: ComponentPropsMap["co
   );
 }
 
-function JobScraperComponent({
-  query,
-  location,
-  jobs,
-}: ComponentPropsMap["jobScraper"]) {
-  return (
-    <JobScraperCard
-      initialQuery={query}
-      initialLocation={location}
-      initialJobs={jobs}
-    />
-  );
+function JobScraperComponent(_props: ComponentPropsMap["jobScraper"]): React.ReactElement {
+  return <div className="hidden" aria-hidden="true" />;
 }
 
 function HRNoteComponent({ subject, body, to }: ComponentPropsMap["hrNote"]) {

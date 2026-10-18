@@ -4,7 +4,7 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 dotenv.config({ path: ".env" });
 
-const connectionString = process.env.DATABASE_URL || process.env.XATA_DATABASE_URL;
+const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   console.error("❌ DATABASE_URL is not set in .env or .env.local");

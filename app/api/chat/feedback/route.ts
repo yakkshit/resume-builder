@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Neo4jGraphService } from "@/lib/neo4j/graph-service";
+
+const inMemoryFeedback: Array<{
+  feedbackId: string;
+  userId: string;
+  sessionId: string;
+  messageId: string;
+  prompt: string;
+  response: string;
+  rating: number;
+  isPositive: boolean;
+  correction?: string;
+  tags?: string[];
+  comments?: string;
+  timestamp: number;
+}> = [];
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,8 +39,7 @@ export async function POST(req: NextRequest) {
       timestamp: timestamp || Date.now(),
     };
 
-    // 1. Save to Neo4j Graph
-    await Neo4jGraphService.saveChatFeedback(payload);
+    inMemoryFeedback.push(payload);
 
     return NextResponse.json({ success: true, feedbackId: payload.feedbackId });
   } catch (error) {
@@ -44,7 +57,14 @@ export async function GET(req: NextRequest) {
     const format = searchParams.get("format") || "json";
     const limit = parseInt(searchParams.get("limit") || "500", 10);
 
-    const dataset = await Neo4jGraphService.getFineTuningDataset(limit);
+    const dataset = inMemoryFeedback.slice(-limit).map((f) => ({
+      prompt: f.prompt,
+      chosen: f.isPositive ? f.response : f.correction || "",
+      rejected: !f.isPositive ? f.response : "",
+      rating: f.rating,
+      tags: f.tags,
+      timestamp: f.timestamp,
+    }));
 
     if (format === "jsonl") {
       // Export standard JSONL training format

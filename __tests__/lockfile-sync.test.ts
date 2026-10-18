@@ -58,10 +58,11 @@ describe("Lockfile & Vercel Build Synchronization", () => {
     expect(missingDependencies).toHaveLength(0);
   });
 
-  it("should specifically contain neo4j-driver and critical dependencies in pnpm-lock.yaml", () => {
+  it("should specifically contain critical dependencies in pnpm-lock.yaml", () => {
     const lockContent = fs.readFileSync(lockPath, "utf-8");
-    expect(lockContent).toContain("neo4j-driver");
-    expect(lockContent).toContain("drizzle-orm");
-    expect(lockContent).toContain("@clerk/nextjs");
+    expect(lockContent).toContain("framer-motion");
+    expect(lockContent).toContain("lucide-react");
+    expect(lockContent).toContain("postgres");
   });
 });
+

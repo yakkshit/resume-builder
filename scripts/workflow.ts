@@ -82,14 +82,7 @@ async function startWorkflow() {
         process.exit(1);
     }
 
-    // 2. Drizzle Database Schema Sync & Generation
-    console.log("\n--- Syncing Drizzle Database Schema ---");
-    const dbPassed = await runCommand(`${runCmd} db:push`, "Drizzle Database Schema Sync (db:push)");
-    if (!dbPassed) {
-        console.log("\n⚠️ Drizzle Database sync encountered a warning or DATABASE_URL not reachable. Continuing build...");
-    }
-
-    // 3. Build
+    // 2. Build
     const buildPassed = await runCommand(`${runCmd} build`, "Production Build");
     if (!buildPassed) {
         console.log("\n⚠️ Build failed. Stopping workflow.");
@@ -207,10 +200,16 @@ async function startWorkflow() {
             execSync(`git checkout ${branchName}`, { stdio: "inherit" });
         }
 
-        // Pre-commit security check: ensure no .env files or secret credentials are in git status
+        // Pre-commit security check: ensure no real .env files or secret credentials are in git status
         const gitStatusOutput = execSync("git status --porcelain", { encoding: "utf-8" });
-        if (/^\s*[AM\?].*(\.env|\.pem|\.key|credentials\.json|serviceAccountKey)/m.test(gitStatusOutput)) {
-            console.error("\n🛑 SECURITY ALERT: A sensitive file (.env, .pem, .key, credentials.json) was detected in git status! Push aborted.");
+        const sensitiveFileRegex = /(^|[/\\])(\.env(?!\.example)|\.env\.(local|production|development)|[^/\\]+\.(pem|key)|credentials\.json|serviceAccountKey.*\.json)$/i;
+        const sensitiveMatch = gitStatusOutput
+            .split("\n")
+            .map(line => line.trim().slice(2).trim())
+            .find(filePath => sensitiveFileRegex.test(filePath));
+
+        if (sensitiveMatch) {
+            console.error(`\n🛑 SECURITY ALERT: A sensitive file (${sensitiveMatch}) was detected in git status! Push aborted.`);
             process.exit(1);
         }
 

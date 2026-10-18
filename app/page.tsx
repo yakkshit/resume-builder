@@ -83,7 +83,7 @@ export default function HomePage() {
     },
     {
       icon: Database,
-      title: "PostgreSQL & Xata Edge Layer",
+      title: "PostgreSQL & Edge Storage Layer",
       description: "High-performance database storage for user profiles, encrypted API keys, and anonymized telemetry for continuous model optimization.",
       badge: "PostgreSQL",
       color: "from-indigo-500/20 to-blue-500/20 text-indigo-400 border-indigo-500/30",

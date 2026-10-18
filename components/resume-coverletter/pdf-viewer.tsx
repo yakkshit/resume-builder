@@ -6,16 +6,38 @@ import { Button } from "@/components/ui/button"
 import { Download, RefreshCw, AlertCircle, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card } from "@/components/ui/card"
-import { getResumeTemplate } from "@/components/pdf-templates"
+import { getResumeTemplate, resumeTemplates } from "@/components/pdf-templates"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TranslationControls } from "@/components/chat/translation-controls"
+import { TRANSLATION_ORIGINAL } from "@/lib/translation"
+
+const TEMPLATE_OPTIONS = (Object.keys(resumeTemplates) as Template[]).map((t) => ({
+  value: t,
+  label: t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, " "),
+}))
 
 interface PDFViewerProps {
   resumeData: ResumeData
   template: Template
+  language?: string
+  onTemplateChange?: (template: Template) => void
+  onLanguageChange?: (language: string) => void
+  currentLanguage?: string
+  isTranslating?: boolean
 }
 
-export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
+export default function PDFViewer({
+  resumeData,
+  template,
+  language,
+  onTemplateChange,
+  onLanguageChange,
+  currentLanguage,
+  isTranslating,
+}: PDFViewerProps) {
   const safeResumeData = useMemo(() => sanitizeResumeData(resumeData), [resumeData])
+  const activeLanguage = language || safeResumeData.language || "en"
   const [isClient, setIsClient] = useState(false)
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -38,7 +60,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
     }
   }, [])
 
-  // Generate PDF Blob whenever safeResumeData or template changes
+  // Generate PDF Blob whenever safeResumeData, template or activeLanguage changes
   useEffect(() => {
     if (!isClient) return
 
@@ -53,7 +75,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
     renderTimeoutRef.current = setTimeout(async () => {
       try {
         const PDFTemplate = getResumeTemplate(template as string)
-        const element = React.createElement(PDFTemplate, { resumeData: safeResumeData })
+        const element = React.createElement(PDFTemplate, { resumeData: safeResumeData, language: activeLanguage })
         const pdfDoc = (pdf as any)(element)
         const blob = await pdfDoc.toBlob()
 
@@ -85,7 +107,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
         clearTimeout(renderTimeoutRef.current)
       }
     }
-  }, [safeResumeData, template, isClient])
+  }, [safeResumeData, template, activeLanguage, isClient])
 
   const handleDownload = async () => {
     if (!isClient) return
@@ -96,7 +118,7 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
 
       try {
         const PDFTemplate = getResumeTemplate(template as string)
-        const element = React.createElement(PDFTemplate, { resumeData: safeResumeData })
+        const element = React.createElement(PDFTemplate, { resumeData: safeResumeData, language: activeLanguage })
         blob = await (pdf as any)(element).toBlob()
       } catch (clientErr) {
         console.warn("Client-side PDF rendering failed, falling back to MCP server...", clientErr)
@@ -161,18 +183,57 @@ export default function PDFViewer({ resumeData, template }: PDFViewerProps) {
 
   return (
     <Card className="flex flex-col h-full overflow-hidden border-0 shadow-lg">
-      <div className="flex justify-between items-center p-3 sm:p-4 bg-muted/30 border-b">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap sm:flex-nowrap justify-between items-center px-3 sm:px-4 py-2 bg-muted/30 border-b gap-2 min-h-[48px]">
+        <div className="flex items-center gap-2 shrink-0">
           <FileText className="h-4 w-4 text-primary" />
-          <h3 className="text-sm sm:text-base font-semibold">PDF Preview</h3>
+          <h3 className="text-sm font-semibold text-foreground whitespace-nowrap">PDF Preview</h3>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading} className="h-8 text-xs">
-            <RefreshCw size={14} className={`mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 overflow-x-auto no-scrollbar py-0.5">
+          {/* Scrollable Template Selection */}
+          {onTemplateChange && (
+            <Select value={template} onValueChange={(v) => onTemplateChange(v as Template)}>
+              <SelectTrigger
+                className="h-8 w-[115px] sm:w-[130px] text-xs bg-background/80 hover:bg-background border-border/70 focus:ring-0 rounded-lg px-2.5 font-medium shrink-0 transition-colors"
+                aria-label="Select resume template"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent
+                className="max-h-[280px] sm:max-h-[320px] overflow-y-auto w-[180px] p-1 shadow-2xl rounded-xl border-border/60 bg-popover/95 backdrop-blur-md"
+                position="popper"
+                style={{ scrollbarWidth: "thin" }}
+              >
+                {TEMPLATE_OPTIONS.map((t) => (
+                  <SelectItem key={t.value} value={t.value} className="text-xs py-1.5 px-2 rounded-lg cursor-pointer">
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Translation Selection - Flag only in trigger, scrollable list */}
+          {onLanguageChange && (
+            <TranslationControls
+              compact
+              flagOnly
+              value={currentLanguage || TRANSLATION_ORIGINAL}
+              onChange={onLanguageChange}
+              disabled={isTranslating}
+              isTranslating={isTranslating}
+            />
+          )}
+
+          {(onTemplateChange || onLanguageChange) && (
+            <div className="h-4 w-px bg-border/60 shrink-0 mx-0.5 hidden sm:block" />
+          )}
+
+          <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading} className="h-8 text-xs shrink-0 rounded-lg">
+            <RefreshCw size={13} className={`mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
-          <Button variant="default" size="sm" onClick={handleDownload} disabled={isDownloading} className="h-8 text-xs">
-            <Download size={14} className={`mr-1.5 ${isDownloading ? "animate-spin" : ""}`} />
+          <Button variant="default" size="sm" onClick={handleDownload} disabled={isDownloading} className="h-8 text-xs shrink-0 rounded-lg">
+            <Download size={13} className={`mr-1.5 ${isDownloading ? "animate-spin" : ""}`} />
             {isDownloading ? "Downloading..." : "Download"}
           </Button>
         </div>

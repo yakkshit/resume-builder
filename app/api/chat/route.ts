@@ -5,6 +5,13 @@ import { createUIMessageStream, createUIMessageStreamResponse, generateId } from
 import mime from "mime"
 import type { NextRequest } from "next/server"
 import { DEFAULT_CHAT_MODEL } from "@/lib/chat-models"
+import { performWebSearch, type WebSearchResponse } from "@/lib/web-search"
+import { extractKnowledgeGraph } from "@/lib/graph-rag/extractor"
+import { executeNeo4jGraphRag } from "@/lib/graph-rag/neo4j-client"
+import type { GraphRagQueryResult, Neo4jConfig } from "@/lib/graph-rag/types"
+import { executeLangChainVectorRag } from "@/lib/vector-rag/langchain-rag"
+import type { VectorRagQueryResult } from "@/lib/vector-rag/types"
+import { getTemplateCapacityCheatSheetMarkdown, RESUME_TEMPLATE_LIMITS } from "@/lib/resume-template-limits"
 
 /** Extract text from message (supports v4 content and v5 parts) */
 const getMsgText = (m: { content?: string; parts?: Array<{ type: string; text?: string }> }) =>
@@ -50,25 +57,29 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "lingo-ai": { provider: "lingo-ai", modelId: "resume-model-v1" },
 
   // Google Gemini — core chat / multimodal models
+  "gemini-4-argon": { provider: "google", modelId: "gemini-4-argon" },
   "gemini-3.8-flash": { provider: "google", modelId: "gemini-3.8-flash" },
   "gemini-3.7-flash": { provider: "google", modelId: "gemini-3.7-flash" },
   "gemini-3.7-pro": { provider: "google", modelId: "gemini-3.7-pro" },
+  "gemini-3.6-flash": { provider: "google", modelId: "gemini-3.6-flash" },
+  "gemini-3.5-flash": { provider: "google", modelId: "gemini-3.5-flash" },
+  "gemini-3.5-flash-lite": { provider: "google", modelId: "gemini-3.5-flash-lite" },
   "gemini-3.1-pro-preview": { provider: "google", modelId: "gemini-3.1-pro-preview" },
-  "gemini-3-pro-preview": { provider: "google", modelId: "gemini-3-pro-preview" },
-  "gemini-3-flash-preview": { provider: "google", modelId: "gemini-3-flash-preview" },
-  "gemini-3.1-flash-lite-preview": { provider: "google", modelId: "gemini-3.1-flash-lite-preview" },
   "gemini-3.1-flash-image-preview": { provider: "google", modelId: "gemini-3.1-flash-image-preview" },
+  "gemini-3.1-flash-lite-preview": { provider: "google", modelId: "gemini-3.1-flash-lite-preview" },
+  "gemini-3-pro-preview": { provider: "google", modelId: "gemini-3-pro-preview" },
   "gemini-3-pro-image-preview": { provider: "google", modelId: "gemini-3-pro-image-preview" },
+  "gemini-3-flash-preview": { provider: "google", modelId: "gemini-3-flash-preview" },
+  "gemini-2.5-pro": { provider: "google", modelId: "gemini-2.5-pro" },
   "gemini-2.5-flash": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.5-flash-lite": { provider: "google", modelId: "gemini-2.5-flash-lite" },
+  "gemini-2.5-flash-lite-preview-06-17": { provider: "google", modelId: "gemini-2.5-flash-lite" },
   "gemini-2.5-flash-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-flash-image": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-flash-live": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-flash-native-audio-preview-12-2025": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-flash-native-audio-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-flash-preview-tts": { provider: "google", modelId: "gemini-2.5-flash" },
-  "gemini-2.5-flash-lite": { provider: "google", modelId: "gemini-2.5-flash-lite" },
-  "gemini-2.5-flash-lite-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash-lite" },
-  "gemini-2.5-pro": { provider: "google", modelId: "gemini-2.5-pro" },
   "gemini-2.5-pro-preview-tts": { provider: "google", modelId: "gemini-2.5-pro" },
   "gemini-2.0-flash-exp": { provider: "google", modelId: "gemini-2.0-flash-exp" },
   "gemini-2.0-flash": { provider: "google", modelId: "gemini-2.0-flash" },
@@ -78,9 +89,21 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "gemini-2.0-pro": { provider: "google", modelId: "gemini-2.0-pro" },
   "gemini-1.5-pro": { provider: "google", modelId: "gemini-1.5-pro" },
   "gemini-1.5-flash": { provider: "google", modelId: "gemini-1.5-flash" },
+  "gemini-nano-banana-2.1": { provider: "google", modelId: "gemini-2.5-flash" },
+
+  // Google Vertex
+  "vertex/gemini-4-argon": { provider: "google", modelId: "gemini-4-argon" },
+  "vertex/gemini-3.8-flash": { provider: "google", modelId: "gemini-3.8-flash" },
+  "vertex/gemini-3.1-pro-preview": { provider: "google", modelId: "gemini-3.1-pro-preview" },
+  "vertex/gemini-3-pro-preview": { provider: "google", modelId: "gemini-3-pro-preview" },
+  "vertex/gemini-2.5-pro": { provider: "google", modelId: "gemini-2.5-pro" },
+  "vertex/gemini-2.5-flash": { provider: "google", modelId: "gemini-2.5-flash" },
 
   // OpenAI
   "gpt-6-astra": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-6.1-sol": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-6-luna": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
+  "gpt-6-sol": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-5.6": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-5.6-luna": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   "gpt-5.6-sol": { provider: "openai", modelId: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
@@ -108,7 +131,10 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "gpt-3.5-turbo": { provider: "openai", modelId: "gpt-3.5-turbo", apiKey: process.env.OPENAI_API_KEY },
 
   // Anthropic Claude
+  "claude-opus-5-5": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-sonnet-5-5": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-sonnet-5": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
+  "claude-haiku-5-5": { provider: "anthropic", modelId: "claude-3-5-haiku-20241022", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-fable-5-1": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-fable-5": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
   "claude-opus-4.8": { provider: "anthropic", modelId: "claude-3-7-sonnet-20250219", apiKey: process.env.ANTHROPIC_API_KEY },
@@ -333,6 +359,11 @@ export async function POST(req: NextRequest) {
     memoryContext,
     retrievalContext,
     preferredLanguage,
+    webSearch,
+    graphRag,
+    vectorRag,
+    activeTools,
+    providerKeys,
   } = body as {
     messages?: any[]
     resumeData?: any
@@ -352,6 +383,18 @@ export async function POST(req: NextRequest) {
     memoryContext?: string
     retrievalContext?: string
     preferredLanguage?: string
+    webSearch?: boolean
+    graphRag?: boolean
+    vectorRag?: boolean
+    activeTools?: string[]
+    providerKeys?: {
+      tavily?: string
+      firecrawl?: string
+      neo4jUri?: string
+      neo4jUser?: string
+      neo4jPassword?: string
+      neo4jDatabase?: string
+    }
   }
 
   // If using a model with a small context or strict upstream timeout (cedz-hr-qwen), optimize context
@@ -390,6 +433,7 @@ CRITICAL INSTRUCTIONS FOR RESUMES:
    You MUST output a \`\`\`component:cv code block containing the full structured resume JSON so the interactive builder and PDF preview render immediately:
 \`\`\`component:cv
 {
+  "language": "en",
   "basicInfo": {
     "name": "Full Name",
     "title": "Professional Title",
@@ -425,7 +469,7 @@ CRITICAL INSTRUCTIONS FOR RESUMES:
   "achievements": [{ "title": "Achievement Title", "description": "Details...", "date": "YYYY" }]
 }
 \`\`\`
-   MANDATORY: When creating or generating a resume, you MUST emit this structured \`\`\`component:cv code block. DO NOT just write plain text, bullet points, or markdown summaries.
+   MANDATORY: When creating or generating a resume, you MUST emit this structured \`\`\`component:cv code block. DO NOT just write plain text, bullet points, or markdown summaries. If generating in German or another language, set "language": "de" (or corresponding code) so all template section titles are automatically mapped from the dictionary. English ("en") is default.
 
 2. When the user asks for a PARTIAL UPDATE or single edit (e.g. "update my summary", "add skill"):
    Output a brief 1-2 sentence explanation and a \`\`\`json code block with only the modified fields:
@@ -509,8 +553,8 @@ Resume data: ${resumeJson}`
 
 Structured UI (use when appropriate; always close fenced blocks with \`\`\`):
 - Interactive resume card — use **flat** \`resumeData\` (same keys as the editor / PDF). For \`component:cv\`, emit a complete, tailored snapshot (all sections the user should see on the card). Partial edits alone stay in \`\`\`json\`\`\` blocks as already described above. Example skeleton:
-  \`\`\`component:cv\n{"resumeData":{"basicInfo":{"name":"","title":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":"","languages":[]},"experience":[{"company":"","position":"","startDate":"","endDate":"","description":"","highlights":[]}],"education":[{"institution":"","degree":"","field":"","startDate":"","endDate":"","gpa":""}],"skills":[],"projects":[{"name":"","description":"","technologies":[]}],"achievements":[{"title":"","description":"","date":""}]},"template":"modern"}\n\`\`\`
-  **Rules:** Top-level keys inside \`resumeData\` must be \`basicInfo\`, \`experience\`, \`education\`, \`skills\`, \`projects\`, \`achievements\` — not \`sections\` / \`items\` trees. Use \`experience[].highlights\` for keyword bullets; \`projects[].technologies\` for stacks; \`basicInfo.summary\` for the summary. **Avoid** \`resumeData.sections\`; the app can normalize it if you slip, but the flat schema is what you should emit. Never include \`profilePicture\`. \`template\` (optional): modern, classic, minimal, professional, elegant, dark, gradient, two-column, gradient-gray, german-cv, multi-colour.
+  \`\`\`component:cv\n{"resumeData":{"language":"en","basicInfo":{"name":"","title":"","email":"","phone":"","location":"","linkedin":"","website":"","summary":"","languages":[]},"experience":[{"company":"","position":"","startDate":"","endDate":"","description":"","highlights":[]}],"education":[{"institution":"","degree":"","field":"","startDate":"","endDate":"","gpa":""}],"skills":[],"projects":[{"name":"","description":"","technologies":[]}],"achievements":[{"title":"","description":"","date":""}]},"template":"modern"}\n\`\`\`
+  **Rules:** Top-level keys inside \`resumeData\` must be \`language\`, \`basicInfo\`, \`experience\`, \`education\`, \`skills\`, \`projects\`, \`achievements\` — not \`sections\` / \`items\` trees. Use \`experience[].highlights\` for keyword bullets; \`projects[].technologies\` for stacks; \`basicInfo.summary\` for the summary. **Language mapping:** If generating content in German or user requests German, set \`"language": "de"\` (or "es", "fr", "it", etc.). English ("en") is default. The application maps all template titles (Experience, Education, Skills, etc.) deterministically from this language code. **Avoid** \`resumeData.sections\`; the app can normalize it if you slip, but the flat schema is what you should emit. Never include \`profilePicture\`. \`template\` (optional): modern, classic, minimal, professional, elegant, dark, gradient, two-column, gradient-gray, german-cv, multi-colour.
 - For requests like "create resume as per job description", prefer \`component:cv\` as the primary structured output (you may include a short explanation outside the fence).
 - Cover letter viewer: \`\`\`component:coverLetter\n{"head":"...","body":"...","footer":"..."}\n\`\`\`
 
@@ -598,11 +642,26 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
 - **Page Length & Budget Calibration**:
   - **1-Page Resume Request**: High-impact density. Emit 1 concise summary (2–3 sentences), 6–10 prioritized skills, 2–3 most relevant roles with 2–3 quantified bullet points each, top 2 key projects with tech stack, and concise education & languages.
   - **2-Page Resume Request**: Comprehensive depth. Emit an expanded technical summary, categorized core skill clusters (e.g. Languages, AI & Robotics, Frontend/Mobile, Backend/Cloud), 4–6 detailed roles with 3–4 bullet points each with metrics and impact, 3–5 featured projects with technology stacks, full education, certifications, and languages.
+
+- **Resume Template 1-Page Character Capacity Matrix & Self-Training Skill**:
+  You possess exact knowledge of the maximum character count and word limits that fit onto a single printed/PDF page for every template without spilling onto a second page:
+${getTemplateCapacityCheatSheetMarkdown()}
+
+- **Actionable 1-Page Trimming Feedback & Model Self-Training**:
+  When a user asks:
+  1. "How many characters can fit on 1 page for template X?" -> State the exact max characters, ideal characters, layout, and section breakdown from the matrix above.
+  2. "Can you create a 1-page resume?" -> Strictly tailor and condense the content below the template's max character ceiling so it renders cleanly on a single page.
+  3. "Provide feedback on 1-page fit" or "Does this resume fit in 1 page?" -> Compare the total characters against the template limit. If overflowing, output the structured \`[1-PAGE TEMPLATE FIT: OVERFLOW DETECTED - SELF-TRAINING FEEDBACK]\` showing:
+     - Total characters vs template ceiling
+     - Overflow count (+X characters over)
+     - Section-by-section breakdown (Summary, Experience, Education, Skills, Projects)
+     - Concrete, quantified trimming suggestions (e.g. "Trim summary to 35 words (-60 chars)", "Drop 4th role (-220 chars)", "Shorten bullet 2 of role 1 to <130 chars (-45 chars)")
+     - Corrected \`\`\`component:cv fitting cleanly in 1 page.
 - When user asks to customize for a job description, prioritize direct job requirements and measurable relevance in bullets/skills/summary.
 
 - **Chain of Thought (<think>...</think>) & Tool Declaring**:
   When planning complex tasks, evaluating ATS scores, scraping jobs, visualizing metrics, tailoring resumes, or generating cover letters, wrap your step-by-step reasoning in \\<think\\>...\\</think\\>.
-  In your thinking, declare which tool or component you are executing (e.g. 'Using tool: web_scraper', 'Using tool: chart_generator', 'Using tool: search_jobs', 'Using tool: generate_resume_pdf', 'Using tool: calculate_ats_score', 'Using tool: neo4j_career_graph', 'Using tool: github_encrypted_sync').
+  In your thinking, declare which tool or component you are executing (e.g. 'Using tool: web_scraper', 'Using tool: chart_generator', 'Using tool: generate_resume_pdf', 'Using tool: calculate_ats_score').
   This reasoning and tool execution state will stream directly into the user's live reasoning box with visual tool badges.
 
 - **Interactive UI Components (Emit fenced code blocks with \`\`\`component:<name>)**:
@@ -643,27 +702,7 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
      \`\`\`
      Chart types supported: "bar", "line", "area", "pie", "radar".
 
-  3. **Job Scraping & Search (\`\`\`component:job-scraper)**:
-     \`\`\`component:job-scraper
-     {
-       "query": "Target Role",
-       "location": "Location / Remote",
-       "jobs": [
-         {
-           "id": "job-1",
-           "title": "Role Title",
-           "company": "Company Name",
-           "location": "Location",
-           "salary": "$X - $Y",
-           "link": "https://...",
-           "description": "Key requirements and duties...",
-           "postedMinutesAgo": 5
-         }
-       ]
-     }
-     \`\`\`
-
-  4. **Cover Letter Generator (\`\`\`component:cover-letter)**:
+  3. **Cover Letter Generator (\`\`\`component:cover-letter)**:
      \`\`\`component:cover-letter
      {
        "head": "Sender & Recipient details, Date, Subject line",
@@ -764,6 +803,42 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
       }
       \`\`\`
 
+  14. **Neo4j Graphical RAG Knowledge Explorer (\`\`\`component:graph-rag)**:
+      Interactive knowledge graph visualization with node physics, degree sizing, multi-hop relationship paths, and Cypher inspection.
+      \`\`\`component:graph-rag
+      {
+        "query": "Full Stack Engineer qualification path",
+        "nodes": [
+          { "id": "u:candidate", "label": "Alex Morgan", "type": "user" },
+          { "id": "s:typescript", "label": "TypeScript", "type": "skill", "category": "Languages" },
+          { "id": "r:swe", "label": "Senior Software Engineer", "type": "target_role" }
+        ],
+        "edges": [
+          { "id": "e1", "source": "u:candidate", "target": "s:typescript", "type": "HAS_SKILL" },
+          { "id": "e2", "source": "s:typescript", "target": "r:swe", "type": "QUALIFIES_FOR" }
+        ],
+        "paths": [
+          {
+            "nodes": ["u:candidate", "s:typescript", "r:swe"],
+            "edges": ["e1", "e2"],
+            "explanation": "Alex Morgan -> [HAS_SKILL] -> TypeScript -> [QUALIFIES_FOR] -> Senior Software Engineer",
+            "confidence": 0.95
+          }
+        ],
+        "cypherQuery": "MATCH (u:User)-[:HAS_SKILL]->(s:Skill)-[:QUALIFIES_FOR]->(r:TargetRole) RETURN u, s, r",
+        "mode": "neo4j-live"
+      }
+      \`\`\`
+
+  15. **Neural Image Generation (\`\`\`component:image-generation)**:
+      When generating or visualizing an image, photo, wallpaper, illustration, visual concept, or portfolio asset requested by the user, emit:
+      \`\`\`component:image-generation
+      {
+        "prompt": "a calm mountain lake at dawn",
+        "resolution": "1024 × 1024"
+      }
+      \`\`\`
+
 - **Available MCP Tools**:
   - \`search_jobs\`: Search live jobs by query, location, and seniority.
   - \`scrape_job_posting\`: Scrape and extract requirements from job URLs.
@@ -775,9 +850,7 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
 
 - **Available REST API Endpoints**:
   - \`/api/chat\`: Core AI Chat with reasoning, tools, and component streaming.
-  - \`/api/job-search\`: Real-time job search and scraping endpoint.
   - \`/api/user/profile\`: PL/SQL & PostgreSQL storage for user profile, master vault, and API keys.
-  - \`/api/github/sync\`: Zero-knowledge encrypted GitHub and GitLab repository synchronization.
   - \`/api/chat/feedback\`: RLHF training dataset collector and .jsonl export.
   - \`/api/webview/proxy\`: Live Chromium web proxy for interactive web scraping and browsing.
   - \`/api/memory-vault\`: Persistent career knowledge graph and RAG vault.
@@ -818,13 +891,29 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
       const userText = (typeof lastMsg.content === "string" ? lastMsg.content : "").toLowerCase()
       const isCreateOrBuild = /create|build|generate|make|tailor|based\s+on|my\s+profile|cv|resume/i.test(userText)
 
-      let reminder = ""
-      if (isSmallContext) {
+      const isOnePageQuery = /(1\s*page|one\s*page|single\s*page|character\s*limit|how\s*many\s*charact|page\s*budget|fit\s*on\s*one\s*page|overflow|trim\s*resume)/i.test(userText)
+
+      const isImageRequest =
+        (Array.isArray(activeTools) && activeTools.includes("image-generation")) ||
+        /(image|generate image|picture|photo|draw|wallpaper|visualize|illustration)/i.test(userText);
+      let reminder = "";
+      if (isImageRequest) {
+        const cleaned = userText
+          .replace(/\[active tools:[^\]]*\]/gi, "")
+          .replace(/\[attached files:[^\]]*\]/gi, "")
+          .replace(/generate an image of|generate image of|generate an image|generate image|create an image of|create image|draw a|draw an|draw|picture of|photo of|paint a|paint an|paint/gi, "")
+          .trim() || "a calm mountain lake at dawn";
+        reminder = `\n\n[MANDATORY: Output the neural image generation component \`\`\`component:image-generation\n{\n  "prompt": "${cleaned}",\n  "resolution": "1024 × 1024"\n}\n\`\`\` so the interactive ImageGeneration component renders immediately.]`;
+      } else if (isSmallContext) {
         if (isCreateOrBuild) {
-          reminder = `\n\n[MANDATORY: Output the complete resume in a \`\`\`component:cv\n{\n  "basicInfo": { "name": "...", "title": "...", "summary": "...", ... },\n  "skills": [...],\n  "experience": [...],\n  "education": [...]\n}\n\`\`\` code block based on the user profile/background so the interactive resume editor and PDF preview render immediately. Do NOT output plain text summary.]`
+          reminder = `\n\n[MANDATORY: Output the complete resume in a \`\`\`component:cv\n{\n  "basicInfo": { "name": "...", "title": "...", "summary": "...", ... },\n  "skills": [...],\n  "experience": [...],\n  "education": [...]\n}\n\`\`\` code block based on the user profile/background so the interactive resume editor and PDF preview render immediately. Do NOT output plain text summary.]`;
         }
       } else {
-        reminder = `\n\n[SYSTEM REMINDER: You MUST use the interactive markdown components (e.g. \`\`\`component:cv\n{...}\n\`\`\`, \`\`\`component:cover-letter\`, \`\`\`component:job-scraper\`, etc.) to fulfill the request. If generating a resume, output the full \`component:cv\` JSON. Do not just ask for information you already have in the Profile/Memory Vault. Complete the task instantly.]`
+        reminder = `\n\n[SYSTEM REMINDER: You MUST use the interactive markdown components (e.g. \`\`\`component:cv\n{...}\n\`\`\`, \`\`\`component:cover-letter\`, etc.) to fulfill the request. If generating a resume, output the full \`component:cv\` JSON. Do not just ask for information you already have in the Profile/Memory Vault. Complete the task instantly.]`;
+      }
+
+      if (isOnePageQuery) {
+        reminder += `\n\n[TEMPLATE CAPACITY & 1-PAGE BUDGET DIRECTIVE: The user is inquiring about or generating a 1-page resume or template character limit. Honor the template's exact 1-page character ceiling (e.g., ivy-league: 2,950 chars; modern: 2,400 chars; minimal: 2,000 chars; two-column: 2,900 chars; professional: 2,700 chars; german-cv: 2,200 chars). If generating, curate 2-3 roles and concise bullets to fit. If evaluating, calculate exact character overflow and give actionable section-by-section trimming feedback.]`
       }
 
       if (reminder) {
@@ -838,6 +927,217 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
         }
       }
     }
+  }
+
+  // ── Web Search & Grounding via Tavily & Firecrawl ───────────────────
+  const lastUserMsg = (Array.isArray(messages) ? messages : []).filter((m: any) => m.role === 'user').pop();
+  const rawLastUserText = getMsgText(lastUserMsg);
+  const isWebSearchRequested = Boolean(
+    webSearch ||
+    (rawLastUserText.includes("[Active Tools:") && (rawLastUserText.toLowerCase().includes("web") || rawLastUserText.toLowerCase().includes("search"))) ||
+    /(\bsearch\b|\blook up\b|\bfind\b|\bgoogle\b|\btavily\b|\bfirecrawl\b|github\s+and\s+hugging\s*face|on\s+github|on\s+hugging\s*face)/i.test(rawLastUserText)
+  );
+
+  let searchResourcesData: WebSearchResponse | null = null;
+  if (isWebSearchRequested && rawLastUserText.trim()) {
+    const queryToSearch = rawLastUserText
+      .replace(/\[Active Tools:[^\]]*\]/gi, "")
+      .replace(/\[Attached files:[^\]]*\]/gi, "")
+      .replace(/\[SYSTEM REMINDER:[^\]]*\]/gi, "")
+      .trim();
+
+    if (queryToSearch.length > 0) {
+      try {
+        searchResourcesData = await performWebSearch(queryToSearch, {
+          apiKeyTavily: providerKeys?.tavily,
+          apiKeyFirecrawl: providerKeys?.firecrawl,
+          maxResults: 10,
+        });
+      } catch (err) {
+        console.warn("[api/chat] Live web search execution failed:", err);
+      }
+    }
+  }
+
+  if (searchResourcesData && searchResourcesData.resultsCount > 0) {
+    const sanitizedSearchData = {
+      query: searchResourcesData.query,
+      domains: searchResourcesData.domains,
+      resultsCount: searchResourcesData.resultsCount,
+      results: searchResourcesData.results.slice(0, 6).map((r) => ({
+        title: (r.title || "").replace(/[`\\]/g, "").slice(0, 100),
+        url: r.url,
+        domain: r.domain,
+        snippet: (r.snippet || "").replace(/[`\\]/g, "'").replace(/\n+/g, " ").slice(0, 260),
+      })),
+    };
+
+    systemMessage += `\n\n[REAL-TIME WEB SEARCH GROUNDING VIA TAVILY & FIRECRAWL]:
+Query: "${searchResourcesData.query}"
+Domains: ${searchResourcesData.domains.join(", ")}
+Found ${searchResourcesData.resultsCount} live sources:
+${sanitizedSearchData.results.map((r, i) => `${i + 1}. [${r.title}](${r.url}) (${r.domain}): ${r.snippet}`).join("\n")}
+
+MANDATORY INSTRUCTIONS FOR WEB CITATIONS & SEARCH CARD:
+1. Ground your facts directly in the search results above. Write a clear, professional, well-formatted response.
+2. In your response text, cite sources using standard markdown links with descriptive or entity labels (e.g. [Venkata Sai Yakkshit Reddy Asodi](https://github.com/yakkshit) or [LinkedIn Profile](https://linkedin.com/in/yakkshit)). The frontend automatically renders these as interactive citation pills with live hovercards.
+3. At the VERY TOP of your response, output this structured search resources code block so the UI can render the interactive Search Resources Card and open the Sources Drawer:
+\`\`\`component:search-resources
+${JSON.stringify(sanitizedSearchData)}
+\`\`\`
+CRITICAL: Never output raw escaped JSON, scraper data dumps, or broken backticks in your conversational response.
+`;
+  }
+
+  // ── Neo4j Graphical RAG & Memory Vault Grounding (Fixed & Always Enabled) ──
+  const isGraphRagRequested = Boolean(
+    graphRag !== false ||
+    (rawLastUserText.includes("[Active Tools:") && (rawLastUserText.toLowerCase().includes("graph") || rawLastUserText.toLowerCase().includes("neo4j"))) ||
+    /(\bneo4j\b|\bgraph\s*rag\b|\bknowledge\s*graph\b|skill\s*(cluster|network|graph|relationship)|how\s+do\s+my\s+skills\s+connect|career\s+graph|memory\s+graph|multi-?hop)/i.test(rawLastUserText)
+  );
+
+  let graphRagData: GraphRagQueryResult | null = null;
+  if (isGraphRagRequested && rawLastUserText.trim()) {
+    try {
+      const graphQuery = rawLastUserText
+        .replace(/\[Active Tools:[^\]]*\]/gi, "")
+        .replace(/\[Attached files:[^\]]*\]/gi, "")
+        .replace(/\[SYSTEM REMINDER:[^\]]*\]/gi, "")
+        .trim();
+
+      const extractedGraph = extractKnowledgeGraph(
+        resumeData,
+        chatGlobalProfile,
+        retrievalContext || memoryContext || ""
+      );
+
+      const neo4jConfig: Neo4jConfig = {
+        uri: providerKeys?.neo4jUri || process.env.NEO4J_URI,
+        username: providerKeys?.neo4jUser || process.env.NEO4J_USERNAME,
+        user: providerKeys?.neo4jUser || process.env.NEO4J_USERNAME,
+        password: providerKeys?.neo4jPassword || process.env.NEO4J_PASSWORD,
+        database: providerKeys?.neo4jDatabase || process.env.NEO4J_DATABASE,
+      };
+
+      graphRagData = await executeNeo4jGraphRag(
+        graphQuery || "Target roles, skills, and career connections",
+        extractedGraph,
+        neo4jConfig
+      );
+    } catch (err) {
+      console.warn("[api/chat] Neo4j Graph RAG execution failed:", err);
+    }
+  }
+
+  const ragNodes = graphRagData ? (graphRagData.retrievedNodes || graphRagData.nodes || []) : [];
+  if (graphRagData && ragNodes.length > 0) {
+    const activeEngine = (graphRagData.engineUsed || graphRagData.mode) === "neo4j-live"
+      ? "Live Neo4j Aura / Bolt Engine"
+      : "Fault-Tolerant Local Graph Engine (In-Memory Multi-Hop Traversal)";
+    const ragContext = graphRagData.contextString || graphRagData.summary || "";
+    const ragEdges = graphRagData.edges || graphRagData.retrievedEdges || [];
+    const ragPaths = graphRagData.paths || [];
+    const isExplicitGraphView = /(\bneo4j\b|\bgraph\s*rag\b|\bknowledge\s*graph\b|skill\s*(cluster|network|graph|relationship)|how\s+do\s+my\s+skills\s+connect|career\s+graph|memory\s+graph|multi-?hop|explore\s+(my\s+)?graph)/i.test(rawLastUserText);
+
+    systemMessage += `\n\n[NEO4J GRAPHICAL RAG KNOWLEDGE VAULT & MULTI-HOP CITATIONS - FIXED & ALWAYS ENABLED]:
+Query: "${graphRagData.query}"
+Active Mode: ${activeEngine}
+Generated Cypher Query:
+\`\`\`cypher
+${graphRagData.cypherQuery || "MATCH (n)-[r]->(m) RETURN n, r, m"}
+\`\`\`
+
+Multi-Hop Grounding Context (Ground all facts here to eliminate hallucinations):
+${ragContext}
+
+Retrieved Knowledge Nodes (${ragNodes.length}):
+${ragNodes.map((n: any) => `- [${String(n.type).toUpperCase()}] "${n.label}"${n.properties?.category ? ` (Category: ${n.properties.category})` : ""}`).join("\n")}
+
+Traversed Multi-Hop Paths (${ragPaths.length}):
+${ragPaths.map((p: any, i: number) => `${i + 1}. ${p.description || p.explanation || "Direct Connection"} [Score: ${(Number(p.relevanceScore ?? p.confidence ?? 1.0) * 100).toFixed(0)}%]`).join("\n")}
+
+GROUNDING DIRECTIVES:
+1. Ground your response explicitly on the multi-hop paths and verified nodes above to maintain zero hallucinations.
+${isExplicitGraphView ? `2. The user requested knowledge graph traversal. Output the interactive Graphical RAG component:
+\`\`\`component:graph-rag
+${JSON.stringify({
+  query: graphRagData.query,
+  nodes: ragNodes,
+  edges: ragEdges,
+  paths: ragPaths,
+  cypherQuery: graphRagData.cypherQuery,
+  engineUsed: graphRagData.engineUsed || "graph-store-fallback",
+  mode: graphRagData.mode || "local-engine",
+})}
+\`\`\`
+` : `2. If the user requested image generation (\`\`\`component:image-generation\`\`\`), resume, cover letter, or other artifact, output that component and ground its content on this verified knowledge vault.`}
+`;
+  }
+
+  // ── LangChain Personal Vector RAG & Confidence Scoring Grounding (Fixed & Always Enabled) ────
+  const isVectorRagRequested = Boolean(
+    vectorRag !== false ||
+    (rawLastUserText.includes("[Active Tools:") && (rawLastUserText.toLowerCase().includes("langchain") || rawLastUserText.toLowerCase().includes("vector"))) ||
+    /(\blangchain\b|\bvector\s*rag\b|\bvector\s*store\b|\bembeddings?\b|\bcosine\s*similarity\b|confidence\s*score|alternate\s+to\s+vector|switch\s+to\s+vector|not\s+satisfied.*(vector|graph|alternate)?|alternate\s+between|alternative\s+rag)/i.test(rawLastUserText)
+  );
+
+  let vectorRagData: VectorRagQueryResult | null = null;
+  if (isVectorRagRequested && rawLastUserText.trim()) {
+    try {
+      const vectorQuery = rawLastUserText
+        .replace(/\[Active Tools:[^\]]*\]/gi, "")
+        .replace(/\[Attached files:[^\]]*\]/gi, "")
+        .replace(/\[SYSTEM REMINDER:[^\]]*\]/gi, "")
+        .trim();
+
+      vectorRagData = await executeLangChainVectorRag(
+        vectorQuery || "Candidate skills, background, and career qualifications",
+        resumeData,
+        chatGlobalProfile,
+        retrievalContext || memoryContext || ""
+      );
+    } catch (err) {
+      console.warn("[api/chat] LangChain Vector RAG execution failed:", err);
+    }
+  }
+
+  if (vectorRagData && vectorRagData.retrievedChunks.length > 0) {
+    const chunkSnippets = vectorRagData.retrievedChunks
+      .map(
+        (c, i) =>
+          `[Passage #${i + 1} | Confidence: ${c.confidencePercent}% | Cosine: ${c.score.toFixed(3)} | Category: ${c.chunk.category} | Title: ${c.chunk.metadata.title}]:\n${c.chunk.text}`
+      )
+      .join("\n\n");
+    const isExplicitVector = /(\blangchain\b|\bvector\s*rag\b|\bvector\s*store\b|\bcosine\s*similarity\b|confidence\s*score|alternate\s+to\s+vector|switch\s+to\s+vector)/i.test(rawLastUserText);
+
+    systemMessage += `\n\n[LANGCHAIN PERSONAL VECTOR RAG KNOWLEDGE BASE & CONFIDENCE SCORES - FIXED & ALWAYS ENABLED]:
+Query: "${vectorRagData.query}"
+Average Confidence: ${vectorRagData.averageConfidence}% (${vectorRagData.confidenceRating})
+Top Cosine Similarity: ${vectorRagData.topScore.toFixed(3)}
+Retrieved Semantic Passages (${vectorRagData.retrievedChunks.length}):
+${chunkSnippets}
+
+Key Vector Insights:
+${vectorRagData.insights.map((ins, i) => `${i + 1}. ${ins}`).join("\n")}
+
+GROUNDING DIRECTIVES:
+1. Ground recommendations and skill match percentages on the ranked semantic chunks and confidence scores retrieved above.
+${isExplicitVector ? `2. Output the interactive Vector RAG viewer component:
+\`\`\`component:vector-rag
+${JSON.stringify({
+  query: vectorRagData.query,
+  topScore: vectorRagData.topScore,
+  averageConfidence: vectorRagData.averageConfidence,
+  confidenceRating: vectorRagData.confidenceRating,
+  retrievedChunks: vectorRagData.retrievedChunks,
+  summary: vectorRagData.summary,
+  insights: vectorRagData.insights,
+  engine: "langchain-vector",
+  alternatingEngineAvailable: true,
+})}
+\`\`\`
+` : `2. If another specific artifact is requested (such as image generation or resume), output that requested component.`}
+`;
   }
 
   const formattedMessages = [{ role: "system", content: systemMessage }, ...messagesList]
@@ -856,6 +1156,13 @@ Escape backslashes and newlines inside JSON strings so the fence stays valid.`
     switch (modelConfig.provider) {
       case "google":
         try {
+          if (
+            modelConfig.modelId.startsWith("gemini-4") ||
+            modelConfig.modelId.startsWith("gemini-3") ||
+            modelConfig.modelId.includes("banana")
+          ) {
+            return await handleNewGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
+          }
           return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
         } catch (error: any) {
           console.error("Error with Gemini model:", error)
@@ -1248,13 +1555,59 @@ async function handleNewGemini(
     }
 
     const ai = new GoogleGenAI({ apiKey: key })
-    const config: { responseModalities: string[] } = { responseModalities: ["TEXT"] }
+    const config: Record<string, any> = { responseModalities: ["TEXT"] }
 
-    const response = await ai.models.generateContentStream({
-      model: modelId || "gemini-2.0-flash",
-      config,
-      contents,
+    // Configure model reasoning / thinking features
+    if (modelId.includes("gemini-4") || modelId.includes("gemini-3")) {
+      config.thinkingConfig = { thinkingLevel: "high" }
+    } else if (modelId.includes("gemini-2.5")) {
+      config.thinkingConfig = { thinkingBudget: 8192 }
+    }
+
+    // Configure Google Search grounding for live market & job research
+    const promptHasSearchIntent = chatMessages.some((m) => {
+      const text = getMsgText(m).toLowerCase()
+      return (
+        text.includes("search") ||
+        text.includes("latest") ||
+        text.includes("jobs") ||
+        text.includes("hiring") ||
+        text.includes("salary") ||
+        text.includes("recent") ||
+        text.includes("google") ||
+        text.includes("news")
+      )
     })
+
+    if (promptHasSearchIntent || modelId.includes("banana")) {
+      config.tools = [{ googleSearch: {} }]
+    }
+
+    // Resolve target model ID
+    const resolvedModel = modelId === "gemini-nano-banana-2.1"
+      ? "gemini-2.5-flash"
+      : modelId || "gemini-2.5-flash"
+
+    let response: any
+    try {
+      response = await ai.models.generateContentStream({
+        model: resolvedModel,
+        config,
+        contents,
+      })
+    } catch (genErr: any) {
+      // If thinkingConfig or search tool is rejected by older preview API, retry with plain config
+      if (config.thinkingConfig || config.tools) {
+        console.warn("Retrying generateContentStream without thinkingConfig/tools:", genErr?.message)
+        response = await ai.models.generateContentStream({
+          model: resolvedModel,
+          config: { responseModalities: ["TEXT"] },
+          contents,
+        })
+      } else {
+        throw genErr
+      }
+    }
 
     const textId = generateId()
     const stream = createUIMessageStream({

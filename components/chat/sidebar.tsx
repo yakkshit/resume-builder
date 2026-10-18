@@ -32,8 +32,9 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChatSession, ChatSettings } from "./chat-store";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { ProfileSettingsDialog, getStoredProfile } from "./profile-settings-dialog";
+import { getStoredProfile } from "./profile-settings-dialog";
 import { SidebarUserControls, SidebarCompactUserControls } from "@/components/auth/user-menu";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ interface SidebarProps {
   onOpenMcp?: () => void;
   onOpenGuide?: () => void;
   onOpenSettings?: () => void;
+  onOpenCommandPalette?: () => void;
 }
 
 export function ChatSidebar({
@@ -76,9 +78,10 @@ export function ChatSidebar({
   onOpenMcp,
   onOpenGuide,
   onOpenSettings,
+  onOpenCommandPalette,
 }: SidebarProps) {
   const { theme, setTheme } = useTheme();
-  const [profileOpen, setProfileOpen] = useState(false);
+  const router = useRouter();
   const [profileName, setProfileName] = useState("Yakkshit");
   const [profileEmail, setProfileEmail] = useState("AI Engineer");
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,13 +94,13 @@ export function ChatSidebar({
     const p = getStoredProfile();
     setProfileName(p.name || "Yakkshit");
     setProfileEmail(p.email || "AI Studio");
-  }, [profileOpen]);
+  }, []);
 
   const handleOpenSettings = () => {
     if (onOpenSettings) {
       onOpenSettings();
     } else {
-      setProfileOpen(true);
+      router.push("/profile");
     }
   };
 
@@ -177,16 +180,20 @@ export function ChatSidebar({
                 <button
                   type="button"
                   onClick={() => {
-                    onToggleCollapse();
-                    setSearchOpen(true);
+                    if (onOpenCommandPalette) {
+                      onOpenCommandPalette();
+                    } else {
+                      onToggleCollapse();
+                      setSearchOpen(true);
+                    }
                   }}
                   className="size-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
-                  aria-label="Search Chats"
+                  aria-label="Search Chats & Commands (⌘K)"
                 >
                   <Search className="size-4" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" className="text-xs">Search Chats</TooltipContent>
+              <TooltipContent side="right" className="text-xs">Search & Commands (⌘K)</TooltipContent>
             </Tooltip>
 
             <div className="w-8 h-px bg-white/5 my-1" />
@@ -257,17 +264,10 @@ export function ChatSidebar({
             )}
           </div>
 
-          {/* Bottom Avatar & Clerk User Controls */}
+          {/* Bottom Avatar & User Controls */}
           <div className="flex flex-col items-center gap-2">
             <SidebarCompactUserControls onOpenSettings={handleOpenSettings} />
           </div>
-
-          <ProfileSettingsDialog
-            open={profileOpen}
-            onOpenChange={setProfileOpen}
-            settings={settings}
-            onSettingsChange={onSettingsChange}
-          />
         </aside>
       </TooltipProvider>
     );
@@ -324,29 +324,27 @@ export function ChatSidebar({
                 <span>New Chat</span>
               </button>
 
-              {/* Search Trigger / Input */}
-              {searchOpen ? (
-                <div className="relative px-1 py-0.5">
-                  <Search className="size-3.5 absolute left-3.5 top-2.5 text-neutral-400" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search chats..."
-                    autoFocus
-                    className="w-full h-8 pl-8 pr-3 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder:text-neutral-500 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setSearchOpen(true)}
-                  className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs font-normal transition-colors"
-                >
-                  <Search className="size-3.5" />
+              {/* Search Chats / Command Palette Trigger */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenCommandPalette) {
+                    onOpenCommandPalette();
+                  } else {
+                    setSearchOpen(true);
+                  }
+                }}
+                className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs font-normal transition-colors group"
+                aria-label="Search Chats and Commands"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Search className="size-3.5 group-hover:text-indigo-400 transition-colors" />
                   <span>Search Chats</span>
-                </button>
-              )}
+                </div>
+                <kbd className="text-[10px] bg-white/10 text-neutral-400 px-1.5 py-0.5 rounded font-mono border border-white/5 group-hover:border-white/10 group-hover:text-neutral-200 transition-colors">
+                  ⌘K
+                </kbd>
+              </button>
 
               {/* My Library with Thumbnail Previews */}
               <div className="pt-2">
@@ -445,14 +443,6 @@ export function ChatSidebar({
                     <span>Interactive Guide</span>
                   </button>
                 )}
-
-                <Link
-                  href="/"
-                  className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs transition-colors"
-                >
-                  <Users className="size-3.5 text-neutral-400" />
-                  <span>Community & Templates</span>
-                </Link>
               </div>
 
               {/* Projects Collapsible Group */}
@@ -549,17 +539,10 @@ export function ChatSidebar({
           </div>
         </div>
 
-        {/* Bottom User Profile Section with Clerk Credentials */}
+        {/* Bottom User Profile Section with Account Controls */}
         <div className="p-3 border-t border-white/5 shrink-0">
           <SidebarUserControls onOpenSettings={handleOpenSettings} />
         </div>
-
-        <ProfileSettingsDialog
-          open={profileOpen}
-          onOpenChange={setProfileOpen}
-          settings={settings}
-          onSettingsChange={onSettingsChange}
-        />
       </aside>
     </TooltipProvider>
   );

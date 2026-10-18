@@ -89,51 +89,55 @@ export function CoverLetterViewer({
   return (
     <div className="w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all">
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "preview" | "editor")} className="flex flex-col">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 py-3 border-b border-border/50 bg-white/80 dark:bg-neutral-950/80 gap-3 sm:gap-0">
-          <div className="flex items-center gap-4 min-w-0">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-border/50 bg-white/80 dark:bg-neutral-950/80 gap-2 sm:gap-3 min-h-[48px] overflow-hidden">
+          <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 min-w-0">
             <ArtifactTrafficLights variant="light" panelMode={panelMode} setPanelMode={setPanelMode} />
-            <span className="text-xs font-medium text-foreground flex items-center gap-1.5 opacity-90 truncate">
-              <FileText className="w-4 h-4 shrink-0 text-indigo-500" />
-              Cover Letter Editor
+            <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 opacity-90 truncate select-none">
+              <FileText className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
+              <span className="truncate">Cover Letter Editor</span>
             </span>
           </div>
 
           {panelMode !== "hidden" ? (
-            <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto justify-end">
-              <TabsList className="h-8 rounded-full bg-black/5 dark:bg-white/10 p-0.5 border border-black/5 dark:border-white/5">
-                <TabsTrigger value="preview" className="text-[11px] h-7 px-4 rounded-full">
-                  <Eye className="w-3 h-3 mr-1" />
-                  Preview
+            <div className="flex items-center gap-1.5 sm:gap-2 justify-end shrink-0 overflow-x-auto no-scrollbar py-0.5">
+              <TabsList className="h-8 rounded-lg bg-black/5 dark:bg-white/10 p-0.5 border border-black/5 dark:border-white/5 shadow-inner shrink-0">
+                <TabsTrigger
+                  value="preview"
+                  className="text-xs h-7 px-2.5 sm:px-3 rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5 font-medium"
+                >
+                  <Eye className="w-3 h-3 shrink-0" />
+                  <span>Preview</span>
                 </TabsTrigger>
-                <TabsTrigger value="editor" className="text-[11px] h-7 px-4 rounded-full">
-                  <Edit className="w-3 h-3 mr-1" />
-                  Editor
+                <TabsTrigger
+                  value="editor"
+                  className="text-xs h-7 px-2.5 sm:px-3 rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-neutral-800 data-[state=active]:shadow-sm transition-all gap-1.5 font-medium"
+                >
+                  <Edit className="w-3 h-3 shrink-0" />
+                  <span>Editor</span>
                 </TabsTrigger>
               </TabsList>
               {panelMode === "expanded" ? (
-                <div className="hidden sm:block">
-                  <Label className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1 block">
-                    Template
-                  </Label>
-                  <Select value={template} onValueChange={(v) => setTemplate(v as CoverLetterTemplate)}>
-                    <SelectTrigger className="h-9 w-[170px] bg-background/50 border-border/60">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-neutral-950/90">
-                      {Object.keys(coverLetterTemplates).map((t) => (
-                        <SelectItem key={t} value={t} className="text-xs">
-                          {t.charAt(0).toUpperCase() + t.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <Select value={template} onValueChange={(v) => setTemplate(v as CoverLetterTemplate)}>
+                  <SelectTrigger
+                    className="h-8 w-[130px] sm:w-[150px] text-xs bg-background/70 hover:bg-background border-border/70 focus:ring-0 rounded-lg px-2.5 font-medium shrink-0 transition-colors"
+                    aria-label="Select cover letter template"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[280px] sm:max-h-[320px] overflow-y-auto w-[180px] p-1 shadow-2xl rounded-xl border-border/60 bg-popover/95 backdrop-blur-md">
+                    {Object.keys(coverLetterTemplates).map((t) => (
+                      <SelectItem key={t} value={t} className="text-xs py-1.5 px-2 rounded-lg cursor-pointer">
+                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               ) : (
-                <span className="text-[10px] text-muted-foreground">Green expands · Yellow shrinks</span>
+                <span className="text-[10px] text-muted-foreground shrink-0">Green expands · Yellow shrinks</span>
               )}
             </div>
           ) : (
-            <p className="text-[10px] text-muted-foreground sm:ml-auto">Green dot restores the editor</p>
+            <p className="text-[10px] text-muted-foreground shrink-0">Green dot restores the editor</p>
           )}
         </div>
 

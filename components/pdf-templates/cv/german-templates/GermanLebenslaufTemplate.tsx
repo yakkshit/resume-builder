@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image, Link } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
 import { lightIconUrls } from "@/components/logos/logos"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // Optimized German Lebenslauf template - 2 pages max with circular photo
 const styles = StyleSheet.create({
@@ -315,10 +316,14 @@ const styles = StyleSheet.create({
 
 interface GermanLebenslaufTemplateProps {
   resumeData: ResumeData
+  language?: string
 }
 
-export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplateProps) => {
+export const GermanLebenslaufTemplate = ({ resumeData, language }: GermanLebenslaufTemplateProps) => {
   const { basicInfo, experience, education, skills, projects, achievements } = resumeData
+  const activeLang = (language || resumeData.language || "en").toLowerCase()
+  const isGerman = activeLang.startsWith("de")
+  const titles = getResumeSectionTitles(activeLang)
 
   // Helper function to format skills by category
   const formatSkills = (skills: string[]) => {
@@ -372,7 +377,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
 
         {/* Persönliche Angaben (Personal Information) */}
         <View style={styles.personalSection}>
-          <Text style={styles.sectionTitle}>Persönliche Angaben</Text>
+          <Text style={styles.sectionTitle}>{titles.contact}</Text>
           <View style={styles.personalGrid}>
             <View style={styles.personalColumn}>
               <View style={styles.personalItem}>
@@ -381,7 +386,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
               </View>
               {basicInfo.email ? (
                 <View style={styles.personalItem}>
-                  <Text style={styles.personalLabel}>E-Mail:</Text>
+                  <Text style={styles.personalLabel}>{titles.email}</Text>
                   <Link src={`mailto:${basicInfo.email}`} style={styles.contactLink}>
                     <Text style={styles.personalValue}>{basicInfo.email}</Text>
                   </Link>
@@ -389,7 +394,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
               ) : null}
               {basicInfo.phone ? (
                 <View style={styles.personalItem}>
-                  <Text style={styles.personalLabel}>Telefon:</Text>
+                  <Text style={styles.personalLabel}>{titles.phone}</Text>
                   <Link src={`tel:${basicInfo.phone.replace(/[^\d+]/g, "")}`} style={styles.contactLink}>
                     <Text style={styles.personalValue}>{basicInfo.phone}</Text>
                   </Link>
@@ -399,7 +404,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
             <View style={styles.personalColumn}>
               {basicInfo.location ? (
                 <View style={styles.personalItem}>
-                  <Text style={styles.personalLabel}>Adresse:</Text>
+                  <Text style={styles.personalLabel}>{titles.location}</Text>
                   <Text style={styles.personalValue}>{basicInfo.location}</Text>
                 </View>
               ) : null}
@@ -429,7 +434,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
         {/* Kurzprofil (Professional Summary) - Compact */}
         {basicInfo.summary ? (
           <View style={styles.mainSection}>
-            <Text style={styles.sectionTitle}>Kurzprofil</Text>
+            <Text style={styles.sectionTitle}>{titles.summary}</Text>
             <Text style={styles.summaryText}>{basicInfo.summary}</Text>
           </View>
         ) : null}
@@ -437,13 +442,13 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
         {/* Berufserfahrung (Professional Experience) */}
         {experience && experience.length > 0 ? (
           <View style={styles.mainSection}>
-            <Text style={styles.sectionTitle}>Berufserfahrung</Text>
+            <Text style={styles.sectionTitle}>{titles.experience}</Text>
             <View style={styles.experienceContainer}>
               {experience.map((exp, index) => (
                 <View key={`exp-${index}`} style={styles.experienceItem}>
                   <View style={styles.dateColumn}>
                     <Text style={styles.dateText}>
-                      {exp.startDate} - {exp.endDate}
+                      {exp.startDate} - {exp.endDate || titles.present}
                     </Text>
                   </View>
                   <View style={styles.contentColumn}>
@@ -464,7 +469,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
             {/* Ausbildung (Education) */}
             {education && education.length > 0 ? (
               <View style={styles.mainSection}>
-                <Text style={styles.sectionTitle}>Ausbildung</Text>
+                <Text style={styles.sectionTitle}>{titles.education}</Text>
                 <View style={styles.experienceContainer}>
                   {education.map((edu, index) => (
                     <View key={`edu-${index}`} style={styles.educationItem}>
@@ -478,7 +483,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
                           {edu.degree}{edu.field ? ` in ${edu.field}` : ""}
                         </Text>
                         <Text style={styles.educationInstitution}>{edu.institution}</Text>
-                        {edu.gpa ? <Text style={styles.educationDetails}>Note: {edu.gpa}</Text> : null}
+                        {edu.gpa ? <Text style={styles.educationDetails}>{isGerman ? "Note: " : "GPA: "}{edu.gpa}</Text> : null}
                       </View>
                     </View>
                   ))}
@@ -489,11 +494,11 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
             {/* Sprachen (Languages) */}
             {basicInfo.languages && basicInfo.languages.length > 0 ? (
               <View style={styles.mainSection}>
-                <Text style={styles.sectionTitle}>Sprachen</Text>
+                <Text style={styles.sectionTitle}>{titles.languages}</Text>
                 {basicInfo.languages.map((language, index) => (
                   <View key={`lang-${index}`} style={styles.languageItem}>
                     <Text style={styles.languageName}>{language}</Text>
-                    <Text style={styles.languageLevel}>Verhandlungssicher</Text>
+                    <Text style={styles.languageLevel}>{isGerman ? "Verhandlungssicher" : "Fluent"}</Text>
                   </View>
                 ))}
               </View>
@@ -505,17 +510,17 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
             {/* Kenntnisse und Fähigkeiten (Skills and Knowledge) */}
             {skills && skills.length > 0 ? (
               <View style={styles.mainSection}>
-                <Text style={styles.sectionTitle}>Kenntnisse</Text>
+                <Text style={styles.sectionTitle}>{titles.skills}</Text>
                 <View style={styles.skillsContainer}>
                   {technical.length > 0 ? (
                     <View style={styles.skillCategory}>
-                      <Text style={styles.skillCategoryTitle}>Programmierung:</Text>
+                      <Text style={styles.skillCategoryTitle}>{isGerman ? "Programmierung:" : "Programming:"}</Text>
                       <Text style={styles.skillsList}>{technical.join(", ")}</Text>
                     </View>
                   ) : null}
                   {other.length > 0 ? (
                     <View style={styles.skillCategory}>
-                      <Text style={styles.skillCategoryTitle}>Weitere:</Text>
+                      <Text style={styles.skillCategoryTitle}>{isGerman ? "Weitere:" : "Other:"}</Text>
                       <Text style={styles.skillsList}>{other.join(", ")}</Text>
                     </View>
                   ) : null}
@@ -526,7 +531,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
             {/* Sonstige Qualifikationen (Additional Qualifications) */}
             {achievements && achievements.length > 0 ? (
               <View style={styles.mainSection}>
-                <Text style={styles.sectionTitle}>Qualifikationen</Text>
+                <Text style={styles.sectionTitle}>{titles.achievements}</Text>
                 {achievements.map((achievement, index) => (
                   <View key={`ach-${index}`} style={styles.additionalItem}>
                     <Text style={styles.additionalTitle}>{achievement.title}</Text>
@@ -541,7 +546,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
         {/* Projekte (Projects) - Full Width */}
         {projects && projects.length > 0 ? (
           <View style={styles.mainSection}>
-            <Text style={styles.sectionTitle}>Projekte</Text>
+            <Text style={styles.sectionTitle}>{titles.projects}</Text>
             <View style={styles.experienceContainer}>
               {projects.map((project, index) => (
                 <View key={`proj-${index}`} style={styles.projectItem}>
@@ -556,7 +561,7 @@ export const GermanLebenslaufTemplate = ({ resumeData }: GermanLebenslaufTemplat
                     <Text style={styles.projectTitle}>{project.name}</Text>
                     <Text style={styles.projectDescription}>{project.description}</Text>
                     <Text style={styles.projectTechnologies}>
-                      Technologien: {(project.technologies || []).map(t => typeof t === "string" ? t : String(t)).join(", ")}
+                      {isGerman ? "Technologien:" : "Technologies:"} {(project.technologies || []).map(t => typeof t === "string" ? t : String(t)).join(", ")}
                     </Text>
                   </View>
                 </View>

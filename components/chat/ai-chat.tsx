@@ -23,6 +23,7 @@ import {
     Search,
     Settings2,
     Lock,
+    ImageIcon,
     Clapperboard,
     Check,
     BarChart3,
@@ -30,6 +31,14 @@ import {
     Target,
     Cpu,
     Wrench,
+    Network,
+    Layers,
+    ArrowUp,
+    ChevronDown,
+    SlidersHorizontal,
+    Plus,
+    Square,
+    ArrowDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +53,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { InfiniteGridBackground } from "@/components/ui/the-infinite-grid";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ComponentRenderer } from "./component-renderer";
@@ -59,7 +69,36 @@ import {
 import { getTextContent, getReasoningContent, isReasoningStreaming } from "@/lib/message-utils";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ai-elements/reasoning";
 import { Persona } from "@/components/ai-elements/persona";
-import type { JobSuggestion } from "@/lib/job-scraper/google-jobs";
+import {
+    ModelSelector,
+    ModelSelectorTrigger,
+    ModelSelectorContent,
+    ModelSelectorInput,
+    ModelSelectorList,
+    ModelSelectorEmpty,
+    ModelSelectorGroup,
+    ModelSelectorItem,
+    ModelSelectorLogo,
+    ModelSelectorName,
+    ModelCapabilityIcons,
+    CapabilityFilterBar,
+    CapabilityLegendDialog,
+} from "@/components/ai-elements/model-selector";
+import { type ModelCapabilityKey, hasModelCapability } from "@/lib/model-capabilities";
+import {
+    ToolSelector,
+    ToolSelectorTrigger,
+    ToolSelectorContent,
+    ToolSelectorInput,
+    ToolSelectorList,
+    ToolSelectorEmpty,
+    ToolSelectorGroup,
+    ToolSelectorItem,
+    ToolSelectorName,
+    ToolSelectorDescription,
+} from "@/components/ai-elements/tool-selector";
+import { TopCornerControls } from "./top-corner-controls";
+import { AnchorMessageScroller } from "./anchor-message-scroller";
 import { sanitizeResumeData, mergeResumeDataWithDefault } from "@/lib/sanitize-resume-data";
 import { stripIncompleteJsonTail, parseChainOfThought, type ParsedToolCall } from "@/lib/streaming-chat-content";
 import { mergeAssistantResumeIntoCurrent, extractResumeJsonFromMessage } from "@/lib/extract-resume-json";
@@ -70,17 +109,14 @@ import { buildUserKnowledgeStoreChunks } from "@/lib/user-knowledge-context";
 import { DEFAULT_TRANSLATION_LANGUAGE } from "@/lib/translation";
 import type { ResumeData } from "@/lib/types";
 import { tryLocalStorageGet, tryLocalStorageSet, tryLocalStorageRemove } from "@/lib/safe-local-storage";
-import { chatTextareaHeightPx } from "@/lib/chat-textarea";
+import { chatTextareaHeightPx, CHAT_TEXTAREA_MIN_HEIGHT_PX } from "@/lib/chat-textarea";
 import { ShineBorder } from "@/components/ui/shine-border";
 import { ModelProviderIcon } from "@/lib/model-provider-icon";
 import { Plug } from "lucide-react";
-import { GitHubSyncService } from "@/lib/github/sync";
-import { getStoredProfile, ProfileSettingsDialog } from "./profile-settings-dialog";
+import { getStoredProfile, loadProviderKeys } from "./profile-settings-dialog";
+import { SearchSourcesDrawer } from "./search-sources-drawer";
+import type { WebSearchResult } from "@/lib/web-search";
 import { useAuth } from "@/lib/auth/auth-provider";
-
-import { ChatFeedback } from "./chat-feedback";
-import { ChromiumWebview } from "./chromium-webview";
-import { ComponentStage, type StageComponentInfo } from "./components/component-stage";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 const panelLoading = () => (
@@ -90,93 +126,99 @@ const panelLoading = () => (
 );
 
 const ChatSidebar = dynamic(() => import("./sidebar").then((m) => m.ChatSidebar), { loading: panelLoading });
-const JobSuggestionsPanel = dynamic(
-    () => import("./job-suggestions-panel").then((m) => m.JobSuggestionsPanel),
-    { loading: panelLoading },
-);
 const ChatOnboarding = dynamic(() => import("./chat-onboarding").then((m) => m.ChatOnboarding), {
     loading: panelLoading,
 });
 const MCPDialog = dynamic(() => import("./mcp-dialog").then((m) => m.MCPDialog), {
     loading: panelLoading,
 });
-
-// ── Welcome Screen ─────────────────────────────────────────────────────────
-
-const ACTION_PILLS = [
-    { label: "Create", icon: FileText, prompt: "Help me create and show my resume" },
-    { label: "Explore", icon: Briefcase, prompt: "Find job recommendations for me" },
-    { label: "Code", icon: Code, prompt: "Give me a coding challenge" },
-    { label: "Learn", icon: BookOpen, prompt: "Recommend learning resources for me" },
-];
+const ChatFeedback = dynamic(() => import("./chat-feedback").then((m) => m.ChatFeedback), {
+    loading: panelLoading,
+});
+const ChromiumWebview = dynamic(() => import("./chromium-webview").then((m) => m.ChromiumWebview), {
+    loading: panelLoading,
+});
+const ComponentStage = dynamic(
+    () => import("./components/component-stage").then((m) => m.ComponentStage),
+    { loading: panelLoading },
+);
+const ChatCommandPalette = dynamic(
+    () => import("./command-palette").then((m) => m.ChatCommandPalette),
+    { ssr: false }
+);
+import type { StageComponentInfo } from "./components/component-stage";
 
 const CHAT_INPUT_SHINE_LS = "ai-chat-input-shine-seen";
 
-const SUGGESTED_PROMPTS = [
-    "Show me my resume",
-    "Analyze my CV score against a job description",
-    "Find jobs for me",
-    "Start auto-applying to jobs",
-    "Give me a coding challenge",
-    "Practice mock interview questions",
+const HERO_SUGGESTIONS = [
+    { label: "Match live software jobs", prompt: "Find real-time software engineer and fullstack developer jobs matching my profile.", icon: Search },
+    { label: "Score my ATS resume", prompt: "Score my resume against ATS standards and identify critical missing skills.", icon: Target },
+    { label: "Explain system design problem", prompt: "Walk me through designing a high-throughput distributed URL shortener.", icon: Code },
+    { label: "Generate LaTeX CV", prompt: "Generate a clean, high-grade LaTeX resume based on my career background.", icon: FileText },
+    { label: "Draft recruiter outreach email", prompt: "Draft a personalized cold outreach email to an engineering hiring manager.", icon: Sparkles },
+    { label: "Search salary benchmarks", prompt: "What are the latest salary compensation bands for senior fullstack engineers?", icon: Globe },
 ];
 
-function WelcomeScreen({ onPrompt }: { onPrompt: (p: string) => void }) {
+function WelcomeHero() {
     return (
         <motion.div
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -16 }}
-            transition={{ duration: 0.4 }}
-            className="flex flex-col items-center justify-center min-h-[75vh] px-4 py-8 text-center"
+            exit={{ opacity: 0, y: -20, filter: "blur(8px)" }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="flex flex-col items-center justify-center pt-8 pb-5 px-4 text-center select-none"
         >
-            <motion.div
-                initial={{ scale: 0.6, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-                className="w-16 h-16 rounded-3xl bg-gradient-to-br from-indigo-500/20 via-neutral-900 to-neutral-800 border-2 border-white/10 flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(99,102,241,0.2)] backdrop-blur-xl"
-            >
-                <Sparkles className="w-8 h-8 text-indigo-400 drop-shadow-md" />
-            </motion.div>
-
-            <h1 className="text-4xl md:text-6xl font-black tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-b from-white via-white/90 to-white/20 pb-2">
-                How can I help you?
+            <h1 className="text-2xl sm:text-[32px] font-medium tracking-tight text-neutral-200">
+                What can I help with?
             </h1>
-            <p className="text-base md:text-lg text-muted-foreground/80 mb-10 max-w-lg mx-auto font-medium">
-                Your AI-powered career assistant for <span className="text-white/90">resumes</span>, <span className="text-white/90">jobs</span>, and <span className="text-white/90">interviews</span>.
-            </p>
+        </motion.div>
+    );
+}
 
-            <div className="flex flex-wrap justify-center gap-2 mb-8">
-                {ACTION_PILLS.map((pill, i) => (
-                    <motion.button
-                        key={pill.label}
-                        initial={{ opacity: 0, y: 12 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.15 + i * 0.07 }}
-                        onClick={() => onPrompt(pill.prompt)}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full border border-border bg-background hover:bg-muted hover:border-foreground/20 transition-all text-sm font-medium group"
-                    >
-                        <pill.icon className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                        {pill.label}
-                    </motion.button>
-                ))}
+const THINKING_LABELS = [
+    "Thinking",
+    "Searching career knowledge",
+    "Analyzing resume details",
+    "Composing recommendations",
+];
+
+function ThinkingIndicator() {
+    const [labelIndex, setLabelIndex] = useState(0);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setLabelIndex((prev) => (prev + 1) % THINKING_LABELS.length);
+        }, 1300);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center gap-3 py-2"
+        >
+            <div className="size-8 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                <Sparkles className="size-4 text-indigo-400 animate-pulse" />
             </div>
-
-            <div className="w-full max-w-lg space-y-2">
-                <p className="text-xs text-muted-foreground mb-3 font-medium">Suggested prompts</p>
-                {SUGGESTED_PROMPTS.map((p, i) => (
-                    <motion.button
-                        key={p}
-                        initial={{ opacity: 0, x: -16 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3 + i * 0.07 }}
-                        onClick={() => onPrompt(p)}
-                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-border bg-background/50 hover:bg-muted hover:border-foreground/20 transition-all text-sm text-left group"
+            <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-[#1e1e22]/90 border border-white/10 shadow-xl backdrop-blur-md">
+                <AnimatePresence mode="wait">
+                    <motion.span
+                        key={labelIndex}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        transition={{ duration: 0.22, ease: "easeOut" }}
+                        className="text-xs font-medium text-neutral-200 min-w-[70px]"
                     >
-                        <span>{p}</span>
-                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-foreground transition-all" />
-                    </motion.button>
-                ))}
+                        {THINKING_LABELS[labelIndex]}
+                    </motion.span>
+                </AnimatePresence>
+                <span className="mo-dots text-indigo-400 flex items-center" aria-hidden="true">
+                    <i /><i /><i />
+                </span>
             </div>
         </motion.div>
     );
@@ -189,8 +231,9 @@ function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>
     if (t === "cv" || t === "resume") return "resume";
     if (t === "coverletter" || t === "cover-letter" || t === "cover" || t === "coverletters" || t === "cover-letters") return "cover-letter";
     if (t === "cvscorer" || t === "cv-score" || t === "cvscore") return "cv-score";
-    if (t === "joblinks" || t === "job-recommendations" || t === "jobrecommendations") return "job-recommendations";
-    if (t === "jobscraper" || t === "job-scraper" || t === "jobsearch" || t === "job-search") return "job-scraper";
+    if (t === "joblinks" || t === "job-recommendations" || t === "jobrecommendations" || t === "jobscraper" || t === "job-scraper" || t === "jobsearch" || t === "job-search") return "job-recommendations";
+    if (t === "graph-rag" || t === "graphrag" || t === "neo4j" || t === "knowledge-graph" || t === "knowledgegraph" || t === "neo4j-graph") return "graph-rag";
+    if (t === "vector-rag" || t === "vectorrag" || t === "langchain" || t === "langchain-rag" || t === "vector") return "vector-rag";
     if (t === "chart" || t === "recharts" || t === "analytics" || t === "graph") return "chart";
     if (t === "jobapplysimulator" || t === "auto-applier" || t === "autoapplier") return "auto-applier";
     if (t === "course" || t === "learning-resources" || t === "learningresources") return "learning-resources";
@@ -199,8 +242,192 @@ function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>
     if (t === "linkedindm" || t === "linkedin-dm" || t === "linkedin") return "linkedin-dm";
     if (t === "resumelatex" || t === "resume-latex" || t === "latexcv") return "resume-latex";
     if (t === "coverletterlatex" || t === "cover-letter-latex" || t === "latexcover") return "cover-letter-latex";
+    if (t === "image-generation" || t === "imagegeneration" || t === "image" || t === "generate-image" || t === "ai-image") return "image-generation";
     if (t === "browser" || t === "browser-controller" || t === "chromium" || t === "mcp-browser") return "browser";
+    if (t === "search" || t === "searchresources" || t === "search-resources" || t === "sources" || t === "web-search") return "search-resources";
     return null;
+}
+
+export const AVAILABLE_CAREER_TOOLS = [
+    {
+        id: "web-search",
+        name: "Live Web Search (Tavily & Firecrawl)",
+        shortName: "Web Search",
+        description: "Real-time AI search, scraping, and live factual grounding via Tavily and Firecrawl",
+        category: "Live Grounding",
+        icon: Globe,
+        color: "text-teal-400",
+        bgGradient: "from-teal-500/20 to-emerald-500/10 border-teal-500/30",
+        promptSuggestion: "Search online developer profiles and hiring trends on GitHub and Hugging Face.",
+    },
+    {
+        id: "job-scraper",
+        name: "Job Scraper & Live Matching",
+        shortName: "Job Scraper",
+        description: "Search live developer jobs and scrape requirements",
+        category: "Autonomous Agent",
+        icon: Briefcase,
+        color: "text-emerald-400",
+        bgGradient: "from-emerald-500/20 to-teal-500/10 border-emerald-500/30",
+        promptSuggestion: "Find live software engineer jobs matching my profile.",
+    },
+    {
+        id: "cv-score",
+        name: "ATS Resume & CV Scorer",
+        shortName: "ATS Scorer",
+        description: "Analyze ATS match rate, missing keywords, and structural gaps",
+        category: "Autonomous Agent",
+        icon: Target,
+        color: "text-amber-400",
+        bgGradient: "from-amber-500/20 to-orange-500/10 border-amber-500/30",
+        promptSuggestion: "Score my resume against ATS standards and identify missing keywords.",
+    },
+    {
+        id: "latex-cv",
+        name: "LaTeX CV Generator",
+        shortName: "LaTeX CV",
+        description: "Compile and render professional ATS-compliant LaTeX resume",
+        category: "Document Creator",
+        icon: FileText,
+        color: "text-cyan-400",
+        bgGradient: "from-cyan-500/20 to-blue-500/10 border-cyan-500/30",
+        promptSuggestion: "Generate a clean professional LaTeX resume from my career background.",
+    },
+    {
+        id: "auto-apply",
+        name: "Auto-Apply Assistant",
+        shortName: "Auto-Apply",
+        description: "Simulate and automate job application form-filling",
+        category: "Autonomous Agent",
+        icon: Send,
+        color: "text-blue-400",
+        bgGradient: "from-blue-500/20 to-indigo-500/10 border-blue-500/30",
+        promptSuggestion: "Start an auto-apply simulation for jobs matching my target roles.",
+    },
+    {
+        id: "coding-challenge",
+        name: "Coding Challenge Simulator",
+        shortName: "Coding Challenge",
+        description: "Interactive technical interview challenges with automated grading",
+        category: "Career Prep",
+        icon: Code,
+        color: "text-orange-400",
+        bgGradient: "from-orange-500/20 to-rose-500/10 border-orange-500/30",
+        promptSuggestion: "Give me a technical coding challenge for a senior software engineer role.",
+    },
+    {
+        id: "email-hr",
+        name: "Recruiter Outreach & HR Email",
+        shortName: "HR Email",
+        description: "Draft personalized hiring manager emails & LinkedIn DMs",
+        category: "Career Prep",
+        icon: Sparkles,
+        color: "text-pink-400",
+        bgGradient: "from-pink-500/20 to-purple-500/10 border-pink-500/30",
+        promptSuggestion: "Draft a personalized outreach email to a hiring manager.",
+    },
+    {
+        id: "image-generation",
+        name: "AI Image & Asset Synthesis",
+        shortName: "Image Synthesis",
+        description: "Generate synthetic neural visuals, landscape concepts, and portfolio assets",
+        category: "Document Creator",
+        icon: ImageIcon,
+        color: "text-purple-400",
+        bgGradient: "from-purple-500/25 via-pink-500/20 to-indigo-500/10 border-purple-500/40",
+        promptSuggestion: "Generate an image of a calm mountain lake at dawn in 1024 × 1024 resolution.",
+    },
+];
+
+export const FIXED_ALWAYS_ACTIVE_TOOLS = [] as const;
+export const isFixedTool = (_toolId: string) => false;
+
+const DATABASE_TOOL_PATTERNS = [
+    /neo4j/i,
+    /graph\s*rag/i,
+    /graphical\s*rag/i,
+    /vector\s*rag/i,
+    /langchain/i,
+    /memory\s*vault/i,
+    /knowledge\s*vault/i,
+    /database/i,
+];
+
+export function isDatabaseTool(nameOrId: string): boolean {
+    if (!nameOrId) return false;
+    return DATABASE_TOOL_PATTERNS.some((pattern) => pattern.test(nameOrId));
+}
+
+export interface ParsedUserMessage {
+    cleanPrompt: string;
+    activeToolIds: string[];
+    attachedFiles: string[];
+}
+
+export function parseUserMessageContent(rawContent: string): ParsedUserMessage {
+    if (!rawContent) return { cleanPrompt: "", activeToolIds: [], attachedFiles: [] };
+
+    let text = rawContent;
+    const foundToolNames: string[] = [];
+    const attachedFiles: string[] = [];
+
+    // 1. Extract [Active Tools: ...]
+    const toolsRegex = /\[Active Tools:\s*([^\]]+)\]/gi;
+    let match: RegExpExecArray | null;
+    while ((match = toolsRegex.exec(rawContent)) !== null) {
+        const listStr = match[1];
+        if (listStr) {
+            const names = listStr.split(/,\s*/);
+            for (const n of names) {
+                const trimmed = n.trim();
+                if (trimmed && !isDatabaseTool(trimmed)) {
+                    foundToolNames.push(trimmed);
+                }
+            }
+        }
+    }
+    text = text.replace(toolsRegex, "");
+
+    // 2. Extract [Attached files: ...]
+    const filesRegex = /\[Attached files:\s*([^\]]+)\]/gi;
+    while ((match = filesRegex.exec(rawContent)) !== null) {
+        const fileNames = match[1];
+        if (fileNames) {
+            for (const f of fileNames.split(/,\s*/)) {
+                const trimmed = f.trim();
+                if (trimmed) attachedFiles.push(trimmed);
+            }
+        }
+    }
+    text = text.replace(filesRegex, "");
+
+    // 3. Strip any system reminder tags if present
+    text = text.replace(/\[SYSTEM REMINDER:[^\]]*\]/gi, "");
+    text = text.replace(/\[MANDATORY:[^\]]*\]/gi, "");
+
+    // 4. Map found tool names to tool IDs
+    const activeToolIds: string[] = [];
+    for (const name of foundToolNames) {
+        const lower = name.toLowerCase();
+        const matched = AVAILABLE_CAREER_TOOLS.find(
+            (t) =>
+                t.name.toLowerCase() === lower ||
+                (t.shortName && t.shortName.toLowerCase() === lower) ||
+                t.id.toLowerCase() === lower ||
+                lower.includes(t.shortName.toLowerCase()) ||
+                (t.category === "Live Grounding" && (lower.includes("web") || lower.includes("search"))) ||
+                (t.id === "image-generation" && (lower.includes("image") || lower.includes("synthesis")))
+        );
+        if (matched && !activeToolIds.includes(matched.id)) {
+            activeToolIds.push(matched.id);
+        }
+    }
+
+    return {
+        cleanPrompt: text.trim(),
+        activeToolIds,
+        attachedFiles,
+    };
 }
 
 function extractComponents(text: string) {
@@ -331,6 +558,12 @@ function extractComponents(text: string) {
         }
     }
 
+    // Clean any orphaned JSON tool/component leak lines from cleanText
+    cleanText = cleanText
+        .replace(/\{"query":[\s\S]*?"resultsCount":\d+[\s\S]*?"results":\[[\s\S]*?\]\}/g, "")
+        .replace(/^(?:["\w\-./ ]*","(?:domain|url|title|snippet|favicon)":[\s\S]*?)(?:\n\n|\n(?=[A-Z#*`]))/gm, "")
+        .trim();
+
     return { cleanText: cleanText.trim(), components, usedResumeJsonFallback };
 }
 
@@ -388,9 +621,9 @@ function ToolExecutionBadges({
         } else if (name.includes("web") || name.includes("scrape")) {
             label = "Web Scraper";
             IconComponent = Globe;
-        } else if (name.includes("neo4j") || name.includes("graph")) {
-            label = "Neo4j Knowledge Graph";
-            IconComponent = Cpu;
+        } else if (name.includes("neo4j") || name.includes("graph") || name.includes("vector") || name.includes("langchain")) {
+            // Internal database/RAG grounding — keep invisible to user in frontend
+            continue;
         }
         allBadges.push({
             id: `tool-${tool.name}`,
@@ -416,10 +649,6 @@ function ToolExecutionBadges({
             case "cv-score":
                 label = "ATS Match Scorer";
                 IconComponent = Target;
-                break;
-            case "job-scraper":
-                label = "Live Job Scraper Card";
-                IconComponent = Search;
                 break;
             case "job-recommendations":
                 label = "Job Match Recommendations";
@@ -453,6 +682,14 @@ function ToolExecutionBadges({
             case "cover-letter-latex":
                 label = "LaTeX Compiler Artifact";
                 IconComponent = FileText;
+                break;
+            case "graph-rag":
+            case "vector-rag":
+                // Internal database operations — keep invisible to user in frontend
+                continue;
+            case "image-generation":
+                label = "AI Image Generation";
+                IconComponent = ImageIcon;
                 break;
         }
         if (!allBadges.some((b) => b.label === label)) {
@@ -544,7 +781,19 @@ function MessageBubble({
         [isUser, textToClean, content],
     );
 
-    const renderedText = isUser ? content : extracted.cleanText;
+    const userParsed = useMemo(
+        () => (isUser ? parseUserMessageContent(content) : null),
+        [isUser, content]
+    );
+
+    const userActiveTools = useMemo(() => {
+        if (!isUser || !userParsed) return [];
+        return userParsed.activeToolIds
+            .map((id) => AVAILABLE_CAREER_TOOLS.find((t) => t.id === id))
+            .filter((t): t is (typeof AVAILABLE_CAREER_TOOLS)[number] => Boolean(t));
+    }, [isUser, userParsed]);
+
+    const renderedText = isUser ? (userParsed?.cleanPrompt ?? content) : extracted.cleanText;
 
     const fallbackToastShownRef = useRef(false);
     useEffect(() => {
@@ -560,12 +809,13 @@ function MessageBubble({
     }, [isUser, isStreaming, extracted.usedResumeJsonFallback, onToast]);
 
     const copy = () => {
-        navigator.clipboard.writeText(content);
+        navigator.clipboard.writeText(isUser ? (userParsed?.cleanPrompt ?? content) : content);
         onToast("success", "Copied to clipboard!");
     };
 
     return (
         <motion.div
+            data-message-id={message.id}
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
@@ -577,7 +827,7 @@ function MessageBubble({
                 <div className="flex-shrink-0 mt-0.5">
                     <Persona
                         state={isStreaming ? (isReasoningActive ? "thinking" : "speaking") : "idle"}
-                        variant="obsidian"
+                        variant="theme"
                         className="size-8"
                     />
                 </div>
@@ -602,15 +852,84 @@ function MessageBubble({
                     />
                 ) : null}
 
+                {/* Top Search Resources Card (Matching Images 1 & 2) */}
+                {!isUser && extracted.components.filter((c) => c.type === "search-resources").map((c, idx) => (
+                    <div key={`sr-top-${idx}`} className="w-full mb-1">
+                        <ComponentRenderer
+                            type="search-resources"
+                            data={c.data}
+                            componentId={`sr-${message.id ?? "m"}-${idx}`}
+                        />
+                    </div>
+                ))}
+
                 {/* Bubble */}
                 <div
-                    className={`relative px-4 py-3 rounded-2xl text-sm ${isUser
-                        ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 rounded-tr-sm"
-                        : "w-full bg-background border border-border/60 rounded-tl-sm [overflow-wrap:anywhere]"
-                        }`}
+                    className={cn(
+                        "relative px-4 py-2.5 rounded-2xl text-sm transition-colors",
+                        isUser
+                            ? "bg-[#232328] text-neutral-100 border border-white/5 rounded-tr-md max-w-full font-normal shadow-sm"
+                            : "w-full text-neutral-200 [overflow-wrap:anywhere] pt-1"
+                    )}
                 >
                     {isUser ? (
-                        <p className="whitespace-pre-wrap leading-relaxed">{renderedText}</p>
+                        <div className="flex flex-col gap-1.5">
+                            <p className="whitespace-pre-wrap leading-relaxed">{renderedText}</p>
+
+                            {/* Attached files chips */}
+                            {userParsed && userParsed.attachedFiles.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                    {userParsed.attachedFiles.map((fn, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs bg-white/5 border border-white/10 text-neutral-300"
+                                        >
+                                            <Paperclip className="size-3 text-neutral-400" />
+                                            <span className="truncate max-w-[200px]">{fn}</span>
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Tool Logos / Badges positioned at bottom-right corner */}
+                            {userActiveTools.length > 0 && (
+                                <div className="flex items-center justify-end gap-1.5 pt-1.5 -mb-0.5 select-none self-end">
+                                    {userActiveTools.map((tool) => {
+                                        const ToolIcon = tool.icon;
+                                        return (
+                                            <Tooltip key={tool.id}>
+                                                <TooltipTrigger asChild>
+                                                    <div
+                                                        className={cn(
+                                                            "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border shadow-xs transition-all cursor-default select-none",
+                                                            "bg-white/[0.08] hover:bg-white/[0.14] border-white/15 text-neutral-200 backdrop-blur-xs"
+                                                        )}
+                                                    >
+                                                        <ToolIcon className={cn("size-3.5 shrink-0", tool.color)} />
+                                                        <span className="text-[10.5px] font-medium text-neutral-300 tracking-tight">
+                                                            {tool.shortName || tool.name}
+                                                        </span>
+                                                    </div>
+                                                </TooltipTrigger>
+                                                <TooltipContent
+                                                    side="top"
+                                                    align="end"
+                                                    className="text-xs bg-[#18181b] border-white/10 text-neutral-200 shadow-xl max-w-xs p-2.5 rounded-xl z-50"
+                                                >
+                                                    <p className="font-semibold text-white flex items-center gap-1.5">
+                                                        <ToolIcon className={cn("size-3.5", tool.color)} />
+                                                        {tool.name}
+                                                    </p>
+                                                    <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
+                                                        {tool.description}
+                                                    </p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     ) : (
                         <MarkdownRenderer content={renderedText} />
                     )}
@@ -620,7 +939,7 @@ function MessageBubble({
                 </div>
 
                 {/* Inline dynamic components */}
-                {extracted.components.map((c, idx) => {
+                {extracted.components.filter((c) => c.type !== "search-resources").map((c, idx) => {
                     const compId = `${message.id ?? "m"}-${idx}-${c.type}`;
                     return c.type && (!isStreaming || c.isComplete) && (
                         <div key={compId} className="w-full mt-2">
@@ -684,49 +1003,18 @@ function MessageBubble({
                     </div>
                 )}
             </div>
-
-            {isUser && (
-                <div className="w-8 h-8 rounded-full bg-neutral-900 border border-border flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <User className="w-4 h-4 text-white" />
-                </div>
-            )}
         </motion.div>
     );
 }
 
 // ── Input Bar ──────────────────────────────────────────────────────────────
 
-const QUICK_PROMPTS: {
-    emoji: string;
-    label: string;
-    prompt: string;
-    disabled?: boolean;
-    tooltip?: string;
-}[] = [
-    { emoji: "📄", label: "Resume", prompt: "Show me and edit my resume" },
-    { emoji: "✉️", label: "Email HR", prompt: "Help me email HR about a job application and show the email composer" },
-    {
-        emoji: "💼",
-        label: "LinkedIn",
-        prompt:
-            "Write a LinkedIn connection or job-poster message under 200 characters and show the linkedinDm component so I can copy it",
-    },
-    { emoji: "⚡", label: "CV Score", prompt: "Analyze my CV score" },
-    { emoji: "🔍", label: "Job Scraper", prompt: "Search and scrape live job postings for Frontend / Full Stack developer roles and match my resume" },
-    { emoji: "🤖", label: "Auto-apply", prompt: "Start auto-applying to jobs" },
-    { emoji: "💻", label: "Code", prompt: "Give me a coding challenge" },
-    {
-        emoji: "🛠️",
-        label: "MCP Tools",
-        prompt: "List available MCP tools and describe how you can help me generate documents and scrape jobs",
-    },
-    {
-        emoji: "📐",
-        label: "LaTeX CV",
-        prompt:
-            'I want a specific print style: give me both JSON resume updates if needed AND ```component:resumeLatex\n{"latex":"..."}\n``` with a full compilable LaTeX CV. If I also need a cover letter in LaTeX, add ```component:coverLetterLatex\n{"latex":"..."}\n```. Keep JSON valid.',
-    },
-    { emoji: "📚", label: "Learn", prompt: "Recommend learning resources" },
+const MINIMAL_SUGGESTIONS = [
+    "Show me my resume and career profile",
+    "Analyze my CV score against a job description",
+    "Draft a personalized cover letter for my target role",
+    "Practice technical mock interview questions with feedback",
+    "Recommend top learning resources and skill roadmaps",
 ];
 
 function ChatInput({
@@ -739,6 +1027,8 @@ function ChatInput({
     model,
     onModelChange,
     disabled,
+    isLoading,
+    onStop,
     useProfileContext,
     onToggleProfileContext,
     composerShine,
@@ -749,6 +1039,11 @@ function ChatInput({
     showToast,
     onOpenMcpDialog,
     inSplitPanel,
+    isCenterWelcome,
+    activeTools = [],
+    onToggleTool,
+    onClearTools,
+    onOpenProfileSettings,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -759,6 +1054,8 @@ function ChatInput({
     model: string;
     onModelChange: (m: string) => void;
     disabled: boolean;
+    isLoading?: boolean;
+    onStop?: () => void;
     useProfileContext: boolean;
     onToggleProfileContext: () => void;
     composerShine?: boolean;
@@ -769,148 +1066,94 @@ function ChatInput({
     showToast: (variant: "default" | "success" | "error" | "warning", msg: string) => void;
     onOpenMcpDialog?: () => void;
     inSplitPanel?: boolean;
+    isCenterWelcome?: boolean;
+    activeTools?: string[];
+    onToggleTool?: (toolId: string) => void;
+    onClearTools?: () => void;
+    onOpenProfileSettings?: () => void;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const [modelMenuOpen, setModelMenuOpen] = useState(false);
+    const [toolMenuOpen, setToolMenuOpen] = useState(false);
+    const [plusMenuOpen, setPlusMenuOpen] = useState(false);
     const [modelQuery, setModelQuery] = useState("");
+    const [isFocused, setIsFocused] = useState(false);
     const [ingestingVault, setIngestingVault] = useState(false);
     const [vaultAddedFiles, setVaultAddedFiles] = useState<Record<string, boolean>>({});
 
     useLayoutEffect(() => {
         const ta = textareaRef.current;
         if (!ta) return;
-        ta.style.height = "0px";
+        if (!value || !value.trim()) {
+            ta.style.height = `${CHAT_TEXTAREA_MIN_HEIGHT_PX}px`;
+            return;
+        }
+        ta.style.height = "auto";
         ta.style.height = `${chatTextareaHeightPx(ta.scrollHeight, value)}px`;
     }, [value]);
 
     const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            onSend();
+        if (e.key === "Enter") {
+            if (!e.shiftKey || e.metaKey || e.ctrlKey) {
+                e.preventDefault();
+                if (isLoading && onStop) {
+                    onStop();
+                    return;
+                }
+                if (value.trim() || attachedFiles.length > 0) {
+                    onSend();
+                }
+            }
         }
     };
+
+    const [capabilityFilter, setCapabilityFilter] = useState<ModelCapabilityKey | "all">("all");
 
     const selectedModel = AVAILABLE_MODELS.find((m) => m.value === model);
 
-    const filteredModels = useMemo(() => {
-        const q = modelQuery.trim().toLowerCase();
-        if (!q) return AVAILABLE_MODELS;
-        return AVAILABLE_MODELS.filter(
-            (m) =>
-                m.label.toLowerCase().includes(q) ||
-                m.provider.toLowerCase().includes(q) ||
-                m.value.toLowerCase().includes(q),
-        );
-    }, [modelQuery]);
-
     const groupedModels = useMemo(() => {
         const map = new Map<string, typeof AVAILABLE_MODELS>();
-        for (const m of filteredModels) {
-            if (!map.has(m.provider)) map.set(m.provider, []);
-            map.get(m.provider)!.push(m);
+        for (const m of AVAILABLE_MODELS) {
+            if (capabilityFilter !== "all" && !hasModelCapability(m.value, capabilityFilter)) {
+                continue;
+            }
+            const list = map.get(m.provider) || [];
+            list.push(m);
+            map.set(m.provider, list);
         }
-        return map;
-    }, [filteredModels]);
+        return Array.from(map.entries()).map(([provider, models]) => ({ provider, models }));
+    }, [capabilityFilter]);
 
-    const pickModel = (next: string) => {
-        onModelChange(next);
-        setModelMenuOpen(false);
-        setModelQuery("");
-    };
-
-    const inputShell = (child: React.ReactNode) =>
-        composerShine ? (
-            <ShineBorder borderRadius={16} borderWidth={2} duration={12} color={["#a855f7", "#6366f1", "#22d3ee"]} className="w-full">
-                {child}
-            </ShineBorder>
-        ) : (
-            child
-        );
+    const isWebSearchActive = activeTools.includes("web-search");
 
     return (
-        <div
-            className={cn(
-                inSplitPanel
-                    ? "absolute bottom-3 left-0 right-0 z-30 w-full max-w-2xl mx-auto px-3 pointer-events-auto"
-                    : "fixed bottom-5 left-1/2 z-30 w-full max-w-4xl -translate-x-1/2 px-4 pointer-events-auto",
-                raiseForOnboarding && "z-[70]",
-            )}
-        >
-            {/* Quick prompt chips */}
-            {attachedFiles.length === 0 && (
-                <div
-                    data-chat-tour="quick-prompts"
-                    className="flex items-center gap-1.5 mb-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth justify-start sm:justify-center px-1"
-                >
-                    {QUICK_PROMPTS.map((q) => {
-                        const chip = (
-                            <button
-                                type="button"
-                                key={q.label}
-                                disabled={q.disabled}
-                                onClick={() => {
-                                    if (!q.disabled && q.prompt) onChange(q.prompt);
-                                }}
-                                className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs transition-all shadow-sm ${
-                                    q.disabled
-                                        ? "opacity-50 cursor-not-allowed bg-muted/40 border-border/40"
-                                        : "bg-background/90 backdrop-blur border-border/60 hover:border-foreground/30 hover:bg-muted"
-                                }`}
-                            >
-                                <span>{q.emoji}</span>
-                                <span className="text-muted-foreground">{q.label}</span>
-                            </button>
-                        );
-                        if (q.disabled && q.tooltip) {
-                            return (
-                                <Tooltip key={q.label}>
-                                    <TooltipTrigger asChild>
-                                        <span className="inline-flex">{chip}</span>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-[220px] text-xs">
-                                        {q.tooltip}
-                                    </TooltipContent>
-                                </Tooltip>
-                            );
-                        }
-                        return (
-                            <Tooltip key={q.label}>
-                                <TooltipTrigger asChild>{chip}</TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-[260px] text-xs">
-                                    {q.prompt || q.label}
-                                </TooltipContent>
-                            </Tooltip>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* Attached files & Memory Vault Ingestion Prompt */}
+        <div className={cn("w-full transition-all duration-200", raiseForOnboarding && "z-[70]")}>
+            {/* Attached files preview */}
             {attachedFiles.length > 0 && (
                 <div className="space-y-2 mb-2">
                     <div className="flex flex-wrap items-center gap-2">
                         {attachedFiles.map((f, i) => (
-                            <div key={i} className="flex items-center gap-1.5 bg-background/90 border border-border/60 rounded-lg px-2.5 py-1 text-xs shadow-sm">
+                            <div key={i} className="flex items-center gap-1.5 bg-[#1e1e22] border border-white/10 rounded-lg px-2.5 py-1 text-xs text-neutral-200 shadow-sm">
                                 <FileText className="w-3.5 h-3.5 text-primary" />
                                 <span className="max-w-[130px] truncate font-medium">{f.name}</span>
                                 {vaultAddedFiles[f.name] && (
-                                    <span className="text-[10px] text-emerald-500 font-semibold flex items-center gap-0.5">
+                                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-0.5">
                                         <Check className="w-3 h-3" /> In Vault
                                     </span>
                                 )}
-                                <button onClick={() => onRemoveFile(i)} className="text-muted-foreground hover:text-destructive ml-1">
+                                <button type="button" onClick={() => onRemoveFile(i)} className="text-neutral-400 hover:text-red-400 ml-1">
                                     <X className="w-3 h-3" />
                                 </button>
                             </div>
                         ))}
                     </div>
 
-                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-cyan-500/10 border border-indigo-500/20 backdrop-blur-md">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 backdrop-blur-md">
                         <div className="flex items-center gap-2 text-xs">
-                            <Sparkles className="w-3.5 h-3.5 text-primary shrink-0" />
-                            <span className="text-muted-foreground">
-                                Add {attachedFiles.length > 1 ? "these files" : attachedFiles[0].name} to your <strong className="text-foreground font-semibold">Memory Vault</strong>?
+                            <Sparkles className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                            <span className="text-neutral-300">
+                                Add {attachedFiles.length > 1 ? "these files" : attachedFiles[0].name} to your <strong className="text-white font-semibold">Memory Vault</strong>?
                             </span>
                         </div>
                         <Button
@@ -936,7 +1179,7 @@ function ChatInput({
                                     setIngestingVault(false);
                                 }
                             }}
-                            className="h-7 text-xs px-2.5 font-semibold bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white shadow-sm"
+                            className="h-7 text-xs px-2.5 font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm"
                         >
                             {ingestingVault ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Sparkles className="w-3 h-3 mr-1" />}
                             Yes, Add to Vault
@@ -945,193 +1188,697 @@ function ChatInput({
                 </div>
             )}
 
-            {/* Input container */}
-            {inputShell(
-                <div className="flex items-end gap-1.5 sm:gap-2 bg-background/95 backdrop-blur-xl border-2 border-border/60 focus-within:border-foreground/30 rounded-2xl px-2 py-2 sm:px-3 shadow-xl transition-all">
-                {/* Model: compact provider logo → popover (models + API key) + side sheets */}
-                <Popover
-                    open={modelMenuOpen}
-                    onOpenChange={(o) => {
-                        setModelMenuOpen(o);
-                        if (!o) setModelQuery("");
-                    }}
-                >
-                    <Tooltip>
-                        <TooltipTrigger asChild>
+            {/* Input Container - Starts as compact single-line, expands to squircle max height, scrolls cleanly */}
+            {/* Input Container - 2-tier squircle card with top textarea and bottom action bar */}
+            <div
+                className={cn(
+                    "relative w-full rounded-[24px] sm:rounded-[26px] border border-white/10 bg-[#161619] hover:border-white/15 focus-within:border-white/20 focus-within:bg-[#18181c] transition-colors duration-200 shadow-2xl",
+                    "p-3 sm:p-3.5 flex flex-col gap-2"
+                )}
+            >
+                {/* Center: Textarea auto-sizing from single-line to max height, then scrolling */}
+                <div className="w-full min-h-[32px] px-0.5">
+                    <textarea
+                        data-chat-tour="composer"
+                        ref={textareaRef}
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                        onKeyDown={handleKey}
+                        onFocus={() => {
+                            setIsFocused(true);
+                            onClearComposerShine?.();
+                        }}
+                        onBlur={() => {
+                            setIsFocused(false);
+                        }}
+                        placeholder={isCenterWelcome ? "Ask anything about your career, resume, or jobs…" : "Ask a follow-up…"}
+                        rows={1}
+                        aria-label="Chat message"
+                        className="w-full bg-transparent resize-none outline-none text-sm text-neutral-100 placeholder:text-neutral-500 leading-relaxed min-h-[30px] max-h-[140px] overflow-y-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                    />
+                </div>
+
+                {/* Bottom Action Row inside the input container */}
+                <div className="flex items-center justify-between gap-2 pt-0.5">
+                    {/* Left: Web Search Button + Plus button */}
+                    <div className="flex items-center gap-2 shrink-0">
+                        {/* Standalone sleek Web Search toggle button - NO circular thing beside it */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onToggleTool?.("web-search");
+                                showToast(
+                                    "default",
+                                    isWebSearchActive
+                                        ? "Live Web Search disabled"
+                                        : "Live Web Search (Tavily & Firecrawl) active: queries ground with real-time sources"
+                                );
+                            }}
+                            className={cn(
+                                "flex items-center gap-1.5 h-8 px-2.5 rounded-full transition-all duration-200 border text-xs font-medium",
+                                isWebSearchActive
+                                    ? "bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_12px_rgba(245,158,11,0.25)]"
+                                    : "bg-[#1c1c20] text-neutral-400 hover:text-white hover:bg-white/10 border-white/10"
+                            )}
+                            title={
+                                isWebSearchActive
+                                    ? "Web Search (Tavily & Firecrawl) active: Click to disable"
+                                    : "Enable real-time Web Search (Tavily & Firecrawl)"
+                            }
+                            aria-label="Toggle Web Search"
+                        >
+                            <Search className={cn("size-3.5 stroke-[2.2]", isWebSearchActive ? "text-amber-300" : "text-neutral-400")} />
+                            <span className="text-[11px] font-medium">Search</span>
+                        </button>
+
+                        {/* Plus button for attachments, vault, MCP */}
+                        <Popover open={plusMenuOpen} onOpenChange={setPlusMenuOpen}>
                             <PopoverTrigger asChild>
                                 <button
                                     type="button"
-                                    data-chat-tour="model-select"
-                                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-muted/70 text-foreground ring-offset-background transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40 focus-visible:ring-offset-2"
-                                    aria-label={`Model: ${selectedModel?.label ?? model}. Click to switch model.`}
-                                    aria-expanded={modelMenuOpen}
+                                    className="size-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors border border-transparent hover:border-white/10"
+                                    aria-label="Attachments and features"
+                                    title="Attachments and tools"
                                 >
-                                    {selectedModel?.provider ? (
-                                        <ModelProviderIcon provider={selectedModel.provider} size={18} className="opacity-95" />
-                                    ) : (
-                                        <span className="text-[10px] font-medium text-muted-foreground">?</span>
-                                    )}
+                                    <Plus className="size-4" />
                                 </button>
                             </PopoverTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent
-                            side="top"
-                            className="max-w-[min(92vw,280px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
-                        >
-                            Model: {selectedModel?.label ?? model}. Click to switch AI models.
-                        </TooltipContent>
-                    </Tooltip>
-                    <PopoverContent
-                        align="start"
-                        side="top"
-                        sideOffset={10}
-                        collisionPadding={12}
-                        className="z-[85] w-[min(94vw,22rem)] border-border/80 bg-popover p-0 shadow-xl"
-                        onOpenAutoFocus={(e) => e.preventDefault()}
-                    >
-                        <div className="border-b border-border/60 p-2.5">
-                            <div className="relative">
-                                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    value={modelQuery}
-                                    onChange={(e) => setModelQuery(e.target.value)}
-                                    placeholder="Search models…"
-                                    className="h-9 rounded-lg border-border/60 bg-background/80 pl-8 text-xs"
-                                />
-                            </div>
-                        </div>
-                        <ScrollArea className="h-[min(50vh,300px)]">
-                            <div className="p-1.5">
-                                {filteredModels.length === 0 ? (
-                                    <p className="px-2 py-6 text-center text-xs text-muted-foreground">No models match.</p>
-                                ) : (
-                                    Array.from(groupedModels.entries()).map(([provider, models]) => (
-                                        <div key={provider} className="mb-2 last:mb-0">
-                                            <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                                {provider}
-                                            </p>
-                                            <div className="space-y-0.5">
-                                                {models.map((m) => (
-                                                    <button
-                                                        key={m.value}
-                                                        type="button"
-                                                        onClick={() => pickModel(m.value)}
-                                                        className={cn(
-                                                            "flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left text-xs transition-colors hover:bg-muted/80",
-                                                            m.value === model ? "bg-muted font-medium" : "",
-                                                        )}
-                                                    >
-                                                        <ModelProviderIcon
-                                                            provider={m.provider}
-                                                            size={14}
-                                                            className="mt-0.5 shrink-0 opacity-90"
-                                                        />
-                                                        <span className="min-w-0 flex-1 leading-snug">{m.label}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
+                            <PopoverContent
+                                align="start"
+                                side="top"
+                                sideOffset={8}
+                                className="w-56 p-1.5 border-white/10 bg-[#1a1a1e] text-xs shadow-2xl rounded-xl z-[85]"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        fileRef.current?.click();
+                                        setPlusMenuOpen(false);
+                                    }}
+                                    className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-neutral-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                >
+                                    <Paperclip className="size-4 text-indigo-400" />
+                                    <div>
+                                        <p className="font-medium text-white">Attach Documents</p>
+                                        <p className="text-[10px] text-neutral-400">PDF, DOCX, TXT, JSON</p>
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        onToggleProfileContext();
+                                        setPlusMenuOpen(false);
+                                        showToast(
+                                            "default",
+                                            useProfileContext ? "Memory Vault context disabled" : "Memory Vault (RAG) context enabled"
+                                        );
+                                    }}
+                                    className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-neutral-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                >
+                                    <User className={cn("size-4", useProfileContext ? "text-emerald-400" : "text-neutral-500")} />
+                                    <div>
+                                        <p className="font-medium text-white">Memory Vault Context</p>
+                                        <p className="text-[10px] text-neutral-400">{useProfileContext ? "Active (Personalized)" : "Disabled"}</p>
+                                    </div>
+                                </button>
+                                {onOpenMcpDialog && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            onOpenMcpDialog();
+                                            setPlusMenuOpen(false);
+                                        }}
+                                        className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg text-neutral-300 hover:text-white hover:bg-white/10 transition-colors text-left"
+                                    >
+                                        <Plug className="size-4 text-purple-400" />
+                                        <div>
+                                            <p className="font-medium text-white">MCP Tools & Servers</p>
+                                            <p className="text-[10px] text-neutral-400">Autonomous integrations</p>
                                         </div>
-                                    ))
+                                    </button>
                                 )}
-                            </div>
-                        </ScrollArea>
-                    </PopoverContent>
-                </Popover>
+                            </PopoverContent>
+                        </Popover>
 
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <textarea
-                            data-chat-tour="composer"
-                            ref={textareaRef}
-                            value={value}
-                            onChange={(e) => onChange(e.target.value)}
-                            onKeyDown={handleKey}
-                            onFocus={() => onClearComposerShine?.()}
-                            placeholder="Ask me anything about your career…"
-                            rows={1}
-                            aria-label="Chat message"
-                            className="flex-1 bg-transparent resize-none outline-none text-sm placeholder:text-muted-foreground py-1.5 leading-relaxed max-h-[180px] overflow-y-auto min-h-[40px]"
-                            style={{ scrollbarWidth: "none" }}
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            multiple
+                            className="hidden"
+                            onChange={onFileAttach}
+                            accept=".pdf,.doc,.docx,.txt,.png,.jpg,.json,.csv"
                         />
-                    </TooltipTrigger>
-                    <TooltipContent
-                        side="top"
-                        className="max-w-[min(92vw,300px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
-                    >
-                        Press Cmd+Enter (or Ctrl+Enter) to send, Enter for a new line.
-                    </TooltipContent>
-                </Tooltip>
+                    </div>
 
-                {/* Attach + send */}
-                <div className="flex items-center gap-1 flex-shrink-0">
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                data-chat-tour="profile-toggle"
-                                type="button"
-                                onClick={onToggleProfileContext}
-                                className={`p-2 rounded-xl transition-all ${
-                                    useProfileContext
-                                        ? "text-foreground bg-muted"
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                }`}
-                                aria-pressed={useProfileContext}
-                                aria-label="Toggle global profile and knowledge context"
-                            >
-                                <User className="w-4 h-4" />
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent
-                            side="top"
-                            className="max-w-[min(92vw,320px)] border border-border/80 bg-popover px-3 py-2 text-sm leading-snug text-popover-foreground shadow-lg"
+                    {/* Right: Profile/Vault toggle + Send/Stop */}
+                    <div className="shrink-0 flex items-center gap-1.5 sm:gap-2">
+                        {/* Profile / Memory Vault (RAG) context button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onToggleProfileContext();
+                                showToast(
+                                    "default",
+                                    useProfileContext ? "Memory Vault context disabled" : "Memory Vault (RAG) active: personalizing with verified resume & goals"
+                                );
+                            }}
+                            className={cn(
+                                "size-8 rounded-full flex items-center justify-center transition-all duration-200 border",
+                                useProfileContext
+                                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/25 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                                    : "border-transparent text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
+                            )}
+                            title={
+                                useProfileContext
+                                    ? "Memory Vault (RAG) active: Injects verified resume & past conversation context"
+                                    : "Memory Vault (RAG) disabled: Click to enable personalized context"
+                            }
+                            aria-label="Toggle Memory Vault Context"
                         >
-                            {useProfileContext
-                                ? "Global profile is ON. Your name, email, career notes, and saved resume chunks are included in what the model sees."
-                                : "Global profile is OFF. Only the context text from Profile & Settings is sent—your stored profile fields are not added automatically."}
-                        </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
+                            <User className="size-4" />
+                        </button>
+
+                        {/* Send button replaced by Stop button when generating */}
+                        {isLoading ? (
                             <button
                                 type="button"
-                                onClick={() => fileRef.current?.click()}
-                                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
-                                aria-label="Attach files"
+                                onClick={onStop}
+                                className="size-8 rounded-full bg-[#2a2a2e] text-white hover:bg-[#38383e] flex items-center justify-center border border-white/15 transition-all shadow-md active:scale-95"
+                                title="Stop AI response"
+                                aria-label="Stop response"
                             >
-                                <Paperclip className="w-4 h-4" />
+                                <Square className="size-3.5 fill-white text-white" />
                             </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
-                            Attach PDF, DOCX, images, or text (max per browser limits).
-                        </TooltipContent>
-                    </Tooltip>
-                    <input
-                        ref={fileRef}
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={onFileAttach}
-                        accept=".pdf,.doc,.docx,.txt,.png,.jpg,.json,.csv"
-                    />
-                    <Tooltip>
-                        <TooltipTrigger asChild>
+                        ) : value.trim().length > 0 || attachedFiles.length > 0 ? (
                             <button
                                 type="button"
                                 onClick={onSend}
-                                disabled={(!value.trim() && attachedFiles.length === 0) || disabled}
-                                className="p-2 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:opacity-80 disabled:opacity-30 transition-all"
+                                disabled={disabled}
+                                className="size-8 rounded-full bg-white text-black font-bold flex items-center justify-center hover:bg-neutral-200 transition-all shadow-md active:scale-95 disabled:opacity-40"
+                                title="Send message (Enter or Cmd+Enter)"
                                 aria-label="Send message"
                             >
-                                <Send className="w-4 h-4" />
+                                <ArrowUp className="size-4 stroke-[2.5]" />
                             </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="text-xs">
-                            Send message to the assistant
-                        </TooltipContent>
-                    </Tooltip>
+                        ) : (
+                            <button
+                                type="button"
+                                disabled
+                                className="size-8 rounded-full flex items-center justify-center text-neutral-500 bg-[#242428] cursor-not-allowed transition-colors"
+                                aria-label="Send message"
+                            >
+                                <ArrowUp className="size-4 stroke-[2]" />
+                            </button>
+                        )}
+                    </div>
                 </div>
-                </div>,
-            )}
+            </div>
+
+            {/* Bottom Sub-bar directly underneath prompt input (Model Logo + Tools) */}
+            <div className="flex items-center justify-between gap-2 px-2 pt-2 text-xs">
+                {/* Left side: Active tools chips */}
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                    {activeTools.map((tid) => {
+                        const tool = AVAILABLE_CAREER_TOOLS.find((t) => t.id === tid);
+                        if (!tool) return null;
+                        const ToolIcon = tool.icon;
+                        return (
+                            <span
+                                key={tid}
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] backdrop-blur-md shadow-xs transition-all bg-indigo-500/15 border border-indigo-500/30 text-indigo-200"
+                            >
+                                <ToolIcon className={cn("size-3", tool.color)} />
+                                <span className="truncate max-w-[140px] font-medium">{tool.shortName || tool.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => onToggleTool?.(tid)}
+                                    className="hover:text-white text-indigo-300 ml-0.5"
+                                    aria-label={`Remove ${tool.name}`}
+                                >
+                                    <X className="size-2.5" />
+                                </button>
+                            </span>
+                        );
+                    })}
+                    {activeTools.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={onClearTools}
+                            className="text-[10px] text-neutral-400 hover:text-white underline underline-offset-2 ml-1"
+                        >
+                            Clear all
+                        </button>
+                    )}
+                </div>
+
+                {/* Right side: Model (with logo) and Tools selectors */}
+                <div className="flex items-center gap-2 shrink-0 ml-auto">
+                    {/* Model selector with Logo and capability badges */}
+                    <div className="flex items-center gap-1.5">
+                        <ModelSelector open={modelMenuOpen} onOpenChange={setModelMenuOpen}>
+                            <ModelSelectorTrigger asChild>
+                                <button
+                                    type="button"
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-neutral-400 hover:text-neutral-200 hover:bg-white/5 transition-colors border border-white/5 hover:border-white/10"
+                                    title={`Model: ${selectedModel?.label ?? model}`}
+                                >
+                                    {selectedModel && (
+                                        <ModelSelectorLogo provider={selectedModel.provider} className="size-3.5" />
+                                    )}
+                                    <span className="truncate max-w-[110px]">{selectedModel?.label ? selectedModel.label.split(" ")[0] : "Model"}</span>
+                                    <ChevronDown className="size-3 text-neutral-500" />
+                                </button>
+                            </ModelSelectorTrigger>
+                            <ModelSelectorContent title="Select AI Model" className="max-w-xl">
+                                <ModelSelectorInput placeholder="Search models (Gemini 4, Claude, GPT-6, DeepSeek)..." />
+                                <div className="border-b border-white/10 px-2 py-1.5 bg-black/20">
+                                    <CapabilityFilterBar
+                                        selectedCapability={capabilityFilter}
+                                        onSelectCapability={setCapabilityFilter}
+                                    />
+                                </div>
+                                <ModelSelectorList className="max-h-[320px] overflow-y-auto p-1.5 no-scrollbar">
+                                    <ModelSelectorEmpty className="py-6 text-center text-xs text-neutral-400">
+                                        No models found matching search or capability.
+                                    </ModelSelectorEmpty>
+                                    {groupedModels.map((grp) => (
+                                        <ModelSelectorGroup
+                                            key={grp.provider}
+                                            heading={grp.provider}
+                                            className="text-[11px] text-neutral-400 px-1 py-1 font-semibold uppercase tracking-wider"
+                                        >
+                                            {grp.models.map((m) => (
+                                                <ModelSelectorItem
+                                                    key={m.value}
+                                                    value={`${m.label} ${m.provider} ${m.value}`}
+                                                    onSelect={() => {
+                                                        onModelChange(m.value);
+                                                        setModelMenuOpen(false);
+                                                    }}
+                                                    className={cn(
+                                                        "flex items-center gap-2.5 px-3 py-2 text-xs rounded-xl cursor-pointer transition-colors my-0.5 group",
+                                                        m.value === model
+                                                            ? "bg-white/15 text-white font-medium shadow-sm"
+                                                            : "text-neutral-300 hover:bg-white/10 hover:text-white"
+                                                    )}
+                                                >
+                                                    <ModelSelectorLogo provider={m.provider} className="size-3.5" />
+                                                    <ModelSelectorName className="text-xs truncate">{m.label}</ModelSelectorName>
+                                                    <ModelCapabilityIcons modelId={m.value} size="xs" className="ml-auto shrink-0 mr-1" />
+                                                    {m.value === model && <Check className="size-3.5 text-indigo-400 ml-1 shrink-0" />}
+                                                </ModelSelectorItem>
+                                            ))}
+                                        </ModelSelectorGroup>
+                                    ))}
+                                </ModelSelectorList>
+                                <div className="border-t border-white/10 px-3 py-2 bg-black/30 flex items-center justify-between text-xs text-neutral-400">
+                                    <span className="text-[11px] text-neutral-400">
+                                        7 Capabilities: Thinking, Vision, Schema, Tools, Stream, Search, URL
+                                    </span>
+                                    <CapabilityLegendDialog />
+                                </div>
+                            </ModelSelectorContent>
+                        </ModelSelector>
+
+                        {/* Active Model Capabilities Icons right on the bar */}
+                        <div className="hidden lg:flex items-center gap-1 bg-black/30 border border-white/10 rounded-full px-2 py-0.5">
+                            <ModelCapabilityIcons modelId={model} size="xs" maxIcons={7} />
+                        </div>
+                    </div>
+
+                    {/* Tools Selector */}
+                    <ToolSelector open={toolMenuOpen} onOpenChange={setToolMenuOpen}>
+                        <ToolSelectorTrigger asChild>
+                            <button
+                                type="button"
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 border",
+                                    activeTools.length > 0
+                                        ? "bg-indigo-500/20 text-indigo-200 hover:bg-indigo-500/30 border-indigo-500/35 shadow-[0_0_12px_rgba(99,102,241,0.25)]"
+                                        : "bg-[#1c1c20] text-neutral-400 hover:text-neutral-200 hover:bg-white/10 border-white/10"
+                                )}
+                                title="Autonomous Career Tools & Settings"
+                            >
+                                <SlidersHorizontal className="size-3.5 text-neutral-400" />
+                                <span>{activeTools.length > 0 ? `${activeTools.length} Tools Active` : "Tools"}</span>
+                                <ChevronDown className="size-3 text-neutral-500" />
+                            </button>
+                        </ToolSelectorTrigger>
+                        <ToolSelectorContent
+                            title="Select Tools & Settings"
+                            className="sm:max-w-xl border-white/10 bg-[#121216]/98 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.85)] rounded-2xl overflow-hidden"
+                        >
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08] bg-gradient-to-r from-indigo-500/[0.08] via-transparent to-transparent">
+                                <div className="flex items-center gap-3">
+                                    <div className="size-9 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+                                        <SlidersHorizontal className="size-4" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-sm font-semibold text-white tracking-tight">Career & Agent Tools</h3>
+                                            {activeTools.length > 0 && (
+                                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                                    {activeTools.length} active
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] text-neutral-400 mt-0.5">
+                                            Enable specialized AI capabilities, ATS analyzers, and live research
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    {activeTools.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={onClearTools}
+                                            className="text-[11px] font-medium text-neutral-400 hover:text-white px-2 py-1 rounded-lg hover:bg-white/5 transition-colors"
+                                        >
+                                            Clear all
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Search bar */}
+                            <div className="p-3 border-b border-white/[0.06] bg-[#16161c]/50">
+                                <ToolSelectorInput
+                                    placeholder="Search tools, agents, ATS analyzers, or integrations..."
+                                    className="h-10 text-xs bg-[#1a1a22] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500 px-3"
+                                />
+                            </div>
+
+                            {/* Tools List */}
+                            <ToolSelectorList className="max-h-[380px] overflow-y-auto p-3.5 space-y-4 no-scrollbar">
+                                <ToolSelectorEmpty className="py-8 text-center text-xs text-neutral-400">
+                                    No tools or settings found.
+                                </ToolSelectorEmpty>
+
+                                {/* Group 1: Autonomous Career Agents */}
+                                <ToolSelectorGroup
+                                    heading="Autonomous Career Agents"
+                                    className="text-[11px] text-neutral-400 px-1 py-1 font-semibold uppercase tracking-wider mt-2"
+                                >
+                                    {AVAILABLE_CAREER_TOOLS.filter((t) => t.category === "Autonomous Agent" || t.category === "Document Creator").map((t) => {
+                                        const isActive = activeTools.includes(t.id);
+                                        const IconComp = t.icon;
+                                        return (
+                                            <ToolSelectorItem
+                                                key={t.id}
+                                                value={`${t.name} ${t.category} ${t.description}`}
+                                                onSelect={() => {
+                                                    onToggleTool?.(t.id);
+                                                    if (!value.trim() && t.promptSuggestion) {
+                                                        onChange(t.promptSuggestion);
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border my-1.5 group select-none",
+                                                    isActive
+                                                        ? "bg-indigo-500/[0.12] border-indigo-500/35 shadow-[0_0_20px_rgba(99,102,241,0.15)]"
+                                                        : "bg-[#18181f]/70 border-white/[0.06] hover:bg-[#202029] hover:border-white/15"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    <div className={cn("size-9 rounded-xl flex items-center justify-center shrink-0 border bg-gradient-to-br shadow-sm", (t as any).bgGradient || "from-white/10 to-white/5 border-white/10")}>
+                                                        <IconComp className={cn("size-4", t.color)} />
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <ToolSelectorName className="text-xs font-semibold text-white group-hover:text-indigo-200 transition-colors">
+                                                                {t.name}
+                                                            </ToolSelectorName>
+                                                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md uppercase tracking-wider bg-white/[0.06] text-neutral-400 border border-white/10 shrink-0">
+                                                                {t.category}
+                                                            </span>
+                                                        </div>
+                                                        <ToolSelectorDescription className="text-[11px] text-neutral-400 leading-snug mt-0.5 line-clamp-1">
+                                                            {t.description}
+                                                        </ToolSelectorDescription>
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0">
+                                                    {isActive ? (
+                                                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.25)]">
+                                                            <Check className="size-3 stroke-[2.5]" /> Active
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium text-neutral-400 group-hover:text-white bg-white/5 group-hover:bg-white/10 border border-white/10 transition-colors">
+                                                            Enable
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </ToolSelectorItem>
+                                        );
+                                    })}
+                                </ToolSelectorGroup>
+
+                                {/* Group 2: Live Grounding & Web Intelligence */}
+                                <ToolSelectorGroup
+                                    heading="Live Grounding & Web Research"
+                                    className="text-[11px] text-neutral-400 px-1 py-1 font-semibold uppercase tracking-wider mt-2"
+                                >
+                                    {AVAILABLE_CAREER_TOOLS.filter((t) => t.id === "web-search").map((t) => {
+                                        const isActive = activeTools.includes(t.id);
+                                        const IconComp = t.icon;
+                                        return (
+                                            <ToolSelectorItem
+                                                key={t.id}
+                                                value={`${t.name} ${t.category} ${t.description} tavily firecrawl`}
+                                                onSelect={() => {
+                                                    onToggleTool?.(t.id);
+                                                    if (!value.trim() && t.promptSuggestion) {
+                                                        onChange(t.promptSuggestion);
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border my-1.5 group select-none",
+                                                    isActive
+                                                        ? "bg-amber-500/[0.12] border-amber-500/35 shadow-[0_0_20px_rgba(245,158,11,0.15)]"
+                                                        : "bg-[#18181f]/70 border-white/[0.06] hover:bg-[#202029] hover:border-white/15"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    <div className={cn("size-9 rounded-xl flex items-center justify-center shrink-0 border bg-gradient-to-br shadow-sm", (t as any).bgGradient || "from-teal-500/20 to-emerald-500/10 border-teal-500/30")}>
+                                                        <IconComp className={cn("size-4", t.color)} />
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <ToolSelectorName className="text-xs font-semibold text-white group-hover:text-amber-200 transition-colors">
+                                                                {t.name}
+                                                            </ToolSelectorName>
+                                                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/25 shrink-0">
+                                                                Tavily & Firecrawl
+                                                            </span>
+                                                        </div>
+                                                        <ToolSelectorDescription className="text-[11px] text-neutral-400 leading-snug mt-0.5 line-clamp-1">
+                                                            {t.description}
+                                                        </ToolSelectorDescription>
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0">
+                                                    {isActive ? (
+                                                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_10px_rgba(245,158,11,0.25)]">
+                                                            <Check className="size-3 stroke-[2.5]" /> Active
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium text-neutral-400 group-hover:text-white bg-white/5 group-hover:bg-white/10 border border-white/10 transition-colors">
+                                                            Enable
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </ToolSelectorItem>
+                                        );
+                                    })}
+                                </ToolSelectorGroup>
+
+                                {/* Group 3: Career Prep & Outreach */}
+                                <ToolSelectorGroup
+                                    heading="Interview Prep & Outreach"
+                                    className="text-[11px] text-neutral-400 px-1 py-1 font-semibold uppercase tracking-wider mt-2"
+                                >
+                                    {AVAILABLE_CAREER_TOOLS.filter((t) => t.category === "Career Prep").map((t) => {
+                                        const isActive = activeTools.includes(t.id);
+                                        const IconComp = t.icon;
+                                        return (
+                                            <ToolSelectorItem
+                                                key={t.id}
+                                                value={`${t.name} ${t.category} ${t.description}`}
+                                                onSelect={() => {
+                                                    onToggleTool?.(t.id);
+                                                    if (!value.trim() && t.promptSuggestion) {
+                                                        onChange(t.promptSuggestion);
+                                                    }
+                                                }}
+                                                className={cn(
+                                                    "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border my-1.5 group select-none",
+                                                    isActive
+                                                        ? "bg-indigo-500/[0.12] border-indigo-500/35 shadow-[0_0_20px_rgba(99,102,241,0.15)]"
+                                                        : "bg-[#18181f]/70 border-white/[0.06] hover:bg-[#202029] hover:border-white/15"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                    <div className={cn("size-9 rounded-xl flex items-center justify-center shrink-0 border bg-gradient-to-br shadow-sm", (t as any).bgGradient || "from-white/10 to-white/5 border-white/10")}>
+                                                        <IconComp className={cn("size-4", t.color)} />
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <ToolSelectorName className="text-xs font-semibold text-white group-hover:text-indigo-200 transition-colors">
+                                                                {t.name}
+                                                            </ToolSelectorName>
+                                                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md uppercase tracking-wider bg-white/[0.06] text-neutral-400 border border-white/10 shrink-0">
+                                                                {t.category}
+                                                            </span>
+                                                        </div>
+                                                        <ToolSelectorDescription className="text-[11px] text-neutral-400 leading-snug mt-0.5 line-clamp-1">
+                                                            {t.description}
+                                                        </ToolSelectorDescription>
+                                                    </div>
+                                                </div>
+                                                <div className="shrink-0">
+                                                    {isActive ? (
+                                                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.25)]">
+                                                            <Check className="size-3 stroke-[2.5]" /> Active
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium text-neutral-400 group-hover:text-white bg-white/5 group-hover:bg-white/10 border border-white/10 transition-colors">
+                                                            Enable
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </ToolSelectorItem>
+                                        );
+                                    })}
+                                </ToolSelectorGroup>
+
+                                {/* Group 4: Profile & Memory Vault */}
+                                <ToolSelectorGroup
+                                    heading="Profile & Memory Vault"
+                                    className="text-[11px] text-neutral-400 px-1 py-1 font-semibold uppercase tracking-wider mt-2"
+                                >
+                                    <ToolSelectorItem
+                                        value="memory vault context rag profile"
+                                        onSelect={() => {
+                                            onToggleProfileContext();
+                                            showToast(
+                                                "default",
+                                                useProfileContext ? "Memory Vault context disabled" : "Memory Vault (RAG) context enabled"
+                                            );
+                                        }}
+                                        className={cn(
+                                            "flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border my-1.5 group select-none",
+                                            useProfileContext
+                                                ? "bg-emerald-500/[0.12] border-emerald-500/35 shadow-[0_0_20px_rgba(16,185,129,0.15)]"
+                                                : "bg-[#18181f]/70 border-white/[0.06] hover:bg-[#202029] hover:border-white/15"
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div className="size-9 rounded-xl flex items-center justify-center shrink-0 border border-emerald-500/30 bg-emerald-500/10 shadow-sm text-emerald-400">
+                                                <User className="size-4" />
+                                            </div>
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <ToolSelectorName className="text-xs font-semibold text-white">
+                                                        Memory Vault Context (RAG)
+                                                    </ToolSelectorName>
+                                                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-md uppercase tracking-wider bg-emerald-500/15 text-emerald-300 border border-emerald-500/25 shrink-0">
+                                                        Personalized
+                                                    </span>
+                                                </div>
+                                                <ToolSelectorDescription className="text-[11px] text-neutral-400 leading-snug mt-0.5 line-clamp-1">
+                                                    {useProfileContext ? "Active: Personalizing with verified resume & career goals" : "Disabled: Click to enable personalized context"}
+                                                </ToolSelectorDescription>
+                                            </div>
+                                        </div>
+                                        <div className="shrink-0">
+                                            {useProfileContext ? (
+                                                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-[0_0_10px_rgba(16,185,129,0.25)]">
+                                                    <Check className="size-3 stroke-[2.5]" /> Active
+                                                </span>
+                                            ) : (
+                                                <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium text-neutral-400 group-hover:text-white bg-white/5 group-hover:bg-white/10 border border-white/10 transition-colors">
+                                                    Enable
+                                                </span>
+                                            )}
+                                        </div>
+                                    </ToolSelectorItem>
+
+                                    <ToolSelectorItem
+                                        value="profile settings configuration api keys tavily firecrawl"
+                                        onSelect={() => {
+                                            setToolMenuOpen(false);
+                                            onOpenProfileSettings?.();
+                                        }}
+                                        className="flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border my-1.5 group select-none bg-[#18181f]/70 border-white/[0.06] hover:bg-[#202029] hover:border-white/15"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div className="size-9 rounded-xl flex items-center justify-center shrink-0 border border-indigo-500/30 bg-indigo-500/10 shadow-sm text-indigo-400">
+                                                <Settings2 className="size-4" />
+                                            </div>
+                                            <div className="flex flex-col min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <ToolSelectorName className="text-xs font-semibold text-white">
+                                                        Open Full Profile Settings
+                                                    </ToolSelectorName>
+                                                </div>
+                                                <ToolSelectorDescription className="text-[11px] text-neutral-400 leading-snug mt-0.5 line-clamp-1">
+                                                    Configure target roles, personal info, and custom API keys (Tavily, Firecrawl, etc.)
+                                                </ToolSelectorDescription>
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="size-4 text-neutral-500 group-hover:text-white transition-colors" />
+                                    </ToolSelectorItem>
+
+                                    {onOpenMcpDialog && (
+                                        <ToolSelectorItem
+                                            value="mcp tools autonomous integrations servers"
+                                            onSelect={() => {
+                                                setToolMenuOpen(false);
+                                                onOpenMcpDialog();
+                                            }}
+                                            className="flex items-center justify-between gap-3 p-3 rounded-xl cursor-pointer transition-all duration-200 border my-1.5 group select-none bg-[#18181f]/70 border-white/[0.06] hover:bg-[#202029] hover:border-white/15"
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                                                <div className="size-9 rounded-xl flex items-center justify-center shrink-0 border border-purple-500/30 bg-purple-500/10 shadow-sm text-purple-400">
+                                                    <Plug className="size-4" />
+                                                </div>
+                                                <div className="flex flex-col min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <ToolSelectorName className="text-xs font-semibold text-white">
+                                                            MCP Autonomous Tools
+                                                        </ToolSelectorName>
+                                                    </div>
+                                                    <ToolSelectorDescription className="text-[11px] text-neutral-400 leading-snug mt-0.5 line-clamp-1">
+                                                        Manage external Model Context Protocol servers & browser agents
+                                                    </ToolSelectorDescription>
+                                                </div>
+                                            </div>
+                                            <ChevronRight className="size-4 text-neutral-500 group-hover:text-white transition-colors" />
+                                        </ToolSelectorItem>
+                                    )}
+                                </ToolSelectorGroup>
+                            </ToolSelectorList>
+
+                            {/* Modal Footer */}
+                            <div className="flex items-center justify-between px-5 py-3 border-t border-white/[0.08] bg-[#141418] text-xs">
+                                <div className="flex items-center gap-1.5 text-[11px] text-neutral-400">
+                                    <Sparkles className="size-3.5 text-indigo-400" />
+                                    <span>Selected tools automatically ground every assistant response</span>
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => setToolMenuOpen(false)}
+                                    className="h-7 text-xs px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-sm transition-colors"
+                                >
+                                    Done
+                                </Button>
+                            </div>
+                        </ToolSelectorContent>
+                    </ToolSelector>
+                </div>
+            </div>
         </div>
     );
 }
@@ -1153,13 +1900,18 @@ export default function AICareerAssistantChat() {
     const [activeSideTab, setActiveSideTab] = useState<"webview" | "stage">("stage");
     const isSplitLayout = webviewOpen || activeStageComponent !== null;
     const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-    const [jobPanelOpen, setJobPanelOpen] = useState(false);
-    const [jobPanelLoading, setJobPanelLoading] = useState(false);
-    const [jobPanelProgress, setJobPanelProgress] = useState(0);
-    const [jobPanelProgressLabel, setJobPanelProgressLabel] = useState("Searching Google jobs...");
-    const [jobPanelJobs, setJobPanelJobs] = useState<JobSuggestion[]>([]);
-    const [jobProfileDialogOpen, setJobProfileDialogOpen] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const bottomAnchorRef = useRef<HTMLDivElement>(null);
+    const toasterRef = useRef<ToasterRef>(null);
+
+    const showToast = useCallback((variant: 'default' | 'success' | 'error' | 'warning', msg: string) => {
+        toasterRef.current?.show({
+            title: variant.charAt(0).toUpperCase() + variant.slice(1),
+            message: msg,
+            variant,
+            position: 'bottom-right',
+        });
+    }, []);
 
     const handleInjectWebviewSnippet = useCallback((snippet: string, _sourceUrl?: string) => {
         setInput((prev) => {
@@ -1179,6 +1931,50 @@ export default function AICareerAssistantChat() {
     const [useProfileContext, setUseProfileContext] = useState(true);
     const useProfileContextRef = useRef(true);
     useProfileContextRef.current = useProfileContext;
+    const [activeTools, setActiveTools] = useState<string[]>([]);
+    const activeToolsRef = useRef<string[]>([]);
+    activeToolsRef.current = activeTools;
+
+    const [searchSourcesDrawerOpen, setSearchSourcesDrawerOpen] = useState(false);
+    const [searchSourcesData, setSearchSourcesData] = useState<{ query: string; results: WebSearchResult[] }>({
+        query: "",
+        results: [],
+    });
+
+    useEffect(() => {
+        const handleOpenSources = (e: any) => {
+            if (e?.detail) {
+                setSearchSourcesData({
+                    query: e.detail.query || "Web Search",
+                    results: Array.isArray(e.detail.results) ? e.detail.results : [],
+                });
+                setSearchSourcesDrawerOpen(true);
+            }
+        };
+        const handleKey = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+                e.preventDefault();
+                setSearchSourcesDrawerOpen((prev) => !prev);
+            }
+        };
+        window.addEventListener("open-search-sources-drawer" as any, handleOpenSources);
+        window.addEventListener("keydown", handleKey);
+        return () => {
+            window.removeEventListener("open-search-sources-drawer" as any, handleOpenSources);
+            window.removeEventListener("keydown", handleKey);
+        };
+    }, []);
+
+    const handleToggleTool = useCallback((toolId: string) => {
+        setActiveTools((prev) =>
+            prev.includes(toolId) ? prev.filter((id) => id !== toolId) : [...prev, toolId]
+        );
+    }, []);
+
+    const handleClearTools = useCallback(() => {
+        setActiveTools([]);
+        showToast("default", "Active tools reset.");
+    }, [showToast]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -1376,18 +2172,12 @@ export default function AICareerAssistantChat() {
         }
     };
 
-    const toasterRef = useRef<ToasterRef>(null);
-    const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+    const router = useRouter();
+    const navigateToProfile = useCallback(() => {
+        router.push("/profile");
+    }, [router]);
+    const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
     const [showScrollButton, setShowScrollButton] = useState(false);
-    
-    const showToast = (variant: 'default' | 'success' | 'error' | 'warning', msg: string) => {
-        toasterRef.current?.show({
-            title: variant.charAt(0).toUpperCase() + variant.slice(1),
-            message: msg,
-            variant,
-            position: 'bottom-right',
-        });
-    };
 
     useEffect(() => {
         const onProfileUpdated = () => {
@@ -1443,6 +2233,17 @@ export default function AICareerAssistantChat() {
                     chatGlobalProfile: chatProfile,
                     aiMode: true,
                     mode: "career-assistant",
+                    webSearch: activeToolsRef.current.includes("web-search"),
+                    graphRag: true,
+                    vectorRag: true,
+                    providerKeys: {
+                        tavily: loadProviderKeys().tavily,
+                        firecrawl: loadProviderKeys().firecrawl,
+                        neo4jUri: loadProviderKeys().neo4jUri,
+                        neo4jUser: loadProviderKeys().neo4jUser,
+                        neo4jPassword: loadProviderKeys().neo4jPassword,
+                        neo4jDatabase: loadProviderKeys().neo4jDatabase,
+                    },
                 },
             };
             },
@@ -1502,49 +2303,6 @@ export default function AICareerAssistantChat() {
         }
     }, []);
 
-    // Cross-Device Restoration: Fetch and decrypt past chat sessions and resumes from GitHub
-    const hasRestoredFromCloudRef = useRef(false);
-    useEffect(() => {
-        const p = getStoredProfile();
-        const ghToken = user.githubToken || p.githubToken;
-        const ghOwner = user.githubUsername || p.github;
-        const ghRepo = user.githubRepo || p.githubRepo;
-        const passphrase = user.encryptionPassphrase;
-
-        if (user.isOnboarded && ghToken && ghOwner && ghRepo && !hasRestoredFromCloudRef.current) {
-            hasRestoredFromCloudRef.current = true;
-            GitHubSyncService.fetchAllEncryptedChatSessions(
-                { token: ghToken, owner: ghOwner, repo: ghRepo },
-                passphrase
-            ).then((remoteSessions) => {
-                if (remoteSessions && remoteSessions.length > 0) {
-                    const formatted = remoteSessions.map((rs: any) => ({
-                        id: rs.id || `session_${Date.now()}`,
-                        title: rs.title || "Restored Chat",
-                        createdAt: rs.createdAt || Date.now(),
-                        updatedAt: rs.updatedAt || Date.now(),
-                    }));
-                    setSessions((prev) => {
-                        const map = new Map();
-                        for (const s of prev) map.set(s.id, s);
-                        for (const s of formatted) map.set(s.id, s);
-                        const merged = Array.from(map.values());
-                        tryLocalStorageSet("chat_sessions", JSON.stringify(merged));
-                        return merged;
-                    });
-                    remoteSessions.forEach((rs: any) => {
-                        if (rs.messages && rs.id) {
-                            tryLocalStorageSet(`chat_messages_${rs.id}`, JSON.stringify(rs.messages));
-                        }
-                    });
-                    if (formatted.length > 0) {
-                        setCurrentSessionId(formatted[0].id);
-                    }
-                    showToast("success", `Restored ${remoteSessions.length} encrypted chat session(s) from GitHub.`);
-                }
-            }).catch(() => { /* silent */ });
-        }
-    }, [user.isOnboarded, user.githubToken, user.githubUsername, user.githubRepo, user.encryptionPassphrase, showToast]);
 
     // When currentSessionId changes, load its messages
     useEffect(() => {
@@ -1578,6 +2336,24 @@ export default function AICareerAssistantChat() {
         }
     }, [messages, currentSessionId]);
 
+    // Keep searchSourcesData automatically populated from latest search in conversation
+    useEffect(() => {
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const text = getTextContent(messages[i]);
+            if (text && text.includes("search-resources")) {
+                const { components } = extractComponents(text);
+                const searchComp = components.find((c) => c.type === "search-resources");
+                if (searchComp?.data && Array.isArray(searchComp.data.results) && searchComp.data.results.length > 0) {
+                    setSearchSourcesData({
+                        query: searchComp.data.query || "Live Web Search",
+                        results: searchComp.data.results,
+                    });
+                    break;
+                }
+            }
+        }
+    }, [messages]);
+
     useEffect(() => {
         lastMergedAssistantIdRef.current = null;
         resumeCvHintShownForAssistantIdRef.current = null;
@@ -1596,26 +2372,6 @@ export default function AICareerAssistantChat() {
 
         // Hint only once per assistant message, right when stream finishes
         if (wasStreaming && nowIdle) {
-            // Auto-sync chat session to GitHub repository (Zero-Knowledge Encrypted) if configured
-            const p = getStoredProfile();
-            const ghToken = user.githubToken || p.githubToken;
-            const ghOwner = user.githubUsername || p.github;
-            const ghRepo = user.githubRepo || p.githubRepo;
-            const passphrase = user.encryptionPassphrase;
-
-            if (ghToken && ghOwner && ghRepo) {
-                const sessionMessages = messages.map((m) => ({
-                    role: m.role,
-                    content: getTextContent(m) ?? "",
-                }));
-                GitHubSyncService.syncEncryptedChatSession(
-                    { token: ghToken, owner: ghOwner, repo: ghRepo },
-                    currentSessionId || "default",
-                    `Chat ${new Date().toLocaleDateString()}`,
-                    sessionMessages,
-                    passphrase
-                ).catch(() => { /* silent background sync */ });
-            }
 
             if (resumeCvHintShownForAssistantIdRef.current !== last.id) {
                 let lastUser = "";
@@ -1672,21 +2428,7 @@ export default function AICareerAssistantChat() {
                 }).catch(() => { /* offline / anonymous */ });
             }
 
-            // Auto-sync resume to user's private GitHub repository (Zero-Knowledge Encrypted)
-            const p = getStoredProfile();
-            const ghToken = user.githubToken || p.githubToken;
-            const ghOwner = user.githubUsername || p.github;
-            const ghRepo = user.githubRepo || p.githubRepo;
-            const passphrase = user.encryptionPassphrase;
 
-            if (ghToken && ghOwner && ghRepo) {
-                GitHubSyncService.syncEncryptedResume(
-                    { token: ghToken, owner: ghOwner, repo: ghRepo },
-                    (merged as any)?.basicInfo?.name ? `${(merged as any).basicInfo.name}-Resume` : "Resume",
-                    merged as unknown as Record<string, unknown>,
-                    passphrase
-                ).catch(() => { /* silent */ });
-            }
         } else {
             setResumeApplyOfferId(last.id);
         }
@@ -1721,14 +2463,30 @@ export default function AICareerAssistantChat() {
 
     const isAtBottomRef = useRef(true);
 
+    const scrollToBottom = useCallback(() => {
+        if (bottomAnchorRef.current) {
+            bottomAnchorRef.current.scrollIntoView({ behavior: "smooth" });
+        } else if (scrollRef.current) {
+            scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+        }
+        isAtBottomRef.current = true;
+        setShowScrollButton(false);
+    }, []);
+
     const handleChatScroll = useCallback(() => {
         if (!scrollRef.current) return;
         const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-        // User is considered at bottom if within 120px of bottom
-        const isAtBottom = scrollHeight - (scrollTop + clientHeight) < 120;
+        // User is at bottom if distance from bottom is less than 100px
+        const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+        const isAtBottom = distanceFromBottom < 100;
         isAtBottomRef.current = isAtBottom;
         setShowScrollButton(!isAtBottom);
     }, []);
+
+    const handleRestoreCheckpoint = useCallback((messageIndex: number) => {
+        setMessages(messages.slice(0, messageIndex + 1));
+        showToast("default", "Restored conversation to this checkpoint");
+    }, [messages, setMessages, showToast]);
 
     const handleNewSession = useCallback(() => {
         const id = Date.now().toString();
@@ -1775,217 +2533,27 @@ export default function AICareerAssistantChat() {
 
     // Scroll to bottom on new messages ONLY if user was already at the bottom
     useEffect(() => {
-        if (scrollRef.current && isAtBottomRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [messages, isLoading]);
-
-    const JOB_PROFILE_STORE_ID = "job-search-profile-store";
-
-    const loadJobSearchProfile = (): {
-        name: string;
-        email: string;
-        phone: string;
-        location: string;
-    } | null => {
-        try {
-            const raw = tryLocalStorageGet(JOB_PROFILE_STORE_ID);
-            if (!raw) return null;
-            return JSON.parse(raw) as {
-                name: string;
-                email: string;
-                phone: string;
-                location: string;
-            };
-        } catch {
-            return null;
-        }
-    };
-
-    const shouldScrapeJobsCommand = (text: string) => {
-        const t = (text || "").toLowerCase();
-        // Guardrails: job scraping must ONLY happen on explicit job-search intent.
-        // This prevents intercepting prompts like "create me a resume..."
-        if (/\b(resume|cv|cover\s*letter)\b/.test(t)) return false;
-
-        // Explicit command still supported
-        if (/^\s*\/jobs\b/.test(t) || /^\s*\/job\b/.test(t)) return true;
-
-        // Natural language: require BOTH an action verb AND an explicit jobs token.
-        const hasAction = /\b(find|search|look\s*for|looking\s*for|show\s*me|get\s*me|list)\b/.test(t);
-        const hasJobsToken =
-            /\b(jobs?|job\s*openings?|vacanc(?:y|ies)|opportunit(?:y|ies))\b/.test(t);
-
-        return hasAction && hasJobsToken;
-    };
-
-    const getResumeQuery = (resumeData: any) => {
-        try {
-            const safe = sanitizeResumeData(resumeData);
-            const title = safe.basicInfo?.title || "";
-            const location = safe.basicInfo?.location || "";
-            const skills = Array.isArray(safe.skills) ? safe.skills.slice(0, 8) : [];
-            const summary = safe.basicInfo?.summary || "";
-            return {
-                query: [title, summary, skills.join(" ")].filter(Boolean).join(" ").trim() || "software engineer",
-                location,
-            };
-        } catch {
-            return { query: "software engineer", location: "" };
-        }
-    };
-
-    const startJobScrape = useCallback(async () => {
-        if (jobPanelLoading) return;
-
-        const resumeData = getResumeData();
-        if (!resumeData) {
-            showToast("warning", "Generate your resume first (so we know your role + skills).");
-            return;
-        }
-
-        const safeQuery = getResumeQuery(resumeData);
-        const profile = loadJobSearchProfile();
-        const location = profile?.location || safeQuery.location || "";
-        const query = safeQuery.query;
-
-        setJobPanelOpen(true);
-        setJobPanelLoading(true);
-        setJobPanelProgress(8);
-        setJobPanelProgressLabel("Preparing your job search…");
-        setJobPanelJobs([]);
-
-        const steps = [
-            { label: "Searching Google jobs…", pct: 35 },
-            { label: "Filtering jobs posted within 5 minutes…", pct: 70 },
-            { label: "Formatting suggestions…", pct: 88 },
-        ];
-
-        let cancelled = false;
-        let stepIdx = 0;
-        const stepTimer = window.setInterval(() => {
-            if (cancelled) return;
-            const next = steps[Math.min(stepIdx, steps.length - 1)];
-            setJobPanelProgress((prev) => Math.max(prev, next.pct));
-            setJobPanelProgressLabel(next.label);
-            stepIdx += 1;
-            if (stepIdx >= steps.length) window.clearInterval(stepTimer);
-        }, 550);
-
-        try {
-            const res = await fetch("/api/job-search", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    query,
-                    location,
-                    maxResults: 30,
-                    maxPostedMinutes: 5,
-                    // Use the API key from the user's profile/settings (in-memory).
-                    apiKey: settingsRef.current.apiKey || undefined,
-                }),
-            });
-
-            if (!res.ok) throw new Error(`Job scrape failed (${res.status})`);
-            const data = (await res.json()) as { jobs?: JobSuggestion[]; error?: string };
-
-            const jobs = Array.isArray(data.jobs) ? data.jobs : [];
-            if (!cancelled) {
-                setJobPanelJobs(jobs);
-                setJobPanelProgress(100);
-                setJobPanelProgressLabel(jobs.length ? "Done" : "No recent jobs found");
-                setJobPanelLoading(false);
+        if (isAtBottomRef.current) {
+            if (bottomAnchorRef.current) {
+                bottomAnchorRef.current.scrollIntoView({ behavior: isLoading ? "auto" : "smooth" });
+            } else if (scrollRef.current) {
+                scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
             }
-        } catch (e) {
-            if (cancelled) return;
-            setJobPanelJobs([]);
-            setJobPanelProgress(100);
-            setJobPanelProgressLabel("Could not fetch jobs");
-            setJobPanelLoading(false);
-            showToast("error", e instanceof Error ? e.message : "Failed to fetch jobs");
-        } finally {
-            cancelled = true;
-            window.clearInterval(stepTimer);
         }
-    }, [getResumeData, jobPanelLoading]);
-
-    const handleUseJob = useCallback(
-        async (job: JobSuggestion) => {
-            setJobPanelOpen(false);
-            setJobPanelJobs([]);
-            setJobPanelLoading(false);
-            setJobPanelProgress(0);
-
-            const safeLink = job.link ? `\nJob link: ${job.link}` : "";
-            const text = `Tailor my resume and draft a short application plan for this role:\n\nTitle: ${job.title}\nCompany: ${job.company}\nLocation: ${job.location}${safeLink}\n\nInclude relevant keywords and suggest a cover letter outline.`;
-
-            sendMessage({ text });
-        },
-        [sendMessage]
-    );
-
-    const handleJobProfileSaved = useCallback(
-        (profile: { name: string; email: string; phone: string; location: string }) => {
-            try {
-                const raw = tryLocalStorageGet("resumeData");
-                const current = raw ? JSON.parse(raw) : {};
-                const next = {
-                    ...current,
-                    basicInfo: {
-                        ...(current.basicInfo || {}),
-                        name: profile.name,
-                        email: profile.email,
-                        phone: profile.phone,
-                        location: profile.location,
-                    },
-                };
-                tryLocalStorageSet("resumeData", JSON.stringify(next));
-            } catch {
-                // ignore
-            }
-        },
-        []
-    );
-
-    // If the user clicks “Apply Now” inside the job component,
-    // trigger the same flow as “Use this job” from the panel.
-    useEffect(() => {
-        const handler = (ev: Event) => {
-            const detail = (ev as CustomEvent<any>).detail;
-            if (!detail) return;
-            const job = detail as {
-                title?: string;
-                company?: string;
-                location?: string;
-                link?: string;
-            };
-
-            void handleUseJob({
-                id: String(detail.id ?? ""),
-                title: job.title ?? "Role",
-                company: job.company ?? "Company",
-                location: job.location ?? "Location not specified",
-                link: job.link ?? "",
-            } as JobSuggestion);
-        };
-
-        window.addEventListener("ai-chat:apply-job", handler);
-        return () => window.removeEventListener("ai-chat:apply-job", handler);
-    }, [handleUseJob]);
+    }, [messages, isLoading, status]);
 
     const handleSend = useCallback(async () => {
         const trimmed = input.trim();
         if (!trimmed && attachedFiles.length === 0) return;
 
-        // If user explicitly asks for jobs, show scraped results instead of chatting.
-        if (shouldScrapeJobsCommand(trimmed) && getResumeData()) {
-            setInput("");
-            setAttachedFiles([]);
-            void startJobScrape();
-            return;
+        let text = trimmed;
+        const userTools = activeTools
+            .filter((id) => !isDatabaseTool(id))
+            .map((id) => AVAILABLE_CAREER_TOOLS.find((t) => t.id === id)?.name)
+            .filter(Boolean);
+        if (userTools.length > 0) {
+            text = `[Active Tools: ${userTools.join(", ")}]\n\n${text}`;
         }
-
-        let text = input.trim();
         if (attachedFiles.length > 0) {
             text = text ? `${text}\n\n[Attached files: ${attachedFiles.map((f) => f.name).join(", ")}]` : `[Attached files: ${attachedFiles.map((f) => f.name).join(", ")}]`;
         }
@@ -1993,18 +2561,22 @@ export default function AICareerAssistantChat() {
         setInput("");
         setAttachedFiles([]);
         sendMessage({ text });
-    }, [input, attachedFiles, sendMessage, startJobScrape]);
+    }, [input, attachedFiles, activeTools, sendMessage]);
 
     // NOTE: We intentionally do NOT auto-open job suggestions after CV generation.
     // Jobs should appear only when the user explicitly asks for them.
 
     const handlePrompt = useCallback((p: string) => {
-        setInput(p);
-        // tiny delay so input state updates before send
-        setTimeout(() => {
-            sendMessage({ text: p });
-            setInput("");
-        }, 50);
+        let text = p;
+        const userTools = activeToolsRef.current
+            .filter((id) => !isDatabaseTool(id))
+            .map((id) => AVAILABLE_CAREER_TOOLS.find((t) => t.id === id)?.name)
+            .filter(Boolean);
+        if (userTools.length > 0) {
+            text = `[Active Tools: ${userTools.join(", ")}]\n\n${text}`;
+        }
+        setInput("");
+        sendMessage({ text });
     }, [sendMessage]);
 
     const handleExport = () => {
@@ -2182,14 +2754,6 @@ export default function AICareerAssistantChat() {
                 open={mcpDialogOpen}
                 onOpenChange={setMcpDialogOpen}
             />
-            <ProfileSettingsDialog
-                open={profileSettingsOpen}
-                onOpenChange={(v) => {
-                    setProfileSettingsOpen(v);
-                }}
-                settings={settings}
-                onSettingsChange={updateSettings}
-            />
             <Toaster ref={toasterRef} />
 
             {/* Sidebar (Desktop Collapsible Rail / Expanded + Mobile Drawer) */}
@@ -2212,49 +2776,59 @@ export default function AICareerAssistantChat() {
                 webviewOpen={webviewOpen}
                 onOpenMcp={() => setMcpDialogOpen(true)}
                 onOpenGuide={() => setOnboardingOpen(true)}
-                onOpenSettings={() => setProfileSettingsOpen(true)}
+                onOpenSettings={navigateToProfile}
+                onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+            />
+
+            {/* Scrollable Command Palette (Cmd+K / Ctrl+K) */}
+            <ChatCommandPalette
+                open={commandPaletteOpen}
+                onOpenChange={setCommandPaletteOpen}
+                sessions={sessions}
+                currentId={currentSessionId}
+                onSessionSelect={(id) => {
+                    setCurrentSessionId(id);
+                    setSidebarOpen(false);
+                }}
+                onNewSession={() => {
+                    handleNewSession();
+                    setSidebarOpen(false);
+                }}
+                onOpenWebview={() => setWebviewOpen((v) => !v)}
+                onOpenMcp={() => setMcpDialogOpen(true)}
+                onOpenGuide={() => setOnboardingOpen(true)}
+                onOpenSettings={navigateToProfile}
             />
 
             {/* Main Content Column */}
-            <div className="flex-1 flex flex-col h-full min-w-0 bg-[#161619]/90 relative overflow-hidden">
-                {/* Mobile-only floating sidebar trigger */}
-                <div className="md:hidden absolute top-3 left-3 z-30">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setSidebarOpen(true)}
-                        className="size-8 rounded-lg border border-white/10 bg-[#141416]/80 text-foreground backdrop-blur-md shadow-md"
-                        aria-label="Open sidebar"
-                        type="button"
-                    >
-                        <Menu className="size-4" />
-                    </Button>
-                </div>
+            <div className="flex-1 flex flex-col h-full min-w-0 bg-[#161619] relative overflow-hidden">
+                {/* Floating mobile sidebar trigger (unobtrusive, no top bar) */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setSidebarOpen(true)}
+                    className="md:hidden fixed top-3 left-3 z-30 size-8 rounded-full bg-[#18181c]/80 backdrop-blur-md border border-white/10 text-neutral-400 hover:text-white hover:bg-white/10 transition-colors shadow-lg"
+                    aria-label="Open sidebar"
+                    type="button"
+                >
+                    <Menu className="size-4" />
+                </Button>
 
-                {/* Floating Stop generation button if generating */}
-                {isLoading && (
-                    <div className="absolute top-3 right-3 z-30">
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            onClick={stop}
-                            className="h-7 px-2.5 text-xs gap-1.5 rounded-full shadow-lg backdrop-blur-md"
-                            aria-label="Stop generating"
-                        >
-                            <Loader2 className="size-3 animate-spin" />
-                            <span>Stop</span>
-                        </Button>
+                {/* Floating Top-Right Controls with Inbound Curves (Stop + Search + Settings) */}
+                <TopCornerControls
+                    isLoading={isLoading}
+                    onStop={stop}
+                    onOpenSettings={navigateToProfile}
+                    onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+                />
+
+                {/* Error banner */}
+                {error && (
+                    <div className="fixed top-14 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-destructive/10 border border-destructive/30 text-destructive rounded-xl px-4 py-2 text-xs shadow-lg">
+                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>{error.message?.slice(0, 120) ?? "An error occurred"}</span>
                     </div>
                 )}
-
-            {/* Error banner */}
-            {error && (
-                <div className="fixed top-16 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-destructive/10 border border-destructive/30 text-destructive rounded-xl px-4 py-2 text-xs shadow-lg">
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>{error.message?.slice(0, 120) ?? "An error occurred"}</span>
-                </div>
-            )}
 
             {/* Main Workspace Layout (Supports Split Webview / Component Stage + Chat) */}
             {isSplitLayout ? (
@@ -2337,87 +2911,209 @@ export default function AICareerAssistantChat() {
 
                     {/* Chat Column */}
                     <ResizablePanel defaultSize={50} minSize={30} className="flex flex-col relative h-full min-h-0 overflow-hidden">
-                        <div
-                            ref={scrollRef}
-                            onScroll={handleChatScroll}
-                            className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-64 pt-4 sm:pb-72"
-                            style={{ scrollbarWidth: "thin" }}
-                        >
-                            <div className="mx-auto w-full max-w-3xl px-3 sm:px-5">
-                                <AnimatePresence mode="wait">
-                                    {showWelcome ? (
-                                        <WelcomeScreen key="welcome" onPrompt={handlePrompt} />
-                                    ) : (
+                        <AnimatePresence mode="wait">
+                            {showWelcome ? (
+                                <motion.div
+                                    key="split-welcome"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0, y: -20, filter: "blur(6px)" }}
+                                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                                    className="flex-1 flex flex-col items-center justify-center px-4 py-8 relative z-10 min-h-0 overflow-y-auto"
+                                >
+                                    <div className="w-full max-w-xl mx-auto flex flex-col items-center -mt-8 sm:-mt-12">
+                                        <WelcomeHero />
                                         <motion.div
-                                            key="messages"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            className="space-y-6 py-8"
+                                            layoutId="chat-composer-split"
+                                            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                                            className="w-full"
                                         >
+                                            <ChatInput
+                                                value={input}
+                                                onChange={setInput}
+                                                onSend={handleSend}
+                                                onFileAttach={handleFileAttach}
+                                                attachedFiles={attachedFiles}
+                                                onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                                model={settings.model}
+                                                onModelChange={(m) => updateSettings({ model: m })}
+                                                disabled={isLoading}
+                                                isLoading={isLoading}
+                                                onStop={stop}
+                                                useProfileContext={useProfileContext}
+                                                onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                                                composerShine={composerShine}
+                                                onClearComposerShine={clearComposerShine}
+                                                settings={settings}
+                                                onSettingsChange={updateSettings}
+                                                raiseForOnboarding={onboardingOpen}
+                                                showToast={showToast}
+                                                onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                                                inSplitPanel={true}
+                                                isCenterWelcome={true}
+                                                activeTools={activeTools}
+                                                onToggleTool={handleToggleTool}
+                                                onClearTools={handleClearTools}
+                                                onOpenProfileSettings={navigateToProfile}
+                                            />
+                                        </motion.div>
+
+                                        {/* Centered prompt suggestions underneath composer (matching Image 1) */}
+                                        <div className="flex flex-wrap items-center justify-center gap-2 mt-5 max-w-xl mx-auto px-2">
+                                            {HERO_SUGGESTIONS.map((item) => {
+                                                const IconComp = item.icon;
+                                                return (
+                                                    <button
+                                                        key={item.label}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setInput(item.prompt);
+                                                        }}
+                                                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-neutral-300 bg-[#1c1c20] hover:bg-[#28282e] hover:text-white border border-white/5 hover:border-white/10 transition-all duration-150 shadow-sm"
+                                                    >
+                                                        <IconComp className="size-3.5 text-neutral-400" />
+                                                        <span>{item.label}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="split-messages"
+                                    initial={{ opacity: 0, y: 16 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                                    className="flex-1 flex flex-col min-h-0 relative"
+                                >
+                                    <div
+                                        ref={scrollRef}
+                                        onScroll={handleChatScroll}
+                                        className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-3 sm:px-4 py-4 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                                        style={{ scrollbarWidth: "none" }}
+                                    >
+                                        <div className="mx-auto w-full max-w-2xl space-y-6 pb-6">
                                             {messages.map((msg, i) => (
-                                                <MessageBubble
-                                                    key={msg.id ?? i}
-                                                    message={msg}
-                                                    isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
-                                                    onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
-                                                    onToast={showToast}
-                                                    chatApiKey={settings.apiKey}
-                                                    chatModel={settings.model}
-                                                    canonicalResumeKey={canonicalResumeKey}
-                                                    activeStageComponentId={activeStageComponent?.id}
-                                                    onPopOutToSide={(comp) => {
-                                                        setActiveStageComponent(comp);
-                                                        setActiveSideTab("stage");
-                                                    }}
-                                                    onDockToChat={() => setActiveStageComponent(null)}
-                                                />
+                                                <React.Fragment key={msg.id ?? i}>
+                                                    <MessageBubble
+                                                        message={msg}
+                                                        isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
+                                                        onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
+                                                        onToast={showToast}
+                                                        chatApiKey={settings.apiKey}
+                                                        chatModel={settings.model}
+                                                        canonicalResumeKey={canonicalResumeKey}
+                                                        activeStageComponentId={activeStageComponent?.id}
+                                                        onPopOutToSide={(comp) => {
+                                                            setActiveStageComponent(comp);
+                                                            setActiveSideTab("stage");
+                                                        }}
+                                                        onDockToChat={() => setActiveStageComponent(null)}
+                                                    />
+
+                                                    {/* Checkpoint divider between conversation turns (Video 1) */}
+                                                    {msg.role === "assistant" && i < messages.length - 1 && (
+                                                        <div className="flex items-center justify-center gap-3 py-2 text-xs text-neutral-500 select-none">
+                                                            <div className="h-px bg-white/5 flex-1" />
+                                                            <span className="text-[11px] font-medium tracking-wider uppercase text-neutral-500">Checkpoint</span>
+                                                            <span className="text-neutral-600">|</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRestoreCheckpoint(i)}
+                                                                className="text-[11px] text-neutral-400 hover:text-white underline transition-colors"
+                                                                title="Restore conversation to this turn"
+                                                            >
+                                                                Restore
+                                                            </button>
+                                                            <div className="h-px bg-white/5 flex-1" />
+                                                        </div>
+                                                    )}
+                                                </React.Fragment>
                                             ))}
 
-                                            {/* Typing indicator while submitted */}
+                                            {/* Animated Thinking Indicator */}
                                             <AnimatePresence>
-                                                {status === "submitted" && (
-                                                    <motion.div
-                                                        initial={{ opacity: 0, y: 8 }}
-                                                        animate={{ opacity: 1, y: 0 }}
-                                                        exit={{ opacity: 0 }}
-                                                        className="flex gap-3"
-                                                    >
-                                                        <Persona state="thinking" variant="obsidian" className="size-8 flex-shrink-0" />
-                                                        <div className="bg-background border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
-                                                            <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                                            <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                                            <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                                                        </div>
-                                                    </motion.div>
-                                                )}
+                                                {status === "submitted" && <ThinkingIndicator />}
                                             </AnimatePresence>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </div>
-                        </div>
 
-                        <ChatInput
-                            value={input}
-                            onChange={setInput}
-                            onSend={handleSend}
-                            onFileAttach={handleFileAttach}
-                            attachedFiles={attachedFiles}
-                            onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                            model={settings.model}
-                            onModelChange={(m) => updateSettings({ model: m })}
-                            disabled={isLoading}
-                            useProfileContext={useProfileContext}
-                            onToggleProfileContext={() => setUseProfileContext((v) => !v)}
-                            composerShine={composerShine}
-                            onClearComposerShine={clearComposerShine}
-                            settings={settings}
-                            onSettingsChange={updateSettings}
-                            raiseForOnboarding={onboardingOpen}
-                            showToast={showToast}
-                            onOpenMcpDialog={() => setMcpDialogOpen(true)}
-                            inSplitPanel={true}
-                        />
+                                            {/* Invisible Bottom Anchor Ref */}
+                                            <div ref={bottomAnchorRef} className="h-px w-full pointer-events-none" />
+                                        </div>
+                                    </div>
+
+                                    {/* Anchor Message Navigation Rail (Image 2) */}
+                                    <AnchorMessageScroller
+                                        messages={messages}
+                                        containerRef={scrollRef}
+                                    />
+
+                                    {/* Floating Scroll to Bottom Down Arrow (Matching Image 4) */}
+                                    <AnimatePresence>
+                                        {showScrollButton && (
+                                            <TooltipProvider delayDuration={100}>
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <motion.button
+                                                            type="button"
+                                                            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                                                            transition={{ duration: 0.15 }}
+                                                            onClick={scrollToBottom}
+                                                            className="absolute bottom-24 sm:bottom-28 right-6 sm:right-10 z-30 size-9 sm:size-10 rounded-full bg-[#1e1e24] hover:bg-[#282830] text-neutral-300 hover:text-white border border-white/10 shadow-xl flex items-center justify-center transition-all duration-150 backdrop-blur-md active:scale-95 group"
+                                                            aria-label="Scroll to bottom"
+                                                        >
+                                                            <ChevronDown className="size-5 stroke-[2.2] group-hover:translate-y-0.5 transition-transform" />
+                                                        </motion.button>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent side="left" className="bg-[#121215] border-white/10 text-xs text-neutral-200 shadow-xl py-1 px-2.5">
+                                                        Scroll to bottom
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                        )}
+                                    </AnimatePresence>
+
+                                    <motion.div
+                                        layoutId="chat-composer-split"
+                                        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                                        className="shrink-0 p-3 bg-gradient-to-t from-[#161619] via-[#161619]/90 to-transparent z-20"
+                                    >
+                                        <div className="mx-auto w-full max-w-2xl">
+                                            <ChatInput
+                                                value={input}
+                                                onChange={setInput}
+                                                onSend={handleSend}
+                                                onFileAttach={handleFileAttach}
+                                                attachedFiles={attachedFiles}
+                                                onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                                model={settings.model}
+                                                onModelChange={(m) => updateSettings({ model: m })}
+                                                disabled={isLoading}
+                                                isLoading={isLoading}
+                                                onStop={stop}
+                                                useProfileContext={useProfileContext}
+                                                onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                                                composerShine={composerShine}
+                                                onClearComposerShine={clearComposerShine}
+                                                settings={settings}
+                                                onSettingsChange={updateSettings}
+                                                raiseForOnboarding={onboardingOpen}
+                                                showToast={showToast}
+                                                onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                                                inSplitPanel={true}
+                                                isCenterWelcome={false}
+                                                activeTools={activeTools}
+                                                onToggleTool={handleToggleTool}
+                                                onClearTools={handleClearTools}
+                                                onOpenProfileSettings={navigateToProfile}
+                                            />
+                                        </div>
+                                    </motion.div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
                     </ResizablePanel>
 
                     {webviewSplitMode === "horizontal" && (
@@ -2495,27 +3191,92 @@ export default function AICareerAssistantChat() {
                 </ResizablePanelGroup>
             ) : (
                 /* Fullscreen Standard Chat */
-                <>
-                    <div
-                        ref={scrollRef}
-                        onScroll={handleChatScroll}
-                        className="relative z-10 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-64 pt-4 sm:pb-72"
-                        style={{ scrollbarWidth: "thin" }}
-                    >
-                        <div className="mx-auto w-full max-w-4xl px-3 sm:px-5">
-                            <AnimatePresence mode="wait">
-                                {showWelcome ? (
-                                    <WelcomeScreen key="welcome" onPrompt={handlePrompt} />
-                                ) : (
-                                    <motion.div
-                                        key="messages"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        className="space-y-6 py-8"
-                                    >
-                                        {messages.map((msg, i) => (
+                <AnimatePresence mode="wait">
+                    {showWelcome ? (
+                        <motion.div
+                            key="fs-welcome"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0, y: -20, filter: "blur(6px)" }}
+                            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                            className="flex-1 flex flex-col items-center justify-center px-4 py-8 relative z-10 min-h-0 overflow-y-auto"
+                        >
+                            <div className="w-full max-w-2xl mx-auto flex flex-col items-center -mt-12 sm:-mt-20">
+                                <WelcomeHero />
+                                <motion.div
+                                    layoutId="chat-composer-fullscreen"
+                                    transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                                    className="w-full"
+                                >
+                                    <ChatInput
+                                        value={input}
+                                        onChange={setInput}
+                                        onSend={handleSend}
+                                        onFileAttach={handleFileAttach}
+                                        attachedFiles={attachedFiles}
+                                        onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                        model={settings.model}
+                                        onModelChange={(m) => updateSettings({ model: m })}
+                                        disabled={isLoading}
+                                        isLoading={isLoading}
+                                        onStop={stop}
+                                        useProfileContext={useProfileContext}
+                                        onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                                        composerShine={composerShine}
+                                        onClearComposerShine={clearComposerShine}
+                                        settings={settings}
+                                        onSettingsChange={updateSettings}
+                                        raiseForOnboarding={onboardingOpen}
+                                        showToast={showToast}
+                                        onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                                        inSplitPanel={false}
+                                        isCenterWelcome={true}
+                                        activeTools={activeTools}
+                                        onToggleTool={handleToggleTool}
+                                        onClearTools={handleClearTools}
+                                        onOpenProfileSettings={navigateToProfile}
+                                    />
+                                </motion.div>
+
+                                {/* Centered prompt suggestions underneath composer (matching Image 1) */}
+                                <div className="flex flex-wrap items-center justify-center gap-2 mt-5 max-w-2xl mx-auto px-2">
+                                    {HERO_SUGGESTIONS.map((item) => {
+                                        const IconComp = item.icon;
+                                        return (
+                                            <button
+                                                key={item.label}
+                                                type="button"
+                                                onClick={() => {
+                                                    setInput(item.prompt);
+                                                }}
+                                                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-neutral-300 bg-[#1c1c20] hover:bg-[#28282e] hover:text-white border border-white/5 hover:border-white/10 transition-all duration-150 shadow-sm"
+                                            >
+                                                <IconComp className="size-3.5 text-neutral-400" />
+                                                <span>{item.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="fs-chat"
+                            initial={{ opacity: 0, y: 16 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                            className="flex-1 flex flex-col min-h-0 relative"
+                        >
+                            <div
+                                ref={scrollRef}
+                                onScroll={handleChatScroll}
+                                className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain px-3 sm:px-5 py-4 scrollbar-none [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                                style={{ scrollbarWidth: "none" }}
+                            >
+                                <div className="mx-auto w-full max-w-3xl space-y-6 pb-6">
+                                    {messages.map((msg, i) => (
+                                        <React.Fragment key={msg.id ?? i}>
                                             <MessageBubble
-                                                key={msg.id ?? i}
                                                 message={msg}
                                                 isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
                                                 onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
@@ -2530,57 +3291,113 @@ export default function AICareerAssistantChat() {
                                                 }}
                                                 onDockToChat={() => setActiveStageComponent(null)}
                                             />
-                                        ))}
 
-                                        {/* Typing indicator while submitted */}
-                                        <AnimatePresence>
-                                            {status === "submitted" && (
-                                                <motion.div
-                                                    initial={{ opacity: 0, y: 8 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    exit={{ opacity: 0 }}
-                                                    className="flex gap-3"
-                                                >
-                                                    <Persona state="thinking" variant="obsidian" className="size-8 flex-shrink-0" />
-                                                    <div className="bg-background border border-border/60 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
-                                                        <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                                        <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                                        <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                                                    </div>
-                                                </motion.div>
+                                            {/* Checkpoint divider between conversation turns (Video 1) */}
+                                            {msg.role === "assistant" && i < messages.length - 1 && (
+                                                <div className="flex items-center justify-center gap-3 py-2 text-xs text-neutral-500 select-none">
+                                                    <div className="h-px bg-white/5 flex-1" />
+                                                    <span className="text-[11px] font-medium tracking-wider uppercase text-neutral-500">Checkpoint</span>
+                                                    <span className="text-neutral-600">|</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRestoreCheckpoint(i)}
+                                                        className="text-[11px] text-neutral-400 hover:text-white underline transition-colors"
+                                                        title="Restore conversation to this turn"
+                                                    >
+                                                        Restore
+                                                    </button>
+                                                    <div className="h-px bg-white/5 flex-1" />
+                                                </div>
                                             )}
-                                        </AnimatePresence>
-                                    </motion.div>
+                                        </React.Fragment>
+                                    ))}
+
+                                    {/* Animated Thinking Indicator */}
+                                    <AnimatePresence>
+                                        {status === "submitted" && <ThinkingIndicator />}
+                                    </AnimatePresence>
+
+                                    {/* Invisible Bottom Anchor Ref */}
+                                    <div ref={bottomAnchorRef} className="h-px w-full pointer-events-none" />
+                                </div>
+                            </div>
+
+                            {/* Anchor Message Navigation Rail (Image 2) */}
+                            <AnchorMessageScroller
+                                messages={messages}
+                                containerRef={scrollRef}
+                            />
+
+                            {/* Floating Scroll to Bottom Down Arrow (Matching Image 4) */}
+                            <AnimatePresence>
+                                {showScrollButton && (
+                                    <TooltipProvider delayDuration={100}>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <motion.button
+                                                    type="button"
+                                                    initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                    exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                                                    transition={{ duration: 0.15 }}
+                                                    onClick={scrollToBottom}
+                                                    className="absolute bottom-24 sm:bottom-28 right-6 sm:right-10 z-30 size-9 sm:size-10 rounded-full bg-[#1e1e24] hover:bg-[#282830] text-neutral-300 hover:text-white border border-white/10 shadow-xl flex items-center justify-center transition-all duration-150 backdrop-blur-md active:scale-95 group"
+                                                    aria-label="Scroll to bottom"
+                                                >
+                                                    <ChevronDown className="size-5 stroke-[2.2] group-hover:translate-y-0.5 transition-transform" />
+                                                </motion.button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="left" className="bg-[#121215] border-white/10 text-xs text-neutral-200 shadow-xl py-1 px-2.5">
+                                                Scroll to bottom
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
                                 )}
                             </AnimatePresence>
-                        </div>
-                    </div>
 
-                    <ChatInput
-                        value={input}
-                        onChange={setInput}
-                        onSend={handleSend}
-                        onFileAttach={handleFileAttach}
-                        attachedFiles={attachedFiles}
-                        onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                        model={settings.model}
-                        onModelChange={(m) => updateSettings({ model: m })}
-                        disabled={isLoading}
-                        useProfileContext={useProfileContext}
-                        onToggleProfileContext={() => setUseProfileContext((v) => !v)}
-                        composerShine={composerShine}
-                        onClearComposerShine={clearComposerShine}
-                        settings={settings}
-                        onSettingsChange={updateSettings}
-                        raiseForOnboarding={onboardingOpen}
-                        showToast={showToast}
-                        onOpenMcpDialog={() => setMcpDialogOpen(true)}
-                        inSplitPanel={false}
-                    />
-                </>
+                            {/* Docked bottom composer */}
+                            <motion.div
+                                layoutId="chat-composer-fullscreen"
+                                transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+                                className="shrink-0 p-3 sm:p-4 bg-gradient-to-t from-[#161619] via-[#161619]/90 to-transparent z-20"
+                            >
+                                <div className="mx-auto w-full max-w-3xl">
+                                    <ChatInput
+                                        value={input}
+                                        onChange={setInput}
+                                        onSend={handleSend}
+                                        onFileAttach={handleFileAttach}
+                                        attachedFiles={attachedFiles}
+                                        onRemoveFile={(i) => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                        model={settings.model}
+                                        onModelChange={(m) => updateSettings({ model: m })}
+                                        disabled={isLoading}
+                                        isLoading={isLoading}
+                                        onStop={stop}
+                                        useProfileContext={useProfileContext}
+                                        onToggleProfileContext={() => setUseProfileContext((v) => !v)}
+                                        composerShine={composerShine}
+                                        onClearComposerShine={clearComposerShine}
+                                        settings={settings}
+                                        onSettingsChange={updateSettings}
+                                        raiseForOnboarding={onboardingOpen}
+                                        showToast={showToast}
+                                        onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                                        inSplitPanel={false}
+                                        isCenterWelcome={false}
+                                        activeTools={activeTools}
+                                        onToggleTool={handleToggleTool}
+                                        onClearTools={handleClearTools}
+                                        onOpenProfileSettings={navigateToProfile}
+                                    />
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             )}
 
-            {resumeApplyOfferId && !jobPanelOpen && (
+            {resumeApplyOfferId && (
                 <div className="pointer-events-none fixed inset-x-0 bottom-[5.75rem] z-[36] flex justify-center px-3 sm:bottom-[6.25rem]">
                     <div className="pointer-events-auto flex w-full max-w-lg items-center gap-2 rounded-2xl border border-primary/35 bg-background/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl dark:border-primary/25 dark:bg-[#0c0c10]/95 sm:gap-3 sm:px-4">
                         <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
@@ -2597,6 +3414,15 @@ export default function AICareerAssistantChat() {
                 </div>
             )}
 
+
+            {/* Search Sources Right Drawer (Matching Image 2) */}
+            <SearchSourcesDrawer
+                isOpen={searchSourcesDrawerOpen}
+                onClose={() => setSearchSourcesDrawerOpen(false)}
+                query={searchSourcesData.query}
+                results={searchSourcesData.results}
+                onFeedbackClick={() => showToast("success", "Search feedback recorded!")}
+            />
 
             </div>
         </div>

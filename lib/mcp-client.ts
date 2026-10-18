@@ -51,6 +51,7 @@ export async function callMcpTool(name: string, args: Record<string, unknown> = 
 export async function mcpListTemplates(category: "all" | "resume" | "coverletter" = "all"): Promise<{
   resumeTemplates?: string[];
   coverLetterTemplates?: string[];
+  templateBudgets?: Record<string, any>;
 }> {
   const result = await callMcpTool("list_templates", { category });
   const textItem = result.content.find((c) => c.type === "text");
@@ -59,6 +60,25 @@ export async function mcpListTemplates(category: "all" | "resume" | "coverletter
     return JSON.parse(textItem.text);
   } catch {
     return {};
+  }
+}
+
+/**
+ * Validate Resume Page Budget via MCP server
+ * Returns character count, max character limit, overflow status, and actionable trimming feedback
+ */
+export async function mcpValidateTemplatePageBudget(
+  resumeData: ResumeData,
+  template: Template = "modern",
+  targetPages: number = 1
+): Promise<any> {
+  const result = await callMcpTool("validate_template_page_budget", { resumeData, template, targetPages });
+  const textItem = result.content.find((c) => c.type === "text");
+  if (!textItem?.text) return null;
+  try {
+    return JSON.parse(textItem.text);
+  } catch {
+    return null;
   }
 }
 

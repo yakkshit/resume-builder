@@ -62,6 +62,8 @@ const RESUME_KEYS = [
   "certifications",
   "publications",
   "languages",
+  "language",
+  "lang",
   "portfolioLinks",
   "portfolio",
 ] as const
@@ -109,6 +111,15 @@ export function unwrapResumeEnvelope(obj: Record<string, unknown> | null): {
   if (!obj) return { resume: null }
 
   const topTemplate = typeof obj.template === "string" ? obj.template : undefined
+  const topLanguage = typeof obj.language === "string" ? obj.language : typeof (obj as any).lang === "string" ? (obj as any).lang : undefined
+
+  const attachLanguage = (target: Record<string, unknown> | null): Record<string, unknown> | null => {
+    if (!target) return null
+    if (topLanguage && !target.language) {
+      target.language = topLanguage
+    }
+    return target
+  }
 
   const tryFlat = (candidate: Record<string, unknown>): Record<string, unknown> | null => {
     const flat = normalizeResumePayloadToFlat(candidate)
@@ -118,19 +129,24 @@ export function unwrapResumeEnvelope(obj: Record<string, unknown> | null): {
   }
 
   const fromTop = tryFlat(obj)
-  if (fromTop) return { resume: fromTop, template: topTemplate }
+  if (fromTop) return { resume: attachLanguage(fromTop), template: topTemplate }
 
   const props = obj.props
   if (props && typeof props === "object" && !Array.isArray(props)) {
     const p = props as Record<string, unknown>
     const pt = typeof p.template === "string" ? p.template : topTemplate
+    const pLang = typeof p.language === "string" ? p.language : topLanguage
     const fromProps = tryFlat(p)
-    if (fromProps) return { resume: fromProps, template: pt }
+    if (fromProps) {
+      if (pLang && !fromProps.language) fromProps.language = pLang
+      return { resume: fromProps, template: pt }
+    }
     const prd = p.resumeData
     if (prd && typeof prd === "object" && !Array.isArray(prd)) {
       const flatPrd = normalizeResumePayloadToFlat(prd as Record<string, unknown>) ??
         (isResumeUpdateShape(prd as Record<string, unknown>) ? (prd as Record<string, unknown>) : null)
       if (flatPrd && isResumeUpdateShape(flatPrd)) {
+        if (pLang && !flatPrd.language) flatPrd.language = pLang
         return { resume: flatPrd, template: pt }
       }
     }

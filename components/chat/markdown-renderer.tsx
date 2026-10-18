@@ -9,9 +9,12 @@ import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+import { AICitation } from "@/components/ai-elements/inline-citation";
+
 interface MarkdownRendererProps {
   content: string;
   className?: string;
+  onOpenSourceUrl?: (url: string) => void;
 }
 
 function CodeBlock({
@@ -61,7 +64,7 @@ function CodeBlock({
   );
 }
 
-export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+export function MarkdownRenderer({ content, className, onOpenSourceUrl }: MarkdownRendererProps) {
   return (
     <div
       className={cn(
@@ -103,6 +106,41 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
               >
                 {children}
               </code>
+            );
+          },
+          // Custom citation link with InlineCitation & hovercard preview (Image 3)
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          a: ({ node, href, children, ...props }) => {
+            const url = href || "";
+            const isExternal = url.startsWith("http://") || url.startsWith("https://");
+
+            if (!isExternal) {
+              return (
+                <a href={url} className="text-blue-400 hover:underline" {...props}>
+                  {children}
+                </a>
+              );
+            }
+
+            let domain = "";
+            try {
+              domain = new URL(url).hostname.replace(/^www\./, "");
+            } catch {
+              domain = url;
+            }
+
+            const rawLabel = typeof children === "string" 
+              ? children 
+              : (Array.isArray(children) && typeof children[0] === "string" ? children[0] : domain);
+
+            return (
+              <AICitation
+                url={url}
+                label={rawLabel}
+                title={rawLabel !== domain ? String(rawLabel) : domain}
+                description={`Verified web reference on ${domain}. Click to inspect live source.`}
+                onOpenUrl={onOpenSourceUrl}
+              />
             );
           },
         }}

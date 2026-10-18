@@ -42,7 +42,7 @@ describe("DatabaseService & User Onboarding Persistence", () => {
       template: "gradient",
       data: {
         basicInfo: { name: "Jordan Lee" },
-        skills: { Core: ["Next.js", "PostgreSQL", "Drizzle ORM"] },
+        skills: { Core: ["Next.js", "PostgreSQL", "TypeScript"] },
       },
     });
 

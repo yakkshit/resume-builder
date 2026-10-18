@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
 import { lightIconUrls, darkIconUrls } from "@/components/logos/logos"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // German Slate Split Lebenslauf (Paul Schmidt style)
 const styles = StyleSheet.create({
@@ -204,8 +205,11 @@ const styles = StyleSheet.create({
   },
 })
 
-export function GermanSlateSplitTemplate({ resumeData }: { resumeData: ResumeData }) {
+export function GermanSlateSplitTemplate({ resumeData, language }: { resumeData: ResumeData; language?: string }) {
   const { basicInfo, experience = [], education = [], skills = [], projects = [], achievements = [] } = resumeData
+  const activeLang = (language || resumeData.language || "en").toLowerCase()
+  const isGerman = activeLang.startsWith("de")
+  const titles = getResumeSectionTitles(activeLang)
 
   return (
     <Document>
@@ -221,13 +225,13 @@ export function GermanSlateSplitTemplate({ resumeData }: { resumeData: ResumeDat
           {/* Experience */}
           {experience.length > 0 && (
             <View style={styles.leftSection}>
-              <Text style={styles.leftSectionTitle}>Erfahrung</Text>
+              <Text style={styles.leftSectionTitle}>{titles.experience}</Text>
               {experience.map((exp, idx) => (
                 <View key={idx} style={styles.timelineRow}>
                   {/* Left Date Column */}
                   <View style={styles.dateColumn}>
                     <Text style={styles.dateText}>{exp.startDate || ""}</Text>
-                    <Text style={styles.dateText}>{exp.endDate || "Aktuell"}</Text>
+                    <Text style={styles.dateText}>{exp.endDate || titles.present}</Text>
                   </View>
 
                   {/* Right Content Column */}
@@ -252,7 +256,7 @@ export function GermanSlateSplitTemplate({ resumeData }: { resumeData: ResumeDat
           {/* Education */}
           {education.length > 0 && (
             <View style={styles.leftSection}>
-              <Text style={styles.leftSectionTitle}>Ausbildung</Text>
+              <Text style={styles.leftSectionTitle}>{titles.education}</Text>
               {education.map((edu, idx) => (
                 <View key={idx} style={styles.timelineRow}>
                   <View style={styles.dateColumn}>
@@ -262,7 +266,7 @@ export function GermanSlateSplitTemplate({ resumeData }: { resumeData: ResumeDat
                   <View style={styles.contentColumn}>
                     <Text style={styles.itemRole}>{edu.degree} {edu.field ? `in ${edu.field}` : ""}</Text>
                     <Text style={styles.itemCompany}>{edu.institution}</Text>
-                    {edu.gpa ? <Text style={styles.itemDescription}>Abschlussnote: {edu.gpa}</Text> : null}
+                    {edu.gpa ? <Text style={styles.itemDescription}>{isGerman ? "Abschlussnote: " : "GPA: "}{edu.gpa}</Text> : null}
                   </View>
                 </View>
               ))}
@@ -272,7 +276,7 @@ export function GermanSlateSplitTemplate({ resumeData }: { resumeData: ResumeDat
           {/* Projects */}
           {projects.length > 0 && (
             <View style={styles.leftSection}>
-              <Text style={styles.leftSectionTitle}>Projekte</Text>
+              <Text style={styles.leftSectionTitle}>{titles.projects}</Text>
               {projects.map((proj, idx) => (
                 <View key={idx} style={styles.timelineRow}>
                   <View style={styles.dateColumn}>
@@ -344,18 +348,18 @@ export function GermanSlateSplitTemplate({ resumeData }: { resumeData: ResumeDat
             )}
           </View>
 
-          {/* Summary / Betreff */}
+          {/* Summary */}
           {basicInfo.summary && (
             <View style={styles.sidebarSection}>
-              <Text style={styles.sidebarSectionTitle}>Betreff</Text>
+              <Text style={styles.sidebarSectionTitle}>{titles.summary}</Text>
               <Text style={styles.sidebarSummaryText}>{basicInfo.summary}</Text>
             </View>
           )}
 
-          {/* Skills / Fähigkeiten */}
+          {/* Skills */}
           {skills.length > 0 && (
             <View style={styles.sidebarSection}>
-              <Text style={styles.sidebarSectionTitle}>Fähigkeiten</Text>
+              <Text style={styles.sidebarSectionTitle}>{titles.skills}</Text>
               {skills.map((skill, idx) => (
                 <View key={idx} style={styles.sidebarBulletRow}>
                   <View style={styles.sidebarBulletDot} />
@@ -365,14 +369,16 @@ export function GermanSlateSplitTemplate({ resumeData }: { resumeData: ResumeDat
             </View>
           )}
 
-          {/* Languages / Sprachen */}
+          {/* Languages */}
           {basicInfo.languages && basicInfo.languages.length > 0 && (
             <View style={styles.sidebarSection}>
-              <Text style={styles.sidebarSectionTitle}>Sprachen</Text>
+              <Text style={styles.sidebarSectionTitle}>{titles.languages}</Text>
               {basicInfo.languages.map((lang, idx) => {
                 const parts = lang.split(/[:\-(]/)
                 const name = parts[0]?.trim() || lang
-                const level = parts[1]?.replace(/[)]/g, "").trim() || (idx === 0 ? "Muttersprache" : "Fortgeschritten")
+                const defaultLevel = idx === 0 ? (isGerman ? "Muttersprache" : "Native") : (isGerman ? "Fortgeschritten" : "Fluent")
+                const rawLevel = parts[1]?.replace(/[)]/g, "").trim()
+                const level = rawLevel || defaultLevel
                 return (
                   <View key={idx} style={styles.sidebarBulletRow}>
                     <View style={styles.sidebarBulletDot} />
@@ -388,7 +394,7 @@ export function GermanSlateSplitTemplate({ resumeData }: { resumeData: ResumeDat
           {/* Achievements (if any) */}
           {achievements.length > 0 && (
             <View style={styles.sidebarSection}>
-              <Text style={styles.sidebarSectionTitle}>Erfolge</Text>
+              <Text style={styles.sidebarSectionTitle}>{titles.achievements}</Text>
               {achievements.map((ach, idx) => (
                 <View key={idx} style={styles.sidebarBulletRow}>
                   <View style={styles.sidebarBulletDot} />

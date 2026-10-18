@@ -109,11 +109,17 @@ import React from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import { sanitizeCoverLetterData } from "@/lib/sanitize-cover-letter-data"
 import type { ResumeData, CoverLetterData } from "@/lib/types"
+import { localizeResumePdfElement } from "@/lib/resume-section-titles"
 
 function createSafeResumeTemplate(RawTemplate: any) {
-  const SafeComponent = (props: { resumeData: ResumeData; [key: string]: any }) => {
-    const safeData = sanitizeResumeData(props?.resumeData)
-    return React.createElement(RawTemplate, { ...props, resumeData: safeData })
+  const SafeComponent = (props: { resumeData: ResumeData; language?: string; [key: string]: any }) => {
+    const rawData = props?.resumeData
+    const lang = (props?.language || rawData?.language || "en").toLowerCase()
+    const safeData = sanitizeResumeData({ ...rawData, language: lang })
+    const rendered = typeof RawTemplate === "function"
+      ? RawTemplate({ ...props, resumeData: safeData, language: lang })
+      : React.createElement(RawTemplate, { ...props, resumeData: safeData, language: lang })
+    return localizeResumePdfElement(rendered, lang)
   }
   SafeComponent.displayName = `SafeTemplate(${RawTemplate.displayName || RawTemplate.name || "Template"})`
   return SafeComponent

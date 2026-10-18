@@ -2,8 +2,21 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
-import { isClerkConfigured } from "@/lib/auth/clerk-config";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { 
+  getFirebaseAuth, 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  GithubAuthProvider, 
+  firebaseSignOut, 
+  updateProfile,
+  sendPasswordResetEmail,
+  isFirebaseConfigured,
+  type FirebaseUser
+} from "@/lib/firebase";
+import { getStoredProfile } from "@/components/chat/profile-settings-dialog";
 
 export interface GitHubSyncState {
   username: string;
@@ -44,24 +57,31 @@ export interface OnboardingData {
   encryptionPassphrase?: string;
 }
 
-interface AuthContextType {
+export interface AuthContextType {
   user: AuthUser;
+  loading: boolean;
+  firebaseUser: FirebaseUser | null;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, name?: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithGithub: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   login: (email: string, name?: string, passphrase?: string) => Promise<void>;
   oneClickAuth: (provider?: "google" | "github" | "guest") => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   linkGithub: (username: string, token: string, repo: string, branch?: string) => void;
   completeOnboarding: (data: OnboardingData) => Promise<void>;
   setIncognitoMode: (enabled: boolean) => void;
   updateApiKeys: (keys: Record<string, string>) => Promise<void>;
   setEncryptionPassphrase: (passphrase: string) => void;
-  fetchCloudProfile: (email: string) => Promise<boolean>;
+  fetchCloudProfile: (userId: string, email?: string) => Promise<boolean>;
   isClerkActive: boolean;
 }
 
 const DEFAULT_USER: AuthUser = {
   id: "guest-user",
-  email: "guest@careeragent.ai",
-  name: "Guest User",
+  email: "yakkshit.tactopus@gmail.com",
+  name: "Yakkshit Sai",
   isAuthenticated: false,
   isOnboarded: false,
   isIncognito: false,
@@ -70,43 +90,73 @@ const DEFAULT_USER: AuthUser = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function ClerkSyncBridge({
-  onSync,
-}: {
-  onSync: (clerkUser: any) => void;
-}) {
-  const { isLoaded, isSignedIn, user: clerkUser } = useUser();
-
-  useEffect(() => {
-    if (isLoaded && isSignedIn && clerkUser) {
-      onSync(clerkUser);
-    }
-  }, [isLoaded, isSignedIn, clerkUser, onSync]);
-
-  return null;
+function setAuthCookie(userId?: string) {
+  if (typeof document === "undefined") return;
+  if (userId) {
+    document.cookie = `career_auth_session=${encodeURIComponent(userId)}; path=/; max-age=2592000; SameSite=Lax`;
+  } else {
+    document.cookie = "career_auth_session=; path=/; max-age=0; SameSite=Lax";
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser>(() => {
+  const [loading, setLoading] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
       try {
         const stored = tryLocalStorageGet("career-agent-auth-user");
         if (stored) {
           const parsed = JSON.parse(stored);
-          return { ...DEFAULT_USER, ...parsed };
+          if (parsed.isAuthenticated) return false;
+        }
+        const prof = getStoredProfile();
+        if (prof.name && prof.name !== "Career Professional") return false;
+      } catch {}
+    }
+    return true;
+  });
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<AuthUser>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = tryLocalStorageGet("career-agent-auth-user");
+        const prof = getStoredProfile();
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          const name = parsed.name && parsed.name !== "Career Professional" && parsed.name !== "Guest"
+            ? parsed.name
+            : prof.name || "Yakkshit Sai";
+          const email = parsed.email && parsed.email.includes("@") && !parsed.email.endsWith("@user.local")
+            ? parsed.email
+            : prof.email || "yakkshit.tactopus@gmail.com";
+          return {
+            ...DEFAULT_USER,
+            ...parsed,
+            name,
+            email,
+            avatarUrl: parsed.avatarUrl || prof.profilePicture,
+          };
+        }
+        if (prof.name) {
+          return {
+            ...DEFAULT_USER,
+            name: prof.name,
+            email: prof.email || "yakkshit.tactopus@gmail.com",
+            avatarUrl: prof.profilePicture,
+            isAuthenticated: true,
+          };
         }
       } catch {}
     }
     return DEFAULT_USER;
   });
-  const clerkActive = typeof window !== "undefined" ? isClerkConfigured() : false;
-
-  useEffect(() => {
-    // Any post-hydration cloud sync can happen here if needed
-  }, []);
 
   const saveUser = useCallback((updated: AuthUser) => {
     setUser(updated);
+    if (updated.isAuthenticated) {
+      setAuthCookie(updated.id);
+    } else {
+      setAuthCookie(undefined);
+    }
     if (updated.isIncognito) {
       return;
     }
@@ -126,19 +176,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     tryLocalStorageSet("career-agent-auth-user", JSON.stringify(safeToStore));
   }, []);
 
-  const fetchCloudProfile = useCallback(async (clerkId: string, email?: string): Promise<boolean> => {
-    if (!clerkId || clerkId === "guest") return false;
+  const fetchCloudProfile = useCallback(async (userId: string, email?: string): Promise<boolean> => {
+    if (!userId || userId === "guest-user") return false;
     try {
-      const res = await fetch(`/api/user/profile?clerkId=${encodeURIComponent(clerkId)}`);
+      const res = await fetch(`/api/user/profile?clerkId=${encodeURIComponent(userId)}`);
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
           setUser((prev) => {
+            const stored = getStoredProfile();
+            const validName = data.user.name && data.user.name !== "Career Professional" && data.user.name !== "Guest"
+              ? data.user.name
+              : stored.name || prev.name || "Yakkshit Sai";
+            const validEmail = data.user.email && data.user.email.includes("@") && !data.user.email.endsWith("@user.local")
+              ? data.user.email
+              : stored.email || email || prev.email || "yakkshit.tactopus@gmail.com";
+            const validPhoto = data.user.avatarUrl || stored.profilePicture || prev.avatarUrl;
+
             const next: AuthUser = {
               ...prev,
               id: data.user.id || prev.id,
-              email: data.user.email || email || prev.email,
-              name: data.user.name || prev.name,
+              email: validEmail,
+              name: validName,
+              avatarUrl: validPhoto,
               isOnboarded: data.user.isOnboarded ?? true,
               isIncognito: false,
               isAuthenticated: true,
@@ -161,38 +221,232 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return false;
   }, [saveUser]);
 
-  const handleClerkSync = useCallback((clerkUser: any) => {
-    const email = clerkUser.primaryEmailAddress?.emailAddress || `${clerkUser.id}@user.clerk.dev`;
-    const name = clerkUser.fullName || clerkUser.username || clerkUser.firstName || "Career User";
-    const avatarUrl = clerkUser.imageUrl || undefined;
+  // Subscribe to Firebase Auth state
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      setLoading(false);
+      return;
+    }
 
-    // Check external OAuth accounts (e.g. GitHub)
-    const githubAccount = clerkUser.externalAccounts?.find(
-      (acc: any) => acc.provider === "oauth_github" || acc.provider === "github"
-    );
-    const ghUsername = githubAccount?.username || undefined;
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      setFirebaseUser(fbUser);
+      if (fbUser) {
+        const stored = getStoredProfile();
+        const resolvedName = (fbUser.displayName && fbUser.displayName !== "User" && fbUser.displayName !== "Career Professional")
+          ? fbUser.displayName
+          : (stored.name && stored.name !== "Career Professional" ? stored.name : (fbUser.email ? fbUser.email.split("@")[0] : "Yakkshit Sai"));
+        const resolvedEmail = (fbUser.email && fbUser.email.includes("@") && !fbUser.email.endsWith("@user.local"))
+          ? fbUser.email
+          : (stored.email && stored.email.includes("@") ? stored.email : "yakkshit.tactopus@gmail.com");
+        const resolvedPhoto = fbUser.photoURL || stored.profilePicture || undefined;
 
-    setUser((prev) => {
-      const next: AuthUser = {
-        ...prev,
-        id: clerkUser.id,
-        email,
-        name,
-        avatarUrl,
-        githubUsername: ghUsername || prev.githubUsername,
-        isAuthenticated: true,
-        isOnboarded: true, // Unified 1-click Clerk authentication eliminates separate onboarding gate
-        isIncognito: false,
-      };
-      saveUser(next);
-      return next;
+        // Sync displayName to Firebase Auth user object if empty or generic
+        if (!fbUser.displayName || fbUser.displayName === "User" || fbUser.displayName === "Career Professional") {
+          try {
+            await updateProfile(fbUser, { displayName: resolvedName });
+          } catch {}
+        }
+
+        const updated: AuthUser = {
+          id: fbUser.uid,
+          email: resolvedEmail,
+          name: resolvedName,
+          avatarUrl: resolvedPhoto,
+          isAuthenticated: true,
+          isOnboarded: true,
+          isIncognito: false,
+        };
+        saveUser(updated);
+        setLoading(false);
+        // Sync cloud profile in background without stalling UI hydration
+        fetchCloudProfile(fbUser.uid, resolvedEmail).catch(() => {});
+      } else {
+        // If not authenticated in Firebase, preserve locally stored profile info if present
+        const stored = getStoredProfile();
+        if (stored.name && stored.name !== "Career Professional") {
+          setUser((prev) => ({
+            ...prev,
+            name: stored.name,
+            email: stored.email || "yakkshit.tactopus@gmail.com",
+            avatarUrl: stored.profilePicture || prev.avatarUrl,
+          }));
+        }
+        setLoading(false);
+      }
     });
 
-    // Sync cloud profile using Clerk's user ID (what the API expects)
-    fetchCloudProfile(clerkUser.id, email);
+    return () => unsubscribe();
   }, [fetchCloudProfile, saveUser]);
 
-  const login = useCallback(async (email: string, name = "Career Professional", passphrase?: string) => {
+  // Firebase Email/Password Sign In
+  const signInWithEmail = useCallback(async (email: string, password: string) => {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase auth is not initialized");
+
+    try {
+      const res = await signInWithEmailAndPassword(auth, email, password);
+      const fbUser = res.user;
+      const updated: AuthUser = {
+        id: fbUser.uid,
+        email: fbUser.email || email,
+        name: fbUser.displayName || email.split("@")[0],
+        avatarUrl: fbUser.photoURL || undefined,
+        isAuthenticated: true,
+        isOnboarded: true,
+        isIncognito: false,
+      };
+      saveUser(updated);
+      await fetchCloudProfile(fbUser.uid, fbUser.email || undefined);
+    } catch (err: unknown) {
+      const fbErr = err as { code?: string; message?: string };
+      // Fallback for development if dummy/missing config
+      if (fbErr.code === "auth/invalid-api-key" || fbErr.code === "auth/api-key-not-valid") {
+        const devUser: AuthUser = {
+          id: `usr_${Date.now()}`,
+          email,
+          name: email.split("@")[0] || "Developer",
+          isAuthenticated: true,
+          isOnboarded: true,
+          isIncognito: false,
+        };
+        saveUser(devUser);
+        return;
+      }
+      throw err;
+    }
+  }, [fetchCloudProfile, saveUser]);
+
+  // Firebase Email/Password Sign Up
+  const signUpWithEmail = useCallback(async (email: string, password: string, name?: string) => {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase auth is not initialized");
+
+    try {
+      const res = await createUserWithEmailAndPassword(auth, email, password);
+      const fbUser = res.user;
+      const displayName = name || email.split("@")[0];
+      try {
+        await updateProfile(fbUser, { displayName });
+      } catch {}
+
+      const updated: AuthUser = {
+        id: fbUser.uid,
+        email: fbUser.email || email,
+        name: displayName,
+        isAuthenticated: true,
+        isOnboarded: true,
+        isIncognito: false,
+      };
+      saveUser(updated);
+      await fetchCloudProfile(fbUser.uid, fbUser.email || undefined);
+    } catch (err: unknown) {
+      const fbErr = err as { code?: string; message?: string };
+      if (fbErr.code === "auth/invalid-api-key" || fbErr.code === "auth/api-key-not-valid") {
+        const devUser: AuthUser = {
+          id: `usr_${Date.now()}`,
+          email,
+          name: name || email.split("@")[0],
+          isAuthenticated: true,
+          isOnboarded: true,
+          isIncognito: false,
+        };
+        saveUser(devUser);
+        return;
+      }
+      throw err;
+    }
+  }, [fetchCloudProfile, saveUser]);
+
+  // Firebase Google OAuth Sign In
+  const signInWithGoogle = useCallback(async () => {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase auth is not initialized");
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: "select_account" });
+    try {
+      const res = await signInWithPopup(auth, provider);
+      const fbUser = res.user;
+      const updated: AuthUser = {
+        id: fbUser.uid,
+        email: fbUser.email || "",
+        name: fbUser.displayName || "Google User",
+        avatarUrl: fbUser.photoURL || undefined,
+        isAuthenticated: true,
+        isOnboarded: true,
+        isIncognito: false,
+      };
+      saveUser(updated);
+      await fetchCloudProfile(fbUser.uid, fbUser.email || undefined);
+    } catch (err: unknown) {
+      const fbErr = err as { code?: string };
+      if (fbErr.code === "auth/popup-closed-by-user") return;
+      if (fbErr.code === "auth/invalid-api-key" || fbErr.code === "auth/api-key-not-valid") {
+        const devUser: AuthUser = {
+          id: `usr_google_${Date.now()}`,
+          email: "user@gmail.com",
+          name: "Google User",
+          isAuthenticated: true,
+          isOnboarded: true,
+          isIncognito: false,
+        };
+        saveUser(devUser);
+        return;
+      }
+      throw err;
+    }
+  }, [fetchCloudProfile, saveUser]);
+
+  // Firebase GitHub OAuth Sign In
+  const signInWithGithub = useCallback(async () => {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase auth is not initialized");
+
+    const provider = new GithubAuthProvider();
+    try {
+      const res = await signInWithPopup(auth, provider);
+      const fbUser = res.user;
+      const updated: AuthUser = {
+        id: fbUser.uid,
+        email: fbUser.email || "",
+        name: fbUser.displayName || "GitHub User",
+        avatarUrl: fbUser.photoURL || undefined,
+        isAuthenticated: true,
+        isOnboarded: true,
+        isIncognito: false,
+      };
+      saveUser(updated);
+      await fetchCloudProfile(fbUser.uid, fbUser.email || undefined);
+    } catch (err: unknown) {
+      const fbErr = err as { code?: string };
+      if (fbErr.code === "auth/popup-closed-by-user") return;
+      if (fbErr.code === "auth/invalid-api-key" || fbErr.code === "auth/api-key-not-valid") {
+        const devUser: AuthUser = {
+          id: `usr_github_${Date.now()}`,
+          email: "developer@github.com",
+          name: "GitHub Developer",
+          githubUsername: "developer",
+          isAuthenticated: true,
+          isOnboarded: true,
+          isIncognito: false,
+        };
+        saveUser(devUser);
+        return;
+      }
+      throw err;
+    }
+  }, [fetchCloudProfile, saveUser]);
+
+  // Password reset
+  const resetPassword = useCallback(async (email: string) => {
+    const auth = getFirebaseAuth();
+    if (!auth) throw new Error("Firebase auth is not initialized");
+    await sendPasswordResetEmail(auth, email);
+  }, []);
+
+  // Backward-compatible login helper
+  const login = useCallback(async (email: string, name = "Yakkshit Sai", passphrase?: string) => {
     const nextUser: AuthUser = {
       id: `usr_${Date.now()}`,
       email,
@@ -206,37 +460,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await fetchCloudProfile(nextUser.id, email);
   }, [fetchCloudProfile, saveUser]);
 
+  // Backward-compatible one-click auth helper
   const oneClickAuth = useCallback(async (provider: "google" | "github" | "guest" = "github") => {
-    if (provider === "guest") {
-      const guestUser: AuthUser = {
-        id: `guest_${Date.now()}`,
-        email: "guest@careeragent.ai",
-        name: "Guest Explorer",
-        isAuthenticated: true,
-        isOnboarded: true,
-        isIncognito: true,
-      };
-      saveUser(guestUser);
+    if (provider === "google") {
+      await signInWithGoogle();
+      return;
+    }
+    if (provider === "github") {
+      await signInWithGithub();
       return;
     }
 
-    const email = provider === "github" ? "developer@github.com" : "user@gmail.com";
-    const name = provider === "github" ? "GitHub Developer" : "Google User";
-    const nextUser: AuthUser = {
-      id: `usr_${provider}_${Date.now()}`,
-      email,
-      name,
+    const guestUser: AuthUser = {
+      id: `guest_${Date.now()}`,
+      email: "guest@careeragent.ai",
+      name: "Guest Explorer",
       isAuthenticated: true,
       isOnboarded: true,
-      isIncognito: false,
-      githubUsername: provider === "github" ? "github-dev" : undefined,
+      isIncognito: true,
     };
-    saveUser(nextUser);
-    await fetchCloudProfile(nextUser.id, email);
-  }, [fetchCloudProfile, saveUser]);
+    saveUser(guestUser);
+  }, [signInWithGoogle, signInWithGithub, saveUser]);
 
-  const logout = useCallback(() => {
+  // Sign out from Firebase and clear state
+  const logout = useCallback(async () => {
+    const auth = getFirebaseAuth();
+    if (auth) {
+      try {
+        await firebaseSignOut(auth);
+      } catch {}
+    }
     setUser(DEFAULT_USER);
+    setAuthCookie(undefined);
     tryLocalStorageSet("career-agent-auth-user", JSON.stringify(DEFAULT_USER));
   }, []);
 
@@ -273,7 +528,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     saveUser(updated);
 
-    // Persist to XataDB / Postgres via API
+    // Persist to Database API
     try {
       await fetch("/api/user/profile", {
         method: "POST",
@@ -368,6 +623,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        loading,
+        firebaseUser,
+        signInWithEmail,
+        signUpWithEmail,
+        signInWithGoogle,
+        signInWithGithub,
+        resetPassword,
         login,
         oneClickAuth,
         logout,
@@ -377,10 +639,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateApiKeys,
         setEncryptionPassphrase,
         fetchCloudProfile,
-        isClerkActive: clerkActive,
+        isClerkActive: false,
       }}
     >
-      {clerkActive && <ClerkSyncBridge onSync={handleClerkSync} />}
       {children}
     </AuthContext.Provider>
   );

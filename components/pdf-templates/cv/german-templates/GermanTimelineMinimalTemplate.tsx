@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
 import { darkIconUrls } from "@/components/logos/logos"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // German Minimal Timeline Lebenslauf (Maximilian Muster style)
 const styles = StyleSheet.create({
@@ -20,7 +21,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 20,
     paddingBottom: 16,
     borderBottomWidth: 0.5,
     borderBottomColor: "#e5e7eb",
@@ -28,26 +29,29 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
+    paddingRight: 12,
   },
   photoContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: "#f3f4f6",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
+    marginRight: 14,
+    flexShrink: 0,
   },
   photo: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     objectFit: "cover",
   },
   photoPlaceholder: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: "#e5e7eb",
     alignItems: "center",
     justifyContent: "center",
@@ -58,21 +62,32 @@ const styles = StyleSheet.create({
     color: "#4b5563",
   },
   headerTitles: {
+    flex: 1,
     justifyContent: "center",
   },
-  mainHeaderTitle: {
-    fontSize: 22,
-    fontFamily: "Helvetica",
+  headerCategory: {
+    fontSize: 7.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#6b7280",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+    marginBottom: 2,
+  },
+  mainHeaderName: {
+    fontSize: 18,
+    fontFamily: "Helvetica-Bold",
     color: "#1f2937",
     marginBottom: 3,
+    lineHeight: 1.15,
   },
-  headerName: {
-    fontSize: 10.5,
-    color: "#6b7280",
-    letterSpacing: 0.5,
+  headerJobTitle: {
+    fontSize: 9.5,
+    color: "#4b5563",
+    lineHeight: 1.25,
   },
   headerRight: {
     alignItems: "flex-end",
+    flexShrink: 0,
   },
   contactItem: {
     flexDirection: "row",
@@ -98,8 +113,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionHeaderLabel: {
-    fontSize: 12,
-    fontFamily: "Helvetica",
+    fontSize: 11,
+    fontFamily: "Helvetica-Bold",
     color: "#374151",
     width: "30%",
   },
@@ -201,10 +216,11 @@ const styles = StyleSheet.create({
   },
 })
 
-export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: ResumeData }) {
+export function GermanTimelineMinimalTemplate({ resumeData, language }: { resumeData: ResumeData; language?: string }) {
   const { basicInfo, experience = [], education = [], skills = [], projects = [], achievements = [] } = resumeData
+  const titles = getResumeSectionTitles(language || resumeData.language)
 
-  const skillLevels = ["Experte", "Erfahren", "Fortgeschritten", "Sehr gut", "Gut"]
+  const skillLevels = [titles.skills, "Advanced", "Proficient", "Intermediate", "Skilled"]
 
   return (
     <Document>
@@ -231,9 +247,9 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
               )}
             </View>
             <View style={styles.headerTitles}>
-              <Text style={styles.mainHeaderTitle}>Lebenslauf</Text>
-              <Text style={styles.headerName}>{basicInfo.name || "Maximilian Muster"}</Text>
-              {basicInfo.title ? <Text style={[styles.headerName, { fontSize: 8 }]}>{basicInfo.title}</Text> : null}
+              <Text style={styles.headerCategory}>{titles.contact === "Kontakt" ? "LEBENSLAUF" : "CURRICULUM VITAE"}</Text>
+              <Text style={styles.mainHeaderName}>{basicInfo.name || "Lebenslauf"}</Text>
+              {basicInfo.title ? <Text style={styles.headerJobTitle}>{basicInfo.title}</Text> : null}
             </View>
           </View>
 
@@ -270,7 +286,7 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
         {basicInfo.summary && (
           <View style={styles.sectionBlock}>
             <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionHeaderLabel}>Profil</Text>
+              <Text style={styles.sectionHeaderLabel}>{titles.summary}</Text>
               <View style={{ width: "70%", paddingLeft: 10 }}>
                 <Text style={styles.itemDescription}>{basicInfo.summary}</Text>
               </View>
@@ -282,7 +298,7 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
         {experience.length > 0 && (
           <View style={styles.sectionBlock}>
             <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionHeaderLabel}>Berufserfahrung</Text>
+              <Text style={styles.sectionHeaderLabel}>{titles.experience}</Text>
             </View>
             {experience.map((exp, idx) => (
               <View key={idx} style={styles.timelineItem}>
@@ -290,7 +306,7 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
                 <View style={styles.timelineLeft}>
                   <Text style={styles.leftCompany}>{exp.company}</Text>
                   <Text style={styles.leftDate}>
-                    {exp.startDate || exp.endDate ? `${exp.startDate || ""} - ${exp.endDate || "aktuell"}` : ""}
+                    {exp.startDate || exp.endDate ? `${exp.startDate || ""} - ${exp.endDate || titles.present}` : ""}
                   </Text>
                 </View>
 
@@ -320,7 +336,7 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
         {education.length > 0 && (
           <View style={styles.sectionBlock}>
             <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionHeaderLabel}>Bildungsweg</Text>
+              <Text style={styles.sectionHeaderLabel}>{titles.education}</Text>
             </View>
             {education.map((edu, idx) => (
               <View key={idx} style={styles.timelineItem}>
@@ -338,7 +354,7 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
 
                 <View style={styles.timelineRight}>
                   <Text style={styles.itemTitle}>{edu.degree} {edu.field ? `in ${edu.field}` : ""}</Text>
-                  {edu.gpa ? <Text style={styles.itemDescription}>Abschlussnote: {edu.gpa}</Text> : null}
+                  {edu.gpa ? <Text style={styles.itemDescription}>GPA: {edu.gpa}</Text> : null}
                 </View>
               </View>
             ))}
@@ -349,7 +365,7 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
         {skills.length > 0 && (
           <View style={styles.sectionBlock}>
             <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionHeaderLabel}>Kenntnisse</Text>
+              <Text style={styles.sectionHeaderLabel}>{titles.skills}</Text>
               <View style={styles.skillsGrid}>
                 {skills.map((skill, idx) => (
                   <View key={idx} style={styles.skillCard}>
@@ -366,12 +382,12 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
         {basicInfo.languages && basicInfo.languages.length > 0 && (
           <View style={styles.sectionBlock}>
             <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionHeaderLabel}>Sprachen</Text>
+              <Text style={styles.sectionHeaderLabel}>{titles.languages}</Text>
               <View style={styles.skillsGrid}>
                 {basicInfo.languages.map((lang, idx) => {
                   const parts = lang.split(/[:\-(]/)
                   const name = parts[0]?.trim() || lang
-                  const level = parts[1]?.replace(/[)]/g, "").trim() || (idx === 0 ? "Muttersprache" : "Fließend")
+                  const level = parts[1]?.replace(/[)]/g, "").trim() || (idx === 0 ? "Native" : "Fluent")
                   return (
                     <View key={idx} style={styles.skillCard}>
                       <Text style={styles.skillName}>{name}</Text>
@@ -388,7 +404,7 @@ export function GermanTimelineMinimalTemplate({ resumeData }: { resumeData: Resu
         {projects.length > 0 && (
           <View style={styles.sectionBlock}>
             <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionHeaderLabel}>Projekte</Text>
+              <Text style={styles.sectionHeaderLabel}>{titles.projects}</Text>
             </View>
             {projects.map((proj, idx) => (
               <View key={idx} style={styles.timelineItem}>

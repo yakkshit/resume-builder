@@ -42,6 +42,7 @@ const FALSE_POSITIVE_VALUES = [
     "Access-Control-Allow-Methods",
     "Content-Security-Policy",
     "X-Frame-Options",
+    "cv_sync_record_v2",
 ];
 
 const SECRET_PATTERNS = [

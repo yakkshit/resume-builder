@@ -53,6 +53,7 @@ export interface Achievement {
 }
 
 export interface ResumeData {
+  language?: string
   basicInfo: BasicInfo
   experience: Experience[]
   education: Education[]
@@ -70,24 +71,40 @@ export type Template = keyof typeof resumeTemplates
 export type AIModel =
   | "lingo-ai"
   // Google Gemini
+  | "gemini-4-argon"
   | "gemini-3.8-flash"
   | "gemini-3.7-flash"
   | "gemini-3.7-pro"
+  | "gemini-3.6-flash"
+  | "gemini-3.5-flash"
+  | "gemini-3.5-flash-lite"
   | "gemini-3.1-pro-preview"
-  | "gemini-3-pro-preview"
-  | "gemini-3-flash-preview"
-  | "gemini-3.1-flash-lite-preview"
   | "gemini-3.1-flash-image-preview"
+  | "gemini-3.1-flash-lite-preview"
+  | "gemini-3-pro-preview"
   | "gemini-3-pro-image-preview"
+  | "gemini-3-flash-preview"
   | "gemini-2.5-pro"
   | "gemini-2.5-flash"
   | "gemini-2.5-flash-lite"
+  | "gemini-2.5-flash-lite-preview-06-17"
   | "gemini-2.0-flash"
   | "gemini-2.0-pro"
   | "gemini-1.5-pro"
   | "gemini-1.5-flash"
+  | "gemini-nano-banana-2.1"
+  // Google Vertex
+  | "vertex/gemini-4-argon"
+  | "vertex/gemini-3.8-flash"
+  | "vertex/gemini-3.1-pro-preview"
+  | "vertex/gemini-3-pro-preview"
+  | "vertex/gemini-2.5-pro"
+  | "vertex/gemini-2.5-flash"
   // OpenAI
   | "gpt-6-astra"
+  | "gpt-6.1-sol"
+  | "gpt-6-luna"
+  | "gpt-6-sol"
   | "gpt-5.6"
   | "gpt-5.6-luna"
   | "gpt-5.6-sol"
@@ -112,7 +129,10 @@ export type AIModel =
   | "gpt-4"
   | "gpt-3.5-turbo"
   // Anthropic Claude
+  | "claude-opus-5-5"
+  | "claude-sonnet-5-5"
   | "claude-sonnet-5"
+  | "claude-haiku-5-5"
   | "claude-fable-5-1"
   | "claude-fable-5"
   | "claude-opus-4.8"
@@ -167,28 +187,34 @@ export type AIModel =
   | "command-a-reasoning-08-2025"
   | "command-r-plus"
   | "command-r"
+  // Together AI
+  | "meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo"
+  | "Qwen/Qwen2.5-72B-Instruct-Turbo"
+  | "deepseek-ai/DeepSeek-V3"
+  | "mistralai/Mixtral-8x22B-Instruct-v0.1"
+  // Fireworks
+  | "accounts/fireworks/models/deepseek-r1"
+  | "accounts/fireworks/models/deepseek-v3"
+  | "accounts/fireworks/models/llama-v3p3-70b-instruct"
+  | "accounts/fireworks/models/qwen2-vl-72b-instruct"
   // Alibaba / DeepInfra
   | "qwen3-max"
   | "qwen-plus"
-  | "devstral-medium-1.0"
-  | "devstral-small-2"
-  | "mistral-large-latest"
-  | "mistral-medium-latest"
-  | "mistral-small-latest"
-  | "mistral-7b-instruct"
-  | "meta-llama/llama-3.1-8b-instruct"
-  | "meta-llama/llama-3.1-70b-instruct"
-  | "meta-llama/llama-3.3-70b-instruct"
-  | "command-r-plus"
-  | "command-r"
-  | "command-light"
-  | "llama-3.1-sonar-large-128k-online"
-  | "llama-3.1-8b-instruct"
-  | "llama-3.1-70b-instruct"
-  | "mixtral-8x7b-instruct"
-  | "fireworks-llama-3.1-8b-instruct"
-  | "fireworks-llama-3.1-70b-instruct"
-  | "fireworks-mixtral-8x7b-instruct"
+  | "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
+  | "meta-llama/Llama-4-Scout-17B-16E-Instruct"
+  | "meta-llama/Llama-3.3-70B-Instruct"
+  | "deepseek-ai/DeepSeek-R1"
+  | "Qwen/QwQ-32B"
+  // Cerebras
+  | "gpt-oss-120b"
+  | "gemma-4-31b"
+  // Hugging Face
+  | "meta-llama/Llama-3.1-8B-Instruct"
+  | "moonshotai/Kimi-K2-Instruct"
+  // Baseten
+  | "Qwen/Qwen3-235B-A22B-Instruct-2507"
+  | "deepseek-ai/DeepSeek-V3.1"
+  | "moonshotai/Kimi-K2-Instruct-0905"
   | "huggingface-endpoint"
   | "huggingface-model"
   | "huggingface-streaming"
@@ -199,7 +225,8 @@ export type AIModel =
   | "openai-like-local"
   | "cedz-qwen3-8b"
   | "cedz-llama3-8b"
-  | "cedz-custom";
+  | "cedz-custom"
+  | (string & {});
 
 
 // Cover Letter Types

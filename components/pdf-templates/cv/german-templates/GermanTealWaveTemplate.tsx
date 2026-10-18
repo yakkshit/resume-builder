@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet, Image, Svg, Path } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // German Teal Wave Lebenslauf (Jennifer Beyer style)
 const styles = StyleSheet.create({
@@ -22,7 +23,6 @@ const styles = StyleSheet.create({
     right: 0,
     width: 200,
     height: 140,
-    zIndex: 0,
   },
   bottomLeftCurve: {
     position: "absolute",
@@ -30,14 +30,12 @@ const styles = StyleSheet.create({
     left: 0,
     width: 140,
     height: 90,
-    zIndex: 0,
   },
   headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
     marginBottom: 10,
-    zIndex: 1,
     minHeight: 110,
   },
   headerLeft: {
@@ -96,30 +94,30 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   photoContainer: {
-    width: 100,
-    height: 100,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    zIndex: 2,
-  },
-  photo: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
-    objectFit: "cover",
     borderWidth: 3,
     borderColor: "#ffffff",
+    overflow: "hidden",
+    backgroundColor: "#ffffff",
+  },
+  photo: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 48,
+    objectFit: "cover",
   },
   photoPlaceholder: {
-    width: 92,
-    height: 92,
-    borderRadius: 46,
+    width: "100%",
+    height: "100%",
+    borderRadius: 48,
     backgroundColor: "#2e8b84",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 3,
-    borderColor: "#ffffff",
   },
   photoInitials: {
     color: "#ffffff",
@@ -135,7 +133,6 @@ const styles = StyleSheet.create({
   columnsContainer: {
     flexDirection: "row",
     flex: 1,
-    zIndex: 1,
   },
   leftColumn: {
     width: "63%",
@@ -256,8 +253,11 @@ const styles = StyleSheet.create({
   },
 })
 
-export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData }) {
+export function GermanTealWaveTemplate({ resumeData, language }: { resumeData: ResumeData; language?: string }) {
   const { basicInfo, experience = [], education = [], skills = [], projects = [], achievements = [] } = resumeData
+  const activeLang = (language || resumeData.language || "en").toLowerCase()
+  const isGerman = activeLang.startsWith("de")
+  const titles = getResumeSectionTitles(activeLang)
 
   // Split name for dramatic 2-line layout if two words
   const nameParts = (basicInfo.name || "").trim().split(/\s+/)
@@ -368,7 +368,7 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
             {/* Summary */}
             {basicInfo.summary && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Zusammenfassung</Text>
+                <Text style={styles.sectionTitle}>{titles.summary}</Text>
                 <Text style={styles.summaryText}>{basicInfo.summary}</Text>
               </View>
             )}
@@ -376,14 +376,14 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
             {/* Experience */}
             {experience.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Berufserfahrung</Text>
+                <Text style={styles.sectionTitle}>{titles.experience}</Text>
                 {experience.map((exp, idx) => (
                   <View key={idx} style={styles.entryContainer}>
                     <Text style={styles.entryTitle}>{exp.position}</Text>
                     <Text style={styles.entrySubtitle}>
                       {exp.company}
                       {exp.company && (exp.startDate || exp.endDate) ? " | " : ""}
-                      {exp.startDate || exp.endDate ? `${exp.startDate || ""} - ${exp.endDate || "Aktuell"}` : ""}
+                      {exp.startDate || exp.endDate ? `${exp.startDate || ""} - ${exp.endDate || titles.present}` : ""}
                     </Text>
                     {exp.description ? <Text style={styles.summaryText}>{exp.description}</Text> : null}
                     {exp.highlights?.map((highlight, hIdx) => (
@@ -400,7 +400,7 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
             {/* Education */}
             {education.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Ausbildung</Text>
+                <Text style={styles.sectionTitle}>{titles.education}</Text>
                 {education.map((edu, idx) => (
                   <View key={idx} style={styles.entryContainer}>
                     <Text style={styles.entryTitle}>{edu.degree} {edu.field ? `- ${edu.field}` : ""}</Text>
@@ -409,7 +409,7 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
                       {edu.institution && (edu.startDate || edu.endDate) ? " | " : ""}
                       {edu.startDate || edu.endDate ? `${edu.startDate || ""} - ${edu.endDate || ""}` : ""}
                     </Text>
-                    {edu.gpa ? <Text style={styles.summaryText}>Abschlussnote: {edu.gpa}</Text> : null}
+                    {edu.gpa ? <Text style={styles.summaryText}>{isGerman ? "Abschlussnote: " : "GPA: "}{edu.gpa}</Text> : null}
                   </View>
                 ))}
               </View>
@@ -418,7 +418,7 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
             {/* Projects (if available) */}
             {projects.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Projekte</Text>
+                <Text style={styles.sectionTitle}>{titles.projects}</Text>
                 {projects.map((proj, idx) => (
                   <View key={idx} style={styles.entryContainer}>
                     <Text style={styles.entryTitle}>{proj.name}</Text>
@@ -437,11 +437,13 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
             {/* Languages */}
             {basicInfo.languages && basicInfo.languages.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Sprachen</Text>
+                <Text style={styles.sectionTitle}>{titles.languages}</Text>
                 {basicInfo.languages.map((lang, idx) => {
                   const parts = lang.split(/[:\-(]/)
                   const name = parts[0]?.trim() || lang
-                  const level = parts[1]?.replace(/[)]/g, "").trim() || (idx === 0 ? "Muttersprache" : idx === 1 ? "Fließend (C1)" : "Gut (B2)")
+                  const defaultLevel = idx === 0 ? (isGerman ? "Muttersprache" : "Native") : idx === 1 ? (isGerman ? "Fließend (C1)" : "Fluent (C1)") : (isGerman ? "Gut (B2)" : "Intermediate (B2)")
+                  const rawLevel = parts[1]?.replace(/[)]/g, "").trim()
+                  const level = rawLevel || defaultLevel
                   return (
                     <View key={idx} style={styles.languageItem}>
                       <View style={styles.languageHeader}>
@@ -458,7 +460,7 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
             {/* Software / Skills */}
             {softwareSkills.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Software & IT</Text>
+                <Text style={styles.sectionTitle}>{titles.skills}</Text>
                 {softwareSkills.map((skill, idx) => (
                   <View key={idx} style={styles.skillBulletRow}>
                     <View style={styles.skillBulletDot} />
@@ -471,7 +473,7 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
             {/* Competencies / Soft Skills */}
             {softSkills.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Kompetenzen</Text>
+                <Text style={styles.sectionTitle}>{isGerman ? "Kompetenzen" : "Key Competencies"}</Text>
                 {softSkills.map((skill, idx) => (
                   <View key={idx} style={styles.skillBulletRow}>
                     <View style={styles.skillBulletDot} />
@@ -484,7 +486,7 @@ export function GermanTealWaveTemplate({ resumeData }: { resumeData: ResumeData 
             {/* Achievements / Interests */}
             {achievements.length > 0 && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Erfolge & Hobbys</Text>
+                <Text style={styles.sectionTitle}>{titles.achievements}</Text>
                 {achievements.map((ach, idx) => (
                   <View key={idx} style={styles.skillBulletRow}>
                     <View style={styles.skillBulletDot} />

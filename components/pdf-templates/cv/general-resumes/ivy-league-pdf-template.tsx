@@ -1,5 +1,6 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // Ivy League / Academic Engineering ATS Resume (Sparky Sundevil style)
 const styles = StyleSheet.create({
@@ -94,13 +95,13 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
     color: "#000000",
-    flex: 1,
-    marginRight: 8,
+    width: "74%",
+    paddingRight: 6,
   },
   entryDateRight: {
     fontSize: 8.2,
     color: "#000000",
-    flexShrink: 0,
+    width: "26%",
     textAlign: "right",
   },
   entrySubRow: {
@@ -112,13 +113,14 @@ const styles = StyleSheet.create({
   entrySubtitleLeft: {
     fontSize: 8.2,
     color: "#000000",
-    flex: 1,
+    width: "74%",
+    paddingRight: 6,
   },
   entryGpaRight: {
     fontSize: 8.2,
     fontFamily: "Helvetica-Bold",
     color: "#000000",
-    flexShrink: 0,
+    width: "26%",
     textAlign: "right",
   },
   entryDescription: {
@@ -165,8 +167,9 @@ const styles = StyleSheet.create({
   },
 })
 
-export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData }) {
+export function IvyLeaguePDFTemplate({ resumeData, language }: { resumeData: ResumeData; language?: string }) {
   const { basicInfo, experience = [], education = [], skills = [], projects = [], achievements = [] } = resumeData
+  const titles = getResumeSectionTitles(language || resumeData.language)
 
   // Clean contact items for header
   const contactParts: string[] = []
@@ -189,7 +192,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
   // Partition skills cleanly into categorized rows
   const categorizeSkills = (skillsList: string[]) => {
     if (skillsList.length <= 6) {
-      return [{ label: "Technical Skills:", values: skillsList.join(", ") }]
+      return [{ label: `${titles.skills}:`, values: skillsList.join(", ") }]
     }
 
     const mid = Math.ceil(skillsList.length / 3)
@@ -225,7 +228,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
         {/* SUMMARY */}
         {basicInfo.summary && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Summary</Text>
+            <Text style={styles.sectionTitle}>{titles.summary}</Text>
             <Text style={styles.summaryText}>{basicInfo.summary}</Text>
           </View>
         )}
@@ -233,7 +236,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
         {/* EDUCATION */}
         {education.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Education</Text>
+            <Text style={styles.sectionTitle}>{titles.education}</Text>
             {education.map((edu, idx) => (
               <View key={idx} style={styles.entryContainer}>
                 <View style={styles.entryHeaderRow}>
@@ -256,7 +259,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
         {/* TECHNICAL SKILLS */}
         {skills.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Technical Skills</Text>
+            <Text style={styles.sectionTitle}>{titles.skills}</Text>
             {categorizedSkills.map((cat, idx) => (
               <View key={idx} style={styles.skillCategoryRow}>
                 <Text style={styles.skillCategoryLabel}>{cat.label}</Text>
@@ -265,7 +268,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
             ))}
             {basicInfo.languages && basicInfo.languages.length > 0 && (
               <View style={styles.skillCategoryRow}>
-                <Text style={styles.skillCategoryLabel}>Languages:</Text>
+                <Text style={styles.skillCategoryLabel}>{titles.languages}:</Text>
                 <Text style={styles.skillCategoryValues}>{basicInfo.languages.join(", ")}</Text>
               </View>
             )}
@@ -275,7 +278,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
         {/* PROFESSIONAL EXPERIENCE */}
         {professionalExp.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Professional Experience</Text>
+            <Text style={styles.sectionTitle}>{titles.experience}</Text>
             {professionalExp.map((exp, idx) => (
               <View key={idx} style={styles.entryContainer}>
                 <View style={styles.entryHeaderRow}>
@@ -285,7 +288,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
                     {exp.position}
                   </Text>
                   <Text style={styles.entryDateRight}>
-                    {exp.startDate || exp.endDate ? `${exp.startDate || ""} – ${exp.endDate || "Present"}` : ""}
+                    {exp.startDate || exp.endDate ? `${exp.startDate || ""} – ${exp.endDate || titles.present}` : ""}
                   </Text>
                 </View>
                 {exp.description ? <Text style={styles.entryDescription}>{exp.description}</Text> : null}
@@ -303,7 +306,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
         {/* ACADEMIC PROJECTS */}
         {projects.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Academic Projects</Text>
+            <Text style={styles.sectionTitle}>{titles.projects}</Text>
             {projects.map((proj, idx) => (
               <View key={idx} style={styles.entryContainer}>
                 <View style={styles.entryHeaderRow}>
@@ -327,7 +330,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
         {/* OTHER WORK EXPERIENCE */}
         {otherExp.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Other Work Experience</Text>
+            <Text style={styles.sectionTitle}>{titles.experience}</Text>
             {otherExp.map((exp, idx) => (
               <View key={idx} style={styles.entryContainer}>
                 <View style={styles.entryHeaderRow}>
@@ -353,7 +356,7 @@ export function IvyLeaguePDFTemplate({ resumeData }: { resumeData: ResumeData })
         {/* ACTIVITIES / ACHIEVEMENTS */}
         {achievements.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Activities & Leadership</Text>
+            <Text style={styles.sectionTitle}>{titles.achievements}</Text>
             {achievements.map((ach, idx) => (
               <View key={idx} style={styles.entryContainer}>
                 <View style={styles.entryHeaderRow}>

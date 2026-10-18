@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image, Link } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
 import { lightIconUrls } from "@/components/logos/logos"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // Modern German Lebenslauf layout with dark accent header and structured table-like sections
 const styles = StyleSheet.create({
@@ -181,10 +182,14 @@ const styles = StyleSheet.create({
 
 interface Props {
   resumeData: ResumeData
+  language?: string
 }
 
-export function GermanModernLebenslaufTemplate({ resumeData }: Props) {
+export function GermanModernLebenslaufTemplate({ resumeData, language }: Props) {
   const { basicInfo, experience, education, skills, projects, achievements } = resumeData
+  const activeLang = (language || resumeData.language || "en").toLowerCase()
+  const isGerman = activeLang.startsWith("de")
+  const titles = getResumeSectionTitles(activeLang)
 
   return (
     <Document>
@@ -233,22 +238,22 @@ export function GermanModernLebenslaufTemplate({ resumeData }: Props) {
 
         {/* Persoenliche Angaben */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Persönliche Daten</Text>
+          <Text style={styles.sectionTitle}>{titles.contact}</Text>
           <View style={styles.personalGrid}>
             <View style={styles.personalItem}>
               <Text style={styles.personalLabel}>Name:</Text>
               <Text style={styles.personalValue}>{basicInfo.name}</Text>
             </View>
             <View style={styles.personalItem}>
-              <Text style={styles.personalLabel}>Wohnort:</Text>
-              <Text style={styles.personalValue}>{basicInfo.location || "Deutschland"}</Text>
+              <Text style={styles.personalLabel}>{titles.location}</Text>
+              <Text style={styles.personalValue}>{basicInfo.location || (isGerman ? "Deutschland" : "Germany")}</Text>
             </View>
             <View style={styles.personalItem}>
-              <Text style={styles.personalLabel}>E-Mail:</Text>
+              <Text style={styles.personalLabel}>{titles.email}</Text>
               <Text style={styles.personalValue}>{basicInfo.email}</Text>
             </View>
             <View style={styles.personalItem}>
-              <Text style={styles.personalLabel}>Telefon:</Text>
+              <Text style={styles.personalLabel}>{titles.phone}</Text>
               <Text style={styles.personalValue}>{basicInfo.phone}</Text>
             </View>
           </View>
@@ -257,7 +262,7 @@ export function GermanModernLebenslaufTemplate({ resumeData }: Props) {
         {/* Profil / Zusammenfassung */}
         {basicInfo.summary && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Profil</Text>
+            <Text style={styles.sectionTitle}>{titles.summary}</Text>
             <Text style={styles.text}>{basicInfo.summary}</Text>
           </View>
         )}
@@ -265,11 +270,11 @@ export function GermanModernLebenslaufTemplate({ resumeData }: Props) {
         {/* Berufserfahrung */}
         {experience && experience.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Berufserfahrung</Text>
+            <Text style={styles.sectionTitle}>{titles.experience}</Text>
             {experience.map((exp, idx) => (
               <View key={idx} style={styles.rowGroup}>
                 <Text style={styles.dateCol}>
-                  {exp.startDate} – {exp.endDate || "Heute"}
+                  {exp.startDate} – {exp.endDate || titles.present}
                 </Text>
                 <View style={styles.contentCol}>
                   <Text style={styles.itemTitle}>{exp.position}</Text>
@@ -294,18 +299,18 @@ export function GermanModernLebenslaufTemplate({ resumeData }: Props) {
         {/* Ausbildung */}
         {education && education.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Ausbildung</Text>
+            <Text style={styles.sectionTitle}>{titles.education}</Text>
             {education.map((edu, eIdx) => (
               <View key={eIdx} style={styles.rowGroup}>
                 <Text style={styles.dateCol}>
-                  {edu.startDate} – {edu.endDate || "Heute"}
+                  {edu.startDate} – {edu.endDate || titles.present}
                 </Text>
                 <View style={styles.contentCol}>
                   <Text style={styles.itemTitle}>
                     {edu.degree} {edu.field ? `in ${edu.field}` : ""}
                   </Text>
                   <Text style={styles.itemSubTitle}>{edu.institution}</Text>
-                  {edu.gpa && <Text style={styles.text}>Note: {edu.gpa}</Text>}
+                  {edu.gpa && <Text style={styles.text}>{isGerman ? "Note: " : "GPA: "}{edu.gpa}</Text>}
                 </View>
               </View>
             ))}
@@ -315,7 +320,7 @@ export function GermanModernLebenslaufTemplate({ resumeData }: Props) {
         {/* Kenntnisse & Fähigkeiten */}
         {skills && skills.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Kenntnisse & Fähigkeiten</Text>
+            <Text style={styles.sectionTitle}>{titles.skills}</Text>
             <View style={styles.skillContainer}>
               {skills.map((skill, sIdx) => (
                 <Text key={sIdx} style={styles.skillBadge}>
@@ -329,7 +334,7 @@ export function GermanModernLebenslaufTemplate({ resumeData }: Props) {
         {/* Projekte */}
         {projects && projects.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Projekte</Text>
+            <Text style={styles.sectionTitle}>{titles.projects}</Text>
             {projects.map((proj, pIdx) => (
               <View key={pIdx} style={styles.rowGroup}>
                 <Text style={styles.dateCol}>
@@ -340,7 +345,7 @@ export function GermanModernLebenslaufTemplate({ resumeData }: Props) {
                   {proj.description && <Text style={styles.text}>{proj.description}</Text>}
                   {proj.technologies && proj.technologies.length > 0 && (
                     <Text style={[styles.text, { color: "#4f46e5", marginTop: 2 }]}>
-                      Technologien: {proj.technologies.join(", ")}
+                      {isGerman ? "Technologien:" : "Technologies:"} {proj.technologies.join(", ")}
                     </Text>
                   )}
                 </View>

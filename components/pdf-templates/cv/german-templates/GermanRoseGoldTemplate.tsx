@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
 import { lightIconUrls } from "@/components/logos/logos"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // German Rose Gold & Slate Lebenslauf (Melanie Schwarz style)
 const styles = StyleSheet.create({
@@ -24,7 +25,6 @@ const styles = StyleSheet.create({
   layoutContainer: {
     flexDirection: "row",
     flex: 1,
-    zIndex: 1,
   },
   // Left Sidebar
   sidebar: {
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     paddingRight: 24,
   },
   headerBox: {
-    height: 72,
+    minHeight: 65,
     justifyContent: "center",
     marginBottom: 10,
   },
@@ -159,7 +159,8 @@ const styles = StyleSheet.create({
     color: "#44403c",
     textTransform: "uppercase",
     letterSpacing: 2,
-    lineHeight: 1.1,
+    lineHeight: 1.15,
+    marginBottom: 4,
   },
   title: {
     fontSize: 9,
@@ -167,7 +168,8 @@ const styles = StyleSheet.create({
     color: "#b08974",
     textTransform: "uppercase",
     letterSpacing: 1.8,
-    marginTop: 4,
+    marginTop: 0,
+    lineHeight: 1.3,
   },
   mainSection: {
     marginBottom: 12,
@@ -201,14 +203,23 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     fontFamily: "Helvetica-Bold",
     color: "#1c1917",
-    flex: 1,
-    marginRight: 8,
+    width: "74%",
+    marginRight: 6,
+    lineHeight: 1.25,
+  },
+  itemTitle: {
+    fontSize: 8.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#1c1917",
+    marginBottom: 2,
+    lineHeight: 1.25,
   },
   expDate: {
     fontSize: 7.5,
     color: "#78716c",
-    flexShrink: 0,
+    width: "26%",
     textAlign: "right",
+    lineHeight: 1.25,
   },
   expCompany: {
     fontSize: 7.8,
@@ -237,8 +248,9 @@ const styles = StyleSheet.create({
   },
 })
 
-export function GermanRoseGoldTemplate({ resumeData }: { resumeData: ResumeData }) {
+export function GermanRoseGoldTemplate({ resumeData, language }: { resumeData: ResumeData; language?: string }) {
   const { basicInfo, experience = [], education = [], skills = [], projects = [], achievements = [] } = resumeData
+  const titles = getResumeSectionTitles(language || resumeData.language)
 
   // 5 dot rating helper
   const renderDots = (index: number) => {
@@ -283,7 +295,7 @@ export function GermanRoseGoldTemplate({ resumeData }: { resumeData: ResumeData 
 
             {/* Badge: KONTAKT */}
             <View style={styles.badgeHeader}>
-              <Text style={styles.badgeText}>Kontakt</Text>
+              <Text style={styles.badgeText}>{titles.contact}</Text>
             </View>
 
             {basicInfo.phone && (
@@ -313,7 +325,7 @@ export function GermanRoseGoldTemplate({ resumeData }: { resumeData: ResumeData 
 
             {/* Badge: KENNTNISSE */}
             <View style={[styles.badgeHeader, { marginTop: 14 }]}>
-              <Text style={styles.badgeText}>Kenntnisse</Text>
+              <Text style={styles.badgeText}>{titles.skills}</Text>
             </View>
 
             {/* Languages with Dots */}
@@ -321,7 +333,7 @@ export function GermanRoseGoldTemplate({ resumeData }: { resumeData: ResumeData 
               <View style={{ marginBottom: 10 }}>
                 <View style={styles.sidebarSectionTitle}>
                   <Image src={lightIconUrls.languages} style={styles.sidebarSectionIcon} />
-                  <Text style={styles.sidebarSectionLabel}>Sprachen</Text>
+                  <Text style={styles.sidebarSectionLabel}>{titles.languages}</Text>
                 </View>
                 {basicInfo.languages.map((lang, idx) => {
                   const name = lang.split(/[:\-(]/)[0]?.trim() || lang
@@ -340,7 +352,7 @@ export function GermanRoseGoldTemplate({ resumeData }: { resumeData: ResumeData 
               <View>
                 <View style={styles.sidebarSectionTitle}>
                   <Image src={lightIconUrls.code} style={styles.sidebarSectionIcon} />
-                  <Text style={styles.sidebarSectionLabel}>IT-Kenntnisse</Text>
+                  <Text style={styles.sidebarSectionLabel}>{titles.skills}</Text>
                 </View>
                 {skills.slice(0, 7).map((skill, idx) => (
                   <View key={idx} style={styles.ratingRow}>
@@ -360,24 +372,24 @@ export function GermanRoseGoldTemplate({ resumeData }: { resumeData: ResumeData 
               {basicInfo.title ? <Text style={styles.title}>{basicInfo.title}</Text> : null}
             </View>
 
-            {/* Über mich / Summary */}
+            {/* Summary */}
             {basicInfo.summary && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Über Mich</Text>
+                <Text style={styles.mainSectionTitle}>{titles.summary}</Text>
                 <Text style={styles.summaryParagraph}>{basicInfo.summary}</Text>
               </View>
             )}
 
-            {/* Berufliche Laufbahn / Experience */}
+            {/* Experience */}
             {experience.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Berufliche Laufbahn</Text>
+                <Text style={styles.mainSectionTitle}>{titles.experience}</Text>
                 {experience.map((exp, idx) => (
                   <View key={idx} style={styles.experienceItem}>
                     <View style={styles.expHeaderRow}>
                       <Text style={styles.expRole}>{exp.position}</Text>
                       <Text style={styles.expDate}>
-                        {exp.startDate || exp.endDate ? `${exp.startDate || ""} - ${exp.endDate || "Aktuell"}` : ""}
+                        {exp.startDate || exp.endDate ? `${exp.startDate || ""} - ${exp.endDate || titles.present}` : ""}
                       </Text>
                     </View>
                     <Text style={styles.expCompany}>{exp.company}</Text>
@@ -393,10 +405,10 @@ export function GermanRoseGoldTemplate({ resumeData }: { resumeData: ResumeData 
               </View>
             )}
 
-            {/* Akademischer Werdegang / Education */}
+            {/* Education */}
             {education.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Akademischer Werdegang</Text>
+                <Text style={styles.mainSectionTitle}>{titles.education}</Text>
                 {education.map((edu, idx) => (
                   <View key={idx} style={styles.experienceItem}>
                     <View style={styles.expHeaderRow}>
@@ -406,32 +418,32 @@ export function GermanRoseGoldTemplate({ resumeData }: { resumeData: ResumeData 
                       </Text>
                     </View>
                     <Text style={styles.expCompany}>{edu.institution}</Text>
-                    {edu.gpa ? <Text style={styles.summaryParagraph}>Abschlussnote: {edu.gpa}</Text> : null}
+                    {edu.gpa ? <Text style={styles.summaryParagraph}>GPA: {edu.gpa}</Text> : null}
                   </View>
                 ))}
               </View>
             )}
 
-            {/* Projekte / Projects */}
+            {/* Projects */}
             {projects.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Projekte</Text>
+                <Text style={styles.mainSectionTitle}>{titles.projects}</Text>
                 {projects.map((proj, idx) => (
                   <View key={idx} style={styles.experienceItem}>
-                    <Text style={styles.expRole}>{proj.name}</Text>
+                    <Text style={styles.itemTitle}>{proj.name}</Text>
                     {proj.description ? <Text style={styles.summaryParagraph}>{proj.description}</Text> : null}
                   </View>
                 ))}
               </View>
             )}
 
-            {/* Erfolge / Achievements */}
+            {/* Achievements */}
             {achievements.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Erfolge & Auszeichnungen</Text>
+                <Text style={styles.mainSectionTitle}>{titles.achievements}</Text>
                 {achievements.map((ach, idx) => (
                   <View key={idx} style={styles.experienceItem}>
-                    <Text style={styles.expRole}>{ach.title}</Text>
+                    <Text style={styles.itemTitle}>{ach.title}</Text>
                     {ach.description ? <Text style={styles.summaryParagraph}>{ach.description}</Text> : null}
                   </View>
                 ))}

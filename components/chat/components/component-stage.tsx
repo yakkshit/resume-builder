@@ -17,6 +17,9 @@ import {
   Maximize2,
   Minimize2,
   Layers,
+  Network,
+  Database,
+  ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -46,7 +49,6 @@ const COMPONENT_ICONS: Record<ComponentType, React.ElementType> = {
   "cover-letter-latex": FileText,
   "cv-score": Sparkles,
   "job-recommendations": Briefcase,
-  "job-scraper": Briefcase,
   chart: BarChart3,
   "auto-applier": Sparkles,
   "coding-challenge": Code,
@@ -54,6 +56,12 @@ const COMPONENT_ICONS: Record<ComponentType, React.ElementType> = {
   "email-hr": Mail,
   "linkedin-dm": Share2,
   browser: Globe,
+  "search-resources": Globe,
+  "graph-rag": Network,
+  "vector-rag": Layers,
+  "scraper-plan": Globe,
+  "github-sync": Database,
+  "image-generation": ImageIcon,
 };
 
 export function ComponentStage({

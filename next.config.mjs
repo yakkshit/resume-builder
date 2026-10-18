@@ -21,6 +21,22 @@ const nextConfig = {
   async redirects() {
     return []
   },
+  async rewrites() {
+    return [
+      {
+        source: '/_next/static/chunks/bergamot-translator-worker.js',
+        destination: '/bergamot/bergamot-translator-worker.js',
+      },
+      {
+        source: '/_next/static/chunks/bergamot-translator-worker.wasm',
+        destination: '/bergamot/bergamot-translator-worker.wasm',
+      },
+      {
+        source: '/_next/static/chunks/translator-worker.js',
+        destination: '/bergamot/translator-worker.js',
+      },
+    ]
+  },
   async headers() {
     return [
       {

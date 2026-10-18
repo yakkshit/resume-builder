@@ -1,26 +1,45 @@
 /**
  * Curated AI model IDs supported by this project (stable APIs).
- * Grouped by provider for the UI.
+ * Grouped by provider for the UI with full capability intelligence.
  */
 export const CHAT_MODELS_BY_PROVIDER: Record<string, readonly string[]> = {
   "Cedz": ["cedz-qwen3-8b", "cedz-llama3-8b", "cedz-custom"],
   "Lingo AI": ["lingo-ai"],
   "Google Gemini": [
+    "gemini-4-argon",
     "gemini-3.8-flash",
     "gemini-3.7-flash",
     "gemini-3.7-pro",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
     "gemini-3.1-pro-preview",
-    "gemini-3-pro-preview",
-    "gemini-3-flash-preview",
+    "gemini-3.1-flash-image-preview",
     "gemini-3.1-flash-lite-preview",
-    "gemini-2.5-flash",
+    "gemini-3-pro-preview",
+    "gemini-3-pro-image-preview",
+    "gemini-3-flash-preview",
     "gemini-2.5-pro",
+    "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
+    "gemini-2.5-flash-lite-preview-06-17",
     "gemini-2.0-flash",
     "gemini-2.0-pro",
+    "gemini-nano-banana-2.1",
+  ],
+  "Google Vertex": [
+    "vertex/gemini-4-argon",
+    "vertex/gemini-3.8-flash",
+    "vertex/gemini-3.1-pro-preview",
+    "vertex/gemini-3-pro-preview",
+    "vertex/gemini-2.5-pro",
+    "vertex/gemini-2.5-flash",
   ],
   "OpenAI": [
     "gpt-6-astra",
+    "gpt-6.1-sol",
+    "gpt-6-luna",
+    "gpt-6-sol",
     "gpt-5.6",
     "gpt-5.6-luna",
     "gpt-5.6-sol",
@@ -31,6 +50,7 @@ export const CHAT_MODELS_BY_PROVIDER: Record<string, readonly string[]> = {
     "gpt-5.2-pro",
     "gpt-5.2",
     "gpt-5.1",
+    "gpt-5.1-codex",
     "gpt-5",
     "gpt-5-mini",
     "gpt-4.1",
@@ -43,16 +63,21 @@ export const CHAT_MODELS_BY_PROVIDER: Record<string, readonly string[]> = {
     "gpt-3.5-turbo",
   ],
   "Anthropic Claude": [
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
     "claude-sonnet-5",
+    "claude-haiku-5-5",
     "claude-fable-5-1",
     "claude-fable-5",
-    "claude-opus-4.8",
-    "claude-opus-4.7",
-    "claude-opus-4.6",
-    "claude-opus-4.5",
-    "claude-sonnet-4.6",
-    "claude-sonnet-4.5",
-    "claude-haiku-4.5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "claude-opus-4-5",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-5",
+    "claude-opus-4-1",
+    "claude-sonnet-4-0",
     "claude-3-7-sonnet",
     "claude-3-5-sonnet",
     "claude-3-5-haiku",
@@ -100,19 +125,53 @@ export const CHAT_MODELS_BY_PROVIDER: Record<string, readonly string[]> = {
     "command-r-plus",
     "command-r",
   ],
-  "Hugging Face": ["huggingface-endpoint", "huggingface-model", "huggingface-streaming", "huggingface-provider"],
-  "Hugging Face (AI SDK)": [
+  "Together AI": [
+    "meta-llama/Meta-Llama-3.3-70B-Instruct-Turbo",
+    "Qwen/Qwen2.5-72B-Instruct-Turbo",
+    "deepseek-ai/DeepSeek-V3",
+    "mistralai/Mixtral-8x22B-Instruct-v0.1",
+  ],
+  "Fireworks": [
+    "accounts/fireworks/models/deepseek-r1",
+    "accounts/fireworks/models/deepseek-v3",
+    "accounts/fireworks/models/llama-v3p3-70b-instruct",
+    "accounts/fireworks/models/qwen2-vl-72b-instruct",
+  ],
+  "Alibaba": [
+    "qwen3-max",
+    "qwen-plus",
+  ],
+  "DeepInfra": [
+    "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
+    "meta-llama/Llama-4-Scout-17B-16E-Instruct",
+    "meta-llama/Llama-3.3-70B-Instruct",
+    "deepseek-ai/DeepSeek-V3",
+    "deepseek-ai/DeepSeek-R1",
+    "Qwen/QwQ-32B",
+  ],
+  "Cerebras": [
+    "gpt-oss-120b",
+    "gemma-4-31b",
+  ],
+  "Hugging Face": [
     "meta-llama/Llama-3.1-8B-Instruct",
-    "deepseek-ai/DeepSeek-V3-0324",
-    "Qwen/Qwen2.5-72B-Instruct",
-    "hf-custom-hub-aisdk",
+    "moonshotai/Kimi-K2-Instruct",
+    "huggingface-endpoint",
+    "huggingface-model",
+    "huggingface-streaming",
+    "huggingface-provider",
+  ],
+  "Baseten": [
+    "Qwen/Qwen3-235B-A22B-Instruct-2507",
+    "deepseek-ai/DeepSeek-V3.1",
+    "moonshotai/Kimi-K2-Instruct-0905",
   ],
   "Local / Custom": ["local-custom", "ollama-local", "lmstudio-local", "openai-like-local"],
-} as const
+} as const;
 
-export const CHAT_MODEL_IDS = Object.values(CHAT_MODELS_BY_PROVIDER).flat() as readonly string[]
+export const CHAT_MODEL_IDS = Object.values(CHAT_MODELS_BY_PROVIDER).flat() as readonly string[];
 
-export type ChatModelId = (typeof CHAT_MODEL_IDS)[number]
+export type ChatModelId = (typeof CHAT_MODEL_IDS)[number];
 
 // Use a stable, non-deprecated default Gemini model
-export const DEFAULT_CHAT_MODEL: ChatModelId = "gemini-2.5-flash"
+export const DEFAULT_CHAT_MODEL: ChatModelId = "gemini-2.5-flash";

@@ -86,7 +86,7 @@ async function generateVagasPackage() {
         description: "Developed AI-driven web applications and predictive backend services with Python, Next.js, and PostgreSQL.",
         highlights: [
           "Designed and consumed high-performance RESTful APIs integrating vector databases and relational data layers.",
-          "Implemented automated test suites and structured database migrations using Drizzle ORM and PostgreSQL."
+          "Implemented automated test suites and structured database architectures using PostgreSQL and ORM layers."
         ]
       },
       {
@@ -124,7 +124,7 @@ async function generateVagasPackage() {
       "React & Next.js",
       "RESTful APIs & GraphQL",
       "PostgreSQL & MySQL",
-      "SQLAlchemy & Drizzle ORM",
+      "SQLAlchemy & Relational Databases",
       "AWS (ECS, S3, RDS, Lambda)",
       "Docker & Kubernetes",
       "CI/CD (GitHub Actions, GitLab)",

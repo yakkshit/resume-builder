@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { resumeTemplates, coverLetterTemplates } from "@/components/pdf-templates"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, CoverLetterData, Template, CoverLetterTemplate } from "@/lib/types"
+import { RESUME_TEMPLATE_LIMITS, validateTemplatePageBudget } from "@/lib/resume-template-limits"
 import { spawn } from "node:child_process"
 import path from "node:path"
 import React from "react"
+import { resilientScrape } from "@/lib/scrapers/resilient-scraper"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -18,7 +20,7 @@ const corsHeaders = {
 const TOOLS = [
   {
     name: "list_templates",
-    description: "List all available PDF resume and cover letter templates.",
+    description: "List all available PDF resume and cover letter templates, along with exact 1-page character limits, layouts, and recommended section capacities.",
     inputSchema: {
       type: "object",
       properties: {
@@ -28,6 +30,28 @@ const TOOLS = [
           description: "Filter templates by category (default: all)",
         },
       },
+    },
+  },
+  {
+    name: "validate_template_page_budget",
+    description: "Validate whether a resume JSON fits on a single page for a specific template. Returns character count, max character limit, overflow status, and actionable trimming feedback for models to self-train and correct.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        resumeData: {
+          type: "object",
+          description: "Resume JSON data (basicInfo, experience, education, skills, projects)",
+        },
+        template: {
+          type: "string",
+          description: "Template ID (e.g. 'modern', 'ivy-league', 'two-column', 'german-cv')",
+        },
+        targetPages: {
+          type: "number",
+          description: "Target number of pages (default: 1)",
+        },
+      },
+      required: ["resumeData"],
     },
   },
   {
@@ -478,8 +502,16 @@ async function handleToolCall(name: string, args: any) {
         const res = await fetch(`https://serpapi.com/search.json?${qs.toString()}`);
         if (res.ok) {
           const data = await res.json();
-          const { extractJobsFromSerpApiGoogleJobsResponse } = await import("@/lib/job-scraper/google-jobs");
-          jobs = extractJobsFromSerpApiGoogleJobsResponse(data).slice(0, maxResults);
+          const raw = Array.isArray(data?.jobs_results) ? data.jobs_results : [];
+          jobs = raw.slice(0, maxResults).map((j: any, idx: number) => ({
+            id: j.job_id || `serp-${idx}`,
+            title: j.title || "Software Engineer",
+            company: j.company_name || "Company",
+            location: j.location || "Remote",
+            salary: j.detected_extensions?.salary,
+            link: j.related_links?.[0]?.link || "https://google.com/search?q=jobs",
+            description: j.description || "",
+          }));
         }
       } catch (e) {
         console.warn("SerpAPI search failed, using fallback jobs", e);
@@ -537,35 +569,33 @@ async function handleToolCall(name: string, args: any) {
   if (name === "scrape_job_posting") {
     const { url, text } = args || {};
     let contentToParse = text || "";
+    let executionPlan: any = null;
 
     if (url && !contentToParse) {
       try {
-        const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" } });
-        if (res.ok) {
-          const raw = await res.text();
-          // Extract text content from html
-          contentToParse = raw.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
-            .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .slice(0, 8000);
-        }
+        const plan = await resilientScrape(url);
+        executionPlan = plan;
+        contentToParse = plan.extractedData.content;
       } catch (e) {
-        console.warn("Failed to scrape URL directly:", e);
+        console.warn("Failed to execute resilient scrape:", e);
       }
     }
 
     const summary = {
       sourceUrl: url || "pasted-text",
-      extractedRole: "Senior Software Engineer",
+      extractedRole: executionPlan?.extractedData?.title || "Senior Software Engineer",
+      providerUsed: executionPlan?.chosenProvider || "direct",
       keyRequirements: [
         "Strong proficiency in TypeScript, React, and Node.js",
         "Experience building and consuming RESTful and GraphQL APIs",
         "Demonstrated track record of delivering production software",
         "Excellent communication and cross-functional team skills"
       ],
-      recommendedKeywords: ["TypeScript", "React", "Next.js", "System Design", "Cloud Infrastructure", "CI/CD", "Unit Testing"],
+      recommendedKeywords: executionPlan?.extractedData?.keywords?.length
+        ? executionPlan.extractedData.keywords
+        : ["TypeScript", "React", "Next.js", "System Design", "Cloud Infrastructure", "CI/CD", "Unit Testing"],
       contentSnippet: contentToParse ? contentToParse.slice(0, 1500) : "Job description processed.",
+      executionPlan,
     };
 
     return {
@@ -619,6 +649,7 @@ async function handleToolCall(name: string, args: any) {
     const result: any = {}
     if (cat === "all" || cat === "resume") {
       result.resumeTemplates = Object.keys(resumeTemplates)
+      result.templateBudgets = RESUME_TEMPLATE_LIMITS
     }
     if (cat === "all" || cat === "coverletter") {
       result.coverLetterTemplates = Object.keys(coverLetterTemplates)
@@ -628,6 +659,23 @@ async function handleToolCall(name: string, args: any) {
         {
           type: "text",
           text: JSON.stringify(result, null, 2),
+        },
+      ],
+    }
+  }
+
+  if (name === "validate_template_page_budget") {
+    const { resumeData, template = "modern", targetPages = 1 } = args || {}
+    if (!resumeData) {
+      throw new Error("Missing required argument: resumeData")
+    }
+    const safeData = sanitizeResumeData(resumeData)
+    const evaluation = validateTemplatePageBudget(safeData, template, targetPages)
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(evaluation, null, 2),
         },
       ],
     }

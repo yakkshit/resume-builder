@@ -5,11 +5,25 @@ import type { BoltModel } from "@/components/ui/bolt-style-chat";
 
 export const BOLT_MODELS: BoltModel[] = [
   {
+    id: "gemini-4-argon",
+    name: "Gemini 4 Argon",
+    description: "Thinking, Long Decode & Tools",
+    icon: <Brain className="size-4 text-purple-400" />,
+    badge: "Flagship",
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    description: "Search, Tools & URL Grounding",
+    icon: <Sparkles className="size-4 text-emerald-400" />,
+    badge: "Next Gen",
+  },
+  {
     id: "gemini-3.7-flash",
     name: "Gemini 3.7 Flash",
     description: "Hybrid reasoning & speed",
-    icon: <Sparkles className="size-4 text-emerald-400" />,
-    badge: "Next Gen",
+    icon: <Sparkles className="size-4 text-teal-400" />,
+    badge: "Hybrid",
   },
   {
     id: "gemini-2.5-flash",

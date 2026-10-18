@@ -1,8 +1,8 @@
-/** Max height for the career chat composer (px). */
-export const CHAT_TEXTAREA_MAX_HEIGHT_PX = 180;
+/** Max height for the career chat composer (px), capping at the expanded squircle height before scrolling. */
+export const CHAT_TEXTAREA_MAX_HEIGHT_PX = 88;
 
-/** Approximate single-line content height for reset (px). */
-export const CHAT_TEXTAREA_MIN_HEIGHT_PX = 40;
+/** Single-line content height for compact composer mode (px). */
+export const CHAT_TEXTAREA_MIN_HEIGHT_PX = 26;
 
 /**
  * Height to apply after measuring scrollHeight. When input is empty, reset to min line height.

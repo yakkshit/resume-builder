@@ -2,6 +2,7 @@ import { spawn } from "node:child_process"
 import path from "node:path"
 import fs from "node:fs"
 import { resumeTemplates, coverLetterTemplates } from "../components/pdf-templates"
+import { RESUME_TEMPLATE_LIMITS, validateTemplatePageBudget } from "../lib/resume-template-limits"
 
 interface JsonRpcRequest {
   jsonrpc: "2.0"
@@ -24,7 +25,7 @@ interface JsonRpcResponse {
 const TOOLS = [
   {
     name: "list_templates",
-    description: "List all available PDF resume and cover letter templates supported by the generator.",
+    description: "List all available PDF resume and cover letter templates supported by the generator, including 1-page character limits and capacity matrix.",
     inputSchema: {
       type: "object",
       properties: {
@@ -34,6 +35,28 @@ const TOOLS = [
           description: "Filter templates by category (default: all)",
         },
       },
+    },
+  },
+  {
+    name: "validate_template_page_budget",
+    description: "Validate if a resume JSON fits on a single page for a given PDF template. Returns character count, max character limit, overflow status, and actionable trimming feedback for models to self-train and correct.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        resumeData: {
+          type: "object",
+          description: "Resume JSON data (basicInfo, experience, education, skills, projects)",
+        },
+        template: {
+          type: "string",
+          description: "Template ID (e.g. 'modern', 'ivy-league', 'two-column', 'german-cv')",
+        },
+        targetPages: {
+          type: "number",
+          description: "Target number of pages (default: 1)",
+        },
+      },
+      required: ["resumeData"],
     },
   },
   {
@@ -192,6 +215,7 @@ async function handleCallTool(name: string, args: any) {
     const result: any = {}
     if (cat === "all" || cat === "resume") {
       result.resumeTemplates = Object.keys(resumeTemplates)
+      result.templateBudgets = RESUME_TEMPLATE_LIMITS
     }
     if (cat === "all" || cat === "coverletter") {
       result.coverLetterTemplates = Object.keys(coverLetterTemplates)
@@ -201,6 +225,22 @@ async function handleCallTool(name: string, args: any) {
         {
           type: "text",
           text: JSON.stringify(result, null, 2),
+        },
+      ],
+    }
+  }
+
+  if (name === "validate_template_page_budget") {
+    const { resumeData, template = "modern", targetPages = 1 } = args || {}
+    if (!resumeData) {
+      throw new Error("Missing required argument: resumeData")
+    }
+    const evaluation = validateTemplatePageBudget(resumeData, template, targetPages)
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(evaluation, null, 2),
         },
       ],
     }
@@ -225,8 +265,16 @@ async function handleCallTool(name: string, args: any) {
         const res = await fetch(`https://serpapi.com/search.json?${qs.toString()}`)
         if (res.ok) {
           const data = await res.json()
-          const { extractJobsFromSerpApiGoogleJobsResponse } = await import("../lib/job-scraper/google-jobs")
-          jobs = extractJobsFromSerpApiGoogleJobsResponse(data).slice(0, maxResults)
+          const raw = Array.isArray(data?.jobs_results) ? data.jobs_results : []
+          jobs = raw.slice(0, maxResults).map((j: any, idx: number) => ({
+            id: j.job_id || `serp-${idx}`,
+            title: j.title || "Software Engineer",
+            company: j.company_name || "Company",
+            location: j.location || "Remote",
+            salary: j.detected_extensions?.salary,
+            link: j.related_links?.[0]?.link || "https://google.com/search?q=jobs",
+            description: j.description || "",
+          }))
         }
       } catch (e) {
         console.warn("SerpAPI search fallback:", e)

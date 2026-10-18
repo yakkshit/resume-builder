@@ -232,7 +232,7 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
       setHarnessName("");
       setHarnessDescription("");
       setHarnessPrompt("");
-      toast.success(`Agent Harness "${created.name}" created and synced to XataDB!`);
+      toast.success(`Agent Harness "${created.name}" created and synced!`);
     } catch (err: any) {
       toast.error(err.message || "Failed to save agent harness");
     } finally {
@@ -421,7 +421,7 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
                 <DialogTitle className="text-base font-semibold text-white flex items-center gap-2">
                   Career Agent MCP & Multi-Agent Harness Platform
                   <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[10px]">
-                    XataDB Synced
+                    Cloud Synced
                   </Badge>
                 </DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
@@ -802,7 +802,7 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
                     className="h-8 bg-indigo-500 text-indigo-950 font-semibold hover:bg-indigo-400 text-xs"
                   >
                     {isSavingHarness ? <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
-                    Save Harness to XataDB
+                    Save Harness
                   </Button>
                 </div>
               </form>

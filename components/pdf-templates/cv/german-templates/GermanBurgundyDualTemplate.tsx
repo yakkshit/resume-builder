@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/renderer"
 import type { ResumeData } from "@/lib/types"
 import { darkIconUrls } from "@/components/logos/logos"
+import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 
 // German Burgundy Dual Tone Lebenslauf (Martina Kovac style)
 const styles = StyleSheet.create({
@@ -24,7 +25,6 @@ const styles = StyleSheet.create({
   layout: {
     flexDirection: "row",
     flex: 1,
-    zIndex: 1,
   },
   // Left Sidebar
   sidebar: {
@@ -125,10 +125,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   name: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: "Helvetica-Bold",
     color: "#111827",
     letterSpacing: 0.8,
+    marginBottom: 4,
+    lineHeight: 1.15,
   },
   targetTitle: {
     fontSize: 9.5,
@@ -136,12 +138,12 @@ const styles = StyleSheet.create({
     color: "#802035",
     textTransform: "uppercase",
     letterSpacing: 0.6,
-    marginTop: 2,
+    lineHeight: 1.25,
   },
   burgundyBar: {
-    height: 3,
+    height: 2.5,
     backgroundColor: "#802035",
-    marginTop: 6,
+    marginTop: 5,
     marginBottom: 10,
   },
   mainSection: {
@@ -240,8 +242,9 @@ const styles = StyleSheet.create({
   },
 })
 
-export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeData }) {
+export function GermanBurgundyDualTemplate({ resumeData, language }: { resumeData: ResumeData; language?: string }) {
   const { basicInfo, experience = [], education = [], skills = [], projects = [], achievements = [] } = resumeData
+  const titles = getResumeSectionTitles(language || resumeData.language)
 
   // Partition skills: strengths for sidebar, technical skills for main section
   const halfSkills = Math.ceil(skills.length / 2)
@@ -285,7 +288,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
                           .slice(0, 2)
                           .join("")
                           .toUpperCase()
-                    : "CV"}
+                      : "CV"}
                   </Text>
                 </View>
               )}
@@ -294,7 +297,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {/* Kontakt Section */}
             <View style={styles.sidebarSection}>
               <View style={styles.sidebarSectionHeader}>
-                <Text style={styles.sidebarSectionTitle}>Kontakt</Text>
+                <Text style={styles.sidebarSectionTitle}>{titles.contact}</Text>
               </View>
               {basicInfo.location && (
                 <View style={styles.contactItem}>
@@ -326,7 +329,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {sidebarStrengths.length > 0 && (
               <View style={styles.sidebarSection}>
                 <View style={styles.sidebarSectionHeader}>
-                  <Text style={styles.sidebarSectionTitle}>Persönliche Stärken</Text>
+                  <Text style={styles.sidebarSectionTitle}>{titles.skills}</Text>
                 </View>
                 {sidebarStrengths.map((skill, idx) => (
                   <View key={idx} style={styles.bulletItem}>
@@ -341,7 +344,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {achievements.length > 0 && (
               <View style={styles.sidebarSection}>
                 <View style={styles.sidebarSectionHeader}>
-                  <Text style={styles.sidebarSectionTitle}>Ehrenamt / Erfolge</Text>
+                  <Text style={styles.sidebarSectionTitle}>{titles.achievements}</Text>
                 </View>
                 {achievements.map((ach, idx) => (
                   <View key={idx} style={styles.bulletItem}>
@@ -367,7 +370,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {/* Profil / Summary */}
             {basicInfo.summary && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Profil</Text>
+                <Text style={styles.mainSectionTitle}>{titles.summary}</Text>
                 <Text style={styles.summaryText}>{basicInfo.summary}</Text>
                 <View style={styles.sectionDivider} />
               </View>
@@ -376,7 +379,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {/* Bildungsweg / Education */}
             {education.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Bildungsweg</Text>
+                <Text style={styles.mainSectionTitle}>{titles.education}</Text>
                 {education.map((edu, idx) => (
                   <View key={idx} style={styles.entryRow}>
                     <View style={styles.entryDateCol}>
@@ -387,7 +390,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
                     <View style={styles.entryContentCol}>
                       <Text style={styles.entryHeading}>{edu.institution}</Text>
                       <Text style={styles.entrySubHeading}>{edu.degree} {edu.field ? `- ${edu.field}` : ""}</Text>
-                      {edu.gpa ? <Text style={styles.summaryText}>Abschlussnote: {edu.gpa}</Text> : null}
+                      {edu.gpa ? <Text style={styles.summaryText}>GPA: {edu.gpa}</Text> : null}
                     </View>
                   </View>
                 ))}
@@ -398,12 +401,12 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {/* Praxiserfahrung / Experience */}
             {experience.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Praxiserfahrung</Text>
+                <Text style={styles.mainSectionTitle}>{titles.experience}</Text>
                 {experience.map((exp, idx) => (
                   <View key={idx} style={styles.entryRow}>
                     <View style={styles.entryDateCol}>
                       <Text style={styles.entryDateText}>
-                        {exp.startDate || exp.endDate ? `${exp.startDate || ""} - ${exp.endDate || "Aktuell"}` : ""}
+                        {exp.startDate || exp.endDate ? `${exp.startDate || ""} - ${exp.endDate || titles.present}` : ""}
                       </Text>
                     </View>
                     <View style={styles.entryContentCol}>
@@ -426,7 +429,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {/* Kompetenzen / Skills */}
             {mainSkills.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Kompetenzen</Text>
+                <Text style={styles.mainSectionTitle}>{titles.skills}</Text>
                 <View style={styles.twoColGrid}>
                   {mainSkills.map((skill, idx) => (
                     <View key={idx} style={styles.twoColItem}>
@@ -444,11 +447,11 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {/* Sprachen / Languages */}
             {basicInfo.languages && basicInfo.languages.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Sprachen</Text>
+                <Text style={styles.mainSectionTitle}>{titles.languages}</Text>
                 {basicInfo.languages.map((lang, idx) => {
                   const parts = lang.split(/[:\-(]/)
                   const name = parts[0]?.trim() || lang
-                  const level = parts[1]?.replace(/[)]/g, "").trim() || (idx === 0 ? "Muttersprache" : "B2")
+                  const level = parts[1]?.replace(/[)]/g, "").trim() || (idx === 0 ? "Native" : "B2")
                   return (
                     <View key={idx} style={styles.languageRow}>
                       <View style={styles.languageHeader}>
@@ -465,7 +468,7 @@ export function GermanBurgundyDualTemplate({ resumeData }: { resumeData: ResumeD
             {/* Projects (if present) */}
             {projects.length > 0 && (
               <View style={styles.mainSection}>
-                <Text style={styles.mainSectionTitle}>Projekte</Text>
+                <Text style={styles.mainSectionTitle}>{titles.projects}</Text>
                 {projects.map((proj, idx) => (
                   <View key={idx} style={{ marginBottom: 4 }}>
                     <Text style={styles.entryHeading}>{proj.name}</Text>
