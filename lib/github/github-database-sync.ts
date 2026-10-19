@@ -115,7 +115,7 @@ export function downloadSecurityTokenFile(params: {
     createdAt: new Date().toISOString(),
     credentials: {
       githubRepository: params.repo || "career-agent-database",
-      githubUsername: params.username || "yakkshit",
+      githubUsername: (params.username && params.username !== "yakkshit") ? params.username : "",
       hasToken: Boolean(params.token),
       token: params.token || "",
       encryptionPassphrase: params.passphrase || "",

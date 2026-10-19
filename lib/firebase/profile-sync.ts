@@ -66,8 +66,8 @@ export async function syncUserProfileToFirebase(
       if (db) {
         const profilePayload = {
           uid,
-          name: merged.name || "Yakkshit Sai",
-          email: merged.email || currentUser?.email || "yakkshit.tactopus@gmail.com",
+          name: (merged.name && merged.name !== "Yakkshit Sai") ? merged.name : "",
+          email: (merged.email && merged.email !== "yakkshit.tactopus@gmail.com") ? merged.email : (currentUser?.email && currentUser.email !== "yakkshit.tactopus@gmail.com" ? currentUser.email : ""),
           phone: merged.phone || "",
           location: merged.location || "",
           linkedin: merged.linkedin || "",
@@ -131,8 +131,8 @@ export async function syncUserProfileToFirebase(
     ok: true,
     syncedTo: "local_cache",
     uid,
-    name: merged.name || "Yakkshit Sai",
-    email: merged.email || "yakkshit.tactopus@gmail.com",
+    name: (merged.name && merged.name !== "Yakkshit Sai") ? merged.name : "",
+    email: (merged.email && merged.email !== "yakkshit.tactopus@gmail.com") ? merged.email : "",
     timestamp,
   };
 }

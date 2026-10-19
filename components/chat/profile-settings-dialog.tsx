@@ -64,8 +64,8 @@ export type UserProfile = {
 export const PROFILE_STORE_ID = "ai-chat-profile";
 
 export const EMPTY_PROFILE: UserProfile = {
-  name: "Yakkshit Sai",
-  email: "yakkshit.tactopus@gmail.com",
+  name: "",
+  email: "",
   phone: "",
   location: "",
   linkedin: "",
@@ -131,12 +131,14 @@ export function loadProfile(): UserProfile {
     const raw = tryLocalStorageGet(PROFILE_STORE_ID);
     if (!raw) return { ...EMPTY_PROFILE };
     const p = JSON.parse(raw) as Partial<UserProfile>;
+    // Accept stored name as-is (it's the user's real name); only fallback for truly invalid values
     const resolvedName = (p.name && p.name.trim() && p.name !== "Career Professional" && p.name !== "Guest" && p.name !== "User")
       ? p.name.trim()
-      : "Yakkshit Sai";
+      : "";
+    // Accept stored email as-is; only reject structurally invalid ones
     const resolvedEmail = (p.email && p.email.includes("@") && !p.email.endsWith("@user.local"))
       ? p.email.trim()
-      : "yakkshit.tactopus@gmail.com";
+      : "";
 
     return {
       name: resolvedName,
@@ -614,6 +616,37 @@ export function ProfileSettingsDialog({
                   value={keys.ollamaEndpoint || ""}
                   onChange={(e) => setKeys((k) => ({ ...k, ollamaEndpoint: e.target.value }))}
                   placeholder="http://localhost:11434"
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>Tavily AI Search Key</span>
+                  <a href="https://app.tavily.com" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.tavily || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, tavily: e.target.value }))}
+                  placeholder="tvly-..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>Firecrawl Scraper Key</span>
+                  <a href="https://www.firecrawl.dev" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.firecrawl || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, firecrawl: e.target.value }))}
+                  placeholder="fc-..."
                   className="h-9 text-xs font-mono"
                 />
               </div>

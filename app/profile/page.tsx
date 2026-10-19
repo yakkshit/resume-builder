@@ -224,9 +224,9 @@ export default function ProfileDashboardPage() {
     const loadedProf = loadProfile();
     const loadedKeys = loadProviderKeys();
 
-    const initialHandle = (loadedProf.handle && loadedProf.handle.trim())
+    const initialHandle = (loadedProf.handle && loadedProf.handle.trim() && loadedProf.handle.trim() !== "yakkshit")
       ? loadedProf.handle.trim()
-      : "yakkshit";
+      : "";
 
     setProfile({
       ...loadedProf,
@@ -236,13 +236,13 @@ export default function ProfileDashboardPage() {
     setKeys(loadedKeys);
 
     // Split name into first and last name
-    const defaultName = (loadedProf.name && loadedProf.name !== "Career Professional")
+    const defaultName = (loadedProf.name && loadedProf.name !== "Career Professional" && loadedProf.name !== "Yakkshit Sai")
       ? loadedProf.name
-      : "Yakkshit Sai";
+      : "";
     const parts = defaultName.trim().split(/\s+/);
-    if (parts.length > 0) {
-      setFirstName(parts[0] || "Yakkshit");
-      setLastName(parts.slice(1).join(" ") || "Sai");
+    if (parts.length > 0 && defaultName) {
+      setFirstName(parts[0] || "");
+      setLastName(parts.slice(1).join(" ") || "");
     }
 
     // Attempt cloud profile sync
@@ -251,17 +251,17 @@ export default function ProfileDashboardPage() {
       .then((data) => {
         if (data?.user) {
           setProfile((prev) => {
-            const nextName = (data.user.name && data.user.name !== "Career Professional" && data.user.name !== "Guest")
+            const nextName = (data.user.name && data.user.name !== "Career Professional" && data.user.name !== "Guest" && data.user.name !== "Yakkshit Sai")
               ? data.user.name
-              : prev.name || "Yakkshit Sai";
+              : (prev.name && prev.name !== "Yakkshit Sai" ? prev.name : "");
             const pParts = nextName.trim().split(/\s+/);
-            if (pParts.length > 0) {
-              setFirstName(pParts[0] || "Yakkshit");
-              setLastName(pParts.slice(1).join(" ") || "Sai");
+            if (pParts.length > 0 && nextName) {
+              setFirstName(pParts[0] || "");
+              setLastName(pParts.slice(1).join(" ") || "");
             }
-            const nextEmail = (data.user.email && data.user.email.includes("@") && !data.user.email.endsWith("@user.local"))
+            const nextEmail = (data.user.email && data.user.email.includes("@") && !data.user.email.endsWith("@user.local") && data.user.email !== "yakkshit.tactopus@gmail.com")
               ? data.user.email
-              : prev.email || "yakkshit.tactopus@gmail.com";
+              : (prev.email && prev.email !== "yakkshit.tactopus@gmail.com" ? prev.email : "");
             return {
               ...prev,
               name: nextName,
@@ -413,7 +413,7 @@ export default function ProfileDashboardPage() {
       token: profile.githubToken,
       passphrase: profile.encryptionPassphrase,
       repo: profile.githubRepo || "career-agent-database",
-      username: profile.github || "yakkshit",
+      username: (profile.github && profile.github !== "yakkshit") ? profile.github : "",
     });
     toast({ title: "Security Token File Downloaded", description: "Saved credentials to career-vault-security-token.json" });
   };
@@ -771,22 +771,22 @@ export default function ProfileDashboardPage() {
   }, [searchQuery]);
 
   // Derived user display
-  const userDisplayName = (profile.name && profile.name.trim() && profile.name !== "Career Professional" && profile.name !== "Guest" && profile.name !== "User")
+  const userDisplayName = (profile.name && profile.name.trim() && profile.name !== "Career Professional" && profile.name !== "Guest" && profile.name !== "User" && profile.name !== "Yakkshit Sai")
     ? profile.name.trim()
-    : (user.name && user.name.trim() && user.name !== "Career Professional" && user.name !== "Guest" && user.name !== "User"
+    : (user.name && user.name.trim() && user.name !== "Career Professional" && user.name !== "Guest" && user.name !== "User" && user.name !== "Yakkshit Sai"
       ? user.name.trim()
-      : "Yakkshit Sai");
+      : (user.email ? user.email.split("@")[0] : "User"));
 
-  const userDisplayEmail = (profile.email && profile.email.includes("@") && !profile.email.endsWith("@user.local"))
+  const userDisplayEmail = (profile.email && profile.email.includes("@") && !profile.email.endsWith("@user.local") && profile.email !== "yakkshit.tactopus@gmail.com")
     ? profile.email.trim()
-    : (user.email && user.email.includes("@") && !user.email.endsWith("@user.local")
+    : (user.email && user.email.includes("@") && !user.email.endsWith("@user.local") && user.email !== "yakkshit.tactopus@gmail.com"
       ? user.email.trim()
-      : "yakkshit.tactopus@gmail.com");
+      : "");
 
   const userInitials = useMemo(() => {
     const parts = userDisplayName.trim().split(/\s+/);
     if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    return userDisplayName.slice(0, 2).toUpperCase() || "YS";
+    return userDisplayName.slice(0, 2).toUpperCase() || "U";
   }, [userDisplayName]);
 
   // Memory stats
@@ -986,7 +986,7 @@ export default function ProfileDashboardPage() {
                           setProfile((p) => ({ ...p, email: e.target.value }));
                           markChanged();
                         }}
-                        placeholder="yakkshit.tactopus@gmail.com"
+                        placeholder="alex@example.com"
                         className="h-9 bg-[#1d1d23] border-white/10 rounded-xl text-xs sm:text-sm text-neutral-100 placeholder:text-neutral-500 focus-visible:ring-1 focus-visible:ring-white/20 font-mono"
                       />
                     </div>
@@ -1048,7 +1048,7 @@ export default function ProfileDashboardPage() {
                       <Input
                         value={firstName}
                         onChange={(e) => handleNameChange(e.target.value, lastName)}
-                        placeholder="Yakkshit"
+                        placeholder="Alex"
                         className="h-9 bg-[#1d1d23] border-white/10 rounded-xl text-xs sm:text-sm text-neutral-100 placeholder:text-neutral-500 focus-visible:ring-1 focus-visible:ring-white/20"
                       />
                     </div>
@@ -1166,7 +1166,7 @@ export default function ProfileDashboardPage() {
                         <div className="flex items-center gap-2 pt-1">
                           <Input
                             autoFocus
-                            placeholder="e.g. github.com/yakkshit or x.com/yakkshit"
+                            placeholder="e.g. github.com/username or x.com/username"
                             value={newLinkInput}
                             onChange={(e) => setNewLinkInput(e.target.value)}
                             onKeyDown={(e) => {

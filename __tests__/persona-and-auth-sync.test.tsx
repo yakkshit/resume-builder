@@ -43,4 +43,18 @@ describe("Unified Authentication Logic", () => {
     expect(mockClerkUser.primaryEmailAddress.emailAddress).toBe("alex.rivera@example.com");
     expect(mockClerkUser.externalAccounts[0].username).toBe("arivera-dev");
   });
+
+  it("renders SSR markup for UserMenu without hydration mismatch", async () => {
+    const { AuthProvider } = await import("@/lib/auth/auth-provider");
+    const { UserMenu } = await import("@/components/auth/user-menu");
+
+    const html = renderToStaticMarkup(
+      React.createElement(AuthProvider, null, React.createElement(UserMenu))
+    );
+
+    // Initial SSR output must consistently contain the sign-in link and not leak unmounted authenticated badge
+    expect(html).toContain('href="/sign-in"');
+    expect(html).not.toContain('truncate');
+  });
 });
+

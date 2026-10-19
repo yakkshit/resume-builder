@@ -6,6 +6,7 @@ import mime from "mime"
 import type { NextRequest } from "next/server"
 import { DEFAULT_CHAT_MODEL } from "@/lib/chat-models"
 import { performWebSearch, type WebSearchResponse } from "@/lib/web-search"
+import { resilientScrape, type ScraperExecutionPlan } from "@/lib/scrapers/resilient-scraper"
 import { extractKnowledgeGraph } from "@/lib/graph-rag/extractor"
 import { executeNeo4jGraphRag } from "@/lib/graph-rag/neo4j-client"
 import type { GraphRagQueryResult, Neo4jConfig } from "@/lib/graph-rag/types"
@@ -506,32 +507,82 @@ Rules:
     }
   } else {
     if (aiMode) {
-      systemMessage = `You are an AI Resume Assistant. The user will give you their resume data and often a job description or request (e.g. "tailor my resume to this job", "update my summary").
+      systemMessage = `You are an expert AI Resume Architect & Career Copilot.
+When the user asks you to CREATE, BUILD, or TAILOR a resume for a job description (or role), your goal is to produce an exceptional, ATS-optimized, high-impact resume that maximizes interview callbacks.
 
-Your response must follow this structure every time you suggest resume changes:
-1. Write a short human-readable explanation (1–3 sentences) before or after the code block.
-2. Include exactly one JSON code block with ONLY the resume fields you are changing. Use this format with no trailing commas or comments:
-
-\`\`\`json
+RESUME TAILORING MANDATES FOR JOB DESCRIPTIONS:
+1. Target Role & Summary Alignment:
+   - Match \`basicInfo.title\` directly to the target job title from the job description.
+   - Craft a compelling, quantified 2–4 sentence summary highlighting relevant competencies, tech stack, and achievements matching the job requirements.
+2. Skill Keyword Density (ATS Optimization):
+   - Extract every required framework, language, database, cloud service, and methodology from the job description.
+   - Populate \`skills\` with these exact industry keywords.
+3. Quantified Experience Bullets (Google XYZ / STAR):
+   - Formulate bullet points using action verbs and quantified impact (e.g. "Increased performance by 35%", "Reduced latency by 40ms", "Led a team of 6 engineers").
+   - Directly address the responsibilities and technical challenges outlined in the job description.
+4. Complete Structured UI Output:
+   - When asked to create, tailor, or build a resume (or for a job description), you MUST output the COMPLETE resume snapshot inside a \`\`\`component:cv code block so the live editor and PDF preview render immediately:
+\`\`\`component:cv
 {
-  "basicInfo": { "summary": "..." },
-  "skills": ["skill1", "skill2"],
-  "experience": [{ "company": "...", "position": "...", "startDate": "...", "endDate": "...", "description": "...", "highlights": [] }],
-  "education": [{ "institution": "...", "degree": "...", "field": "...", "startDate": "...", "endDate": "...", "gpa": "..." }],
-  "projects": [{ "name": "...", "description": "...", "technologies": [] }],
-  "achievements": [{ "title": "...", "description": "...", "date": "..." }]
+  "resumeData": {
+    "language": "en",
+    "basicInfo": {
+      "name": "Full Name",
+      "title": "Target Role",
+      "email": "email@example.com",
+      "phone": "+1 555-0192",
+      "location": "City, State",
+      "linkedin": "linkedin.com/in/profile",
+      "website": "portfolio.dev",
+      "summary": "Compelling tailored professional summary.",
+      "languages": ["English"]
+    },
+    "skills": ["Skill1", "Skill2", "Skill3"],
+    "experience": [
+      {
+        "company": "Company Name",
+        "position": "Title",
+        "startDate": "2022",
+        "endDate": "Present",
+        "description": "Led engineering initiatives...",
+        "highlights": ["Engineered high-throughput service...", "Boosted test coverage..."]
+      }
+    ],
+    "education": [
+      {
+        "institution": "University Name",
+        "degree": "B.S.",
+        "field": "Computer Science",
+        "startDate": "2018",
+        "endDate": "2022",
+        "gpa": "3.8"
+      }
+    ],
+    "projects": [
+      {
+        "name": "Project Name",
+        "description": "Production system...",
+        "technologies": ["React", "TypeScript", "Node.js"]
+      }
+    ],
+    "achievements": [
+      {
+        "title": "Award or Cert",
+        "description": "Recognized for excellence",
+        "date": "2023"
+      }
+    ]
+  },
+  "template": "modern"
 }
 \`\`\`
+5. For small, localized edits (e.g. "change only my summary" or "add Docker to my skills"):
+   - You may output a partial diff \`\`\`json block with only modified keys.
+   - For any "create", "build", "tailor", or job description request, ALWAYS emit the complete \`\`\`component:cv block.
+6. Grounding:
+   - Ground information in the user's provided profile, Memory Vault, or existing resume. Never use fake placeholder names like "John Doe" or placeholder emails when user profile data exists.
 
-Rules:
-- Output ONLY the keys and values you are modifying. Omit any section you are not changing.
-- Never include "profilePicture" in the JSON.
-- For partial updates (e.g. only summary), output only: \`\`\`json\n{"basicInfo":{"summary":"Your new summary text."}}\n\`\`\`
-- Keep JSON valid: no trailing commas, no comments, use double quotes for strings.
-- For "update my summary" or similar: return \`\`\`json\n{"basicInfo":{"summary":"<improved summary>"}}\n\`\`\` and a brief explanation.
-- If user asks to create/build/tailor a resume for a job description, you MUST include \`\`\`component:cv ...\`\`\` with resumeData so the app can render the resume tool and PDF preview immediately.
-
-Provided resume data (for context; suggest only changes): ${resumeJson}`
+Provided resume data: ${resumeJson}`
     } else {
       systemMessage = `You are an AI Resume Assistant. The user will ask questions about their resume or ask for improvements.
 
@@ -929,9 +980,55 @@ ${getTemplateCapacityCheatSheetMarkdown()}
     }
   }
 
-  // ── Web Search & Grounding via Tavily & Firecrawl ───────────────────
+  // ── Web Scraping & URL Extraction via Resilient Scraper (Direct -> Firecrawl -> Tavily) ────
   const lastUserMsg = (Array.isArray(messages) ? messages : []).filter((m: any) => m.role === 'user').pop();
   const rawLastUserText = getMsgText(lastUserMsg);
+  const urlMatch = rawLastUserText.match(/https?:\/\/[^\s<>"')]+/i);
+  const targetUrl = urlMatch ? urlMatch[0] : null;
+
+  let scraperPlanData: ScraperExecutionPlan | null = null;
+  if (targetUrl) {
+    try {
+      scraperPlanData = await resilientScrape(targetUrl, {
+        apiKeyFirecrawl: providerKeys?.firecrawl,
+        apiKeyTavily: providerKeys?.tavily,
+      });
+    } catch (err) {
+      console.warn("[api/chat] Resilient scraping failed:", err);
+    }
+  }
+
+  if (scraperPlanData && scraperPlanData.extractedData?.content) {
+    const sanitizedPlan = {
+      ...scraperPlanData,
+      extractedData: {
+        ...scraperPlanData.extractedData,
+        content: scraperPlanData.extractedData.content.slice(0, 15000),
+      },
+    };
+
+    systemMessage += `\n\n[LIVE WEB & JOB SCRAPED INTEL VIA ${scraperPlanData.chosenProvider.toUpperCase()} / FIRECRAWL / TAVILY]:
+Target URL: ${scraperPlanData.url}
+Title: ${scraperPlanData.extractedData.title}
+Domain: ${scraperPlanData.extractedData.domain}
+Keywords Extracted: ${scraperPlanData.extractedData.keywords.join(", ")}
+Content Preview:
+${sanitizedPlan.extractedData.content.slice(0, 6000)}
+
+MANDATORY INSTRUCTIONS FOR SCRAPED JOB & WEB INTEL:
+1. Ground your response in the real scraped job description/page content above.
+2. At the top of your response, output the scraper plan component so the user sees the extraction pipeline and intel:
+\`\`\`component:scraper-plan
+${JSON.stringify(sanitizedPlan)}
+\`\`\`
+3. If the user requested to create, tailor, or build a resume for this job/URL, use the extracted job title, required skills, and responsibilities to generate a complete tailored resume using:
+\`\`\`component:cv
+{"resumeData": { ... }, "template": "modern"}
+\`\`\`
+`;
+  }
+
+  // ── Web Search & Grounding via Tavily & Firecrawl ───────────────────
   const isWebSearchRequested = Boolean(
     webSearch ||
     (rawLastUserText.includes("[Active Tools:") && (rawLastUserText.toLowerCase().includes("web") || rawLastUserText.toLowerCase().includes("search"))) ||
@@ -939,7 +1036,7 @@ ${getTemplateCapacityCheatSheetMarkdown()}
   );
 
   let searchResourcesData: WebSearchResponse | null = null;
-  if (isWebSearchRequested && rawLastUserText.trim()) {
+  if (!targetUrl && isWebSearchRequested && rawLastUserText.trim()) {
     const queryToSearch = rawLastUserText
       .replace(/\[Active Tools:[^\]]*\]/gi, "")
       .replace(/\[Attached files:[^\]]*\]/gi, "")
@@ -980,7 +1077,7 @@ ${sanitizedSearchData.results.map((r, i) => `${i + 1}. [${r.title}](${r.url}) ($
 
 MANDATORY INSTRUCTIONS FOR WEB CITATIONS & SEARCH CARD:
 1. Ground your facts directly in the search results above. Write a clear, professional, well-formatted response.
-2. In your response text, cite sources using standard markdown links with descriptive or entity labels (e.g. [Venkata Sai Yakkshit Reddy Asodi](https://github.com/yakkshit) or [LinkedIn Profile](https://linkedin.com/in/yakkshit)). The frontend automatically renders these as interactive citation pills with live hovercards.
+2. In your response text, cite sources using standard markdown links with descriptive or entity labels (e.g. [Engineering Lead Profile](https://github.com/developer) or [LinkedIn Profile](https://linkedin.com/in/profile)). The frontend automatically renders these as interactive citation pills with live hovercards.
 3. At the VERY TOP of your response, output this structured search resources code block so the UI can render the interactive Search Resources Card and open the Sources Drawer:
 \`\`\`component:search-resources
 ${JSON.stringify(sanitizedSearchData)}

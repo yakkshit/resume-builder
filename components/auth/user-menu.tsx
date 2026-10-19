@@ -13,7 +13,7 @@ import {
 import { useAuth } from "@/lib/auth/auth-provider";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { loadProfile, type UserProfile } from "@/components/chat/profile-settings-dialog";
+import { loadProfile, EMPTY_PROFILE, type UserProfile } from "@/components/chat/profile-settings-dialog";
 
 interface UserMenuProps {
   className?: string;
@@ -22,9 +22,10 @@ interface UserMenuProps {
 
 export function SidebarCompactUserControls({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const { user } = useAuth();
-  const [profile, setProfile] = useState<UserProfile>(() => loadProfile());
+  const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
 
   useEffect(() => {
+    setProfile(loadProfile());
     const handleUpdate = () => setProfile(loadProfile());
     window.addEventListener("ai-chat-profile-updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
@@ -34,28 +35,52 @@ export function SidebarCompactUserControls({ onOpenSettings }: { onOpenSettings?
     };
   }, []);
 
+  const isAuthenticated = Boolean(user?.isAuthenticated && !user?.isIncognito && (user?.email || user?.name !== "Guest"));
+
   const displayName = useMemo(() => {
-    if (profile.name && profile.name.trim() && profile.name !== "Career Professional" && profile.name !== "Guest" && profile.name !== "User") {
-      return profile.name.trim();
-    }
-    if (user.name && user.name.trim() && user.name !== "Career Professional" && user.name !== "Guest" && user.name !== "User") {
+    if (user.name && user.name.trim() && user.name !== "Career Professional" && user.name !== "Guest" && user.name !== "User" && user.name !== "Yakkshit Sai") {
       return user.name.trim();
     }
-    return "Yakkshit Sai";
-  }, [profile.name, user.name]);
+    if (profile.name && profile.name.trim() && profile.name !== "Career Professional" && profile.name !== "Guest" && profile.name !== "User" && profile.name !== "Yakkshit Sai") {
+      return profile.name.trim();
+    }
+    return user.email ? user.email.split("@")[0] : "Guest";
+  }, [profile.name, user.name, user.email]);
 
   const displayEmail = useMemo(() => {
-    if (profile.email && profile.email.includes("@") && !profile.email.endsWith("@user.local")) {
-      return profile.email.trim();
-    }
-    if (user.email && user.email.includes("@") && !user.email.endsWith("@user.local")) {
+    if (user.email && user.email.includes("@") && !user.email.endsWith("@user.local") && user.email !== "yakkshit.tactopus@gmail.com") {
       return user.email.trim();
     }
-    return "yakkshit.tactopus@gmail.com";
+    if (profile.email && profile.email.includes("@") && !profile.email.endsWith("@user.local") && profile.email !== "yakkshit.tactopus@gmail.com") {
+      return profile.email.trim();
+    }
+    return "";
   }, [profile.email, user.email]);
 
   const avatarSrc = profile.profilePicture || user.avatarUrl || "";
-  const initial = displayName.charAt(0).toUpperCase() || "Y";
+  const initial = (displayName && displayName !== "Guest" ? displayName.charAt(0).toUpperCase() : "U");
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              href="/sign-in"
+              className="size-8 rounded-full flex items-center justify-center transition-all shadow-sm ring-1 ring-white/10 hover:ring-white/30 bg-neutral-800 text-neutral-300 hover:text-white"
+              aria-label="Sign In or Create Account"
+            >
+              <UserIcon className="size-4" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="text-xs space-y-0.5">
+            <p className="font-semibold">Sign In / Sign Up</p>
+            <p className="text-[10px] text-neutral-400">Create your private career vault</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -78,7 +103,7 @@ export function SidebarCompactUserControls({ onOpenSettings }: { onOpenSettings?
         </TooltipTrigger>
         <TooltipContent side="right" className="text-xs space-y-0.5">
           <p className="font-semibold">{displayName}</p>
-          <p className="text-[10px] text-neutral-400 font-mono">{displayEmail}</p>
+          {displayEmail && <p className="text-[10px] text-neutral-400 font-mono">{displayEmail}</p>}
         </TooltipContent>
       </Tooltip>
     </div>
@@ -87,9 +112,10 @@ export function SidebarCompactUserControls({ onOpenSettings }: { onOpenSettings?
 
 export function SidebarUserControls({ onOpenSettings }: { onOpenSettings?: () => void }) {
   const { user, logout } = useAuth();
-  const [profile, setProfile] = useState<UserProfile>(() => loadProfile());
+  const [profile, setProfile] = useState<UserProfile>(EMPTY_PROFILE);
 
   useEffect(() => {
+    setProfile(loadProfile());
     const handleUpdate = () => setProfile(loadProfile());
     window.addEventListener("ai-chat-profile-updated", handleUpdate);
     window.addEventListener("storage", handleUpdate);
@@ -99,35 +125,60 @@ export function SidebarUserControls({ onOpenSettings }: { onOpenSettings?: () =>
     };
   }, []);
 
+  const isAuthenticated = Boolean(user?.isAuthenticated && !user?.isIncognito && (user?.email || user?.name !== "Guest"));
+
   const displayName = useMemo(() => {
-    if (profile.name && profile.name.trim() && profile.name !== "Career Professional" && profile.name !== "Guest" && profile.name !== "User") {
-      return profile.name.trim();
-    }
-    if (user.name && user.name.trim() && user.name !== "Career Professional" && user.name !== "Guest" && user.name !== "User") {
+    if (user.name && user.name.trim() && user.name !== "Career Professional" && user.name !== "Guest" && user.name !== "User" && user.name !== "Yakkshit Sai") {
       return user.name.trim();
     }
-    return "Yakkshit Sai";
-  }, [profile.name, user.name]);
+    if (profile.name && profile.name.trim() && profile.name !== "Career Professional" && profile.name !== "Guest" && profile.name !== "User" && profile.name !== "Yakkshit Sai") {
+      return profile.name.trim();
+    }
+    return user.email ? user.email.split("@")[0] : "User";
+  }, [profile.name, user.name, user.email]);
 
   const displayEmail = useMemo(() => {
-    if (profile.email && profile.email.includes("@") && !profile.email.endsWith("@user.local")) {
-      return profile.email.trim();
-    }
-    if (user.email && user.email.includes("@") && !user.email.endsWith("@user.local")) {
+    if (user.email && user.email.includes("@") && !user.email.endsWith("@user.local") && user.email !== "yakkshit.tactopus@gmail.com") {
       return user.email.trim();
     }
-    return "yakkshit.tactopus@gmail.com";
+    if (profile.email && profile.email.includes("@") && !profile.email.endsWith("@user.local") && profile.email !== "yakkshit.tactopus@gmail.com") {
+      return profile.email.trim();
+    }
+    return "";
   }, [profile.email, user.email]);
 
   const avatarSrc = profile.profilePicture || user.avatarUrl || "";
-  const initial = displayName.charAt(0).toUpperCase() || "Y";
+  const initial = displayName.charAt(0).toUpperCase() || "U";
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex flex-col gap-2 p-2.5 rounded-xl bg-neutral-900/80 border border-white/10 shadow-sm">
+        <div className="text-[11px] text-neutral-400 font-medium">Ready to save your progress?</div>
+        <div className="flex gap-2">
+          <Link
+            href="/sign-in"
+            className="flex-1 text-center py-1.5 px-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold transition-all border border-white/5"
+          >
+            Sign In
+          </Link>
+          <Link
+            href="/sign-up"
+            className="flex-1 text-center py-1.5 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-1"
+          >
+            <Sparkles className="size-3" />
+            <span>Sign Up</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-between p-2 rounded-xl bg-neutral-900/70 border border-white/10 hover:border-white/20 transition-all shadow-sm group">
       <Link
         href="/profile"
         className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer hover:opacity-95 transition-opacity"
-        title={`Profile: ${displayName} (${displayEmail})`}
+        title={`Profile: ${displayName} ${displayEmail ? `(${displayEmail})` : ''}`}
       >
         <div className="size-8 rounded-full overflow-hidden shrink-0 ring-1 ring-white/15 shadow-xs">
           {avatarSrc ? (
@@ -146,9 +197,11 @@ export function SidebarUserControls({ onOpenSettings }: { onOpenSettings?: () =>
             </p>
             <span className="size-1.5 rounded-full bg-emerald-400 shrink-0" title="Connected & Synced" />
           </div>
-          <p className="text-[10.5px] text-neutral-400 truncate max-w-[130px] font-mono tracking-tight">
-            {displayEmail}
-          </p>
+          {displayEmail ? (
+            <p className="text-[10.5px] text-neutral-400 truncate max-w-[130px] font-mono tracking-tight">
+              {displayEmail}
+            </p>
+          ) : null}
         </div>
       </Link>
       <div className="flex items-center gap-0.5 shrink-0">
@@ -176,9 +229,14 @@ export function SidebarUserControls({ onOpenSettings }: { onOpenSettings?: () =>
 }
 
 export function UserMenu({ className, onOpenSettings }: UserMenuProps) {
-  const { user, oneClickAuth, logout } = useAuth();
+  const { user, logout } = useAuth();
+  const [mounted, setMounted] = useState(false);
 
-  if (user.isAuthenticated && !user.isIncognito) {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (mounted && user.isAuthenticated && !user.isIncognito) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
         {onOpenSettings && (

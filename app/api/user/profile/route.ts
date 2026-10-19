@@ -15,12 +15,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ exists: false, user: null });
     }
 
-    const safeName = user.name && user.name !== "Career Professional" && user.name !== "Guest"
+    const safeName = user.name && user.name !== "Career Professional" && user.name !== "Guest" && user.name !== "Yakkshit Sai"
       ? user.name
-      : "Yakkshit Sai";
-    const safeEmail = user.email && user.email.includes("@") && !user.email.endsWith("@user.local")
+      : "";
+    const safeEmail = user.email && user.email.includes("@") && !user.email.endsWith("@user.local") && user.email !== "yakkshit.tactopus@gmail.com"
       ? user.email
-      : "yakkshit.tactopus@gmail.com";
+      : "";
 
     // Return profile (redact sensitive internal DB fields if needed, return keys & settings)
     return NextResponse.json({

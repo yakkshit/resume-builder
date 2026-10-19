@@ -245,6 +245,7 @@ function mapComponentType(rawType: string): Parameters<typeof ComponentRenderer>
     if (t === "image-generation" || t === "imagegeneration" || t === "image" || t === "generate-image" || t === "ai-image") return "image-generation";
     if (t === "browser" || t === "browser-controller" || t === "chromium" || t === "mcp-browser") return "browser";
     if (t === "search" || t === "searchresources" || t === "search-resources" || t === "sources" || t === "web-search") return "search-resources";
+    if (t === "scraper-plan" || t === "scraperplan" || t === "webscraper" || t === "web-scraper" || t === "resilient-scraper") return "scraper-plan";
     return null;
 }
 

@@ -32,34 +32,15 @@ export class DatabaseService {
       }
     }
 
-    // Default fallback user for offline / local testing
-    return {
-      id: clerkIdOrId,
-      clerkId: clerkIdOrId,
-      email: (clerkIdOrId.includes("@") && !clerkIdOrId.endsWith("@user.local"))
-        ? clerkIdOrId
-        : "yakkshit.tactopus@gmail.com",
-      name: "Yakkshit Sai",
-      avatarUrl: null,
-      githubUsername: null,
-      githubRepo: null,
-      githubToken: null,
-      githubSyncEnabled: false,
-      isOnboarded: true,
-      isIncognito: false,
-      apiKeys: {},
-      encryptionSalt: null,
-      preferences: {},
-      bio: "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+    // User does not exist yet
+    return null;
   }
 
   /**
    * Upsert a user profile
    */
   static async upsertUserProfile(user: {
+    id?: string;
     clerkId?: string;
     email?: string;
     name?: string;
@@ -75,12 +56,12 @@ export class DatabaseService {
     githubSyncEnabled?: boolean;
     preferences?: Record<string, unknown>;
   }): Promise<{ success: boolean; user?: User }> {
-    const effectiveId = user.clerkId || user.email || `usr_${Date.now()}`;
+    const effectiveId = user.id || user.clerkId || user.email || `usr_${Date.now()}`;
     const existing = inMemoryUsers.get(effectiveId);
 
     const updatedUser: User = {
-      id: existing?.id || effectiveId,
-      clerkId: effectiveId,
+      id: user.id || existing?.id || effectiveId,
+      clerkId: user.clerkId || existing?.clerkId || effectiveId,
       email: user.email ?? existing?.email ?? null,
       name: user.name ?? existing?.name ?? "Career User",
       avatarUrl: user.avatarUrl ?? existing?.avatarUrl ?? null,

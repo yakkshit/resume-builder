@@ -80,8 +80,8 @@ export interface AuthContextType {
 
 const DEFAULT_USER: AuthUser = {
   id: "guest-user",
-  email: "yakkshit.tactopus@gmail.com",
-  name: "Yakkshit Sai",
+  email: "",
+  name: "Guest",
   isAuthenticated: false,
   isOnboarded: false,
   isIncognito: false,
@@ -100,55 +100,51 @@ function setAuthCookie(userId?: string) {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [loading, setLoading] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = tryLocalStorageGet("career-agent-auth-user");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed.isAuthenticated) return false;
-        }
-        const prof = getStoredProfile();
-        if (prof.name && prof.name !== "Career Professional") return false;
-      } catch {}
-    }
-    return true;
-  });
+  const [loading, setLoading] = useState<boolean>(true);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [user, setUser] = useState<AuthUser>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const stored = tryLocalStorageGet("career-agent-auth-user");
-        const prof = getStoredProfile();
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          const name = parsed.name && parsed.name !== "Career Professional" && parsed.name !== "Guest"
-            ? parsed.name
-            : prof.name || "Yakkshit Sai";
-          const email = parsed.email && parsed.email.includes("@") && !parsed.email.endsWith("@user.local")
-            ? parsed.email
-            : prof.email || "yakkshit.tactopus@gmail.com";
-          return {
-            ...DEFAULT_USER,
-            ...parsed,
-            name,
-            email,
-            avatarUrl: parsed.avatarUrl || prof.profilePicture,
-          };
-        }
-        if (prof.name) {
-          return {
-            ...DEFAULT_USER,
-            name: prof.name,
-            email: prof.email || "yakkshit.tactopus@gmail.com",
-            avatarUrl: prof.profilePicture,
-            isAuthenticated: true,
-          };
-        }
-      } catch {}
-    }
-    return DEFAULT_USER;
-  });
+  const [user, setUser] = useState<AuthUser>(DEFAULT_USER);
+
+  // Restore client-side stored session safely on mount (prevents SSR hydration mismatch)
+  useEffect(() => {
+    try {
+      const stored = tryLocalStorageGet("career-agent-auth-user");
+      const prof = getStoredProfile();
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Only restore if there's meaningful data (not developer placeholder values)
+        const hasValidName = parsed.name && parsed.name !== "Career Professional" && parsed.name !== "Guest" && parsed.name !== "Yakkshit Sai";
+        const hasValidEmail = parsed.email && parsed.email.includes("@") && !parsed.email.endsWith("@user.local") && parsed.email !== "yakkshit.tactopus@gmail.com";
+        const name = hasValidName ? parsed.name : (prof.name && prof.name !== "Yakkshit Sai" ? prof.name : "");
+        const email = hasValidEmail ? parsed.email : (prof.email && prof.email !== "yakkshit.tactopus@gmail.com" ? prof.email : "");
+        const finalName = hasValidName ? parsed.name : (prof.name && prof.name !== "Yakkshit Sai" && prof.name !== "Career Professional" ? prof.name : (hasValidEmail ? parsed.email.split("@")[0] : DEFAULT_USER.name));
+        const finalEmail = hasValidEmail ? parsed.email : (prof.email && prof.email !== "yakkshit.tactopus@gmail.com" ? prof.email : DEFAULT_USER.email);
+        const isAuthenticated = Boolean(parsed.isAuthenticated && (hasValidEmail || (finalName && finalName !== "Guest")));
+        setUser({
+          ...DEFAULT_USER,
+          ...parsed,
+          name: finalName,
+          email: finalEmail,
+          avatarUrl: parsed.avatarUrl || prof.profilePicture,
+          isAuthenticated,
+        });
+        setLoading(false);
+        return;
+      }
+      // Only restore from stored profile if it has the user's own data
+      if (prof.name && prof.name !== "Yakkshit Sai" && prof.name !== "Career Professional") {
+        setUser({
+          ...DEFAULT_USER,
+          name: prof.name,
+          email: (prof.email && prof.email !== "yakkshit.tactopus@gmail.com") ? prof.email : "",
+          avatarUrl: prof.profilePicture,
+          isAuthenticated: true,
+        });
+        setLoading(false);
+        return;
+      }
+    } catch {}
+    setLoading(false);
+  }, []);
 
   const saveUser = useCallback((updated: AuthUser) => {
     setUser(updated);
@@ -185,12 +181,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (data.user) {
           setUser((prev) => {
             const stored = getStoredProfile();
-            const validName = data.user.name && data.user.name !== "Career Professional" && data.user.name !== "Guest"
-              ? data.user.name
-              : stored.name || prev.name || "Yakkshit Sai";
-            const validEmail = data.user.email && data.user.email.includes("@") && !data.user.email.endsWith("@user.local")
-              ? data.user.email
-              : stored.email || email || prev.email || "yakkshit.tactopus@gmail.com";
+            const cloudName = data.user.name && data.user.name !== "Career Professional" && data.user.name !== "Guest" && data.user.name !== "Yakkshit Sai";
+            const storedName = stored.name && stored.name !== "Yakkshit Sai" && stored.name !== "Career Professional";
+            const validName = cloudName ? data.user.name : (storedName ? stored.name : prev.name);
+            const cloudEmail = data.user.email && data.user.email.includes("@") && !data.user.email.endsWith("@user.local") && data.user.email !== "yakkshit.tactopus@gmail.com";
+            const storedEmail = stored.email && stored.email !== "yakkshit.tactopus@gmail.com";
+            const validEmail = cloudEmail ? data.user.email : (storedEmail ? stored.email : (email && email !== "yakkshit.tactopus@gmail.com" ? email : prev.email));
             const validPhoto = data.user.avatarUrl || stored.profilePicture || prev.avatarUrl;
 
             const next: AuthUser = {
@@ -233,12 +229,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(fbUser);
       if (fbUser) {
         const stored = getStoredProfile();
-        const resolvedName = (fbUser.displayName && fbUser.displayName !== "User" && fbUser.displayName !== "Career Professional")
-          ? fbUser.displayName
-          : (stored.name && stored.name !== "Career Professional" ? stored.name : (fbUser.email ? fbUser.email.split("@")[0] : "Yakkshit Sai"));
+        // Use Firebase display name (real user's name), fallback to email prefix; never use developer placeholder
+        const fbName = fbUser.displayName && fbUser.displayName !== "User" && fbUser.displayName !== "Career Professional" && fbUser.displayName !== "Yakkshit Sai";
+        const storedName = stored.name && stored.name !== "Career Professional" && stored.name !== "Yakkshit Sai";
+        const resolvedName = fbName ? fbUser.displayName! : (storedName ? stored.name : (fbUser.email ? fbUser.email.split("@")[0] : "User"));
         const resolvedEmail = (fbUser.email && fbUser.email.includes("@") && !fbUser.email.endsWith("@user.local"))
           ? fbUser.email
-          : (stored.email && stored.email.includes("@") ? stored.email : "yakkshit.tactopus@gmail.com");
+          : (stored.email && stored.email.includes("@") && stored.email !== "yakkshit.tactopus@gmail.com" ? stored.email : "");
         const resolvedPhoto = fbUser.photoURL || stored.profilePicture || undefined;
 
         // Sync displayName to Firebase Auth user object if empty or generic
@@ -262,13 +259,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Sync cloud profile in background without stalling UI hydration
         fetchCloudProfile(fbUser.uid, resolvedEmail).catch(() => {});
       } else {
-        // If not authenticated in Firebase, preserve locally stored profile info if present
+        // If not authenticated in Firebase, only restore profile if it's clearly the user's own (not developer defaults)
         const stored = getStoredProfile();
-        if (stored.name && stored.name !== "Career Professional") {
+        if (stored.name && stored.name !== "Career Professional" && stored.name !== "Yakkshit Sai") {
           setUser((prev) => ({
             ...prev,
             name: stored.name,
-            email: stored.email || "yakkshit.tactopus@gmail.com",
+            email: (stored.email && stored.email !== "yakkshit.tactopus@gmail.com") ? stored.email : prev.email,
             avatarUrl: stored.profilePicture || prev.avatarUrl,
           }));
         }
@@ -446,11 +443,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Backward-compatible login helper
-  const login = useCallback(async (email: string, name = "Yakkshit Sai", passphrase?: string) => {
+  const login = useCallback(async (email: string, name = "", passphrase?: string) => {
     const nextUser: AuthUser = {
       id: `usr_${Date.now()}`,
       email,
-      name,
+      name: name || (email ? email.split("@")[0] : "User"),
       isAuthenticated: true,
       isOnboarded: true,
       isIncognito: false,

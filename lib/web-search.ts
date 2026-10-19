@@ -63,11 +63,12 @@ export async function searchWithTavily(
   apiKey: string,
   options?: WebSearchOptions
 ): Promise<WebSearchResponse> {
+  const cleanKey = apiKey.trim().replace(/^Bearer\s+/i, "");
   const maxResults = options?.maxResults ?? 10;
   const searchDepth = options?.searchDepth ?? "advanced";
 
   const payload: Record<string, any> = {
-    api_key: apiKey,
+    api_key: cleanKey,
     query,
     search_depth: searchDepth,
     include_answer: true,
@@ -125,6 +126,39 @@ export async function searchWithTavily(
 }
 
 /**
+ * Tavily AI URL Content Extraction Implementation
+ * POST https://api.tavily.com/extract
+ */
+export async function extractWithTavily(
+  url: string,
+  apiKey: string
+): Promise<{ rawContent: string; title?: string }> {
+  const cleanKey = apiKey.trim().replace(/^Bearer\s+/i, "");
+  const res = await fetch("https://api.tavily.com/extract", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      api_key: cleanKey,
+      urls: [url],
+    }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Tavily extract API error (${res.status}): ${errorText || res.statusText}`);
+  }
+
+  const data = await res.json();
+  const first = Array.isArray(data.results) ? data.results[0] : null;
+  return {
+    rawContent: first?.raw_content || first?.content || "",
+    title: first?.title,
+  };
+}
+
+/**
  * Firecrawl Search Implementation
  * POST https://api.firecrawl.dev/v1/search
  */
@@ -133,13 +167,14 @@ export async function searchWithFirecrawl(
   apiKey: string,
   options?: WebSearchOptions
 ): Promise<WebSearchResponse> {
+  const cleanKey = apiKey.trim().replace(/^Bearer\s+/i, "");
   const limit = options?.maxResults ?? 10;
 
   const res = await fetch("https://api.firecrawl.dev/v1/search", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${cleanKey}`,
     },
     body: JSON.stringify({
       query,
@@ -191,15 +226,16 @@ export async function scrapeWithFirecrawl(
   url: string,
   apiKey: string
 ): Promise<{ markdown: string; title?: string; description?: string }> {
+  const cleanKey = apiKey.trim().replace(/^Bearer\s+/i, "");
   const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${cleanKey}`,
     },
     body: JSON.stringify({
       url,
-      formats: ["markdown"],
+      formats: ["markdown", "html"],
     }),
   });
 
@@ -209,10 +245,13 @@ export async function scrapeWithFirecrawl(
   }
 
   const data = await res.json();
+  const markdown = data.data?.markdown || data.data?.content || data.markdown || "";
+  const title = data.data?.metadata?.title || data.metadata?.title;
+  const description = data.data?.metadata?.description || data.metadata?.description;
   return {
-    markdown: data.data?.markdown || "",
-    title: data.data?.metadata?.title,
-    description: data.data?.metadata?.description,
+    markdown,
+    title,
+    description,
   };
 }
 
@@ -256,62 +295,26 @@ export async function performWebSearch(
     }
   }
 
-  // 3. Fallback: Parse query targets (e.g. GitHub, Hugging Face, LinkedIn, etc.) and construct realistic result cards
+  // 3. Fallback: no API keys configured — return empty result with explanation
+  // (Do NOT return hardcoded profile data — that would show developer info to all users)
   const detectedDomains: string[] = [];
   const lower = cleanQuery.toLowerCase();
   if (lower.includes("github")) detectedDomains.push("github.com");
   if (lower.includes("hugging face") || lower.includes("huggingface")) detectedDomains.push("huggingface.co");
   if (lower.includes("linkedin")) detectedDomains.push("linkedin.com");
   if (lower.includes("twitter") || lower.includes("x.com")) detectedDomains.push("x.com");
+  if (lower.includes("google")) detectedDomains.push("google.com");
   if (detectedDomains.length === 0) {
-    detectedDomains.push("github.com", "huggingface.co");
+    detectedDomains.push("web");
   }
 
-  // Realistic fallback sources for developer/profile searches when keys are being tested
-  const results: WebSearchResult[] = [
-    {
-      id: "source-1-gh",
-      url: `https://github.com/yakkshit`,
-      title: "GitHub - yakkshit (Venkata Sai Yakkshit Reddy Asodi)",
-      snippet: "Senior Full Stack Developer focused on building scalable, reliable software and autonomous AI agents. Expertise in cloud architectures, TypeScript, Next.js, and PyTorch.",
-      domain: "github.com",
-      favicon: getFaviconUrl("github.com"),
-      provider: "simulated",
-    },
-    {
-      id: "source-2-gh-repos",
-      url: `https://github.com/yakkshit?tab=repositories`,
-      title: "yakkshit · GitHub Repositories and Open Source Projects",
-      snippet: "Public projects including CV Resume Builder, Autonomous Agents, and ML pipelines. Active contributor to modern AI UI elements and developer workflows.",
-      domain: "github.com",
-      favicon: getFaviconUrl("github.com"),
-      provider: "simulated",
-    },
-    {
-      id: "source-3-hf",
-      url: `https://huggingface.co/yakkshit`,
-      title: "yakkshit (Venkata Sai Yakkshit) on Hugging Face",
-      snippet: "Models, datasets, and Spaces covering modern generative AI, fine-tuning LLMs, and agentic workflows.",
-      domain: "huggingface.co",
-      favicon: getFaviconUrl("huggingface.co"),
-      provider: "simulated",
-    },
-    {
-      id: "source-4-gh-topics",
-      url: `https://github.com/topics/huggingface`,
-      title: "Hugging Face · GitHub Topics & Open Source Ecosystem",
-      snippet: "Transformers, Diffusers, and Datasets repository integrations. Community-driven machine learning models and inference tooling.",
-      domain: "github.com",
-      favicon: getFaviconUrl("github.com"),
-      provider: "simulated",
-    },
-  ];
-
+  // Return empty results with a clear note — the UI should prompt user to add API keys
   return {
     query: cleanQuery,
     domains: detectedDomains,
-    resultsCount: results.length,
-    results,
+    resultsCount: 0,
+    results: [],
+    answer: "Web search is not configured. Please add a Tavily or Firecrawl API key in Settings → API Keys to enable live web search.",
     provider: "simulated",
   };
 }

@@ -7,7 +7,7 @@
  * Returns a comprehensive execution plan suitable for user-friendly UI presentation.
  */
 
-import { scrapeWithFirecrawl, searchWithTavily } from "@/lib/web-search";
+import { scrapeWithFirecrawl, searchWithTavily, extractWithTavily } from "@/lib/web-search";
 
 export interface ScraperStepExecution {
   stepNumber: number;
@@ -277,25 +277,44 @@ export async function resilientScrape(
     }
   }
 
-  // ── Step 3: Tavily AI Search Fallback ──────────────────────────────────────
+  // ── Step 3: Tavily AI Extraction & Grounding Fallback ────────────────────
   if (tavilyKey) {
     const step3Start = Date.now();
     try {
-      const tavilyRes = await searchWithTavily(targetUrl, tavilyKey, { maxResults: 3 });
-      if (tavilyRes.results.length > 0) {
-        const primary = tavilyRes.results[0];
-        const combinedText = tavilyRes.results.map((r) => `${r.title}\n${r.snippet}`).join("\n\n");
+      // 3a. Try high-fidelity direct URL extraction via Tavily Extract API
+      let extractedText = "";
+      let extractedTitle = "";
+      try {
+        const extResult = await extractWithTavily(targetUrl, tavilyKey);
+        if (extResult.rawContent && extResult.rawContent.length > 80) {
+          extractedText = extResult.rawContent;
+          extractedTitle = extResult.title || "";
+        }
+      } catch (extErr) {
+        // Fall back to search
+      }
+
+      // 3b. Fallback to Tavily Search if extract was empty
+      if (!extractedText) {
+        const tavilyRes = await searchWithTavily(targetUrl, tavilyKey, { maxResults: 3 });
+        if (tavilyRes.results.length > 0) {
+          extractedTitle = tavilyRes.results[0].title;
+          extractedText = tavilyRes.results.map((r) => `${r.title}\n${r.snippet}`).join("\n\n");
+        }
+      }
+
+      if (extractedText && extractedText.length > 0) {
         steps.push({
           stepNumber: 3,
           name: "Tavily AI Extraction & Grounding",
           provider: "tavily",
           status: "success",
           latencyMs: Date.now() - step3Start,
-          details: `Tavily AI indexed ${tavilyRes.results.length} contextual extracts for ${domain}.`,
+          details: `Tavily AI retrieved deep web intel for ${domain} (${extractedText.length} chars).`,
         });
 
-        const wordCount = combinedText.split(/\s+/).filter(Boolean).length;
-        const keywords = extractKeywords(combinedText);
+        const wordCount = extractedText.split(/\s+/).filter(Boolean).length;
+        const keywords = extractKeywords(extractedText);
 
         return {
           url: targetUrl,
@@ -304,15 +323,15 @@ export async function resilientScrape(
           totalDurationMs: Date.now() - startTime,
           steps,
           extractedData: {
-            title: primary.title || `Extracted Intel - ${domain}`,
-            summary: primary.snippet || combinedText.slice(0, 300) + "...",
-            content: combinedText,
+            title: extractedTitle || `Extracted Intel - ${domain}`,
+            summary: extractedText.slice(0, 300) + "...",
+            content: extractedText,
             keywords,
             wordCount,
             domain,
             timestamp: new Date().toISOString(),
           },
-          confidenceScore: 0.91,
+          confidenceScore: 0.95,
           userExplanation: "Extracted live factual contents via Tavily AI Search grounding.",
         };
       }
