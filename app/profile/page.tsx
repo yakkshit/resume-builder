@@ -463,16 +463,7 @@ export default function ProfileDashboardPage() {
           profilePicture: profile.profilePicture || "",
         },
         apiKeys: {
-          google: keys.google,
-          openai: keys.openai,
-          anthropic: keys.anthropic,
-          groq: keys.groq,
-          tavily: keys.tavily,
-          firecrawl: keys.firecrawl,
-          kernel: keys.kernel,
-          browserbase: keys.browserbase,
-          steel: keys.steel,
-          openrouter: keys.openrouter,
+          ...keys,
           githubToken: profile.githubToken,
         },
         encryptionPassphrase: profile.encryptionPassphrase,
@@ -598,8 +589,11 @@ export default function ProfileDashboardPage() {
     else if (cleanProvider === "openai" && (val.startsWith("sk-") || val.length >= 20)) isValid = true;
     else if (cleanProvider === "anthropic" && (val.startsWith("sk-ant-") || val.length >= 20)) isValid = true;
     else if (cleanProvider === "groq" && (val.startsWith("gsk_") || val.length >= 20)) isValid = true;
+    else if (cleanProvider === "mistral" && val.length >= 15) isValid = true;
     else if (cleanProvider === "deepseek" && (val.startsWith("sk-") || val.length >= 20)) isValid = true;
     else if (cleanProvider === "openrouter" && (val.startsWith("sk-or-") || val.length >= 20)) isValid = true;
+    else if (cleanProvider === "huggingface" && (val.startsWith("hf_") || val.length >= 15)) isValid = true;
+    else if (cleanProvider === "xai" && (val.startsWith("xai-") || val.length >= 15)) isValid = true;
     else if (cleanProvider === "ollama") isValid = val.startsWith("http://") || val.startsWith("https://");
     else if (cleanProvider === "tavily") isValid = val.startsWith("tvly-") || val.length >= 15;
     else if (cleanProvider === "firecrawl") isValid = val.startsWith("fc-") || val.length >= 15;
@@ -684,16 +678,7 @@ export default function ProfileDashboardPage() {
           profilePicture: profile.profilePicture || "",
         },
         apiKeys: {
-          google: keys.google,
-          openai: keys.openai,
-          anthropic: keys.anthropic,
-          groq: keys.groq,
-          tavily: keys.tavily,
-          firecrawl: keys.firecrawl,
-          kernel: keys.kernel,
-          browserbase: keys.browserbase,
-          steel: keys.steel,
-          openrouter: keys.openrouter,
+          ...keys,
           githubToken: profile.githubToken,
         },
         encryptionPassphrase: profile.encryptionPassphrase,
@@ -802,10 +787,16 @@ export default function ProfileDashboardPage() {
       keys.anthropic,
       keys.deepseek,
       keys.groq,
+      keys.mistral,
       keys.openrouter,
+      keys.huggingface,
+      keys.xai,
       keys.ollamaEndpoint,
       keys.tavily,
       keys.firecrawl,
+      keys.kernel,
+      keys.browserbase,
+      keys.steel,
     ].filter((v) => typeof v === "string" && v.trim().length > 0).length;
   }, [keys]);
 
@@ -1553,7 +1544,7 @@ export default function ProfileDashboardPage() {
                           BYOK Gateway Active
                         </span>
                         <span className="text-[11px] font-mono text-neutral-400">
-                          {configuredKeysCount} of 7 Providers Connected
+                          {configuredKeysCount} Providers Configured
                         </span>
                       </div>
 
@@ -1587,7 +1578,7 @@ export default function ProfileDashboardPage() {
                         <div className="text-[10px] font-mono uppercase text-neutral-400">Active Providers</div>
                         <div className="text-sm font-semibold text-white mt-0.5 flex items-center gap-1.5">
                           <span className={`size-2 rounded-full ${configuredKeysCount > 0 ? "bg-primary animate-pulse" : "bg-neutral-600"}`} />
-                          {configuredKeysCount} / 7 Ready
+                          {configuredKeysCount} Ready
                         </div>
                       </div>
 
@@ -1682,7 +1673,7 @@ export default function ProfileDashboardPage() {
                             : "text-neutral-400 hover:text-white"
                         }`}
                       >
-                        All (9)
+                        All
                       </button>
                       <button
                         type="button"
@@ -2187,6 +2178,99 @@ export default function ProfileDashboardPage() {
                       </div>
                     )}
 
+                    {/* Mistral AI Card */}
+                    {(providerFilter === "all" || (providerFilter === "configured" && keys.mistral) || providerFilter === "cloud") && (
+                      <div className="rounded-2xl border border-white/[0.08] bg-[#16161a] p-5 space-y-4 hover:border-white/15 transition-all shadow-lg">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-3">
+                            <div className="size-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
+                              <ModelProviderIcon provider="mistral" size={18} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-white">Mistral AI</span>
+                                <span className="text-[10px] font-medium bg-amber-500/15 text-amber-400 border border-amber-500/25 px-2 py-0.5 rounded-md">
+                                  Frontier European LLM • Mistral Large & Codestral
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-neutral-400 mt-0.5">
+                                Enterprise-grade models for multilingual career dossiers, technical code assessments, and precision drafting.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {keyStatus.mistral === "success" && (
+                              <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                <Check className="h-3 w-3" /> Connected
+                              </span>
+                            )}
+                            <a
+                              href="https://console.mistral.ai/api-keys/"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 transition-colors"
+                            >
+                              Get Key <ArrowUpRight className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              type={showKey.mistral ? "text" : "password"}
+                              value={keys.mistral || ""}
+                              onChange={(e) => {
+                                setKeys((k) => ({ ...k, mistral: e.target.value }));
+                                markChanged();
+                              }}
+                              placeholder="Enter Mistral API key..."
+                              className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
+                            />
+                            <div className="absolute right-2 top-2 flex items-center gap-1">
+                              {keys.mistral && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleClearKey("mistral")}
+                                  className="p-1 text-neutral-400 hover:text-rose-400 transition-colors"
+                                  title="Clear Key"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowKey((s) => ({ ...s, mistral: !s.mistral }))}
+                                className="p-1 text-neutral-400 hover:text-white transition-colors"
+                                title={showKey.mistral ? "Hide Key" : "Show Key"}
+                              >
+                                {showKey.mistral ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={testingKey.mistral}
+                            onClick={() => testApiKey("mistral", keys.mistral)}
+                            className="h-10 px-4 text-xs font-medium bg-[#202026] hover:bg-[#282830] border-white/10 text-white rounded-xl"
+                          >
+                            {testingKey.mistral ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : keyStatus.mistral === "success" ? (
+                              <span className="flex items-center gap-1 text-emerald-400">
+                                <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : (
+                              "Test Connection"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* OpenRouter Hub Card */}
                     {(providerFilter === "all" || (providerFilter === "configured" && keys.openrouter) || providerFilter === "cloud") && (
                       <div className="rounded-2xl border border-white/[0.08] bg-[#16161a] p-5 space-y-4 hover:border-white/15 transition-all shadow-lg">
@@ -2269,6 +2353,192 @@ export default function ProfileDashboardPage() {
                             {testingKey.openrouter ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
                             ) : keyStatus.openrouter === "success" ? (
+                              <span className="flex items-center gap-1 text-emerald-400">
+                                <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : (
+                              "Test Connection"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Hugging Face Hub Card */}
+                    {(providerFilter === "all" || (providerFilter === "configured" && keys.huggingface) || providerFilter === "cloud") && (
+                      <div className="rounded-2xl border border-white/[0.08] bg-[#16161a] p-5 space-y-4 hover:border-white/15 transition-all shadow-lg">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-3">
+                            <div className="size-9 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-400 shrink-0">
+                              <ModelProviderIcon provider="huggingface" size={18} />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-white">Hugging Face Hub</span>
+                                <span className="text-[10px] font-medium bg-yellow-500/15 text-yellow-400 border border-yellow-500/25 px-2 py-0.5 rounded-md">
+                                  Serverless & Dedicated Endpoints
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-neutral-400 mt-0.5">
+                                Access thousands of open-source models (Llama 3, Qwen, DeepSeek) hosted via Inference API.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {keyStatus.huggingface === "success" && (
+                              <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                <Check className="h-3 w-3" /> Connected
+                              </span>
+                            )}
+                            <a
+                              href="https://huggingface.co/settings/tokens"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-yellow-400 hover:underline flex items-center gap-1 px-2.5 py-1 rounded-lg bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/20 transition-colors"
+                            >
+                              Get Token <ArrowUpRight className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              type={showKey.huggingface ? "text" : "password"}
+                              value={keys.huggingface || ""}
+                              onChange={(e) => {
+                                setKeys((k) => ({ ...k, huggingface: e.target.value }));
+                                markChanged();
+                              }}
+                              placeholder="hf_..."
+                              className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
+                            />
+                            <div className="absolute right-2 top-2 flex items-center gap-1">
+                              {keys.huggingface && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleClearKey("huggingface")}
+                                  className="p-1 text-neutral-400 hover:text-rose-400 transition-colors"
+                                  title="Clear Token"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowKey((s) => ({ ...s, huggingface: !s.huggingface }))}
+                                className="p-1 text-neutral-400 hover:text-white transition-colors"
+                                title={showKey.huggingface ? "Hide Token" : "Show Token"}
+                              >
+                                {showKey.huggingface ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={testingKey.huggingface}
+                            onClick={() => testApiKey("huggingface", keys.huggingface)}
+                            className="h-10 px-4 text-xs font-medium bg-[#202026] hover:bg-[#282830] border-white/10 text-white rounded-xl"
+                          >
+                            {testingKey.huggingface ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : keyStatus.huggingface === "success" ? (
+                              <span className="flex items-center gap-1 text-emerald-400">
+                                <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : (
+                              "Test Connection"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* xAI Grok Card */}
+                    {(providerFilter === "all" || (providerFilter === "configured" && keys.xai) || providerFilter === "cloud") && (
+                      <div className="rounded-2xl border border-white/[0.08] bg-[#16161a] p-5 space-y-4 hover:border-white/15 transition-all shadow-lg">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-3">
+                            <div className="size-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+                              <Sparkles className="size-4" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold text-white">xAI Grok</span>
+                                <span className="text-[10px] font-medium bg-purple-500/15 text-purple-400 border border-purple-500/25 px-2 py-0.5 rounded-md">
+                                  Grok 2 & Grok Beta
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-neutral-400 mt-0.5">
+                                High-context reasoning and live market intelligence powered by xAI.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {keyStatus.xai === "success" && (
+                              <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+                                <Check className="h-3 w-3" /> Connected
+                              </span>
+                            )}
+                            <a
+                              href="https://console.x.ai/"
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-[11px] text-purple-400 hover:underline flex items-center gap-1 px-2.5 py-1 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 transition-colors"
+                            >
+                              Get Key <ArrowUpRight className="h-3 w-3" />
+                            </a>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <Input
+                              type={showKey.xai ? "text" : "password"}
+                              value={keys.xai || ""}
+                              onChange={(e) => {
+                                setKeys((k) => ({ ...k, xai: e.target.value }));
+                                markChanged();
+                              }}
+                              placeholder="xai-..."
+                              className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
+                            />
+                            <div className="absolute right-2 top-2 flex items-center gap-1">
+                              {keys.xai && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleClearKey("xai")}
+                                  className="p-1 text-neutral-400 hover:text-rose-400 transition-colors"
+                                  title="Clear Key"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowKey((s) => ({ ...s, xai: !s.xai }))}
+                                className="p-1 text-neutral-400 hover:text-white transition-colors"
+                                title={showKey.xai ? "Hide Key" : "Show Key"}
+                              >
+                                {showKey.xai ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={testingKey.xai}
+                            onClick={() => testApiKey("xai", keys.xai)}
+                            className="h-10 px-4 text-xs font-medium bg-[#202026] hover:bg-[#282830] border-white/10 text-white rounded-xl"
+                          >
+                            {testingKey.xai ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : keyStatus.xai === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
                               </span>

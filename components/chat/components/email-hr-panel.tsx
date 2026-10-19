@@ -15,7 +15,7 @@ import {
   normalizeDefaultEmailProvider,
   type EmailProviderId,
 } from "@/lib/email-compose-urls";
-import { PROFILE_STORE_ID, getStoredProfile } from "@/components/chat/profile-settings-dialog";
+import { PROFILE_STORE_ID, getStoredProfile, loadProviderKeys } from "@/components/chat/profile-settings-dialog";
 import { tryLocalStorageGet } from "@/lib/safe-local-storage";
 
 const PROVIDER_ORDER: EmailProviderId[] = ["gmail", "yahoo", "hotmail", "outlook", "mailto"];
@@ -115,7 +115,8 @@ export function EmailHrPanel({
 
   const refineWithAi = useCallback(async () => {
     setDraftError(null);
-    const key = (chatApiKey || "").trim();
+    const providerKeys = loadProviderKeys();
+    const key = (chatApiKey || providerKeys.google || "").trim();
     if (!key) {
       setDraftError("Add a Google API key in Profile & Settings to generate drafts (Gemini).");
       return;
@@ -127,6 +128,7 @@ export function EmailHrPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey: key,
+          providerKeys,
           model: (chatModel || "").trim() || undefined,
           hrEmail: to,
           company,

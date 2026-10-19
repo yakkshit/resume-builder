@@ -23,9 +23,38 @@ export async function POST(req: Request) {
       contextText?: string;
       resumeSummary?: string;
       userNote?: string;
+      providerKeys?: {
+        google?: string;
+        gemini?: string;
+      };
     };
 
-    const apiKey = body.apiKey?.trim() || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    function cleanKey(val?: unknown): string | undefined {
+      if (typeof val !== "string") return undefined;
+      const trimmed = val.trim();
+      if (!trimmed) return undefined;
+      if (
+        trimmed.startsWith("your_") ||
+        trimmed.startsWith("YOUR_") ||
+        trimmed.includes("your_api_key") ||
+        trimmed === "placeholder" ||
+        trimmed === "TODO" ||
+        trimmed === "undefined" ||
+        trimmed === "null"
+      ) {
+        return undefined;
+      }
+      return trimmed;
+    }
+
+    const apiKey =
+      cleanKey(body.apiKey) ||
+      cleanKey(body.providerKeys?.google) ||
+      cleanKey(body.providerKeys?.gemini) ||
+      cleanKey(process.env.GOOGLE_GENERATIVE_AI_API_KEY) ||
+      cleanKey(process.env.GEMINI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_GENAI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_API_KEY);
     if (!apiKey) {
       return Response.json(
         { error: "Google API key required for email drafting (add in chat settings or set GOOGLE_GENERATIVE_AI_API_KEY)." },

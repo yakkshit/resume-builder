@@ -23,6 +23,7 @@ import { coverLetterTemplates } from "@/components/pdf-templates"
 import CoverLetterChat from "@/components/resume-coverletter/cover-letter-chat"
 import LoadingScreen from "@/components/resume-coverletter/loading-screen"
 import Link from "next/link"
+import { loadProviderKeys } from "@/components/chat/profile-settings-dialog"
 
 export default function CoverLetterPage() {
   const { toast } = useToast()
@@ -55,8 +56,23 @@ export default function CoverLetterPage() {
 
   const [input, setInput] = useState('');
 
-  const bodyRef = useRef<Record<string, unknown>>({ coverLetterData, jobDescription, model: selectedModel, apiKey });
-  bodyRef.current = { coverLetterData, jobDescription, model: selectedModel, apiKey };
+  const providerKeys = typeof window !== "undefined" ? loadProviderKeys() : {}
+  const effectiveKey = apiKey || providerKeys.google
+
+  const bodyRef = useRef<Record<string, unknown>>({
+    coverLetterData,
+    jobDescription,
+    model: selectedModel,
+    apiKey: effectiveKey,
+    providerKeys,
+  });
+  bodyRef.current = {
+    coverLetterData,
+    jobDescription,
+    model: selectedModel,
+    apiKey: effectiveKey,
+    providerKeys,
+  };
 
   const {
     messages,

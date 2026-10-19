@@ -82,12 +82,12 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   "gemini-2.5-flash-native-audio-preview-09-2025": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-flash-preview-tts": { provider: "google", modelId: "gemini-2.5-flash" },
   "gemini-2.5-pro-preview-tts": { provider: "google", modelId: "gemini-2.5-pro" },
-  "gemini-2.0-flash-exp": { provider: "google", modelId: "gemini-2.0-flash-exp" },
-  "gemini-2.0-flash": { provider: "google", modelId: "gemini-2.0-flash" },
-  "gemini-2.0-flash-001": { provider: "google", modelId: "gemini-2.0-flash" },
-  "gemini-2.0-flash-lite": { provider: "google", modelId: "gemini-2.0-flash-lite" },
-  "gemini-2.0-flash-lite-001": { provider: "google", modelId: "gemini-2.0-flash-lite" },
-  "gemini-2.0-pro": { provider: "google", modelId: "gemini-2.0-pro" },
+  "gemini-2.0-flash-exp": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.0-flash": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.0-flash-001": { provider: "google", modelId: "gemini-2.5-flash" },
+  "gemini-2.0-flash-lite": { provider: "google", modelId: "gemini-2.5-flash-lite" },
+  "gemini-2.0-flash-lite-001": { provider: "google", modelId: "gemini-2.5-flash-lite" },
+  "gemini-2.0-pro": { provider: "google", modelId: "gemini-2.5-pro" },
   "gemini-1.5-pro": { provider: "google", modelId: "gemini-1.5-pro" },
   "gemini-1.5-flash": { provider: "google", modelId: "gemini-1.5-flash" },
   "gemini-nano-banana-2.1": { provider: "google", modelId: "gemini-2.5-flash" },
@@ -326,7 +326,94 @@ function resolveModelRouting(model: unknown): { id: string; config: { provider: 
 const MOCK_RESPONSES = [
   "I'm sorry, but I can't process your request right now due to API quota limitations. Here are some general resume tips:\n\n1. Tailor your resume to each job application\n2. Use action verbs and quantify achievements\n3. Keep it concise and focused on relevant experience\n4. Proofread carefully for errors\n5. Include keywords from the job description",
   "Due to high demand, I can't access the AI service right now. Consider these resume improvements:\n\n- Make your summary more impactful by focusing on your unique value proposition\n- Ensure your skills section highlights both technical and soft skills relevant to the position\n- For each work experience, focus on achievements rather than just responsibilities",
-  "API quota exceeded. While I can't analyze your specific resume right now, here are universal resume tips:\n\n- Use a clean, professional layout with consistent formatting\n- Place the most relevant information at the top\n- Use bullet points for better readability\n- Include metrics and specific results when possible\n- Remove outdated or irrelevant information",
+]
+
+function cleanKey(val?: unknown): string | undefined {
+  if (typeof val !== "string") return undefined
+  const trimmed = val.trim()
+  if (!trimmed) return undefined
+  if (
+    trimmed.startsWith("your_") ||
+    trimmed.startsWith("YOUR_") ||
+    trimmed.includes("your_api_key") ||
+    trimmed === "placeholder" ||
+    trimmed === "TODO" ||
+    trimmed === "undefined" ||
+    trimmed === "null"
+  ) {
+    return undefined
+  }
+  return trimmed
+}
+
+function getErrorText(err: unknown): string {
+  if (!err) return ""
+  if (typeof err === "string") return err.toLowerCase()
+  const obj = err as Record<string, any>
+  let text = ""
+  if (typeof obj.message === "string") text += " " + obj.message
+  if (typeof obj.status === "string" || typeof obj.status === "number") text += " " + obj.status
+  if (typeof obj.statusCode === "string" || typeof obj.statusCode === "number") text += " " + obj.statusCode
+  if (typeof obj.code === "string" || typeof obj.code === "number") text += " " + obj.code
+  try {
+    text += " " + JSON.stringify(err)
+  } catch {}
+  return text.toLowerCase()
+}
+
+function isDemandError(err: unknown): boolean {
+  if (!err) return false
+  const text = getErrorText(err)
+  return (
+    text.includes("503") ||
+    text.includes("high demand") ||
+    text.includes("unavailable") ||
+    text.includes("overloaded") ||
+    text.includes("service unavailable") ||
+    text.includes("spikes in demand") ||
+    text.includes("try again later")
+  )
+}
+
+function isQuotaOrCapacityError(err: unknown): boolean {
+  if (!err) return false
+  const text = getErrorText(err)
+  return (
+    text.includes("429") ||
+    text.includes("503") ||
+    text.includes("quota") ||
+    text.includes("resource_exhausted") ||
+    text.includes("rate limit") ||
+    text.includes("rate-limit") ||
+    text.includes("high demand") ||
+    text.includes("unavailable") ||
+    text.includes("overloaded") ||
+    text.includes("service unavailable") ||
+    text.includes("spikes in demand") ||
+    text.includes("too many requests") ||
+    text.includes("try again later")
+  )
+}
+
+function isModelNotFoundError(err: unknown): boolean {
+  if (!err) return false
+  const text = getErrorText(err)
+  return (
+    text.includes("404") ||
+    text.includes("not_found") ||
+    text.includes("not found") ||
+    text.includes("no longer available") ||
+    text.includes("is not found for api version") ||
+    text.includes("is not supported") ||
+    text.includes("model not found")
+  )
+}
+
+const GEMINI_FALLBACK_CANDIDATES = [
+  "gemini-2.5-flash",
+  "gemini-3.8-flash",
+  "gemini-1.5-flash",
+  "gemini-2.5-pro",
 ]
 
 // Update the POST function to handle attachedData (no app-level API key required; users provide provider keys in UI)
@@ -389,6 +476,19 @@ export async function POST(req: NextRequest) {
     vectorRag?: boolean
     activeTools?: string[]
     providerKeys?: {
+      google?: string
+      gemini?: string
+      openai?: string
+      anthropic?: string
+      deepseek?: string
+      groq?: string
+      mistral?: string
+      together?: string
+      cohere?: string
+      perplexity?: string
+      fireworks?: string
+      openrouter?: string
+      huggingface?: string
       tavily?: string
       firecrawl?: string
       neo4jUri?: string
@@ -1041,7 +1141,9 @@ ${JSON.stringify(sanitizedPlan)}
       .replace(/\[Active Tools:[^\]]*\]/gi, "")
       .replace(/\[Attached files:[^\]]*\]/gi, "")
       .replace(/\[SYSTEM REMINDER:[^\]]*\]/gi, "")
-      .trim();
+      .replace(/\[Resume Context:[^\]]*\]/gi, "")
+      .trim()
+      .slice(0, 400);
 
     if (queryToSearch.length > 0) {
       try {
@@ -1249,6 +1351,80 @@ ${JSON.stringify({
   }
 
   try {
+    const profileKeys = (chatGlobalProfile && typeof chatGlobalProfile === "object" && (chatGlobalProfile as any).apiKeys) || {}
+
+    const effectiveGoogleKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.google) ||
+      cleanKey(providerKeys?.gemini) ||
+      cleanKey(profileKeys?.google) ||
+      cleanKey(profileKeys?.gemini) ||
+      cleanKey(process.env.GOOGLE_GENERATIVE_AI_API_KEY) ||
+      cleanKey(process.env.GEMINI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_GENAI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_API_KEY)
+
+    const effectiveOpenAIKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.openai) ||
+      cleanKey(profileKeys?.openai) ||
+      cleanKey(process.env.OPENAI_API_KEY)
+
+    const effectiveAnthropicKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.anthropic) ||
+      cleanKey(profileKeys?.anthropic) ||
+      cleanKey(process.env.ANTHROPIC_API_KEY)
+
+    const effectiveDeepSeekKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.deepseek) ||
+      cleanKey(profileKeys?.deepseek) ||
+      cleanKey(process.env.DEEPSEEK_API_KEY)
+
+    const effectiveGroqKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.groq) ||
+      cleanKey(profileKeys?.groq) ||
+      cleanKey(process.env.GROQ_API_KEY)
+
+    const effectiveMistralKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.mistral) ||
+      cleanKey(profileKeys?.mistral) ||
+      cleanKey(process.env.MISTRAL_API_KEY)
+
+    const effectiveTogetherKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.together) ||
+      cleanKey(profileKeys?.together) ||
+      cleanKey(process.env.TOGETHER_API_KEY)
+
+    const effectiveCohereKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.cohere) ||
+      cleanKey(profileKeys?.cohere) ||
+      cleanKey(process.env.COHERE_API_KEY)
+
+    const effectivePerplexityKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.perplexity) ||
+      cleanKey(profileKeys?.perplexity) ||
+      cleanKey(process.env.PERPLEXITY_API_KEY)
+
+    const effectiveFireworksKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.fireworks) ||
+      cleanKey(profileKeys?.fireworks) ||
+      cleanKey(process.env.FIREWORKS_API_KEY)
+
+    const effectiveHfKey =
+      cleanKey(apiKey) ||
+      cleanKey(providerKeys?.huggingface) ||
+      cleanKey(profileKeys?.huggingface) ||
+      cleanKey(process.env.HUGGINGFACE_API_KEY) ||
+      cleanKey(process.env.HF_TOKEN)
+
     // Route to the appropriate provider handler
     switch (modelConfig.provider) {
       case "google":
@@ -1258,38 +1434,43 @@ ${JSON.stringify({
             modelConfig.modelId.startsWith("gemini-3") ||
             modelConfig.modelId.includes("banana")
           ) {
-            return await handleNewGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
+            return await handleNewGemini(formattedMessages, modelConfig.modelId, effectiveGoogleKey, messagesList)
           }
-          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
+          return await handleWithGemini(formattedMessages, modelConfig.modelId, effectiveGoogleKey, messagesList)
         } catch (error: any) {
           console.error("Error with Gemini model:", error)
-          if (error.message && error.message.includes("429") && error.message.includes("quota")) {
-            return handleQuotaExceeded(messagesList)
+          if (isQuotaOrCapacityError(error) || isModelNotFoundError(error)) {
+            return handleQuotaExceeded(messagesList, isDemandError(error))
+          }
+          if (error?.message?.includes("Google Gemini API key is required")) {
+            throw error
           }
           try {
-            console.warn("Retrying with handleNewGemini...")
-            return await handleNewGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
+            console.warn("Retrying with handleNewGemini fallback...")
+            return await handleNewGemini(formattedMessages, "gemini-2.5-flash", effectiveGoogleKey, messagesList)
           } catch (newGeminiError: any) {
             console.error("Error with New Gemini handler:", newGeminiError)
+            if (isQuotaOrCapacityError(newGeminiError) || isModelNotFoundError(newGeminiError)) {
+              return handleQuotaExceeded(messagesList, isDemandError(newGeminiError))
+            }
             throw newGeminiError
           }
-          throw error
         }
 
       case "openai":
         try {
-          return await handleWithOpenAI(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithOpenAI(formattedMessages, modelConfig.modelId, effectiveOpenAIKey)
         } catch (error: any) {
           console.error("Error with OpenAI model:", error)
-          if (error.message && error.message.includes("429") && error.message.includes("quota")) {
-            return handleQuotaExceeded(messagesList)
+          if (isQuotaOrCapacityError(error)) {
+            return handleQuotaExceeded(messagesList, isDemandError(error))
           }
           throw error
         }
 
       case "anthropic":
         try {
-          return await handleWithAnthropic(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithAnthropic(formattedMessages, modelConfig.modelId, effectiveAnthropicKey)
         } catch (error: any) {
           console.error("Error with Anthropic model:", error)
           throw error
@@ -1297,7 +1478,7 @@ ${JSON.stringify({
 
       case "deepseek":
         try {
-          return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithDeepSeek(formattedMessages, modelConfig.modelId, effectiveDeepSeekKey)
         } catch (error: any) {
           console.error("Error with DeepSeek model:", error)
           throw error
@@ -1305,7 +1486,7 @@ ${JSON.stringify({
 
       case "groq":
         try {
-          return await handleWithGroq(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithGroq(formattedMessages, modelConfig.modelId, effectiveGroqKey)
         } catch (error: any) {
           console.error("Error with Groq model:", error)
           throw error
@@ -1313,7 +1494,7 @@ ${JSON.stringify({
 
       case "mistral":
         try {
-          return await handleWithMistral(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithMistral(formattedMessages, modelConfig.modelId, effectiveMistralKey)
         } catch (error: any) {
           console.error("Error with Mistral model:", error)
           throw error
@@ -1321,7 +1502,7 @@ ${JSON.stringify({
 
       case "together":
         try {
-          return await handleWithTogether(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithTogether(formattedMessages, modelConfig.modelId, effectiveTogetherKey)
         } catch (error: any) {
           console.error("Error with Together.ai model:", error)
           throw error
@@ -1329,7 +1510,7 @@ ${JSON.stringify({
 
       case "cohere":
         try {
-          return await handleWithCohere(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithCohere(formattedMessages, modelConfig.modelId, effectiveCohereKey)
         } catch (error: any) {
           console.error("Error with Cohere model:", error)
           throw error
@@ -1337,7 +1518,7 @@ ${JSON.stringify({
 
       case "perplexity":
         try {
-          return await handleWithPerplexity(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithPerplexity(formattedMessages, modelConfig.modelId, effectivePerplexityKey)
         } catch (error: any) {
           console.error("Error with Perplexity model:", error)
           throw error
@@ -1345,7 +1526,7 @@ ${JSON.stringify({
 
       case "fireworks":
         try {
-          return await handleWithFireworks(formattedMessages, modelConfig.modelId, apiKey)
+          return await handleWithFireworks(formattedMessages, modelConfig.modelId, effectiveFireworksKey)
         } catch (error: any) {
           console.error("Error with Fireworks model:", error)
           throw error
@@ -1363,7 +1544,7 @@ ${JSON.stringify({
           return await handleWithHuggingFace(
             formattedMessages,
             modelConfig.modelId,
-            apiKey,
+            effectiveHfKey,
             effectiveHfCustomModel,
             typeof customEndpoint === "string" ? customEndpoint : undefined,
             typeof customHeaders === "string" ? customHeaders : undefined,
@@ -1515,6 +1696,10 @@ ${JSON.stringify({
     }
   } catch (error: any) {
     console.error("Error generating response:", error)
+
+    if (isQuotaOrCapacityError(error) || isModelNotFoundError(error)) {
+      return handleQuotaExceeded(messagesList, isDemandError(error))
+    }
     
     const errorMessage = error.message || ""
     let userMessage = errorMessage || "There was an error processing your request. Please try again later."
@@ -1551,11 +1736,11 @@ function saveBinaryFile(fileName: string, content: Buffer) {
 async function handleWithGemini(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key =
-      apiKey ||
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-      process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_GENAI_API_KEY ||
-      process.env.GOOGLE_API_KEY
+      cleanKey(apiKey) ||
+      cleanKey(process.env.GOOGLE_GENERATIVE_AI_API_KEY) ||
+      cleanKey(process.env.GEMINI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_GENAI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_API_KEY)
     if (!key) {
       throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY environment variable.")
     }
@@ -1609,9 +1794,8 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
     })
     return createUIMessageStreamResponse({ stream })
   } catch (error: unknown) {
-    const err = error as { message?: string; status?: number }
-    if (err?.message?.includes("429") || err?.message?.includes("quota") || err?.message?.includes("RESOURCE_EXHAUSTED")) {
-      return handleQuotaExceeded(clientMessages)
+    if (isQuotaOrCapacityError(error) || isModelNotFoundError(error)) {
+      return handleQuotaExceeded(clientMessages, isDemandError(error))
     }
     console.error("Error with Gemini model:", error)
     throw error
@@ -1626,11 +1810,11 @@ async function handleNewGemini(
 ) {
   try {
     const key =
-      apiKey ||
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-      process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_GENAI_API_KEY ||
-      process.env.GOOGLE_API_KEY
+      cleanKey(apiKey) ||
+      cleanKey(process.env.GOOGLE_GENERATIVE_AI_API_KEY) ||
+      cleanKey(process.env.GEMINI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_GENAI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_API_KEY)
     if (!key) {
       throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY environment variable.")
     }
@@ -1693,14 +1877,60 @@ async function handleNewGemini(
         contents,
       })
     } catch (genErr: any) {
-      // If thinkingConfig or search tool is rejected by older preview API, retry with plain config
-      if (config.thinkingConfig || config.tools) {
+      if (isQuotaOrCapacityError(genErr) || isModelNotFoundError(genErr)) {
+        const fallbacks = GEMINI_FALLBACK_CANDIDATES.filter((m) => m !== resolvedModel)
+        console.warn(`Primary model ${resolvedModel} hit capacity or unavailable error (${genErr?.message}), trying fallback models...`)
+        let fbSuccess = false
+        for (const fallbackModel of fallbacks) {
+          try {
+            console.warn(`Trying fallback model ${fallbackModel}...`)
+            response = await ai.models.generateContentStream({
+              model: fallbackModel,
+              config: { responseModalities: ["TEXT"] },
+              contents,
+            })
+            fbSuccess = true
+            break
+          } catch (fallbackErr: any) {
+            console.warn(`Fallback model ${fallbackModel} failed:`, fallbackErr?.message)
+          }
+        }
+        if (!fbSuccess) {
+          return handleQuotaExceeded(clientMessages, isDemandError(genErr))
+        }
+      } else if (config.thinkingConfig || config.tools) {
         console.warn("Retrying generateContentStream without thinkingConfig/tools:", genErr?.message)
-        response = await ai.models.generateContentStream({
-          model: resolvedModel,
-          config: { responseModalities: ["TEXT"] },
-          contents,
-        })
+        try {
+          response = await ai.models.generateContentStream({
+            model: resolvedModel,
+            config: { responseModalities: ["TEXT"] },
+            contents,
+          })
+        } catch (retryErr: any) {
+          if (isQuotaOrCapacityError(retryErr) || isModelNotFoundError(retryErr)) {
+            const fallbacks = GEMINI_FALLBACK_CANDIDATES.filter((m) => m !== resolvedModel)
+            console.warn(`Retry model ${resolvedModel} hit capacity or unavailable error, trying fallback models...`)
+            let fbSuccess = false
+            for (const fallbackModel of fallbacks) {
+              try {
+                response = await ai.models.generateContentStream({
+                  model: fallbackModel,
+                  config: { responseModalities: ["TEXT"] },
+                  contents,
+                })
+                fbSuccess = true
+                break
+              } catch (fallbackErr: any) {
+                console.warn(`Fallback model ${fallbackModel} failed:`, fallbackErr?.message)
+              }
+            }
+            if (!fbSuccess) {
+              return handleQuotaExceeded(clientMessages, isDemandError(retryErr))
+            }
+          } else {
+            throw retryErr
+          }
+        }
       } else {
         throw genErr
       }
@@ -1713,8 +1943,19 @@ async function handleNewGemini(
         writer.write({ type: "text-start", id: textId })
         try {
           for await (const chunk of response) {
-            if (chunk.text) {
-              writer.write({ type: "text-delta", id: textId, delta: chunk.text })
+            let delta = ""
+            // Extract text from parts directly to avoid "there are non-text parts thoughtSignature" console warnings
+            if (chunk?.candidates?.[0]?.content?.parts) {
+              for (const part of chunk.candidates[0].content.parts) {
+                if (part && typeof part.text === "string" && !part.thought) {
+                  delta += part.text
+                }
+              }
+            } else if (typeof chunk?.text === "string") {
+              delta = chunk.text
+            }
+            if (delta) {
+              writer.write({ type: "text-delta", id: textId, delta })
             }
           }
           writer.write({ type: "text-end", id: textId })
@@ -1726,9 +1967,8 @@ async function handleNewGemini(
     })
     return createUIMessageStreamResponse({ stream })
   } catch (error: unknown) {
-    const err = error as { message?: string; status?: number }
-    if (err?.message?.includes("429") || err?.message?.includes("quota") || err?.message?.includes("RESOURCE_EXHAUSTED")) {
-      return handleQuotaExceeded(clientMessages)
+    if (isQuotaOrCapacityError(error) || isModelNotFoundError(error)) {
+      return handleQuotaExceeded(clientMessages, isDemandError(error))
     }
     console.error("Error with New Gemini model:", error)
     throw error
@@ -2860,14 +3100,19 @@ async function handleWithLingoAI(
   }
 }
 
-function handleQuotaExceeded(clientMessages?: unknown[]) {
-  const mockResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
+function handleQuotaExceeded(clientMessages?: unknown[], isDemand = false) {
+  const demandResponses = [
+    "Google's AI model is currently experiencing temporary high demand spikes. Here are immediate insights tailored for your career and application goals:\n\n1. Ensure your most recent achievements quantify impact with measurable metrics\n2. Highlight core technical proficiencies matching target role requirements\n3. Keep your executive summary crisp and compelling\n\nTip: You can also switch to another model (such as Gemini 2.0 Flash or Claude) in the model picker.",
+    "The selected AI service is temporarily experiencing a demand spike. Consider these quick career recommendations:\n\n- Tailor your bullet points using the Action Verb + Context + Result formula\n- Align your project portfolio with relevant technologies\n- Review keywords from your target job description\n\nPlease try sending your message again in a moment, or select an alternative model in the menu.",
+  ]
+  const list = isDemand ? demandResponses : MOCK_RESPONSES
+  const mockResponse = list[Math.floor(Math.random() * list.length)]
   return streamTextToResponse(async (write) => {
     const chunks = mockResponse.split(". ")
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i] + (i < chunks.length - 1 ? ". " : "")
       write(chunk)
-      await new Promise((r) => setTimeout(r, 80))
+      await new Promise((r) => setTimeout(r, 60))
     }
   }, clientMessages)
 }

@@ -58,6 +58,14 @@ function HuggingFaceIcon({ size = 16, className = "" }: { size?: number; classNa
   );
 }
 
+function MistralIcon({ size = 16, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M4.5 4.5h3v3h-3zm12 0h3v3h-3zM4.5 7.5h6v3h-6zm9 0h6v3h-6zM4.5 10.5h9v3h-9zm6 0h9v3h-9zM4.5 13.5h15v3h-15zm0 3h3v3h-3zm6 0h3v3h-3zm6 0h3v3h-3z" />
+    </svg>
+  );
+}
+
 /** Provider label from chat-store → compact brand pictogram. */
 export function ModelProviderIcon({
   provider,
@@ -77,7 +85,9 @@ export function ModelProviderIcon({
   if (p.includes("meta") || p.includes("llama")) return <MetaIcon size={size} className={className} />;
   if (p.includes("deepseek")) return <DeepSeekIcon size={size} className={className} />;
   if (p.includes("groq")) return <Zap size={size} className={className} />;
-  if (p.includes("mistral")) return <Sparkles size={size} className={className} />;
+  if (p.includes("mistral") || p.includes("pixtral") || p.includes("codestral") || p.includes("magistral") || p.includes("ministral")) {
+    return <MistralIcon size={size} className={className} />;
+  }
   if (p.includes("hugging")) return <HuggingFaceIcon size={size} className={className} />;
   if (p.includes("cedz") || p.includes("lingo")) return <Globe2 size={size} className={className} />;
   if (p.includes("local") || p.includes("custom")) return <Cpu size={size} className={className} />;

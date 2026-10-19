@@ -2121,9 +2121,18 @@ export default function AICareerAssistantChat() {
         }
     };
 
-    // Ref so the transport closure always reads fresh settings
+    // Ref so the transport closure always reads fresh settings and user
     const settingsRef = useRef(settings);
     settingsRef.current = settings;
+    const userRef = useRef(user);
+    userRef.current = user;
+
+    const effectiveGoogleApiKey =
+        settings.apiKey ||
+        loadProviderKeys().google ||
+        (user?.apiKeys as any)?.google ||
+        (user?.apiKeys as any)?.gemini ||
+        "";
 
     function stripProfilePictureFromResumeData(input: any) {
         if (!input || typeof input !== "object") return input;
@@ -2210,12 +2219,77 @@ export default function AICareerAssistantChat() {
                 const knowledgeContext = useProfileContextRef.current
                     ? buildUserKnowledgeStoreChunks(requestResumeData, chatProfile)
                     : "";
+                const providerKeysFromStorage = loadProviderKeys();
+                const userKeys = (userRef.current?.apiKeys || {}) as Record<string, string>;
+                const profileKeys = (chatProfile && typeof chatProfile === "object" && (chatProfile as any).apiKeys) || {};
+
+                // Determine active model key
+                const modelLower = (mid || "").toLowerCase();
+                const activeModelKey =
+                    settingsRef.current.apiKey ||
+                    (modelLower.startsWith("gemini") || modelLower.includes("banana")
+                        ? providerKeysFromStorage.google || userKeys.google || userKeys.gemini || profileKeys.google || profileKeys.gemini
+                        : modelLower.startsWith("gpt") || modelLower.startsWith("o1") || modelLower.startsWith("o3") || modelLower.startsWith("chatgpt")
+                        ? providerKeysFromStorage.openai || userKeys.openai || profileKeys.openai
+                        : modelLower.startsWith("claude")
+                        ? providerKeysFromStorage.anthropic || userKeys.anthropic || profileKeys.anthropic
+                        : modelLower.includes("deepseek")
+                        ? providerKeysFromStorage.deepseek || userKeys.deepseek || profileKeys.deepseek
+                        : modelLower.includes("groq")
+                        ? providerKeysFromStorage.groq || userKeys.groq || profileKeys.groq
+                        : modelLower.includes("mistral") || modelLower.includes("pixtral") || modelLower.includes("codestral") || modelLower.includes("magistral") || modelLower.includes("ministral")
+                        ? providerKeysFromStorage.mistral || userKeys.mistral || profileKeys.mistral
+                        : modelLower.includes("grok") || modelLower.includes("xai")
+                        ? providerKeysFromStorage.xai || userKeys.xai || profileKeys.xai
+                        : modelLower.includes("cohere") || modelLower.includes("command")
+                        ? providerKeysFromStorage.cohere || userKeys.cohere || profileKeys.cohere
+                        : modelLower.includes("perplexity") || modelLower.includes("sonar")
+                        ? providerKeysFromStorage.perplexity || userKeys.perplexity || profileKeys.perplexity
+                        : modelLower.includes("together")
+                        ? providerKeysFromStorage.together || userKeys.together || profileKeys.together
+                        : modelLower.includes("fireworks")
+                        ? providerKeysFromStorage.fireworks || userKeys.fireworks || profileKeys.fireworks
+                        : modelLower.includes("huggingface") || modelLower.includes("hf")
+                        ? providerKeysFromStorage.huggingface || userKeys.huggingface || profileKeys.huggingface
+                        : undefined) ||
+                    providerKeysFromStorage.google ||
+                    userKeys.google ||
+                    userKeys.gemini ||
+                    profileKeys.google ||
+                    profileKeys.gemini ||
+                    providerKeysFromStorage.openai ||
+                    userKeys.openai;
+
+                const mergedProviderKeys = {
+                    ...providerKeysFromStorage,
+                    ...(userKeys || {}),
+                    google: providerKeysFromStorage.google || userKeys.google || userKeys.gemini || profileKeys.google || profileKeys.gemini,
+                    gemini: providerKeysFromStorage.google || userKeys.google || userKeys.gemini || profileKeys.google || profileKeys.gemini,
+                    openai: providerKeysFromStorage.openai || userKeys.openai || profileKeys.openai,
+                    anthropic: providerKeysFromStorage.anthropic || userKeys.anthropic || profileKeys.anthropic,
+                    deepseek: providerKeysFromStorage.deepseek || userKeys.deepseek || profileKeys.deepseek,
+                    groq: providerKeysFromStorage.groq || userKeys.groq || profileKeys.groq,
+                    mistral: providerKeysFromStorage.mistral || userKeys.mistral || profileKeys.mistral,
+                    xai: providerKeysFromStorage.xai || userKeys.xai || profileKeys.xai,
+                    together: providerKeysFromStorage.together || userKeys.together || profileKeys.together,
+                    cohere: providerKeysFromStorage.cohere || userKeys.cohere || profileKeys.cohere,
+                    perplexity: providerKeysFromStorage.perplexity || userKeys.perplexity || profileKeys.perplexity,
+                    fireworks: providerKeysFromStorage.fireworks || userKeys.fireworks || profileKeys.fireworks,
+                    huggingface: providerKeysFromStorage.huggingface || userKeys.huggingface || profileKeys.huggingface,
+                    tavily: providerKeysFromStorage.tavily || userKeys.tavily,
+                    firecrawl: providerKeysFromStorage.firecrawl || userKeys.firecrawl,
+                    neo4jUri: providerKeysFromStorage.neo4jUri,
+                    neo4jUser: providerKeysFromStorage.neo4jUser,
+                    neo4jPassword: providerKeysFromStorage.neo4jPassword,
+                    neo4jDatabase: providerKeysFromStorage.neo4jDatabase,
+                };
+
                 return {
                 body: {
                     messages,
                     id,
                     model: mid,
-                    apiKey: settingsRef.current.apiKey,
+                    apiKey: activeModelKey || undefined,
                     ...(openAiCompat
                         ? {
                               customEndpoint: settingsRef.current.openAiCompatBaseUrl || undefined,
@@ -2237,14 +2311,7 @@ export default function AICareerAssistantChat() {
                     webSearch: activeToolsRef.current.includes("web-search"),
                     graphRag: true,
                     vectorRag: true,
-                    providerKeys: {
-                        tavily: loadProviderKeys().tavily,
-                        firecrawl: loadProviderKeys().firecrawl,
-                        neo4jUri: loadProviderKeys().neo4jUri,
-                        neo4jUser: loadProviderKeys().neo4jUser,
-                        neo4jPassword: loadProviderKeys().neo4jPassword,
-                        neo4jDatabase: loadProviderKeys().neo4jDatabase,
-                    },
+                    providerKeys: mergedProviderKeys,
                 },
             };
             },
@@ -2879,7 +2946,7 @@ export default function AICareerAssistantChat() {
                                                     component={activeStageComponent}
                                                     onDockToChat={() => setActiveStageComponent(null)}
                                                     onClose={() => setActiveStageComponent(null)}
-                                                    chatApiKey={settings.apiKey}
+                                                    chatApiKey={effectiveGoogleApiKey}
                                                     chatModel={settings.model}
                                                     canonicalResumeKey={canonicalResumeKey}
                                                     onSendMessage={handlePrompt}
@@ -2892,7 +2959,7 @@ export default function AICareerAssistantChat() {
                                         component={activeStageComponent}
                                         onDockToChat={() => setActiveStageComponent(null)}
                                         onClose={() => setActiveStageComponent(null)}
-                                        chatApiKey={settings.apiKey}
+                                        chatApiKey={effectiveGoogleApiKey}
                                         chatModel={settings.model}
                                         canonicalResumeKey={canonicalResumeKey}
                                         onSendMessage={handlePrompt}
@@ -3002,7 +3069,7 @@ export default function AICareerAssistantChat() {
                                                         isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
                                                         onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
                                                         onToast={showToast}
-                                                        chatApiKey={settings.apiKey}
+                                                        chatApiKey={effectiveGoogleApiKey}
                                                         chatModel={settings.model}
                                                         canonicalResumeKey={canonicalResumeKey}
                                                         activeStageComponentId={activeStageComponent?.id}
@@ -3160,7 +3227,7 @@ export default function AICareerAssistantChat() {
                                                     component={activeStageComponent}
                                                     onDockToChat={() => setActiveStageComponent(null)}
                                                     onClose={() => setActiveStageComponent(null)}
-                                                    chatApiKey={settings.apiKey}
+                                                    chatApiKey={effectiveGoogleApiKey}
                                                     chatModel={settings.model}
                                                     canonicalResumeKey={canonicalResumeKey}
                                                     onSendMessage={handlePrompt}
@@ -3173,7 +3240,7 @@ export default function AICareerAssistantChat() {
                                         component={activeStageComponent}
                                         onDockToChat={() => setActiveStageComponent(null)}
                                         onClose={() => setActiveStageComponent(null)}
-                                        chatApiKey={settings.apiKey}
+                                        chatApiKey={effectiveGoogleApiKey}
                                         chatModel={settings.model}
                                         canonicalResumeKey={canonicalResumeKey}
                                         onSendMessage={handlePrompt}
@@ -3282,7 +3349,7 @@ export default function AICareerAssistantChat() {
                                                 isStreaming={isLoading && i === messages.length - 1 && msg.role === "assistant"}
                                                 onReply={(t) => setInput(`Regarding: "${t.slice(0, 60)}…"\n\n`)}
                                                 onToast={showToast}
-                                                chatApiKey={settings.apiKey}
+                                                chatApiKey={effectiveGoogleApiKey}
                                                 chatModel={settings.model}
                                                 canonicalResumeKey={canonicalResumeKey}
                                                 activeStageComponentId={null}

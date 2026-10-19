@@ -64,12 +64,13 @@ export async function searchWithTavily(
   options?: WebSearchOptions
 ): Promise<WebSearchResponse> {
   const cleanKey = apiKey.trim().replace(/^Bearer\s+/i, "");
+  const sanitizedQuery = (query || "").trim().slice(0, 400);
   const maxResults = options?.maxResults ?? 10;
   const searchDepth = options?.searchDepth ?? "advanced";
 
   const payload: Record<string, any> = {
     api_key: cleanKey,
-    query,
+    query: sanitizedQuery,
     search_depth: searchDepth,
     include_answer: true,
     max_results: maxResults,
@@ -168,6 +169,7 @@ export async function searchWithFirecrawl(
   options?: WebSearchOptions
 ): Promise<WebSearchResponse> {
   const cleanKey = apiKey.trim().replace(/^Bearer\s+/i, "");
+  const sanitizedQuery = (query || "").trim().slice(0, 400);
   const limit = options?.maxResults ?? 10;
 
   const res = await fetch("https://api.firecrawl.dev/v1/search", {
@@ -177,7 +179,7 @@ export async function searchWithFirecrawl(
       Authorization: `Bearer ${cleanKey}`,
     },
     body: JSON.stringify({
-      query,
+      query: sanitizedQuery,
       limit,
       scrapeOptions: {
         formats: ["markdown"],
@@ -264,7 +266,7 @@ export async function performWebSearch(
   query: string,
   options?: WebSearchOptions
 ): Promise<WebSearchResponse> {
-  const cleanQuery = query.trim();
+  const cleanQuery = (query || "").trim().slice(0, 400);
   if (!cleanQuery) {
     return {
       query: "",

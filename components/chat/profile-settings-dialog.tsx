@@ -96,6 +96,14 @@ export interface ProviderKeys {
   google?: string;
   deepseek?: string;
   groq?: string;
+  mistral?: string;
+  together?: string;
+  cohere?: string;
+  perplexity?: string;
+  fireworks?: string;
+  huggingface?: string;
+  xai?: string;
+  moonshotai?: string;
   openrouter?: string;
   ollamaEndpoint?: string;
   tavily?: string;
@@ -593,6 +601,40 @@ export function ProfileSettingsDialog({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs flex items-center justify-between">
+                  <span>Mistral AI Key</span>
+                  <a href="https://console.mistral.ai/api-keys/" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.mistral || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, mistral: e.target.value }))}
+                  placeholder="Enter Mistral API Key..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>OpenRouter Key</span>
+                  <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.openrouter || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, openrouter: e.target.value }))}
+                  placeholder="sk-or-v1-..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
                   <span>DeepSeek API Key</span>
                   <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
                     Get Key <ExternalLink className="h-2.5 w-2.5" />
@@ -607,6 +649,24 @@ export function ProfileSettingsDialog({
                 />
               </div>
 
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>Hugging Face Token</span>
+                  <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Token <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.huggingface || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, huggingface: e.target.value }))}
+                  placeholder="hf_..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label className="text-xs flex items-center justify-between">
                   <span>Ollama Local URL</span>
@@ -647,6 +707,22 @@ export function ProfileSettingsDialog({
                   value={keys.firecrawl || ""}
                   onChange={(e) => setKeys((k) => ({ ...k, firecrawl: e.target.value }))}
                   placeholder="fc-..."
+                  className="h-9 text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs flex items-center justify-between">
+                  <span>xAI Grok Key</span>
+                  <a href="https://console.x.ai/" target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5">
+                    Get Key <ExternalLink className="h-2.5 w-2.5" />
+                  </a>
+                </Label>
+                <Input
+                  type="password"
+                  value={keys.xai || ""}
+                  onChange={(e) => setKeys((k) => ({ ...k, xai: e.target.value }))}
+                  placeholder="xai-..."
                   className="h-9 text-xs font-mono"
                 />
               </div>

@@ -108,8 +108,108 @@ const MOCK_RESPONSES = [
   "API quota exceeded. While I can't analyze your specific cover letter right now, here are universal cover letter tips:\n\n- Address the letter to a specific person whenever possible\n- Avoid generic language and clichés\n- Quantify your achievements with numbers when possible\n- Proofread carefully for errors\n- Keep it to one page",
 ]
 
+function cleanKey(val?: unknown): string | undefined {
+  if (typeof val !== "string") return undefined
+  const trimmed = val.trim()
+  if (!trimmed) return undefined
+  if (
+    trimmed.startsWith("your_") ||
+    trimmed.startsWith("YOUR_") ||
+    trimmed.includes("your_api_key") ||
+    trimmed === "placeholder" ||
+    trimmed === "TODO" ||
+    trimmed === "undefined" ||
+    trimmed === "null"
+  ) {
+    return undefined
+  }
+  return trimmed
+}
+
+function getErrorText(err: unknown): string {
+  if (!err) return ""
+  if (typeof err === "string") return err.toLowerCase()
+  const obj = err as Record<string, any>
+  let text = ""
+  if (typeof obj.message === "string") text += " " + obj.message
+  if (typeof obj.status === "string" || typeof obj.status === "number") text += " " + obj.status
+  if (typeof obj.statusCode === "string" || typeof obj.statusCode === "number") text += " " + obj.statusCode
+  if (typeof obj.code === "string" || typeof obj.code === "number") text += " " + obj.code
+  try {
+    text += " " + JSON.stringify(err)
+  } catch {}
+  return text.toLowerCase()
+}
+
+function isDemandError(err: unknown): boolean {
+  if (!err) return false
+  const text = getErrorText(err)
+  return (
+    text.includes("503") ||
+    text.includes("high demand") ||
+    text.includes("unavailable") ||
+    text.includes("overloaded") ||
+    text.includes("service unavailable") ||
+    text.includes("spikes in demand") ||
+    text.includes("try again later")
+  )
+}
+
+function isQuotaOrCapacityError(err: unknown): boolean {
+  if (!err) return false
+  const text = getErrorText(err)
+  return (
+    text.includes("429") ||
+    text.includes("503") ||
+    text.includes("quota") ||
+    text.includes("resource_exhausted") ||
+    text.includes("rate limit") ||
+    text.includes("rate-limit") ||
+    text.includes("high demand") ||
+    text.includes("unavailable") ||
+    text.includes("overloaded") ||
+    text.includes("service unavailable") ||
+    text.includes("spikes in demand") ||
+    text.includes("too many requests") ||
+    text.includes("try again later")
+  )
+}
+
+function isModelNotFoundError(err: unknown): boolean {
+  if (!err) return false
+  const text = getErrorText(err)
+  return (
+    text.includes("404") ||
+    text.includes("not_found") ||
+    text.includes("not found") ||
+    text.includes("no longer available") ||
+    text.includes("is not found for api version") ||
+    text.includes("is not supported") ||
+    text.includes("model not found")
+  )
+}
+
+const GEMINI_FALLBACK_CANDIDATES = [
+  "gemini-2.5-flash",
+  "gemini-3.8-flash",
+  "gemini-1.5-flash",
+  "gemini-2.5-pro",
+]
+
 export async function POST(req: NextRequest) {
-  const { messages, coverLetterData, jobDescription, model, apiKey, attachedData, customModel, customEndpoint, customHeaders } = await req.json()
+  const {
+    messages,
+    coverLetterData,
+    jobDescription,
+    model,
+    apiKey,
+    attachedData,
+    customModel,
+    customEndpoint,
+    customHeaders,
+    providerKeys,
+    chatGlobalProfile,
+  } = await req.json()
 
   // Create a system message
   let systemMessage = `You are an AI cover letter assistant that helps users create and improve their cover letters.
@@ -153,31 +253,43 @@ Job description: ${jobDescription || "Not provided"}`
   // Get the model configuration or use default
   const modelConfig = AVAILABLE_MODELS[model as keyof typeof AVAILABLE_MODELS] || AVAILABLE_MODELS[DEFAULT_MODEL]
 
+  const profileKeys = (chatGlobalProfile && typeof chatGlobalProfile === "object" && (chatGlobalProfile as any).apiKeys) || {}
+
+  const effectiveGoogleKey =
+    cleanKey(apiKey) ||
+    cleanKey(providerKeys?.google) ||
+    cleanKey(providerKeys?.gemini) ||
+    cleanKey(profileKeys?.google) ||
+    cleanKey(profileKeys?.gemini) ||
+    cleanKey(process.env.GOOGLE_GENERATIVE_AI_API_KEY) ||
+    cleanKey(process.env.GEMINI_API_KEY) ||
+    cleanKey(process.env.GOOGLE_GENAI_API_KEY) ||
+    cleanKey(process.env.GOOGLE_API_KEY)
+
   try {
     // Route to the appropriate provider handler
     switch (modelConfig.provider) {
       case "google":
         try {
-          return await handleWithGemini(formattedMessages, modelConfig.modelId, apiKey, messagesList)
+          return await handleWithGemini(formattedMessages, modelConfig.modelId, effectiveGoogleKey, messagesList)
         } catch (error: any) {
           console.error("Error with Gemini model:", error)
-
-          // Check if it's a quota exceeded error (429)
-          if (error.message && error.message.includes("429") && error.message.includes("quota")) {
-            return handleQuotaExceeded(messagesList)
+          if (isQuotaOrCapacityError(error) || isModelNotFoundError(error)) {
+            return handleQuotaExceeded(messagesList, isDemandError(error))
           }
-
-          // For other errors, return a generic error message
-          return new Response(
-            JSON.stringify({
-              error: "Failed to generate response",
-              message: "There was an error processing your request. Please try again later.",
-            }),
-            {
-              status: 500,
-              headers: { "Content-Type": "application/json" },
-            },
-          )
+          if (error?.message?.includes("Google Gemini API key is required")) {
+            throw error
+          }
+          try {
+            console.warn("Retrying cover letter with fallback model gemini-2.5-flash...")
+            return await handleWithGemini(formattedMessages, "gemini-2.5-flash", effectiveGoogleKey, messagesList)
+          } catch (retryError: any) {
+            console.error("Error with fallback Gemini model:", retryError)
+            if (isQuotaOrCapacityError(retryError) || isModelNotFoundError(retryError)) {
+              return handleQuotaExceeded(messagesList, isDemandError(retryError))
+            }
+            throw retryError
+          }
         }
         
       case "huggingface":
@@ -193,6 +305,9 @@ Job description: ${jobDescription || "Not provided"}`
     }
   } catch (error) {
     console.error("Error generating response:", error)
+    if (isQuotaOrCapacityError(error) || isModelNotFoundError(error)) {
+      return handleQuotaExceeded(messagesList, isDemandError(error))
+    }
     return new Response(
       JSON.stringify({
         error: "Failed to generate response",
@@ -209,11 +324,11 @@ Job description: ${jobDescription || "Not provided"}`
 async function handleWithGemini(messages: any[], modelId: string, apiKey?: string, clientMessages?: unknown[]) {
   try {
     const key =
-      apiKey ||
-      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
-      process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_GENAI_API_KEY ||
-      process.env.GOOGLE_API_KEY
+      cleanKey(apiKey) ||
+      cleanKey(process.env.GOOGLE_GENERATIVE_AI_API_KEY) ||
+      cleanKey(process.env.GEMINI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_GENAI_API_KEY) ||
+      cleanKey(process.env.GOOGLE_API_KEY)
     if (!key) {
       throw new Error("Google Gemini API key is required. Please provide it in the UI or set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY environment variable.")
     }
@@ -221,19 +336,28 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
     // Initialize the Gemini API
     const genAI = new GoogleGenerativeAI(key)
 
-    // Create a Gemini model instance
-    const gemini = genAI.getGenerativeModel({ model: modelId })
-
     // Convert messages to Gemini format (support both v4 content and v5 parts)
     const getText = (m: { content?: string; parts?: Array<{ type: string; text?: string }> }) =>
       m.parts?.filter((p): p is { type: "text"; text: string } => p.type === "text").map((p) => p.text).join("") ?? m.content ?? ""
-    const geminiMessages = messages.map((msg) => ({
+
+    const systemMsg = messages.find((m) => m.role === "system")
+    const systemContent = systemMsg ? getText(systemMsg) : ""
+    const chatMessages = messages.filter((m) => m.role !== "system")
+
+    const resolvedModel = modelId || "gemini-2.5-flash"
+    let gemini = genAI.getGenerativeModel({
+      model: resolvedModel,
+      systemInstruction: systemContent || undefined,
+      generationConfig: { maxOutputTokens: 8192 },
+    })
+
+    const geminiMessages = chatMessages.map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: getText(msg) }],
     }))
 
     // Start a chat session
-    const chat = gemini.startChat({
+    let chat = gemini.startChat({
       history: geminiMessages.slice(0, -1),
       generationConfig: {
         maxOutputTokens: 8192,
@@ -242,7 +366,39 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
 
     // Get the last message to send
     const lastMessage = geminiMessages[geminiMessages.length - 1]
-    const result = await chat.sendMessageStream(lastMessage.parts[0].text)
+    let result: any
+    try {
+      result = await chat.sendMessageStream(lastMessage.parts[0].text)
+    } catch (sendErr: any) {
+      if (isQuotaOrCapacityError(sendErr) || isModelNotFoundError(sendErr)) {
+        const fallbacks = GEMINI_FALLBACK_CANDIDATES.filter((m) => m !== resolvedModel)
+        console.warn(`Cover letter primary model ${resolvedModel} hit capacity or unavailable, trying fallback models...`)
+        let fbSuccess = false
+        for (const fallbackModel of fallbacks) {
+          try {
+            gemini = genAI.getGenerativeModel({
+              model: fallbackModel,
+              systemInstruction: systemContent || undefined,
+              generationConfig: { maxOutputTokens: 8192 },
+            })
+            chat = gemini.startChat({
+              history: geminiMessages.slice(0, -1),
+              generationConfig: { maxOutputTokens: 8192 },
+            })
+            result = await chat.sendMessageStream(lastMessage.parts[0].text)
+            fbSuccess = true
+            break
+          } catch (fbErr: any) {
+            console.warn(`Fallback model ${fallbackModel} failed:`, fbErr?.message)
+          }
+        }
+        if (!fbSuccess) {
+          return handleQuotaExceeded(clientMessages, isDemandError(sendErr))
+        }
+      } else {
+        throw sendErr
+      }
+    }
 
     const textId = generateId()
     const stream = createUIMessageStream({
@@ -263,13 +419,21 @@ async function handleWithGemini(messages: any[], modelId: string, apiKey?: strin
     })
     return createUIMessageStreamResponse({ stream })
   } catch (error) {
+    if (isQuotaOrCapacityError(error) || isModelNotFoundError(error)) {
+      return handleQuotaExceeded(clientMessages, isDemandError(error))
+    }
     console.error("Error with Gemini model:", error)
     throw error
   }
 }
 
-function handleQuotaExceeded(clientMessages?: unknown[]) {
-  const mockResponse = MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
+function handleQuotaExceeded(clientMessages?: unknown[], isDemand = false) {
+  const demandResponses = [
+    "Google's AI model is currently experiencing temporary high demand spikes. Here are immediate cover letter recommendations for your application:\n\n1. Personalize the opening paragraph with specific interest in the role and company mission\n2. Clearly align 2-3 measurable accomplishments directly with the required qualifications\n3. Close with a confident, proactive call to action\n\nTip: You can retry sending your request shortly or choose an alternative model in the settings.",
+    "The selected AI service is temporarily experiencing a demand spike. While demand clears, consider these cover letter enhancements:\n\n- Connect past project impact to key responsibilities mentioned in the job description\n- Quantify your achievements (e.g., performance gains, cost reductions, team scale)\n- Maintain a succinct, professional structure across header, body, and footer",
+  ]
+  const list = isDemand ? demandResponses : MOCK_RESPONSES
+  const mockResponse = list[Math.floor(Math.random() * list.length)]
   const textId = generateId()
   const stream = createUIMessageStream({
     originalMessages: (clientMessages ?? []) as Parameters<typeof createUIMessageStream>[0]["originalMessages"],
@@ -279,7 +443,7 @@ function handleQuotaExceeded(clientMessages?: unknown[]) {
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i] + (i < chunks.length - 1 ? ". " : " ")
         writer.write({ type: "text-delta", id: textId, delta: chunk })
-        await new Promise((r) => setTimeout(r, 100))
+        await new Promise((r) => setTimeout(r, 60))
       }
       writer.write({ type: "text-end", id: textId })
     },

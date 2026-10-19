@@ -10,7 +10,17 @@ export const maxDuration = 120;
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages = [], model, apiKey, resumeData, id, contextText, attachedData } = body;
+    const {
+      messages = [],
+      model,
+      apiKey,
+      resumeData,
+      id,
+      contextText,
+      attachedData,
+      providerKeys,
+      chatGlobalProfile,
+    } = body;
 
     const attachedFiles: Array<{
       name: string;
@@ -42,6 +52,8 @@ export async function POST(req: NextRequest) {
         id,
         contextText: contextText || "",
         attachedFiles: attachedFiles.length > 0 ? attachedFiles : undefined,
+        providerKeys,
+        chatGlobalProfile,
       }),
     });
 

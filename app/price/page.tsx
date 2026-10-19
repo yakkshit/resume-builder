@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import PDFViewer from "@/components/resume-coverletter/pdf-viewer";
 import ResumeEditor from "@/components/resume-coverletter/resume-editor";
+import { loadProviderKeys } from "@/components/chat/profile-settings-dialog";
 import { defaultResumeData } from "@/lib/default-resume-data";
 import { getTextContent } from "@/lib/message-utils";
 import type {
@@ -127,15 +128,35 @@ export default function ResumePage() {
 
   const [input, setInput] = useState('');
 
+  const providerKeys = typeof window !== "undefined" ? loadProviderKeys() : {};
+  const effectiveKey =
+    apiKey ||
+    (selectedModel.startsWith("gemini") ? providerKeys.google : undefined) ||
+    providerKeys.google;
+
   const bodyRef = useRef({
-    resumeData, aiMode, model: selectedModel, apiKey,
+    resumeData,
+    aiMode,
+    model: selectedModel,
+    apiKey: effectiveKey,
+    providerKeys,
     contextText: (selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") ? contextText : undefined,
-    customEndpoint, customModel, customHeaders, customAuth,
+    customEndpoint,
+    customModel,
+    customHeaders,
+    customAuth,
   });
   bodyRef.current = {
-    resumeData, aiMode, model: selectedModel, apiKey,
+    resumeData,
+    aiMode,
+    model: selectedModel,
+    apiKey: effectiveKey,
+    providerKeys,
     contextText: (selectedModel.startsWith("gemini") || selectedModel === "lingo-ai") ? contextText : undefined,
-    customEndpoint, customModel, customHeaders, customAuth,
+    customEndpoint,
+    customModel,
+    customHeaders,
+    customAuth,
   };
 
   const {
