@@ -432,7 +432,7 @@ export function parseUserMessageContent(rawContent: string): ParsedUserMessage {
 }
 
 function extractComponents(text: string) {
-    const componentRegex = /```component:([a-zA-Z0-9-_]+)\s*([\s\S]*?)(?:```|$)/gi;
+    const componentRegex = /(?:```|````)\s*component\s*:\s*([a-zA-Z0-9-_]+)\s*([\s\S]*?)(?:(?:```|````)|$)/gi;
     const components: { type: Parameters<typeof ComponentRenderer>[0]["type"] | null, data: any, isComplete: boolean }[] = [];
     let usedResumeJsonFallback = false;
 
@@ -443,7 +443,7 @@ function extractComponents(text: string) {
         const rawMatch = match[0];
         const typeStr = match[1];
         const dataStr = (match[2] ?? "").trim();
-        const isComplete = rawMatch.endsWith("```");
+        const isComplete = rawMatch.endsWith("```") || rawMatch.endsWith("````");
 
         let parsedData: any = {};
         if (dataStr && isComplete) {
@@ -776,9 +776,29 @@ function MessageBubble({
 
     const textToClean = cotResult?.cleanedContent ?? content;
 
+    const cleanReasoning = useMemo(() => {
+        if (!effectiveReasoning) return "";
+        return effectiveReasoning
+            .replace(/(?:```|````)\s*component\s*:[a-zA-Z0-9-_]+\s*[\s\S]*?(?:(?:```|````)|$)/gi, "")
+            .trim();
+    }, [effectiveReasoning]);
+
     /** Stable reference when message text unchanged — avoids ResumeViewer re-running merge on every parent render. */
     const extracted = useMemo(
-        () => (!isUser ? extractComponents(textToClean) : { cleanText: content, components: [], usedResumeJsonFallback: false }),
+        () => {
+            if (isUser) return { cleanText: content, components: [], usedResumeJsonFallback: false };
+            let res = extractComponents(textToClean);
+            if (res.components.length === 0) {
+                const rawRes = extractComponents(content);
+                if (rawRes.components.length > 0) {
+                    res = {
+                        ...rawRes,
+                        cleanText: res.cleanText || rawRes.cleanText,
+                    };
+                }
+            }
+            return res;
+        },
         [isUser, textToClean, content],
     );
 
@@ -841,7 +861,7 @@ function MessageBubble({
                         isStreaming={isReasoningActive}
                     >
                         <ReasoningTrigger />
-                        <ReasoningContent>{effectiveReasoning || " "}</ReasoningContent>
+                        <ReasoningContent>{cleanReasoning || " "}</ReasoningContent>
                     </Reasoning>
                 ) : null}
 

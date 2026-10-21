@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { PDFViewer as ReactPDFViewer, pdf } from "@react-pdf/renderer"
 import type { CoverLetterData, CoverLetterTemplate } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { Download, RefreshCw } from "lucide-react"
+import { Download, RefreshCw, Printer } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card } from "@/components/ui/card"
 import { getCoverLetterTemplate } from "@/components/pdf-templates"
@@ -108,6 +108,46 @@ export default function CoverLetterPDFViewer({ coverLetterData, template }: PDFV
     }, 500)
   }
 
+  const handlePrint = async () => {
+    try {
+      setIsLoading(true)
+      const blob = await pdf(<PDFTemplate coverLetterData={coverLetterData} />).toBlob()
+      const url = URL.createObjectURL(blob)
+      const iframe = document.createElement("iframe")
+      iframe.style.position = "fixed"
+      iframe.style.right = "0"
+      iframe.style.bottom = "0"
+      iframe.style.width = "0"
+      iframe.style.height = "0"
+      iframe.style.border = "0"
+      iframe.src = url
+      document.body.appendChild(iframe)
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow?.focus()
+          iframe.contentWindow?.print()
+        } catch (e) {
+          window.open(url, "_blank")
+        }
+        setTimeout(() => {
+          try {
+            document.body.removeChild(iframe)
+            URL.revokeObjectURL(url)
+          } catch (_) {}
+        }, 60000)
+      }
+    } catch (e) {
+      console.error("Print error:", e)
+      toast({
+        title: "Print failed",
+        description: "Could not initialize print dialog.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Get the template component using the centralized function
   const PDFTemplate = getCoverLetterTemplate(template as string)
 
@@ -119,6 +159,10 @@ export default function CoverLetterPDFViewer({ coverLetterData, template }: PDFV
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading}>
             <RefreshCw size={16} className={`mr-1 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePrint} disabled={isLoading}>
+            <Printer size={16} className="mr-1" />
+            Print
           </Button>
           <Button variant="default" size="sm" onClick={handleDownload} disabled={isLoading}>
             <Download size={16} className="mr-1" />

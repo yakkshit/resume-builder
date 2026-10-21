@@ -24,7 +24,21 @@ const RESUME_TEMPLATE_KEYS = new Set<string>([
   "two-column",
   "gradient-gray",
   "german-cv",
+  "german-modern",
+  "german-teal-wave",
+  "german-slate-split",
+  "german-rose-gold",
+  "german-timeline-minimal",
+  "german-burgundy-dual",
+  "german-forest-slate",
+  "ivy-league",
+  "engineering-ats",
+  "minimal-clean",
+  "tech-modern",
   "multi-colour",
+  "pokemon-trainer",
+  "wizarding-scroll",
+  "retro-pokedex",
 ])
 
 const RESUME_KEYS = [

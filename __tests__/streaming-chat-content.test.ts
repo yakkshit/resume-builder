@@ -71,12 +71,20 @@ describe("parseChainOfThought", () => {
     expect(result.cleanedContent).toBe("Jobs found.");
   });
 
-  it("extracts XML <tool_call> tags", () => {
-    const raw = "<tool_call>{\"name\": \"scrape_github_profile\", \"arguments\": {\"username\": \"octocat\"}}</tool_call>\nProfile scraped.";
+  it("rescues component blocks trapped inside <think> tags into cleanedContent", () => {
+    const raw = "<think>Analyzing user profile...\n```component:cv\n{\"resumeData\":{\"basicInfo\":{\"name\":\"John\"}}}\n```\nDone thinking.</think>\nHere is your resume.";
     const result = parseChainOfThought(raw, false);
-    expect(result.tools.length).toBe(1);
-    expect(result.tools[0].name).toBe("scrape_github_profile");
-    expect(result.tools[0].args?.username).toBe("octocat");
-    expect(result.cleanedContent).toBe("Profile scraped.");
+    expect(result.thinkingText).toBe("Analyzing user profile...\n\nDone thinking.");
+    expect(result.cleanedContent).toContain("Here is your resume.");
+    expect(result.cleanedContent).toContain("```component:cv");
+    expect(result.cleanedContent).toContain('"name":"John"');
+  });
+
+  it("rescues components during streaming in-flight unclosed <think> tag", () => {
+    const raw = "<think>Reasoning about skills and background...\n```component:cv\n{\"resumeData\":{\"basicInfo\":";
+    const result = parseChainOfThought(raw, true);
+    expect(result.thinkingText).toBe("Reasoning about skills and background...");
+    expect(result.isThinkingActive).toBe(false);
+    expect(result.cleanedContent).toContain("```component:cv");
   });
 });

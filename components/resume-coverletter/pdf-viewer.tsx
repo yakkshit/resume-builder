@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react"
 import { pdf } from "@react-pdf/renderer"
 import type { ResumeData, Template } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { Download, RefreshCw, AlertCircle, FileText } from "lucide-react"
+import { Download, RefreshCw, AlertCircle, FileText, Printer } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Card } from "@/components/ui/card"
 import { getResumeTemplate, resumeTemplates } from "@/components/pdf-templates"
@@ -168,6 +168,38 @@ export default function PDFViewer({
     }, 300)
   }
 
+  const handlePrint = () => {
+    if (!blobUrl) return
+    try {
+      const iframe = document.createElement("iframe")
+      iframe.style.position = "fixed"
+      iframe.style.right = "0"
+      iframe.style.bottom = "0"
+      iframe.style.width = "0"
+      iframe.style.height = "0"
+      iframe.style.border = "0"
+      iframe.src = blobUrl
+      document.body.appendChild(iframe)
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow?.focus()
+          iframe.contentWindow?.print()
+        } catch (e) {
+          console.error("Print error, opening in new window instead:", e)
+          window.open(blobUrl, "_blank")
+        }
+        setTimeout(() => {
+          try {
+            document.body.removeChild(iframe)
+          } catch (_) {}
+        }, 60000)
+      }
+    } catch (e) {
+      console.error("Failed to print PDF:", e)
+      window.open(blobUrl, "_blank")
+    }
+  }
+
   if (!isClient) {
     return (
       <Card className="flex flex-col h-full overflow-hidden border-0 shadow-lg">
@@ -231,6 +263,10 @@ export default function PDFViewer({
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isLoading} className="h-8 text-xs shrink-0 rounded-lg">
             <RefreshCw size={13} className={`mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={handlePrint} disabled={isLoading || !blobUrl} className="h-8 text-xs shrink-0 rounded-lg">
+            <Printer size={13} className="mr-1.5" />
+            Print
           </Button>
           <Button variant="default" size="sm" onClick={handleDownload} disabled={isDownloading} className="h-8 text-xs shrink-0 rounded-lg">
             <Download size={13} className={`mr-1.5 ${isDownloading ? "animate-spin" : ""}`} />

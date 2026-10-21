@@ -583,38 +583,43 @@ export default function ProfileDashboardPage() {
       }
     }
 
-    let isValid = false;
-    const val = keyValue.trim();
-    if (cleanProvider === "google" && (val.startsWith("AIzaSy") || val.length >= 20)) isValid = true;
-    else if (cleanProvider === "openai" && (val.startsWith("sk-") || val.length >= 20)) isValid = true;
-    else if (cleanProvider === "anthropic" && (val.startsWith("sk-ant-") || val.length >= 20)) isValid = true;
-    else if (cleanProvider === "groq" && (val.startsWith("gsk_") || val.length >= 20)) isValid = true;
-    else if (cleanProvider === "mistral" && val.length >= 15) isValid = true;
-    else if (cleanProvider === "deepseek" && (val.startsWith("sk-") || val.length >= 20)) isValid = true;
-    else if (cleanProvider === "openrouter" && (val.startsWith("sk-or-") || val.length >= 20)) isValid = true;
-    else if (cleanProvider === "huggingface" && (val.startsWith("hf_") || val.length >= 15)) isValid = true;
-    else if (cleanProvider === "xai" && (val.startsWith("xai-") || val.length >= 15)) isValid = true;
-    else if (cleanProvider === "ollama") isValid = val.startsWith("http://") || val.startsWith("https://");
-    else if (cleanProvider === "tavily") isValid = val.startsWith("tvly-") || val.length >= 15;
-    else if (cleanProvider === "firecrawl") isValid = val.startsWith("fc-") || val.length >= 15;
-    else if (cleanProvider === "kernel") isValid = val.startsWith("knl_") || val.startsWith("kernel_") || val.length >= 10;
-    else if (cleanProvider === "browserbase") isValid = val.startsWith("bb_") || val.length >= 15;
-    else if (cleanProvider === "steel") isValid = val.startsWith("steel_") || val.length >= 15;
-    else isValid = val.length >= 10;
-
-    setTestingKey((prev) => ({ ...prev, [provider]: false, [cleanProvider]: false }));
-    setKeyStatus((prev) => ({ ...prev, [provider]: isValid ? "success" : "error", [cleanProvider]: isValid ? "success" : "error" }));
-
-    if (isValid) {
-      toast({
-        title: `${cleanProvider.toUpperCase()} Key Connected`,
-        description: "Provider key verified and ready for AI models.",
+    try {
+      const res = await fetch("/api/verify-provider", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: cleanProvider,
+          apiKey: keyValue,
+          endpoint: cleanProvider === "ollama" ? keys.ollamaEndpoint : undefined,
+        }),
       });
-    } else {
+      const data = await res.json();
+      setTestingKey((prev) => ({ ...prev, [provider]: false, [cleanProvider]: false }));
+      setKeyStatus((prev) => ({
+        ...prev,
+        [provider]: data.success ? "success" : "error",
+        [cleanProvider]: data.success ? "success" : "error",
+      }));
+
+      if (data.success) {
+        toast({
+          title: `${cleanProvider.toUpperCase()} Verified!`,
+          description: data.message || `Live connection established in ${data.latencyMs ?? 50}ms.`,
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: `${cleanProvider.toUpperCase()} Connection Failed`,
+          description: data.error || "Verification failed. Please check your credentials.",
+        });
+      }
+    } catch (err: any) {
+      setTestingKey((prev) => ({ ...prev, [provider]: false, [cleanProvider]: false }));
+      setKeyStatus((prev) => ({ ...prev, [provider]: "error", [cleanProvider]: "error" }));
       toast({
         variant: "destructive",
-        title: "Validation Warning",
-        description: `The ${cleanProvider} key appears to have an atypical format. Please double-check it.`,
+        title: "Connection Test Error",
+        description: err.message || "Network error while verifying provider.",
       });
     }
   };

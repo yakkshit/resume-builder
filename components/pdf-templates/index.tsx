@@ -22,8 +22,12 @@ import { GermanSlateSplitTemplate } from "./cv/german-templates/GermanSlateSplit
 import { GermanRoseGoldTemplate } from "./cv/german-templates/GermanRoseGoldTemplate"
 import { GermanTimelineMinimalTemplate } from "./cv/german-templates/GermanTimelineMinimalTemplate"
 import { GermanBurgundyDualTemplate } from "./cv/german-templates/GermanBurgundyDualTemplate"
+import { GermanForestSlateTemplate } from "./cv/german-templates/GermanForestSlateTemplate"
 import { IvyLeaguePDFTemplate } from "./cv/general-resumes/ivy-league-pdf-template"
 import { MultiColorfulGradientPDFTemplate } from "./cv/other-resume/RandomColourTemplate"
+import { PokemonTrainerTemplate } from "./cv/other-resume/PokemonTrainerTemplate"
+import { WizardingScrollTemplate } from "./cv/other-resume/WizardingScrollTemplate"
+import { RetroPokedexTemplate } from "./cv/other-resume/RetroPokedexTemplate"
 import { MinimalCleanPDFTemplate } from "./cv/general-resumes/minimal-clean-pdf-template"
 import { TechModernPDFTemplate } from "./cv/general-resumes/tech-modern-pdf-template"
 import { MinimalCoverLetterPDFTemplate } from "./coverletter/minimal-cover-letter-template"
@@ -50,9 +54,13 @@ export {
   GermanRoseGoldTemplate,
   GermanTimelineMinimalTemplate,
   GermanBurgundyDualTemplate,
+  GermanForestSlateTemplate,
   IvyLeaguePDFTemplate,
   MinimalCleanPDFTemplate,
   TechModernPDFTemplate,
+  PokemonTrainerTemplate,
+  WizardingScrollTemplate,
+  RetroPokedexTemplate,
   // Cover letter templates
   StandardCoverLetterPDFTemplate,
   ModernCoverLetterPDFTemplate,
@@ -85,11 +93,15 @@ export const resumeTemplates = {
   "german-rose-gold": GermanRoseGoldTemplate,
   "german-timeline-minimal": GermanTimelineMinimalTemplate,
   "german-burgundy-dual": GermanBurgundyDualTemplate,
+  "german-forest-slate": GermanForestSlateTemplate,
   "ivy-league": IvyLeaguePDFTemplate,
   "engineering-ats": IvyLeaguePDFTemplate,
   "minimal-clean": MinimalCleanPDFTemplate,
   "tech-modern": TechModernPDFTemplate,
-  "multi-colour" : MultiColorfulGradientPDFTemplate
+  "multi-colour": MultiColorfulGradientPDFTemplate,
+  "pokemon-trainer": PokemonTrainerTemplate,
+  "wizarding-scroll": WizardingScrollTemplate,
+  "retro-pokedex": RetroPokedexTemplate,
 } as const
 
 // Template Mappings - Cover Letter

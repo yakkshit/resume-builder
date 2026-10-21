@@ -199,25 +199,28 @@ const AVAILABLE_MODELS: Record<string, { provider: string; modelId: string; apiK
   // Mistral (3.x + mini/magistral/devstral)
   "pixtral-large-latest": { provider: "mistral", modelId: "pixtral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-large-3": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-medium-3.1": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-3.1": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-small-3.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-medium-3": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-3": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-small-3.1": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "ministral-3-14b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "ministral-3-8b": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "ministral-3-3b": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
-  "magistral-medium-2506": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-14b": { provider: "mistral", modelId: "ministral-8b-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-8b": { provider: "mistral", modelId: "ministral-8b-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3-3b": { provider: "mistral", modelId: "ministral-3b-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "magistral-medium-2506": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "magistral-small-2506": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "magistral-medium-1.2": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "magistral-medium-1.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "magistral-small-1.2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "devstral-2": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "devstral-medium-1.0": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "devstral-medium-1.0": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "devstral-small-2": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-large-latest": { provider: "mistral", modelId: "mistral-large-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-medium-latest": { provider: "mistral", modelId: "mistral-medium-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-medium-latest": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
   "mistral-small-latest": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "ministral-8b-latest": { provider: "mistral", modelId: "mistral-small-latest", apiKey: process.env.MISTRAL_API_KEY },
-  "mistral-7b-instruct": { provider: "mistral", modelId: "mistral-7b-instruct", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-8b-latest": { provider: "mistral", modelId: "ministral-8b-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "ministral-3b-latest": { provider: "mistral", modelId: "ministral-3b-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "codestral-latest": { provider: "mistral", modelId: "codestral-latest", apiKey: process.env.MISTRAL_API_KEY },
+  "open-mistral-7b": { provider: "mistral", modelId: "open-mistral-7b", apiKey: process.env.MISTRAL_API_KEY },
+  "mistral-7b-instruct": { provider: "mistral", modelId: "open-mistral-7b", apiKey: process.env.MISTRAL_API_KEY },
 
   // Together.ai
   "meta-llama/llama-3.1-8b-instruct": { provider: "together", modelId: "meta-llama/Llama-3.1-8B-Instruct-Turbo", apiKey: process.env.TOGETHER_API_KEY },
@@ -814,6 +817,7 @@ ${getTemplateCapacityCheatSheetMarkdown()}
   When planning complex tasks, evaluating ATS scores, scraping jobs, visualizing metrics, tailoring resumes, or generating cover letters, wrap your step-by-step reasoning in \\<think\\>...\\</think\\>.
   In your thinking, declare which tool or component you are executing (e.g. 'Using tool: web_scraper', 'Using tool: chart_generator', 'Using tool: generate_resume_pdf', 'Using tool: calculate_ats_score').
   This reasoning and tool execution state will stream directly into the user's live reasoning box with visual tool badges.
+  CRITICAL: Never put \`\`\`component:* code blocks, resume JSON, or email text inside \<think\>...\</think\>. Always close \</think\> BEFORE outputting the user response and interactive components. All interactive components (\`\`\`component:cv, \`\`\`component:cover-letter, \`\`\`component:email-hr, etc.) MUST be emitted OUTSIDE and AFTER \</think\>.
 
 - **Interactive UI Components (Emit fenced code blocks with \`\`\`component:<name>)**:
   1. **Resume / CV Generator (\`\`\`component:cv)**:
@@ -2227,23 +2231,57 @@ async function handleWithMistral(messages: any[], modelId: string, apiKey?: stri
       throw new Error("Mistral API key is required. Please provide it in the UI or set MISTRAL_API_KEY environment variable.")
     }
 
-    const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+    const payload = messages.map(msg => ({
+      role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
+      content: getMsgText(msg),
+    }))
+
+    let activeModel = modelId
+    let response = await fetch("https://api.mistral.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${key}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: modelId,
-        messages: messages.map(msg => ({
-          role: msg.role === "system" ? "system" : msg.role === "assistant" ? "assistant" : "user",
-          content: getMsgText(msg),
-        })),
+        model: activeModel,
+        messages: payload,
         stream: true,
       }),
     })
 
-    if (!response.ok) {
+    // If tier restriction occurs (code 1910, tier_not_allowed), auto-fallback to free/standard tier model
+    if (!response.ok && (response.status === 403 || response.status === 404)) {
+      const errorText = await response.text().catch(() => "")
+      if (
+        (errorText.includes("tier_not_allowed") || errorText.includes("1910") || response.status === 404) &&
+        activeModel !== "mistral-small-latest"
+      ) {
+        console.warn(`Mistral model '${activeModel}' is restricted on this key tier (code 1910). Auto-falling back to 'mistral-small-latest'...`)
+        activeModel = "mistral-small-latest"
+        response = await fetch("https://api.mistral.ai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${key}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: activeModel,
+            messages: payload,
+            stream: true,
+          }),
+        })
+      }
+
+      // If still not ok after fallback, format a clear actionable error message
+      if (!response.ok) {
+        const secondErr = await response.text().catch(() => "")
+        if (secondErr.includes("tier_not_allowed") || secondErr.includes("1910")) {
+          throw new Error("This Mistral model is not included in your API key subscription tier. Please add billing credits at console.mistral.ai or switch to 'Mistral Small' / 'Ministral 8B'.")
+        }
+        throw new Error(`Mistral API error: ${response.status} - ${secondErr || errorText}`)
+      }
+    } else if (!response.ok) {
       const errorText = await response.text().catch(() => "")
       throw new Error(`Mistral API error: ${response.status} - ${errorText}`)
     }

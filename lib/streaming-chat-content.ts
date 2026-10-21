@@ -62,13 +62,33 @@ export function parseChainOfThought(
   let isThinkingActive = false;
   const tools: ParsedToolCall[] = [];
 
+  // Helper to rescue any component blocks trapped inside a thought text
+  const rescueComponents = (thoughtBlock: string): { cleanThought: string; rescued: string[] } => {
+    const compRegex = /(?:```|````)\s*component\s*:[a-zA-Z0-9-_]+\s*[\s\S]*?(?:(?:```|````)|$)/gi;
+    const rescued: string[] = [];
+    let cm: RegExpExecArray | null;
+    while ((cm = compRegex.exec(thoughtBlock)) !== null) {
+      rescued.push(cm[0]);
+    }
+    const cleanThought = thoughtBlock.replace(compRegex, "").trim();
+    return { cleanThought, rescued };
+  };
+
+  const rescuedComponents: string[] = [];
+
   // 1. Handle complete <think>...</think> blocks
   const thinkRegex = /<think>([\s\S]*?)<\/think>/gi;
   let match: RegExpExecArray | null;
   while ((match = thinkRegex.exec(raw)) !== null) {
-    const thoughtChunk = match[1].trim();
-    if (thoughtChunk) {
-      thinkingText = thinkingText ? `${thinkingText}\n\n${thoughtChunk}` : thoughtChunk;
+    const rawThought = match[1].trim();
+    if (rawThought) {
+      const { cleanThought, rescued } = rescueComponents(rawThought);
+      if (rescued.length > 0) {
+        rescuedComponents.push(...rescued);
+      }
+      if (cleanThought) {
+        thinkingText = thinkingText ? `${thinkingText}\n\n${cleanThought}` : cleanThought;
+      }
     }
   }
   raw = raw.replace(thinkRegex, "");
@@ -76,10 +96,32 @@ export function parseChainOfThought(
   // 2. Handle in-flight unclosed <think> during streaming
   const unclosedThinkIndex = raw.indexOf("<think>");
   if (unclosedThinkIndex !== -1) {
-    const inFlightThought = raw.slice(unclosedThinkIndex + 7).trim();
-    thinkingText = thinkingText ? `${thinkingText}\n\n${inFlightThought}` : inFlightThought;
-    isThinkingActive = isStreaming;
-    raw = raw.slice(0, unclosedThinkIndex).trim();
+    const afterThink = raw.slice(unclosedThinkIndex + 7);
+    // Check if the in-flight thought contains a component fence: ```component: or ````component:
+    const componentStartMatch = /(?:```|````)\s*component\s*:[a-zA-Z0-9-_]+/i.exec(afterThink);
+    if (componentStartMatch) {
+      // Thought ended when the component block started!
+      const thoughtPart = afterThink.slice(0, componentStartMatch.index).trim();
+      const contentPart = afterThink.slice(componentStartMatch.index).trim();
+      if (thoughtPart) {
+        const { cleanThought, rescued } = rescueComponents(thoughtPart);
+        if (rescued.length > 0) rescuedComponents.push(...rescued);
+        if (cleanThought) {
+          thinkingText = thinkingText ? `${thinkingText}\n\n${cleanThought}` : cleanThought;
+        }
+      }
+      isThinkingActive = false;
+      raw = raw.slice(0, unclosedThinkIndex) + "\n\n" + contentPart;
+    } else {
+      const inFlightThought = afterThink.trim();
+      const { cleanThought, rescued } = rescueComponents(inFlightThought);
+      if (rescued.length > 0) rescuedComponents.push(...rescued);
+      if (cleanThought) {
+        thinkingText = thinkingText ? `${thinkingText}\n\n${cleanThought}` : cleanThought;
+      }
+      isThinkingActive = isStreaming;
+      raw = raw.slice(0, unclosedThinkIndex).trim();
+    }
   }
 
   // 3. Handle ```thought ... ``` fences
@@ -87,10 +129,18 @@ export function parseChainOfThought(
   while ((match = thoughtFenceRegex.exec(raw)) !== null) {
     const thoughtChunk = match[1].trim();
     if (thoughtChunk) {
-      thinkingText = thinkingText ? `${thinkingText}\n\n${thoughtChunk}` : thoughtChunk;
+      const { cleanThought, rescued } = rescueComponents(thoughtChunk);
+      if (rescued.length > 0) rescuedComponents.push(...rescued);
+      if (cleanThought) {
+        thinkingText = thinkingText ? `${thinkingText}\n\n${cleanThought}` : cleanThought;
+      }
     }
   }
   raw = raw.replace(thoughtFenceRegex, "");
+
+  if (rescuedComponents.length > 0) {
+    raw = `${raw}\n\n${rescuedComponents.join("\n\n")}`.trim();
+  }
 
   // 4. Handle tool calls: ```tool:name\n{json}\n``` or <tool_call>
   const toolFenceRegex = /```\s*tool\s*:\s*([A-Za-z0-9_-]+)\s*([\s\S]*?)```/gi;

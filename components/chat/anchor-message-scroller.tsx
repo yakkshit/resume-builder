@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { UIMessage } from "ai";
 import { getTextContent } from "@/lib/message-utils";
@@ -12,9 +12,9 @@ interface AnchorMessageScrollerProps {
 }
 
 /**
- * Anchor Message Scroller inspired by HextaAI thread navigation (User screenshots).
+ * Anchor Message Scroller inspired by thread navigation checkpoints.
  * Shows clean horizontal dash lines. On hover, a pill pops out to the left displaying
- * a few characters of that message.
+ * message text. Scrollable with hidden scrollbar for a polished UI.
  */
 export function AnchorMessageScroller({
   messages,
@@ -22,7 +22,15 @@ export function AnchorMessageScroller({
   className,
 }: AnchorMessageScrollerProps) {
   const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [hoveredAnchor, setHoveredAnchor] = useState<{
+    id: string;
+    label: string;
+    top: number;
+    right: number;
+  } | null>(null);
+
+  const activeBtnRef = useRef<HTMLButtonElement | null>(null);
+  const scrollerContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Filter to user messages (or anchor points)
   const userAnchors = messages
@@ -80,6 +88,24 @@ export function AnchorMessageScroller({
     return () => container.removeEventListener("scroll", handleScroll);
   }, [messages, containerRef, userAnchors.length]);
 
+  // Keep the active anchor in view within the navigation scroller without scrolling outer containers
+  useEffect(() => {
+    if (scrollerContainerRef.current && activeBtnRef.current) {
+      const container = scrollerContainerRef.current;
+      const btn = activeBtnRef.current;
+      const cTop = container.scrollTop;
+      const cBottom = cTop + container.clientHeight;
+      const bTop = btn.offsetTop;
+      const bBottom = bTop + btn.offsetHeight;
+
+      if (bTop < cTop) {
+        container.scrollTo({ top: Math.max(0, bTop - 20), behavior: "smooth" });
+      } else if (bBottom > cBottom) {
+        container.scrollTo({ top: bBottom - container.clientHeight + 20, behavior: "smooth" });
+      }
+    }
+  }, [activeMessageId]);
+
   const scrollToMessage = (msgId: string) => {
     const container = containerRef.current;
     if (!container) return;
@@ -92,48 +118,73 @@ export function AnchorMessageScroller({
   if (userAnchors.length <= 1) return null;
 
   return (
-    <div
-      className={cn(
-        "fixed right-3 sm:right-5 top-1/2 -translate-y-1/2 z-20 hidden md:flex flex-col items-end gap-2 pointer-events-auto select-none",
-        className
+    <>
+      {/* Floating Pill on Hover positioned without container clipping */}
+      {hoveredAnchor && (
+        <div
+          style={{
+            position: "fixed",
+            top: hoveredAnchor.top,
+            right: hoveredAnchor.right,
+            transform: "translateY(-50%)",
+          }}
+          className="z-50 px-2.5 py-0.5 rounded-full bg-white text-black text-[11px] font-semibold tracking-tight shadow-2xl whitespace-nowrap pointer-events-none animate-in fade-in zoom-in-95 duration-100"
+        >
+          {hoveredAnchor.label}
+        </div>
       )}
-      aria-label="Message navigation anchors"
-    >
-      {userAnchors.map((anchor) => {
-        const isActive = activeMessageId === anchor.id;
-        const isHovered = hoveredId === anchor.id;
 
-        return (
-          <button
-            key={anchor.id}
-            type="button"
-            onClick={() => scrollToMessage(anchor.id)}
-            onMouseEnter={() => setHoveredId(anchor.id)}
-            onMouseLeave={() => setHoveredId(null)}
-            className="group relative flex items-center justify-end py-1 px-0.5 focus:outline-none"
-            aria-label={`Jump to message: ${anchor.fullText.slice(0, 30)}`}
-          >
-            {/* Pill displayed on hover to the left of the dash (Images 2 & 3) */}
-            {isHovered && (
-              <span
-                className="absolute right-full mr-2.5 px-2.5 py-0.5 rounded-full bg-white text-black text-[11px] font-semibold tracking-tight shadow-2xl whitespace-nowrap pointer-events-none animate-in fade-in zoom-in-95 duration-100"
+      {/* Navigation slider rail */}
+      <div
+        className={cn(
+          "fixed right-1.5 sm:right-3.5 top-1/2 -translate-y-1/2 z-20 hidden md:flex flex-col items-end pointer-events-auto select-none",
+          className
+        )}
+        aria-label="Message navigation anchors"
+      >
+        <div
+          ref={scrollerContainerRef}
+          onScroll={() => setHoveredAnchor(null)}
+          className="w-10 sm:w-12 max-h-[85vh] sm:max-h-[calc(100vh-120px)] overflow-y-auto overscroll-contain flex flex-col items-end gap-1.5 py-3 pr-1 sm:pr-1.5 pl-2 scrollbar-none no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+        >
+          {userAnchors.map((anchor) => {
+            const isActive = activeMessageId === anchor.id;
+            const isHovered = hoveredAnchor?.id === anchor.id;
+
+            return (
+              <button
+                key={anchor.id}
+                ref={isActive ? activeBtnRef : undefined}
+                type="button"
+                onClick={() => scrollToMessage(anchor.id)}
+                onMouseEnter={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setHoveredAnchor({
+                    id: anchor.id,
+                    label: anchor.label,
+                    top: rect.top + rect.height / 2,
+                    right: window.innerWidth - rect.left + 8,
+                  });
+                }}
+                onMouseLeave={() => setHoveredAnchor(null)}
+                className="group relative flex items-center justify-end py-1.5 px-1 focus:outline-none cursor-pointer"
+                aria-label={`Jump to message: ${anchor.fullText.slice(0, 30)}`}
               >
-                {anchor.label}
-              </span>
-            )}
-
-            {/* Horizontal line: active or hovered is longer and white, otherwise short muted line */}
-            <span
-              className={cn(
-                "h-[2px] rounded-full transition-all duration-200",
-                isActive || isHovered
-                  ? "w-5 bg-white"
-                  : "w-3 bg-neutral-600 group-hover:bg-neutral-400 group-hover:w-4"
-              )}
-            />
-          </button>
-        );
-      })}
-    </div>
+                {/* Horizontal line: active or hovered is longer and white, otherwise short muted line */}
+                <span
+                  className={cn(
+                    "h-[2px] rounded-full transition-all duration-200",
+                    isActive || isHovered
+                      ? "w-5 bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)]"
+                      : "w-3 bg-neutral-600 group-hover:bg-neutral-300 group-hover:w-4"
+                  )}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
   );
 }
