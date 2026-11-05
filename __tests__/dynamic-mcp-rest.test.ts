@@ -3,6 +3,7 @@ import { POST as RestPOST, GET as RestGET } from "@/app/api/mcp/rest/route";
 import { POST as SlugRestPOST, GET as SlugRestGET } from "@/app/api/mcp/rest/[slug]/route";
 import { POST as SlugMcpPOST, GET as SlugMcpGET } from "@/app/api/mcp/[slug]/route";
 import { GET as ConfigGET, POST as ConfigPOST } from "@/app/api/mcp/user-config/route";
+import { GET as OpenApiGET } from "@/app/api/openapi/route";
 import { NextRequest } from "next/server";
 import {
   saveUserMcpConfig,
@@ -288,6 +289,49 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     expect(mcpRes.status).toBe(200);
     const mcpData = await mcpRes.json();
     expect(mcpData.result).toBeDefined();
+  });
+
+  it("authorizes MCP JSON-RPC protocol calls to user's dedicated personal slug endpoint without header requirements", async () => {
+    // Configured for bearer, but client connects via dedicated personal slug
+    await saveUserMcpConfig({
+      userId: testUserId,
+      slug: testSlug,
+      authType: "bearer",
+      isPublic: false,
+    });
+
+    const mcpReq = new NextRequest(`http://localhost:3000/api/mcp/${testSlug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "gemini-call-1",
+        method: "tools/call",
+        params: { name: "get_user_resume", arguments: {} },
+      }),
+    });
+
+    const mcpRes = await SlugMcpPOST(mcpReq, { params: Promise.resolve({ slug: testSlug }) });
+    expect(mcpRes.status).toBe(200);
+    const mcpData = await mcpRes.json();
+    expect(mcpData.result).toBeDefined();
+    expect(mcpData.result.content[0].text).toContain("activeResume");
+  });
+
+  it("serves OpenAPI 3.1.0 document with flexible multi-auth schemes and dynamic MCP paths", async () => {
+    const openApiReq = new NextRequest("http://localhost:3000/api/openapi");
+    const openApiRes = await OpenApiGET(openApiReq);
+    expect(openApiRes.status).toBe(200);
+    const doc = await openApiRes.json();
+
+    expect(doc.openapi).toBe("3.1.0");
+    expect(doc.components.securitySchemes.BearerAuth).toBeDefined();
+    expect(doc.components.securitySchemes.ApiKeyAuth).toBeDefined();
+    expect(doc.components.securitySchemes.QueryTokenAuth).toBeDefined();
+    expect(doc.paths["/api/mcp/{slug}"]).toBeDefined();
+    expect(doc.paths["/api/mcp/rest/{slug}"]).toBeDefined();
+    // Verify security array includes empty object for optional/public capability auth
+    expect(doc.security).toContainEqual({});
   });
 });
 

@@ -23,12 +23,27 @@ export async function GET(request: NextRequest) {
     servers: [{ url: baseUrl, description: "Current server" }],
     components: {
       securitySchemes: {
+        None: {
+          type: "http",
+          description: "Zero-friction public/capability access via secret endpoint slug. No auth headers required.",
+        },
+        BearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "token",
+          description: "Standard Bearer token authorization header.",
+        },
         ApiKeyAuth: {
           type: "apiKey",
           in: "header",
-          name: "api-key",
-          description:
-            "API key header. Set this to the value of `process.env.API_AUTH_KEY` (or `process.env.API_SECRET_KEY` / `process.env.APP_API_KEY` if configured).",
+          name: "x-api-key",
+          description: "API key passed in x-api-key or api-key header.",
+        },
+        QueryTokenAuth: {
+          type: "apiKey",
+          in: "query",
+          name: "token",
+          description: "API token passed directly in the URL query string (supported by Google Gemini and web AI agents).",
         },
       },
       schemas: {
@@ -115,7 +130,12 @@ export async function GET(request: NextRequest) {
         },
       },
     },
-    security: [{ ApiKeyAuth: [] }],
+    security: [
+      {},
+      { BearerAuth: [] },
+      { ApiKeyAuth: [] },
+      { QueryTokenAuth: [] },
+    ],
     paths: {
       "/api/chat": {
         post: {
@@ -336,6 +356,118 @@ export async function GET(request: NextRequest) {
           responses: {
             "200": {
               description: "JSON-RPC response containing tool results or initialization state.",
+            },
+          },
+        },
+      },
+      "/api/mcp/{slug}": {
+        get: {
+          summary: "Dynamic User MCP Server Manifest & Status",
+          description:
+            "Returns status, tools manifest, and client setup commands for the user's personal MCP endpoint. Supports Google Gemini, Claude, Cursor, and Windsurf.",
+          parameters: [
+            {
+              name: "slug",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User's unique secret personal endpoint slug",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "MCP server manifest, tools list, and connection snippets.",
+            },
+          },
+        },
+        post: {
+          summary: "Dynamic User MCP JSON-RPC 2.0 Endpoint",
+          description:
+            "Standard Model Context Protocol JSON-RPC endpoint supporting `initialize`, `tools/list`, and `tools/call`. Powers personal agent capabilities for resume data, memory vault, ATS scoring, and PDF generation.",
+          parameters: [
+            {
+              name: "slug",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User's unique secret personal endpoint slug",
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    jsonrpc: { type: "string", example: "2.0" },
+                    id: { type: "string", example: "call-1" },
+                    method: { type: "string", example: "tools/call" },
+                    params: { type: "object" },
+                  },
+                  required: ["jsonrpc", "method"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "JSON-RPC response containing tool execution result.",
+            },
+          },
+        },
+      },
+      "/api/mcp/rest/{slug}": {
+        get: {
+          summary: "Dynamic User REST Tools Catalog & Quota",
+          description:
+            "Inspect all 38+ career and resume tools, schemas, and live daily quota stats for your personal endpoint.",
+          parameters: [
+            {
+              name: "slug",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User's unique secret personal endpoint slug",
+            },
+          ],
+          responses: {
+            "200": {
+              description: "REST tool definitions and daily quota info.",
+            },
+          },
+        },
+        post: {
+          summary: "Execute Career Agent Tool via Direct REST JSON",
+          description:
+            "Execute any tool (e.g. `get_user_resume`, `get_memory_vault`, `list_templates`, `generate_resume_pdf`) using standard REST JSON payloads without JSON-RPC framing.",
+          parameters: [
+            {
+              name: "slug",
+              in: "path",
+              required: true,
+              schema: { type: "string" },
+              description: "User's unique secret personal endpoint slug",
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    tool: { type: "string", example: "get_user_resume" },
+                    arguments: { type: "object", example: {} },
+                  },
+                  required: ["tool"],
+                },
+              },
+            },
+          },
+          responses: {
+            "200": {
+              description: "Tool execution result and quota telemetry.",
             },
           },
         },

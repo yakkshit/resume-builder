@@ -241,10 +241,45 @@ export default function ApiDocPage() {
               >
                 <Link href="/api/openapi" target="_blank" className="flex items-center gap-1.5">
                   <FileCode className="size-3.5" />
-                  <span>Raw OpenAPI JSON</span>
+                  <span>Raw OpenAPI 3.1 JSON</span>
                   <ExternalLink className="size-3 text-zinc-500" />
                 </Link>
               </Button>
+            </div>
+          </div>
+
+          {/* Authentication Models Banner */}
+          <div className="mt-8 p-5 rounded-2xl border border-white/10 bg-white/[0.02] backdrop-blur-xl">
+            <div className="flex items-center gap-2 mb-3">
+              <Key className="size-4 text-[#aff33e]" />
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Authentication Options</h2>
+              <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400 bg-emerald-500/10">Zero Friction</Badge>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="p-3 rounded-xl bg-black/60 border border-white/5">
+                <span className="font-semibold text-white flex items-center gap-1.5 mb-1 text-emerald-400">
+                  1. Capability Slug (Gemini Ready)
+                </span>
+                <p className="text-zinc-400 leading-relaxed text-[11px]">
+                  Passing your private 28-character endpoint slug in <code className="text-zinc-200">/api/mcp/{`{slug}`}</code> acts as a capability key. Perfect for Google Gemini, Claude, and external agents with zero header setup.
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-black/60 border border-white/5">
+                <span className="font-semibold text-white flex items-center gap-1.5 mb-1 text-amber-400">
+                  2. Bearer Header (Cursor & IDEs)
+                </span>
+                <p className="text-zinc-400 leading-relaxed text-[11px]">
+                  Pass <code className="text-zinc-200">Authorization: Bearer &lt;token&gt;</code> in your HTTP headers for Cursor, Windsurf, or terminal curl execution.
+                </p>
+              </div>
+              <div className="p-3 rounded-xl bg-black/60 border border-white/5">
+                <span className="font-semibold text-white flex items-center gap-1.5 mb-1 text-sky-400">
+                  3. Query Parameter Token
+                </span>
+                <p className="text-zinc-400 leading-relaxed text-[11px]">
+                  Append <code className="text-zinc-200">?token=&lt;token&gt;</code> to any MCP or REST endpoint to authenticate seamlessly across all webhooks and AI tools.
+                </p>
+              </div>
             </div>
           </div>
 

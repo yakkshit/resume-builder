@@ -49,13 +49,13 @@ export function createDefaultUserMcpConfig(userId: string): UserMcpConfig {
   return {
     userId,
     slug: safeSlug,
-    authType: "bearer",
+    authType: "none",
     bearerToken: `mcp_sec_${generateRandomHex(16)}`,
     oauthClientId: `client_${generateRandomHex(8)}`,
     oauthClientSecret: `sec_${generateRandomHex(24)}`,
     customHeaderName: "x-mcp-key",
     customHeaderValue: `custom_${generateRandomHex(12)}`,
-    isPublic: false,
+    isPublic: true,
     dailyLimit: DEFAULT_DAILY_LIMIT,
     enabledTools: [], // empty = all enabled
     customInstructions: "Provide structured, high-accuracy career intelligence and ground all answers using the user's Memory Vault.",
@@ -298,6 +298,22 @@ export function verifyMcpRequestAuth(
     (reqMcpSlug && (reqMcpSlug === config.slug || reqMcpSlug === config.userId))
   ) {
     return { authorized: true, authTypeUsed: "session-owner" };
+  }
+
+  // 2. Secret Personal Capability Slug URL verification for MCP protocol (/api/mcp/<slug>):
+  // When an AI agent (Google Gemini, Claude Desktop, Cursor) calls the user's dedicated personal MCP endpoint,
+  // the unguessable 28-character slug in the URL itself acts as a capability token.
+  // This allows Google Gemini to execute tools (get_user_resume, tailor_resume_for_job, generate_resume_pdf)
+  // without failing on missing HTTP header inputs.
+  if (config.slug && config.slug.length >= 12 && config.slug !== "default-user") {
+    try {
+      const url = new URL(req.url);
+      const pathname = url.pathname.toLowerCase();
+      const targetSlug = config.slug.toLowerCase();
+      if (pathname.includes(`/api/mcp/${targetSlug}`) && !pathname.includes(`/api/mcp/rest/`)) {
+        return { authorized: true, authTypeUsed: "slug-url" };
+      }
+    } catch {}
   }
 
   const token = extractAuthTokenFromRequest(req);
