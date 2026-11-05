@@ -276,7 +276,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 2. Authenticate request unless client is running internal tests or user set public/none
-      const authResult = verifyMcpRequestAuth(req, mcpConfig);
+      const authResult = verifyMcpRequestAuth(req, mcpConfig, name);
       // If user configured bearer/oauth and token failed (and not default-user in test environment with no auth)
       if (!authResult.authorized && mcpConfig.authType !== "none" && !mcpConfig.isPublic) {
         // If it's a specific token check requested by user

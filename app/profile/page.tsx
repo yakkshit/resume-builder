@@ -888,27 +888,29 @@ export default function ProfileDashboardPage() {
 
         {/* Bottom Sidebar Footer */}
         <div className="pt-3 border-t border-white/[0.08] space-y-2.5 shrink-0">
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setLoadTokensOpen(true)}
+            className="w-full h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-primary/15 border border-amber-500/30 hover:border-amber-500/50 text-amber-200 hover:text-white rounded-lg shadow-xs flex items-center justify-between"
+          >
+            <div className="flex items-center gap-1.5">
+              <Coins className="size-3 text-amber-400 shrink-0" />
+              <span className="font-medium text-[11px]">Load Tokens</span>
+            </div>
+            <span className="text-[9px] font-mono uppercase bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold border border-amber-500/25">Coming Soon</span>
+          </Button>
+
           {/* User Profile & Sign Out Card */}
           <div className="flex items-center justify-between p-2 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/5 transition-colors">
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="size-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-xs font-semibold text-primary overflow-hidden shrink-0">
+              <div className="size-8 rounded-full bg-neutral-800 border border-white/10 flex items-center justify-center text-xs font-semibold text-neutral-200 overflow-hidden shrink-0">
                 {profile.profilePicture ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={profile.profilePicture} alt="" className="h-full w-full object-cover" />
                 ) : (
                   userInitials
                 )}
-
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setLoadTokensOpen(true)}
-                  className="h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-primary/20 border border-amber-500/35 text-amber-200 hover:text-white rounded-full shadow-xs"
-                >
-                  <Coins className="size-3 text-amber-400" />
-                  <span>Load Tokens</span>
-                  <span className="text-[9px] font-mono uppercase bg-amber-500/25 text-amber-300 px-1 py-0.2 rounded font-bold">Coming Soon...</span>
-                </Button>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-white truncate">{userDisplayName}</p>

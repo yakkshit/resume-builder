@@ -86,7 +86,7 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
   const [testResult, setTestResult] = useState<{ tool: string; result: any; quota: any; status: "success" | "error" } | null>(null);
 
   // Active client config tab
-  const [activeClientTab, setActiveClientTab] = useState<"cursor" | "claudeDesktop" | "claudeCode" | "windsurf" | "curl" | "node">("cursor");
+  const [activeClientTab, setActiveClientTab] = useState<"gemini" | "cursor" | "claudeDesktop" | "claudeCode" | "windsurf" | "curl" | "node">("gemini");
 
   // Host origin
   const [origin, setOrigin] = useState("https://resume.cedzlabs.com");
@@ -159,7 +159,14 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
 
       if (res.ok) {
         const data = await res.json();
-        if (data.stats) setStats(data.stats);
+        if (data.stats) {
+          setStats((prev) => ({
+            ...prev,
+            ...data.stats,
+            tokensUsed: data.stats.tokensUsed ?? prev.tokensUsed ?? 0,
+            toolCounts: data.stats.toolCounts ?? prev.toolCounts ?? {},
+          }));
+        }
         toast({
           title: "MCP Configuration Saved!",
           description: "Your custom endpoint, authorization settings, and quota are active in Firebase.",
@@ -217,13 +224,20 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
     else if (toolName === "analyze_resume_ats_match") sampleArgs = { jobDescription: "Senior Software Engineer with deep React, Node, and TypeScript experience." };
 
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+        "x-mcp-slug": slug || userId,
+      };
+
       if (authType === "bearer" && bearerToken) {
         headers["Authorization"] = `Bearer ${bearerToken}`;
       } else if (authType === "oauth" && oauthClientId && oauthClientSecret) {
         headers["Authorization"] = `Basic ${btoa(`${oauthClientId}:${oauthClientSecret}`)}`;
       } else if (authType === "custom_header" && customHeaderName && customHeaderValue) {
         headers[customHeaderName] = customHeaderValue;
+      } else if (bearerToken) {
+        headers["Authorization"] = `Bearer ${bearerToken}`;
       }
 
       const res = await fetch(restEndpointUrl, {
@@ -431,7 +445,7 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
           </div>
           <div className="p-2.5 rounded-lg bg-[#111114] border border-white/[0.04]">
             <div className="text-[10px] text-neutral-500 font-medium">Tokens Processed</div>
-            <div className="text-base font-bold text-neutral-200 font-mono mt-0.5">{stats.tokensUsed.toLocaleString()}</div>
+            <div className="text-base font-bold text-neutral-200 font-mono mt-0.5">{(stats?.tokensUsed ?? 0).toLocaleString()}</div>
           </div>
           <div className="p-2.5 rounded-lg bg-[#111114] border border-white/[0.04]">
             <div className="text-[10px] text-neutral-500 font-medium">Firestore Persistence</div>
@@ -470,11 +484,12 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
               <span className="text-xs font-semibold text-white flex items-center gap-1.5">
                 <Unlock className="h-3.5 w-3.5 text-emerald-400" />
                 Public / None
+                <span className="text-[10px] text-emerald-400 font-normal hidden sm:inline">(Gemini Ready)</span>
               </span>
               {authType === "none" && <Badge className="bg-emerald-500 text-[10px] px-1.5 py-0 h-4">Active</Badge>}
             </div>
             <p className="text-[11px] text-neutral-400 leading-relaxed">
-              No auth headers or tokens required. Open to any local or remote tool.
+              Zero auth headers needed. Perfect for Google Gemini, web agents, and public tools.
             </p>
           </button>
 
@@ -654,7 +669,7 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
 
         {/* Client Tabs */}
         <div className="flex items-center gap-1 p-1 bg-[#111114] rounded-lg border border-white/[0.06] overflow-x-auto no-scrollbar">
-          {(["cursor", "claudeDesktop", "claudeCode", "windsurf", "curl", "node"] as const).map((tab) => (
+          {(["gemini", "cursor", "claudeDesktop", "claudeCode", "windsurf", "curl", "node"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -663,6 +678,7 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
                 activeClientTab === tab ? "bg-[#242429] text-white shadow-xs" : "text-neutral-400 hover:text-neutral-200"
               }`}
             >
+              {tab === "gemini" && "Google Gemini"}
               {tab === "cursor" && "Cursor"}
               {tab === "claudeDesktop" && "Claude Desktop"}
               {tab === "claudeCode" && "Claude Code"}
@@ -679,14 +695,25 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
             type="button"
             onClick={() => {
               let snippet = "";
-              if (activeClientTab === "cursor") {
-                snippet = JSON.stringify({ mcpServers: { [slug || "career-agent"]: { url: mcpEndpointUrl, headers: authType === "none" ? {} : { Authorization: `Bearer ${bearerToken}` } } } }, null, 2);
+              const activeAuthHeaders =
+                authType === "none"
+                  ? {}
+                  : authType === "oauth" && oauthClientId && oauthClientSecret
+                  ? { Authorization: `Basic ${btoa(`${oauthClientId}:${oauthClientSecret}`)}` }
+                  : authType === "custom_header" && customHeaderName
+                  ? { [customHeaderName]: customHeaderValue }
+                  : { Authorization: `Bearer ${bearerToken}` };
+
+              if (activeClientTab === "gemini") {
+                snippet = authType === "none" ? mcpEndpointUrl : `${mcpEndpointUrl}?token=${bearerToken || oauthClientSecret}`;
+              } else if (activeClientTab === "cursor") {
+                snippet = JSON.stringify({ mcpServers: { [slug || "career-agent"]: { url: mcpEndpointUrl, headers: activeAuthHeaders } } }, null, 2);
               } else if (activeClientTab === "claudeDesktop") {
                 snippet = JSON.stringify({ mcpServers: { [slug || "career-agent"]: { command: "npx", args: authType === "none" ? ["-y", "mcp-remote", mcpEndpointUrl] : ["-y", "mcp-remote", mcpEndpointUrl, "--header", `Authorization: Bearer ${bearerToken}`] } } }, null, 2);
               } else if (activeClientTab === "claudeCode") {
                 snippet = authType === "none" ? `claude mcp add ${slug || "career-agent"} ${mcpEndpointUrl}` : `claude mcp add ${slug || "career-agent"} ${mcpEndpointUrl} --header "Authorization: Bearer ${bearerToken}"`;
               } else if (activeClientTab === "windsurf") {
-                snippet = JSON.stringify({ mcpServers: { [slug || "career-agent"]: { serverUrl: mcpEndpointUrl, headers: authType === "none" ? {} : { Authorization: `Bearer ${bearerToken}` } } } }, null, 2);
+                snippet = JSON.stringify({ mcpServers: { [slug || "career-agent"]: { serverUrl: mcpEndpointUrl, headers: activeAuthHeaders } } }, null, 2);
               } else if (activeClientTab === "curl") {
                 snippet = `curl -X POST ${restEndpointUrl} \\\n  -H "Content-Type: application/json" \\\n  ${authType === "none" ? "" : `-H "Authorization: Bearer ${bearerToken}" \\\n  `}-d '{"tool": "get_memory_vault", "args": {}}'`;
               } else if (activeClientTab === "node") {
@@ -701,6 +728,16 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
           </button>
 
           <pre className="overflow-x-auto text-neutral-300 pr-10">
+            {activeClientTab === "gemini" && (
+              `// Google Gemini (MCP Extensions & Custom Tools)\n` +
+              `// 1. In Google Gemini -> Connect Apps & Extensions -> Add MCP Server\n` +
+              `// 2. Server URL:\n` +
+              `${mcpEndpointUrl}\n\n` +
+              `// ✨ Personal capability endpoint: Gemini connects directly and can list templates,\n` +
+              `// fetch your profile, inspect resume data, and generate documents with 0 friction!\n` +
+              `// Note: If you enforce strict Bearer/OAuth mode, supply your token in the URL:\n` +
+              `// ${mcpEndpointUrl}?token=${bearerToken || oauthClientSecret}`
+            )}
             {activeClientTab === "cursor" && (
               `// Add to ~/.cursor/mcp.json:\n` +
               JSON.stringify(
@@ -708,7 +745,14 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
                   mcpServers: {
                     [slug || "career-agent"]: {
                       url: mcpEndpointUrl,
-                      headers: authType === "none" ? {} : { Authorization: `Bearer ${bearerToken}` },
+                      headers:
+                        authType === "none"
+                          ? {}
+                          : authType === "oauth" && oauthClientId && oauthClientSecret
+                          ? { Authorization: `Basic ${btoa(`${oauthClientId}:${oauthClientSecret}`)}` }
+                          : authType === "custom_header" && customHeaderName
+                          ? { [customHeaderName]: customHeaderValue }
+                          : { Authorization: `Bearer ${bearerToken}` },
                     },
                   },
                 },

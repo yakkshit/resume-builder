@@ -237,5 +237,57 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     expect(postData.config.slug).toBe("renamed-custom-slug");
     expect(postData.config.authType).toBe("custom_header");
   });
+
+  it("allows safe discovery tool list_templates without 401 even under strict bearer auth", async () => {
+    await saveUserMcpConfig({
+      userId: testUserId,
+      slug: testSlug,
+      authType: "bearer",
+      isPublic: false,
+    });
+
+    const mcpReq = new NextRequest(`http://localhost:3000/api/mcp/${testSlug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "test-call-1",
+        method: "tools/call",
+        params: { name: "list_templates", arguments: { category: "all" } },
+      }),
+    });
+
+    const mcpRes = await SlugMcpPOST(mcpReq, { params: Promise.resolve({ slug: testSlug }) });
+    expect(mcpRes.status).toBe(200);
+    const mcpData = await mcpRes.json();
+    expect(mcpData.result).toBeDefined();
+    expect(mcpData.result.content[0].text).toContain("resumeTemplates");
+  });
+
+  it("authenticates MCP tools via query parameter token (?token=...)", async () => {
+    await saveUserMcpConfig({
+      userId: testUserId,
+      slug: testSlug,
+      authType: "bearer",
+      bearerToken: "test_query_tok",
+      isPublic: false,
+    });
+
+    const mcpReq = new NextRequest(`http://localhost:3000/api/mcp/${testSlug}?token=test_query_tok`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "test-call-2",
+        method: "tools/call",
+        params: { name: "get_memory_vault", arguments: {} },
+      }),
+    });
+
+    const mcpRes = await SlugMcpPOST(mcpReq, { params: Promise.resolve({ slug: testSlug }) });
+    expect(mcpRes.status).toBe(200);
+    const mcpData = await mcpRes.json();
+    expect(mcpData.result).toBeDefined();
+  });
 });
 

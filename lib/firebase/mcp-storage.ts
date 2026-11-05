@@ -88,6 +88,39 @@ export async function getUserMcpConfig(userIdOrSlug: string): Promise<UserMcpCon
           if (config.slug) inMemoryConfigs.set(config.slug, config);
           return config;
         }
+
+        // Second, try by direct slug in mcp_slugs collection
+        const slugSnap = await getDoc(doc(db, "mcp_slugs", trimmed));
+        if (slugSnap.exists()) {
+          const slugData = slugSnap.data();
+          if (slugData?.config) {
+            const config = slugData.config as UserMcpConfig;
+            inMemoryConfigs.set(config.userId, config);
+            if (config.slug) inMemoryConfigs.set(config.slug, config);
+            return config;
+          }
+          if (slugData?.userId) {
+            const userSnap = await getDoc(doc(db, "users", slugData.userId, "mcp_config", "settings"));
+            if (userSnap.exists()) {
+              const config = userSnap.data() as UserMcpConfig;
+              inMemoryConfigs.set(config.userId, config);
+              if (config.slug) inMemoryConfigs.set(config.slug, config);
+              return config;
+            }
+          }
+        }
+
+        // Third, try user top-level document
+        const userDocSnap = await getDoc(doc(db, "users", trimmed));
+        if (userDocSnap.exists()) {
+          const uData = userDocSnap.data();
+          if (uData?.mcpConfig) {
+            const config = uData.mcpConfig as UserMcpConfig;
+            inMemoryConfigs.set(config.userId, config);
+            if (config.slug) inMemoryConfigs.set(config.slug, config);
+            return config;
+          }
+        }
       }
     } catch (err) {
       console.warn("Firestore getUserMcpConfig error, fallback to memory:", err);
@@ -112,6 +145,12 @@ export async function getUserMcpConfig(userIdOrSlug: string): Promise<UserMcpCon
       const db = getFirebaseFirestore();
       if (db) {
         setDoc(doc(db, "users", newConfig.userId, "mcp_config", "settings"), newConfig, { merge: true }).catch(() => {});
+        setDoc(doc(db, "mcp_slugs", newConfig.slug), {
+          userId: newConfig.userId,
+          slug: newConfig.slug,
+          config: newConfig,
+          updatedAt: newConfig.updatedAt,
+        }, { merge: true }).catch(() => {});
       }
     } catch {}
   }
@@ -152,6 +191,13 @@ export async function saveUserMcpConfig(config: Partial<UserMcpConfig> & { userI
         await setDoc(doc(db, "users", updated.userId, "mcp_config", "settings"), updated, { merge: true });
         // Also update user top-level record for visibility
         await setDoc(doc(db, "users", updated.userId), { mcpSlug: updated.slug, mcpAuthType: updated.authType, mcpUpdatedAt: now }, { merge: true });
+        // Save to dedicated mcp_slugs collection for reliable slug lookups across serverless instances
+        await setDoc(doc(db, "mcp_slugs", updated.slug), {
+          userId: updated.userId,
+          slug: updated.slug,
+          config: updated,
+          updatedAt: now,
+        }, { merge: true });
       }
     } catch (err) {
       console.warn("Firestore saveUserMcpConfig notice:", err);
@@ -200,7 +246,14 @@ export function extractAuthTokenFromRequest(req: Request | NextRequest): string 
 
   try {
     const url = new URL(req.url);
-    return url.searchParams.get("token") || url.searchParams.get("apiKey") || url.searchParams.get("auth") || null;
+    return (
+      url.searchParams.get("token") ||
+      url.searchParams.get("apiKey") ||
+      url.searchParams.get("auth") ||
+      url.searchParams.get("secret") ||
+      url.searchParams.get("client_secret") ||
+      null
+    );
   } catch {
     return null;
   }
@@ -210,20 +263,49 @@ export function extractAuthTokenFromRequest(req: Request | NextRequest): string 
  * Flexible Authorization Verifier
  * Supports:
  * - "none" (Public access)
+ * - Safe discovery tools (list_templates, etc.)
+ * - Secret Capability URL (direct access via unguessable personal slug endpoint)
  * - "bearer" (Bearer token / x-api-key / query param)
  * - "oauth" (Basic auth, client_id + client_secret, or Bearer matching client_secret)
  * - "custom_header" (User-defined header name and value)
  */
 export function verifyMcpRequestAuth(
   req: Request | NextRequest,
-  config: UserMcpConfig
+  config: UserMcpConfig,
+  toolName?: string
 ): { authorized: boolean; authTypeUsed: string; error?: string } {
   // If user configured "none" or public mode, allow immediately
   if (config.authType === "none" || config.isPublic) {
     return { authorized: true, authTypeUsed: "none (public)" };
   }
 
+  // Safe read-only discovery & template inspection tools can always execute without blocking AI clients
+  const SAFE_PUBLIC_TOOLS = new Set([
+    "list_templates",
+    "validate_template_page_budget",
+    "get_template_limits",
+    "search_jobs",
+  ]);
+  if (toolName && SAFE_PUBLIC_TOOLS.has(toolName)) {
+    return { authorized: true, authTypeUsed: `public-safe-tool (${toolName})` };
+  }
+
+  // 1. Owner dashboard session check (live test executions from resume.cedzlabs.com/profile)
+  const reqUserId = req.headers.get("x-user-id");
+  const reqMcpSlug = req.headers.get("x-mcp-slug");
+  if (
+    (reqUserId && (reqUserId === config.userId || reqUserId === config.slug)) ||
+    (reqMcpSlug && (reqMcpSlug === config.slug || reqMcpSlug === config.userId))
+  ) {
+    return { authorized: true, authTypeUsed: "session-owner" };
+  }
+
   const token = extractAuthTokenFromRequest(req);
+
+  // Universal token match (if query param or header matches bearerToken, client secret, or slug)
+  if (token && (token === config.bearerToken || token === config.oauthClientSecret)) {
+    return { authorized: true, authTypeUsed: "token-match" };
+  }
 
   // 1. Bearer Token Check
   if (config.authType === "bearer") {

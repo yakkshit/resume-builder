@@ -98,7 +98,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ slu
     }
 
     // Verify authentication
-    const authResult = verifyMcpRequestAuth(req, mcpConfig);
+    const authResult = verifyMcpRequestAuth(req, mcpConfig, toolName);
     if (!authResult.authorized) {
       return NextResponse.json(
         {

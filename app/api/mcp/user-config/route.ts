@@ -98,6 +98,8 @@ export async function POST(req: NextRequest) {
           used: stats.today.requestsCount,
           remaining: stats.remaining,
           resetsAt: stats.resetsAt,
+          tokensUsed: stats.today.tokensUsed ?? 0,
+          toolCounts: stats.today.toolCounts ?? {},
         },
         endpoints: {
           mcp: `${baseUrl}/api/mcp/${updated.slug}`,
