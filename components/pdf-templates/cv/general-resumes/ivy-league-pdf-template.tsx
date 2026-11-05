@@ -19,6 +19,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: "center",
     marginBottom: 8,
+    flexDirection: "column",
   },
   name: {
     fontSize: 20,
@@ -35,7 +36,8 @@ const styles = StyleSheet.create({
     color: "#333333",
     textTransform: "uppercase",
     letterSpacing: 0.8,
-    marginBottom: 3,
+    marginTop: 4,
+    marginBottom: 5,
     textAlign: "center",
   },
   contactRow: {

@@ -18,10 +18,12 @@ import { sanitizeCoverLetterData } from "@/lib/sanitize-cover-letter-data";
 export function CoverLetterViewer({
   data = {},
   persistToLocalStorage = true,
+  isInSideStage = false,
 }: {
   data?: Record<string, any>;
   /** When false (e.g. translated view), do not overwrite saved originals. */
   persistToLocalStorage?: boolean;
+  isInSideStage?: boolean;
 }) {
   const [coverLetterData, setCoverLetterData] = useState<CoverLetterData>(() => {
     const payload = data?.coverLetterData ?? data?.coverLetter ?? data?.data ?? data;
@@ -79,17 +81,30 @@ export function CoverLetterViewer({
     }
   }, [data]);
 
-  const previewMax =
-    panelMode === "expanded" ? "max-h-[560px] overflow-hidden" : "max-h-[160px] sm:max-h-[200px] overflow-y-auto";
-  const editorMax =
-    panelMode === "expanded"
-      ? "max-h-[520px] overflow-y-auto"
-      : "max-h-[160px] sm:max-h-[200px] overflow-y-auto";
+  const previewMax = isInSideStage
+    ? "h-full min-h-0 flex-1 overflow-hidden"
+    : panelMode === "expanded"
+    ? "max-h-[560px] overflow-hidden"
+    : "max-h-[160px] sm:max-h-[200px] overflow-y-auto";
+
+  const editorMax = isInSideStage
+    ? "h-full min-h-0 flex-1 overflow-y-auto"
+    : panelMode === "expanded"
+    ? "max-h-[520px] overflow-y-auto"
+    : "max-h-[160px] sm:max-h-[200px] overflow-y-auto";
 
   return (
-    <div className="w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all">
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "preview" | "editor")} className="flex flex-col">
-        <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-border/50 bg-white/80 dark:bg-neutral-950/80 gap-2 sm:gap-3 min-h-[48px] overflow-hidden">
+    <div
+      className={`w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all ${
+        isInSideStage ? "h-full flex-1 min-h-0" : ""
+      }`}
+    >
+      <Tabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as "preview" | "editor")}
+        className={`flex flex-col ${isInSideStage ? "h-full flex-1 min-h-0" : ""}`}
+      >
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-border/50 bg-white/80 dark:bg-neutral-950/80 gap-2 sm:gap-3 min-h-[48px] overflow-hidden shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3 shrink-0 min-w-0">
             <ArtifactTrafficLights variant="light" panelMode={panelMode} setPanelMode={setPanelMode} />
             <span className="text-xs font-semibold text-foreground flex items-center gap-1.5 opacity-90 truncate select-none">
@@ -142,18 +157,18 @@ export function CoverLetterViewer({
         </div>
 
         {panelMode !== "hidden" ? (
-          <div className="p-3 bg-white/40 dark:bg-black/20">
-            <TabsContent value="preview" className="m-0 mt-0">
-              <Card className="overflow-hidden border border-border/40 bg-white/80 dark:bg-neutral-950/80 shadow-inner">
-                <CardContent className="p-0">
+          <div className={`p-2 sm:p-3 bg-white/40 dark:bg-black/20 ${isInSideStage ? "h-full flex-1 min-h-0 flex flex-col p-1" : ""}`}>
+            <TabsContent value="preview" className={`m-0 mt-0 ${isInSideStage ? "h-full flex-1 min-h-0 flex flex-col" : ""}`}>
+              <Card className={`overflow-hidden border border-border/40 bg-white/80 dark:bg-neutral-950/80 shadow-inner ${isInSideStage ? "h-full flex-1 min-h-0 flex flex-col border-0 shadow-none rounded-lg" : ""}`}>
+                <CardContent className={`p-0 ${isInSideStage ? "h-full flex-1 min-h-0 flex flex-col" : ""}`}>
                   <div className={previewMax} style={{ scrollbarWidth: "thin" }}>
                     <CoverLetterPDFViewer coverLetterData={coverLetterData} template={template} />
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="editor" className="m-0 mt-0">
-              <Card className="overflow-hidden border border-border/40 bg-white dark:bg-neutral-950 shadow-inner">
+            <TabsContent value="editor" className={`m-0 mt-0 ${isInSideStage ? "h-full flex-1 min-h-0 flex flex-col" : ""}`}>
+              <Card className={`overflow-hidden border border-border/40 bg-white dark:bg-neutral-950 shadow-inner ${isInSideStage ? "h-full flex-1 min-h-0 flex flex-col" : ""}`}>
                 <CardContent className={`p-3 ${editorMax}`} style={{ scrollbarWidth: "thin" }}>
                   <CoverLetterSingleBlockEditor
                     coverLetterData={coverLetterData}

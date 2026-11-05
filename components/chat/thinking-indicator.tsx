@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Persona } from "@/components/ai-elements/persona";
 
 export function ThinkingIndicator() {
   return (
@@ -11,13 +11,9 @@ export function ThinkingIndicator() {
       aria-live="polite"
       aria-label="Assistant is thinking"
     >
-      <motion.div
-        animate={{ rotate: [0, 15, -15, 0], scale: [1, 1.1, 1] }}
-        transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground dark:bg-[#1172e2] dark:text-white"
-      >
-        <Sparkles className="h-4 w-4" />
-      </motion.div>
+      <div className="flex shrink-0 items-center justify-center">
+        <Persona state="thinking" variant="theme" className="size-8" />
+      </div>
       <div className="flex flex-col gap-2">
         <p className="text-sm font-medium text-foreground dark:text-white">Thinking…</p>
         <div className="flex gap-1.5">

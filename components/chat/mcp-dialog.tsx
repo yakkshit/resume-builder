@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import NextLink from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -116,7 +117,7 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
   const [connectMode, setConnectMode] = useState<"quick" | "manual">("quick");
 
   // Live origin for sharing
-  const [origin, setOrigin] = useState<string>("http://localhost:3000");
+  const [origin, setOrigin] = useState<string>("https://resume.cedzlabs.com");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -448,7 +449,31 @@ export function MCPDialog({ open, onOpenChange, onServersUpdated }: MCPDialogPro
 
         {/* Tab 1: Career Agent MCP (Share & Connect) */}
         {activeMainTab === "career" && (
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            {/* Dynamic MCP v2.0 Hub Callout */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-purple-500/30 bg-purple-950/20 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="size-8 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0">
+                  <Server className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-white flex items-center gap-1.5">
+                    <span>Dynamic User MCP &amp; REST Server (v2.0)</span>
+                    <Badge variant="outline" className="text-[9px] bg-purple-500/20 text-purple-300 font-mono">100 Req/Day</Badge>
+                  </div>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Your personal slug, custom auth (Public, Bearer, OAuth), and shared Memory Vault are ready.
+                  </p>
+                </div>
+              </div>
+              <Button asChild size="sm" className="h-7 text-xs bg-purple-600 hover:bg-purple-500 text-white font-medium shrink-0">
+                <NextLink href="/profile?tab=mcp">
+                  <span>Open Full MCP Hub</span>
+                  <ExternalLink className="h-3 w-3 ml-1" />
+                </NextLink>
+              </Button>
+            </div>
+
             {/* Shareable Endpoint Card */}
             <div className="rounded-2xl border border-indigo-500/30 bg-indigo-950/20 p-4 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">

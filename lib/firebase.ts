@@ -59,7 +59,6 @@ export function getFirebaseAuth(): Auth | undefined {
 }
 
 export function getFirebaseFirestore(): Firestore | undefined {
-  if (typeof window === "undefined") return undefined;
   if (!db) {
     try {
       const activeApp = app || (getApps().length > 0 ? getApp() : initializeApp(firebaseConfig));

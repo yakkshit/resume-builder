@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import vm from "node:vm";
+import vm from "vm";
 
 type CodeRunBody = {
   language: string;

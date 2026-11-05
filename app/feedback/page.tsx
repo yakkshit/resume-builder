@@ -1,354 +1,332 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod";
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
+import React, { useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
 import {
-  AlertCircle,
-  CheckCircle2,
-  Send,
-  HelpCircle,
-  Lightbulb,
-  FileText,
-  Mail,
+  Github,
+  Bug,
   Sparkles,
-  LayoutTemplate,
-} from "lucide-react"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { faqData, suggestionData } from "@/lib/faq"
+  HelpCircle,
+  MessageSquare,
+  ArrowUpRight,
+  CheckCircle2,
+  AlertCircle,
+  Send,
+  Terminal,
+} from "lucide-react";
+import { Navbar } from "@/components/landing/navbar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { GridPattern } from "@/components/ui/grid-pattern";
 
-// Define the form schema with Zod
-const formSchema = z.object({
-  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-  email: z.string().email({ message: "Please enter a valid email address" }),
-  type: z.enum(["feedback", "feature", "other"] as const),
-  service: z.enum(["cv", "coverletter", "ai"] as const),
-  message: z.string().min(10, { message: "Message must be at least 10 characters" }),
-})
+type IssueCategory = "bug" | "feature" | "mcp" | "general";
 
-type FormData = z.infer<typeof formSchema>
+const CATEGORIES: { id: IssueCategory; label: string; icon: typeof Bug; gitHubLabel: string }[] = [
+  { id: "bug", label: "Bug Report", icon: Bug, gitHubLabel: "bug" },
+  { id: "feature", label: "Feature Request", icon: Sparkles, gitHubLabel: "enhancement" },
+  { id: "mcp", label: "MCP & Tools", icon: Terminal, gitHubLabel: "mcp" },
+  { id: "general", label: "General Feedback", icon: MessageSquare, gitHubLabel: "feedback" },
+];
+
+const GITHUB_REPO_URL = "https://github.com/yakkshit/resume-builder";
 
 export default function FeedbackPage() {
-  const { toast } = useToast()
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitSuccess, setSubmitSuccess] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [category, setCategory] = useState<IssueCategory>("feature");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [environment, setEnvironment] = useState("");
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [directSubmitSuccess, setDirectSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      type: undefined,
-      service: undefined,
-      message: "",
-    },
-  })
+  // Generate GitHub issue URL
+  const generateGitHubIssueUrl = () => {
+    const selectedCat = CATEGORIES.find((c) => c.id === category);
+    const issueTitle = title.trim() || `[${selectedCat?.label || "Feedback"}]: New submission`;
+    
+    const bodyLines = [
+      `### Issue Type`,
+      `**${selectedCat?.label}**`,
+      ``,
+      `### Description`,
+      description.trim() || "No detailed description provided.",
+      ``,
+      `### Environment / Client Details`,
+      environment.trim() || "Web Browser / CareerAgent v2.0",
+      ``,
+      `### Contact / Author (Optional)`,
+      email.trim() || "Anonymous Community User",
+      ``,
+      `---`,
+      `*Submitted via CareerAgent Feedback Portal (` + new Date().toISOString() + `)*`,
+    ];
 
-  const onSubmit = async (data: FormData) => {
-    setIsSubmitting(true)
-    setSubmitError(null)
+    const bodyEncoded = encodeURIComponent(bodyLines.join("\n"));
+    const titleEncoded = encodeURIComponent(issueTitle);
+    const labelParam = selectedCat?.gitHubLabel ? `&labels=${encodeURIComponent(selectedCat.gitHubLabel)}` : "";
+
+    return `${GITHUB_REPO_URL}/issues/new?title=${titleEncoded}&body=${bodyEncoded}${labelParam}`;
+  };
+
+  const handleOpenGitHub = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() && !description.trim()) {
+      setSubmitError("Please provide a title or description before creating an issue.");
+      return;
+    }
+    setSubmitError(null);
+    const url = generateGitHubIssueUrl();
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const handleDirectSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!description.trim()) {
+      setSubmitError("Please write your message or feedback.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
 
     try {
       const response = await fetch("/api/feedback", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          message: description,
+          type: category,
+          service: category === "mcp" ? "ai" : "cv",
+          email: email || "anonymous@community.local",
+          name: email ? email.split("@")[0] : "Community User",
+        }),
+      });
 
       if (!response.ok) {
-        throw new Error("Failed to submit feedback")
+        throw new Error("Unable to submit directly. You can create an issue on GitHub directly.");
       }
 
-      setSubmitSuccess(true)
-      toast({
-        title: "Feedback submitted",
-        description: "Thank you for your feedback!",
-      })
-      reset()
-
-      // Reset success message after 5 seconds
-      setTimeout(() => {
-        setSubmitSuccess(false)
-      }, 5000)
-    } catch (error) {
-      console.error("Error submitting feedback:", error)
-      setSubmitError("There was an error submitting your feedback. Please try again.")
-      toast({
-        title: "Error",
-        description: "Failed to submit feedback. Please try again.",
-        variant: "destructive",
-      })
+      setDirectSubmitSuccess(true);
+      setTitle("");
+      setDescription("");
+      setEnvironment("");
+    } catch (err: any) {
+      setSubmitError(err.message || "Failed to submit. Please use the GitHub issue button instead.");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
-
-  // Function to render suggestion cards
-  const renderSuggestionIcon = (iconName: string) => {
-    switch (iconName) {
-      case "FileText":
-        return <FileText className="h-5 w-5 text-blue-500" />
-      case "Mail":
-        return <Mail className="h-5 w-5 text-green-500" />
-      case "Sparkles":
-        return <Sparkles className="h-5 w-5 text-purple-500" />
-      case "LayoutTemplate":
-        return <LayoutTemplate className="h-5 w-5 text-orange-500" />
-      default:
-        return <Lightbulb className="h-5 w-5 text-yellow-500" />
-    }
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 py-12 px-4">
-      <div className="container mx-auto max-w-6xl">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-center mb-12"
-        >
-          <h1 className="text-4xl font-bold text-primary mb-2">We Value Your Feedback</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Help us improve our resume and cover letter generator by sharing your thoughts, reporting bugs, or
-            suggesting new features.
-          </p>
-        </motion.div>
+    <div className="min-h-screen bg-black text-[#ededed] font-sans selection:bg-white/20 selection:text-white">
+      {/* ── NAVBAR ────────────────────────────────────────────── */}
+      <Navbar />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Feedback Form */}
-          <div className="lg:col-span-2">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <Card className="shadow-lg">
-                <CardHeader className="border-b bg-muted/30">
-                  <CardTitle className="text-2xl font-bold text-primary">Feedback Form</CardTitle>
-                  <CardDescription>
-                    Share your experience and help us make our tools better for everyone.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  {submitSuccess && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mb-6"
-                    >
-                      <Alert className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900">
-                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        <AlertTitle className="text-green-800 dark:text-green-400">Success!</AlertTitle>
-                        <AlertDescription className="text-green-700 dark:text-green-300">
-                          Your feedback has been submitted successfully. Thank you for helping us improve!
-                        </AlertDescription>
-                      </Alert>
-                    </motion.div>
-                  )}
+      <main className="relative overflow-hidden py-16 md:py-24 px-4 sm:px-6">
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(ellipse_60%_50%_at_50%_25%,#000_70%,transparent_100%)]">
+          <GridPattern
+            width={48}
+            height={48}
+            strokeDasharray="4 4"
+            className="opacity-10 stroke-white/[0.08]"
+          />
+        </div>
 
-                  {submitError && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="mb-6"
-                    >
-                      <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>{submitError}</AlertDescription>
-                      </Alert>
-                    </motion.div>
-                  )}
-
-                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="name">Name</Label>
-                          <Input id="name" {...register("name")} className="mt-1" />
-                          {errors.name && <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>}
-                        </div>
-
-                        <div>
-                          <Label htmlFor="email">Email</Label>
-                          <Input id="email" type="email" {...register("email")} className="mt-1" />
-                          {errors.email && <p className="text-sm text-red-500 mt-1">{errors.email.message}</p>}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <Label>Feedback Type</Label>
-                          <RadioGroup
-                            className="mt-2"
-                            defaultValue={watch("type")}
-                            onValueChange={(value) => setValue("type", value as "feedback" | "feature" | "other")}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="feedback" id="feedback" />
-                              <Label htmlFor="feedback" className="cursor-pointer">
-                                Feedback
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="feature" id="feature" />
-                              <Label htmlFor="feature" className="cursor-pointer">
-                                Feature Request
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="other" id="other" />
-                              <Label htmlFor="other" className="cursor-pointer">
-                                Other
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                          {errors.type && <p className="text-sm text-red-500 mt-1">{errors.type.message}</p>}
-                        </div>
-
-                        <div>
-                          <Label>Service</Label>
-                          <RadioGroup
-                            className="mt-2"
-                            defaultValue={watch("service")}
-                            onValueChange={(value) => setValue("service", value as "cv" | "coverletter" | "ai")}
-                          >
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="cv" id="cv" />
-                              <Label htmlFor="cv" className="cursor-pointer">
-                                Resume/CV
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="coverletter" id="coverletter" />
-                              <Label htmlFor="coverletter" className="cursor-pointer">
-                                Cover Letter
-                              </Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <RadioGroupItem value="ai" id="ai" />
-                              <Label htmlFor="ai" className="cursor-pointer">
-                                AI Assistant
-                              </Label>
-                            </div>
-                          </RadioGroup>
-                          {errors.service && <p className="text-sm text-red-500 mt-1">{errors.service.message}</p>}
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="message">Message</Label>
-                        <Textarea
-                          id="message"
-                          {...register("message")}
-                          className="mt-1"
-                          rows={5}
-                          placeholder="Please describe your feedback, bug report, or feature request in detail..."
-                        />
-                        {errors.message && <p className="text-sm text-red-500 mt-1">{errors.message.message}</p>}
-                      </div>
-                    </div>
-
-                    <Button type="submit" className="w-full" disabled={isSubmitting}>
-                      {isSubmitting ? (
-                        <span className="flex items-center">
-                          <span className="animate-spin mr-2 h-4 w-4 border-2 border-current border-t-transparent rounded-full"></span>
-                          Submitting...
-                        </span>
-                      ) : (
-                        <span className="flex items-center">
-                          <Send className="mr-2 h-4 w-4" />
-                          Submit Feedback
-                        </span>
-                      )}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Suggestions Section */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="mt-8"
-            >
-              <h2 className="text-2xl font-bold text-primary mb-4">Helpful Tips</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {suggestionData.map((suggestion, index) => (
-                  <Card key={index} className="overflow-hidden transition-all hover:shadow-md">
-                    <CardHeader className="pb-2 flex flex-row items-center gap-2">
-                      {renderSuggestionIcon(suggestion.icon)}
-                      <CardTitle className="text-lg">{suggestion.title}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground">{suggestion.description}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </motion.div>
+        <div className="relative z-10 max-w-3xl mx-auto">
+          {/* Header */}
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.02] px-3.5 py-1 text-xs text-zinc-400 backdrop-blur-md mb-4">
+              <span className="size-1.5 rounded-full bg-[#aff33e]" />
+              <span className="text-zinc-300 font-mono text-[11px]">
+                Open Source &bull; Public Issue Tracker
+              </span>
+            </div>
+            <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white">
+              Feedback &amp; Issue Reporter
+            </h1>
+            <p className="mt-3 text-xs sm:text-sm text-zinc-400 max-w-lg mx-auto leading-relaxed">
+              Found a bug, want a new MCP tool, or have ideas to improve CareerAgent? Create an issue directly in our open-source GitHub repository or send direct feedback.
+            </p>
           </div>
 
-          {/* Right Column - FAQ */}
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="lg:col-span-1"
-          >
-            <Card className="shadow-lg h-full">
-              <CardHeader className="border-b bg-muted/30">
-                <CardTitle className="flex items-center gap-2">
-                  <HelpCircle className="h-5 w-5 text-primary" />
-                  Frequently Asked Questions
-                </CardTitle>
-                <CardDescription>Find answers to common questions about our tools</CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6 pb-2">
-                <Accordion type="single" collapsible className="w-full">
-                  {faqData.map((faq, index) => (
-                    <AccordionItem key={index} value={`item-${index}`}>
-                      <AccordionTrigger className="text-left font-medium">{faq.question}</AccordionTrigger>
-                      <AccordionContent className="text-muted-foreground">{faq.answer}</AccordionContent>
-                    </AccordionItem>
-                  ))}
-                </Accordion>
-              </CardContent>
-              <CardFooter className="border-t bg-muted/10 flex justify-center py-4">
-                <p className="text-sm text-muted-foreground text-center">
-                  Can&apos;t find what you&apos;re looking for? <br />
-                  Submit your question using the feedback form.
-                </p>
-              </CardFooter>
-            </Card>
-          </motion.div>
+          {/* Form Card */}
+          <div className="rounded-2xl border border-white/10 bg-zinc-950/80 p-6 sm:p-8 backdrop-blur-xl shadow-2xl">
+            {directSubmitSuccess && (
+              <div className="mb-6 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs flex items-center gap-3">
+                <CheckCircle2 className="size-5 shrink-0 text-emerald-400" />
+                <div>
+                  <p className="font-semibold">Feedback submitted successfully!</p>
+                  <p className="text-[11px] text-emerald-400/80">Thank you for helping us improve CareerAgent and CedzLabs tools.</p>
+                </div>
+              </div>
+            )}
+
+            {submitError && (
+              <div className="mb-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-red-300 text-xs flex items-center gap-3">
+                <AlertCircle className="size-5 shrink-0 text-red-400" />
+                <p>{submitError}</p>
+              </div>
+            )}
+
+            <form className="space-y-6">
+              {/* Category Selector */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-2 font-mono uppercase tracking-wider">
+                  Issue Category
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {CATEGORIES.map((c) => {
+                    const Icon = c.icon;
+                    const isSelected = category === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setCategory(c.id)}
+                        className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-medium transition-all ${
+                          isSelected
+                            ? "border-[#aff33e] bg-[#aff33e]/10 text-white"
+                            : "border-white/10 bg-zinc-900/40 text-zinc-400 hover:text-white hover:border-white/20"
+                        }`}
+                      >
+                        <Icon className={`size-3.5 ${isSelected ? "text-[#aff33e]" : "text-zinc-500"}`} />
+                        <span>{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-2">
+                  Title / Short Summary
+                </label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g., [Feature] Support PDF LaTeX compile preview in live editor"
+                  className="bg-zinc-900/60 border-white/10 text-white placeholder:text-zinc-600 focus:border-white/30 text-xs h-10 rounded-xl"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-300 mb-2">
+                  Description &amp; Reproduction Details
+                </label>
+                <Textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={5}
+                  placeholder="Describe what you observed, what you expected, or the feature you'd love to see..."
+                  className="bg-zinc-900/60 border-white/10 text-white placeholder:text-zinc-600 focus:border-white/30 text-xs rounded-xl"
+                />
+              </div>
+
+              {/* Environment / Client */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-2">
+                    Environment (Optional)
+                  </label>
+                  <Input
+                    value={environment}
+                    onChange={(e) => setEnvironment(e.target.value)}
+                    placeholder="e.g. macOS Safari, Cursor MCP, Claude Desktop"
+                    className="bg-zinc-900/60 border-white/10 text-white placeholder:text-zinc-600 focus:border-white/30 text-xs h-10 rounded-xl"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-300 mb-2">
+                    Your Email (Optional)
+                  </label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. dev@example.com"
+                    className="bg-zinc-900/60 border-white/10 text-white placeholder:text-zinc-600 focus:border-white/30 text-xs h-10 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              {/* Dual Submission CTAs */}
+              <div className="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center gap-3">
+                <Button
+                  type="button"
+                  onClick={handleOpenGitHub}
+                  className="w-full sm:flex-1 h-10 rounded-full bg-white text-black hover:bg-zinc-200 text-xs font-semibold shadow-none flex items-center justify-center gap-2"
+                >
+                  <Github className="size-4" />
+                  <span>Create Issue on GitHub</span>
+                  <ArrowUpRight className="size-3.5" />
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={handleDirectSubmit}
+                  disabled={isSubmitting}
+                  variant="outline"
+                  className="w-full sm:w-auto h-10 rounded-full border-white/15 bg-transparent text-zinc-300 hover:text-white text-xs font-medium px-5 flex items-center justify-center gap-2"
+                >
+                  <Send className="size-3.5" />
+                  <span>{isSubmitting ? "Sending..." : "Submit Anonymously"}</span>
+                </Button>
+              </div>
+            </form>
+          </div>
+
+          {/* Direct Repository Link Bar */}
+          <div className="mt-8 text-center text-xs text-zinc-500 flex flex-wrap items-center justify-center gap-4">
+            <a
+              href={`${GITHUB_REPO_URL}/issues`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors underline flex items-center gap-1 font-mono text-[11px]"
+            >
+              <span>View all open GitHub issues</span>
+              <ArrowUpRight className="size-3" />
+            </a>
+            <span>&bull;</span>
+            <a
+              href="https://github.com/yakkshit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors underline flex items-center gap-1 font-mono text-[11px]"
+            >
+              <span>Maintainer GitHub (yakkshit)</span>
+              <ArrowUpRight className="size-3" />
+            </a>
+          </div>
         </div>
-      </div>
+      </main>
+
+      {/* ── FOOTER ────────────────────────────────────────────── */}
+      <footer className="border-t border-white/10 bg-black py-12 text-xs text-zinc-500">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-[#aff33e]" />
+            <span className="text-white font-medium">CareerAgent</span>
+            <span className="font-mono text-[10px]">Feedback &amp; Issues</span>
+          </div>
+          <div className="flex items-center gap-6 font-mono text-[11px] text-zinc-400">
+            <Link href="/" className="hover:text-white">Home</Link>
+            <Link href="/price" className="hover:text-white">Pricing</Link>
+            <Link href="/labs" className="hover:text-white">Labs</Link>
+            <Link href="/api/doc" className="hover:text-white">API Docs</Link>
+          </div>
+          <div className="font-mono text-[11px] text-zinc-600">
+            &copy; {new Date().getFullYear()} CedzLabs. All rights reserved.
+          </div>
+        </div>
+      </footer>
     </div>
-  )
+  );
 }

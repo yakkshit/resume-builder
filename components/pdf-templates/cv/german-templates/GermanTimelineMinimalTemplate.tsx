@@ -6,10 +6,10 @@ import { getResumeSectionTitles } from "@/lib/resume-section-titles"
 // German Minimal Timeline Lebenslauf (Maximilian Muster style)
 const styles = StyleSheet.create({
   page: {
-    paddingTop: 32,
-    paddingBottom: 32,
-    paddingLeft: 36,
-    paddingRight: 36,
+    paddingTop: 24,
+    paddingBottom: 24,
+    paddingLeft: 30,
+    paddingRight: 30,
     fontFamily: "Helvetica",
     fontSize: 8.5,
     color: "#374151",
@@ -21,8 +21,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 20,
-    paddingBottom: 16,
+    marginBottom: 14,
+    paddingBottom: 12,
     borderBottomWidth: 0.5,
     borderBottomColor: "#e5e7eb",
   },
@@ -78,12 +78,11 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     color: "#1f2937",
     marginBottom: 3,
-    lineHeight: 1.15,
   },
   headerJobTitle: {
     fontSize: 9.5,
     color: "#4b5563",
-    lineHeight: 1.25,
+    marginTop: 2,
   },
   headerRight: {
     alignItems: "flex-end",
@@ -106,27 +105,27 @@ const styles = StyleSheet.create({
   },
   // Timeline Section
   sectionBlock: {
-    marginBottom: 16,
+    marginBottom: 10,
   },
   sectionTitleRow: {
     flexDirection: "row",
-    marginBottom: 10,
+    marginBottom: 6,
   },
   sectionHeaderLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Helvetica-Bold",
     color: "#374151",
-    width: "30%",
+    width: "28%",
   },
   // Timeline Entry
   timelineItem: {
     flexDirection: "row",
-    marginBottom: 10,
+    marginBottom: 8,
     position: "relative",
   },
   timelineLeft: {
-    width: "29%",
-    paddingRight: 12,
+    width: "28%",
+    paddingRight: 10,
   },
   leftCompany: {
     fontSize: 8,
@@ -141,29 +140,30 @@ const styles = StyleSheet.create({
   },
   // Center Timeline Track & Dot
   timelineCenter: {
-    width: "4%",
+    width: 14,
     alignItems: "center",
     position: "relative",
+    minHeight: 24,
   },
   timelineLine: {
     position: "absolute",
-    top: 0,
-    bottom: -10,
-    left: "50%",
-    width: 1,
+    top: 6,
+    left: 6,
+    width: 1.2,
+    height: "100%",
     backgroundColor: "#d1d5db",
   },
   timelineDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 5.5,
+    height: 5.5,
+    borderRadius: 2.75,
     backgroundColor: "#6b7280",
-    marginTop: 3,
-    zIndex: 1,
+    marginTop: 2,
+    zIndex: 2,
   },
   timelineRight: {
-    width: "67%",
-    paddingLeft: 10,
+    flex: 1,
+    paddingLeft: 8,
   },
   itemTitle: {
     fontSize: 8.5,
@@ -196,8 +196,8 @@ const styles = StyleSheet.create({
   skillsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    width: "67%",
-    paddingLeft: 10,
+    flex: 1,
+    paddingLeft: 8,
   },
   skillCard: {
     width: "31%",
@@ -285,9 +285,14 @@ export function GermanTimelineMinimalTemplate({ resumeData, language }: { resume
         {/* Summary (if present) */}
         {basicInfo.summary && (
           <View style={styles.sectionBlock}>
-            <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionHeaderLabel}>{titles.summary}</Text>
-              <View style={{ width: "70%", paddingLeft: 10 }}>
+            <View style={styles.timelineItem}>
+              <View style={styles.timelineLeft}>
+                <Text style={styles.sectionHeaderLabel}>{titles.summary}</Text>
+              </View>
+              <View style={styles.timelineCenter}>
+                <View style={styles.timelineDot} />
+              </View>
+              <View style={styles.timelineRight}>
                 <Text style={styles.itemDescription}>{basicInfo.summary}</Text>
               </View>
             </View>

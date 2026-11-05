@@ -171,6 +171,7 @@ export function ResumeViewer({
   isTranslating = false,
   onPopOutToSide,
   onDockToChat,
+  isInSideStage = false,
 }: {
   data?: Record<string, any>;
   /** When false, show only this message’s resume JSON; do not read/write shared storage or follow global events. */
@@ -180,6 +181,7 @@ export function ResumeViewer({
   isTranslating?: boolean;
   onPopOutToSide?: () => void;
   onDockToChat?: () => void;
+  isInSideStage?: boolean;
 }) {
   const toasterRef = useRef<ToasterRef>(null);
 
@@ -433,9 +435,12 @@ export function ResumeViewer({
   }, [template, syncWithGlobalResume]);
 
   return (
-    <div className="w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all">
+    <div className={cn(
+      "w-full rounded-2xl border border-white/20 dark:border-white/10 bg-white/60 dark:bg-neutral-900/60 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all",
+      isInSideStage ? "h-full flex-1 min-h-0" : ""
+    )}>
       <Toaster ref={toasterRef} />
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className={cn("flex flex-col", isInSideStage ? "h-full flex-1 min-h-0" : "")}>
       <div className="flex items-center justify-between px-3 sm:px-4 py-2 border-b border-border/50 bg-white/80 dark:bg-neutral-950/80 gap-2 sm:gap-3 min-h-[48px] overflow-hidden">
         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 min-w-0">
           <ArtifactTrafficLights variant="light" panelMode={panelMode} setPanelMode={setPanelMode} />
@@ -680,16 +685,18 @@ export function ResumeViewer({
       </div>
 
       {panelMode !== "hidden" ? (
-        <div className="p-3 bg-white/40 dark:bg-black/20">
+        <div className={cn("p-2 sm:p-3 bg-white/40 dark:bg-black/20", isInSideStage ? "h-full flex-1 min-h-0 flex flex-col p-1" : "")}>
           <TabsContent
             value="preview"
-            className="m-0 mt-0 data-[state=inactive]:hidden"
+            className={cn("m-0 mt-0 data-[state=inactive]:hidden", isInSideStage ? "h-full flex-1 min-h-0 flex flex-col" : "")}
             forceMount
           >
-            <div className="rounded-xl overflow-hidden border border-border/40 bg-white/80 dark:bg-neutral-950/80 shadow-inner">
+            <div className={cn("rounded-xl overflow-hidden border border-border/40 bg-white/80 dark:bg-neutral-950/80 shadow-inner", isInSideStage ? "h-full flex-1 min-h-0 flex flex-col border-0 rounded-lg shadow-none" : "")}>
               <div
                 className={
-                  panelMode === "expanded"
+                  isInSideStage
+                    ? "h-full flex-1 min-h-0 flex flex-col overflow-hidden"
+                    : panelMode === "expanded"
                     ? "max-h-[500px] sm:max-h-[600px] overflow-y-auto"
                     : "max-h-[160px] sm:max-h-[200px] overflow-y-auto"
                 }
@@ -708,11 +715,13 @@ export function ResumeViewer({
             </div>
           </TabsContent>
 
-          <TabsContent value="editor" className="m-0 mt-0">
-            <div className="rounded-xl overflow-hidden border border-border/40 bg-white dark:bg-neutral-950 shadow-inner">
+          <TabsContent value="editor" className={cn("m-0 mt-0", isInSideStage ? "h-full flex-1 min-h-0 flex flex-col" : "")}>
+            <div className={cn("rounded-xl overflow-hidden border border-border/40 bg-white dark:bg-neutral-950 shadow-inner", isInSideStage ? "h-full flex-1 min-h-0 flex flex-col" : "")}>
               <div
                 className={
-                  panelMode === "expanded"
+                  isInSideStage
+                    ? "h-full flex-1 min-h-0 overflow-y-auto p-2 sm:p-4"
+                    : panelMode === "expanded"
                     ? "max-h-[500px] sm:max-h-[600px] overflow-y-auto p-2 sm:p-4"
                     : "max-h-[160px] sm:max-h-[200px] overflow-y-auto p-2 sm:p-4"
                 }

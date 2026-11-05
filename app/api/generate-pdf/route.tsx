@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { spawn } from "node:child_process"
-import path from "node:path"
+import { spawn } from "child_process"
+import path from "path"
 import React from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, Template } from "@/lib/types"

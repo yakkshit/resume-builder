@@ -56,39 +56,46 @@ const styles = StyleSheet.create({
   },
   headerInfo: {
     flex: 1,
-    justifyContent: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerLeftText: {
+    flex: 1,
+    paddingRight: 14,
   },
   candidateName: {
-    fontSize: 22,
+    fontSize: 17,
     fontFamily: "Helvetica-Bold",
     color: "#FFFFFF",
-    letterSpacing: 1.8,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
     marginBottom: 4,
-    lineHeight: 1.1,
   },
   candidateTitle: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontFamily: "Helvetica-Oblique",
     color: "#E2F0E7",
-    marginBottom: 6,
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
+    marginTop: 2,
   },
   contactRows: {
     flexDirection: "column",
-    gap: 3,
+    alignItems: "flex-end",
+    flexShrink: 0,
   },
   contactItem: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 2.5,
   },
   contactIcon: {
-    width: 10,
-    height: 10,
-    marginRight: 6,
+    width: 9,
+    height: 9,
+    marginRight: 5,
   },
   contactText: {
-    fontSize: 7.8,
+    fontSize: 7.5,
     color: "#FFFFFF",
     letterSpacing: 0.2,
   },
@@ -229,19 +236,25 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Oblique",
     marginBottom: 4,
   },
+  entryDescription: {
+    fontSize: 7.8,
+    color: "#2D3748",
+    marginBottom: 5,
+  },
   bulletRow: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginTop: 2.5,
-    marginBottom: 1.5,
+    marginTop: 2,
+    marginBottom: 3,
   },
   bulletDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
+    width: 3.5,
+    height: 3.5,
+    borderRadius: 1.75,
     backgroundColor: "#4A5568",
-    marginTop: 4,
+    marginTop: 3.5,
     marginRight: 6,
+    flexShrink: 0,
   },
   bulletText: {
     flex: 1,
@@ -315,8 +328,10 @@ export function GermanForestSlateTemplate({
 
           {/* Name & Contact Details */}
           <View style={styles.headerInfo}>
-            <Text style={styles.candidateName}>{basicInfo.name || "SIMON HEINZ"}</Text>
-            {basicInfo.title ? <Text style={styles.candidateTitle}>{basicInfo.title}</Text> : null}
+            <View style={styles.headerLeftText}>
+              <Text style={styles.candidateName}>{basicInfo.name || "SIMON HEINZ"}</Text>
+              {basicInfo.title ? <Text style={styles.candidateTitle}>{basicInfo.title}</Text> : null}
+            </View>
 
             <View style={styles.contactRows}>
               {basicInfo.email ? (
@@ -432,7 +447,9 @@ export function GermanForestSlateTemplate({
                       <Text style={styles.entrySubheader}>{exp.company}</Text>
                     ) : null}
                     {exp.description ? (
-                      <Text style={styles.bulletText}>{exp.description}</Text>
+                      <View style={{ marginBottom: 4 }}>
+                        <Text style={styles.entryDescription}>{exp.description}</Text>
+                      </View>
                     ) : null}
                     {exp.highlights &&
                       exp.highlights.map((h, hIdx) => (
@@ -485,7 +502,7 @@ export function GermanForestSlateTemplate({
                       </Text>
                     </View>
                     {proj.description ? (
-                      <Text style={styles.bulletText}>{proj.description}</Text>
+                      <Text style={styles.entryDescription}>{proj.description}</Text>
                     ) : null}
                   </View>
                 ))}

@@ -177,8 +177,8 @@ export default function CoverLetterPDFViewer({ coverLetterData, template }: PDFV
             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
           </div>
         ) : isClient ? (
-          <div className="w-full h-full">
-            <ReactPDFViewer style={{ width: "100%", height: "100%", border: "none" }}>
+          <div className="w-full h-full min-h-[400px] flex-1 flex flex-col">
+            <ReactPDFViewer style={{ width: "100%", height: "100%", minHeight: "100%", border: "none", flex: 1 }}>
               <PDFTemplate coverLetterData={coverLetterData} />
             </ReactPDFViewer>
           </div>

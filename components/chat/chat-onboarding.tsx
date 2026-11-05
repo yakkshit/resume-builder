@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Clapperboard, Lock, PanelLeft, Sparkles, User, Video, X, Zap } from "lucide-react";
+import { BookOpen, Clapperboard, Lock, PanelLeft, Server, Sparkles, User, Video, X, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage";
 import { toVideoEmbedSrc } from "@/lib/chat-onboarding-video";
@@ -56,9 +56,9 @@ const DEFAULT_STEPS: ChatOnboardingStep[] = [
     openSidebar: false,
   },
   {
-    title: "Job Scraper & MCP Tools 🛠️",
-    body: "Use the MCP & Integrations panel to search real-time job openings, scrape job requirements, and connect external MCP servers with custom tools.",
-    icon: Clapperboard,
+    title: "Dynamic User MCP & REST Server (v2.0) 🛠️",
+    body: "Each user gets their own dedicated MCP & REST endpoint (/api/mcp/[slug]) with 100 requests/day to 38+ career tools! Connect Cursor, Claude Desktop, or custom scripts and share your live Memory Vault.",
+    icon: Server,
     tour: "mcp-tools",
     openSidebar: true,
   },
@@ -132,6 +132,12 @@ export function ChatOnboarding({
 
   useEffect(() => {
     if (!autoShowOnce || typeof window === "undefined") return;
+    const isNewSignup = tryLocalStorageGet("career_new_signup") === "true";
+    if (isNewSignup) {
+      tryLocalStorageSet("career_new_signup", "false");
+      const t = window.setTimeout(() => onOpenChange(true), 600);
+      return () => window.clearTimeout(t);
+    }
     if (tryLocalStorageGet(ONBOARDING_DONE_LS) === "1") return;
     const t = window.setTimeout(() => onOpenChange(true), 500);
     return () => window.clearTimeout(t);

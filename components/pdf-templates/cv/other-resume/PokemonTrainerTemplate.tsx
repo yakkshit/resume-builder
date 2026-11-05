@@ -132,18 +132,18 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: 2,
-    marginBottom: 8,
-    gap: 8,
+    marginBottom: 6,
   },
   headerStar: {
-    width: 14,
-    height: 14,
+    width: 12,
+    height: 12,
+    marginHorizontal: 6,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontFamily: "Helvetica-Bold",
     color: "#EAB308",
-    letterSpacing: 2.5,
+    letterSpacing: 2,
     textTransform: "uppercase",
   },
 
@@ -151,7 +151,6 @@ const styles = StyleSheet.create({
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
     marginBottom: 8,
     paddingBottom: 6,
     borderBottomWidth: 1.5,
@@ -167,6 +166,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#DBEAFE",
+    marginRight: 10,
+    flexShrink: 0,
   },
   avatarImg: {
     width: "100%",
@@ -186,6 +187,7 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     color: "#0F172A",
     letterSpacing: 0.5,
+    marginBottom: 2,
   },
   candidateTitle: {
     fontSize: 8.2,
@@ -193,18 +195,20 @@ const styles = StyleSheet.create({
     color: "#1E3A8A",
     textTransform: "uppercase",
     letterSpacing: 0.5,
-    marginTop: 1,
+    marginTop: 2,
+    marginBottom: 4,
   },
   contactRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
-    marginTop: 3,
+    marginTop: 1,
   },
   contactItem: {
     fontSize: 7,
-    fontFamily: "Helvetica",
     color: "#475569",
+    fontFamily: "Helvetica-Bold",
+    marginRight: 8,
+    marginBottom: 2,
   },
 
   // Section Header Bars

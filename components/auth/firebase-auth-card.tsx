@@ -135,6 +135,12 @@ export function FirebaseAuthCard({ initialMode = "sign-in" }: FirebaseAuthCardPr
           title: "Account created!",
           description: "Welcome to your AI career workspace.",
         });
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem("ai-chat-onboarding-seen-v2");
+            localStorage.setItem("career_new_signup", "true");
+          } catch {}
+        }
         setShowSignupLoading(true);
       }
     } catch (err: unknown) {
@@ -171,6 +177,12 @@ export function FirebaseAuthCard({ initialMode = "sign-in" }: FirebaseAuthCardPr
         description: `Signed in via ${provider === "google" ? "Google" : "GitHub"}.`,
       });
       if (mode === "sign-up") {
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.removeItem("ai-chat-onboarding-seen-v2");
+            localStorage.setItem("career_new_signup", "true");
+          } catch {}
+        }
         setShowSignupLoading(true);
       } else {
         router.replace(redirectTarget);

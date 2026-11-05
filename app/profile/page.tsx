@@ -56,8 +56,10 @@ import {
   AlertCircle,
   HelpCircle,
   CheckCheck,
-  Network
+  Network,
+  Coins,
 } from "lucide-react";
+import { LoadTokensDialog } from "@/components/tokens/load-tokens-dialog";
 
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -90,6 +92,7 @@ import { AVAILABLE_MODELS, useChatSettings } from "@/components/chat/chat-store"
 import { TRANSLATION_LANGUAGES } from "@/lib/translation";
 import { parseAndIngestFileToMemoryVault } from "@/lib/memory-vault";
 import { GraphRagViewer } from "@/components/chat/components/graph-rag-viewer";
+import { DynamicMcpSettings } from "@/components/profile/dynamic-mcp-settings";
 import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
 import { math } from "@streamdown/math";
@@ -143,6 +146,7 @@ export default function ProfileDashboardPage() {
   // Tab & search state
   const [activeTab, setActiveTab] = useState<string>("profile");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [loadTokensOpen, setLoadTokensOpen] = useState<boolean>(false);
 
   // Profile data
   const [profile, setProfile] = useState<UserProfile>({ ...EMPTY_PROFILE });
@@ -519,10 +523,19 @@ export default function ProfileDashboardPage() {
     }
   };
 
+  // Update specific API Key and reset verification status immediately
+  const handleKeyChange = (providerKey: keyof ProviderKeys, value: string) => {
+    setKeys((k) => ({ ...k, [providerKey]: value }));
+    const clean = providerKey === "ollamaEndpoint" ? "ollama" : providerKey;
+    setKeyStatus((s) => ({ ...s, [providerKey]: "idle", [clean]: "idle" }));
+    markChanged();
+  };
+
   // Clear specific API Key
   const handleClearKey = (providerKey: keyof ProviderKeys) => {
     setKeys((k) => ({ ...k, [providerKey]: "" }));
-    setKeyStatus((s) => ({ ...s, [providerKey]: "idle" }));
+    const clean = providerKey === "ollamaEndpoint" ? "ollama" : providerKey;
+    setKeyStatus((s) => ({ ...s, [providerKey]: "idle", [clean]: "idle" }));
     markChanged();
     toast({ title: "Key Removed", description: `Cleared ${providerKey} key from active session.` });
   };
@@ -748,6 +761,7 @@ export default function ProfileDashboardPage() {
   const menuCategories = [
     { id: "profile", label: "Profile", icon: UserRound, badge: "Account" },
     { id: "memory", label: "Memory Vault", icon: Sparkles, badge: "Career Vault" },
+    { id: "mcp", label: "Dynamic MCP & REST", icon: Server, badge: "100/day" },
     { id: "keys", label: "API Keys & Providers", icon: KeyRound, badge: "BYOK" },
     { id: "appearance", label: "Appearance", icon: Palette },
     { id: "models", label: "AI Models", icon: Cpu },
@@ -884,6 +898,17 @@ export default function ProfileDashboardPage() {
                 ) : (
                   userInitials
                 )}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setLoadTokensOpen(true)}
+                  className="h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-primary/20 border border-amber-500/35 text-amber-200 hover:text-white rounded-full shadow-xs"
+                >
+                  <Coins className="size-3 text-amber-400" />
+                  <span>Load Tokens</span>
+                  <span className="text-[9px] font-mono uppercase bg-amber-500/25 text-amber-300 px-1 py-0.2 rounded font-bold">Coming Soon...</span>
+                </Button>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-white truncate">{userDisplayName}</p>
@@ -939,21 +964,34 @@ export default function ProfileDashboardPage() {
                     Standard Local Storage
                   </span>
                 )}
+
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setLoadTokensOpen(true)}
+                  className="h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-primary/20 border border-amber-500/35 text-amber-200 hover:text-white rounded-full shadow-xs"
+                >
+                  <Coins className="size-3 text-amber-400" />
+                  <span>Load Tokens</span>
+                  <span className="text-[9px] font-mono uppercase bg-amber-500/25 text-amber-300 px-1 py-0.2 rounded font-bold">Coming Soon...</span>
+                </Button>
               </div>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white capitalize">
               {activeTab === "profile" && "Profile"}
               {activeTab === "memory" && "Memory Vault"}
+              {activeTab === "mcp" && "Dynamic MCP & REST Server"}
               {activeTab === "keys" && "API Keys & Custom Providers"}
               {activeTab === "appearance" && "Appearance & Theme"}
               {activeTab === "models" && "Model Settings & Context"}
               {activeTab === "usage" && "Plan & Usage"}
-              {!["profile", "memory", "keys", "appearance", "models", "usage"].includes(activeTab) && "Settings"}
+              {!["profile", "memory", "mcp", "keys", "appearance", "models", "usage"].includes(activeTab) && "Settings"}
             </h1>
             <p className="text-xs sm:text-sm text-neutral-400 mt-1">
               {activeTab === "profile" && "Your personal identity, links, target roles and contact information."}
               {activeTab === "memory" && "Master career knowledge base in Markdown for grounding AI resumes and chat."}
+              {activeTab === "mcp" && "Your custom personal MCP server & REST endpoint with multi-auth, shared Memory Vault, and 100 requests/day quota."}
               {activeTab === "keys" && "Manage your personal AI provider API keys and zero-knowledge encryption."}
               {activeTab === "appearance" && "Customize your workspace theme, accents, and visual display."}
               {activeTab === "models" && "Select default LLMs, reasoning parameters, and context limits."}
@@ -1532,6 +1570,14 @@ export default function ProfileDashboardPage() {
               </div>
             )}
 
+            {/* ── TAB: DYNAMIC MCP & REST SERVER ───────────────────────────────── */}
+            {activeTab === "mcp" && (
+              <DynamicMcpSettings
+                userId={user?.id || profile.name || "default-user"}
+                userName={profile.name || user?.name || "Career Professional"}
+              />
+            )}
+
             {/* ── TAB 3: API KEYS & CUSTOM PROVIDERS (WORKSPACE CONTROL CENTER) ────── */}
             {activeTab === "keys" && (
               <div className="space-y-6">
@@ -1761,10 +1807,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.google ? "text" : "password"}
                               value={keys.google || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, google: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("google", e.target.value)}
                               placeholder="AIzaSy..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -1802,6 +1845,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.google === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.google === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -1854,10 +1901,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.openai ? "text" : "password"}
                               value={keys.openai || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, openai: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("openai", e.target.value)}
                               placeholder="sk-proj-..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -1895,6 +1939,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.openai === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.openai === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -1947,10 +1995,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.anthropic ? "text" : "password"}
                               value={keys.anthropic || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, anthropic: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("anthropic", e.target.value)}
                               placeholder="sk-ant-..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -1988,6 +2033,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.anthropic === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.anthropic === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -2040,10 +2089,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.deepseek ? "text" : "password"}
                               value={keys.deepseek || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, deepseek: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("deepseek", e.target.value)}
                               placeholder="sk-..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -2081,6 +2127,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.deepseek === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.deepseek === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -2133,10 +2183,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.groq ? "text" : "password"}
                               value={keys.groq || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, groq: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("groq", e.target.value)}
                               placeholder="gsk_..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -2174,6 +2221,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.groq === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.groq === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -2226,10 +2277,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.mistral ? "text" : "password"}
                               value={keys.mistral || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, mistral: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("mistral", e.target.value)}
                               placeholder="Enter Mistral API key..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -2267,6 +2315,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.mistral === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.mistral === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -2319,10 +2371,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.openrouter ? "text" : "password"}
                               value={keys.openrouter || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, openrouter: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("openrouter", e.target.value)}
                               placeholder="sk-or-v1-..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -2360,6 +2409,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.openrouter === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.openrouter === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -2412,10 +2465,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.huggingface ? "text" : "password"}
                               value={keys.huggingface || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, huggingface: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("huggingface", e.target.value)}
                               placeholder="hf_..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -2453,6 +2503,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.huggingface === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.huggingface === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -2505,10 +2559,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.xai ? "text" : "password"}
                               value={keys.xai || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, xai: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("xai", e.target.value)}
                               placeholder="xai-..."
                               className="h-10 pr-16 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -2546,6 +2597,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.xai === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.xai === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Connection"
@@ -2597,10 +2652,7 @@ export default function ProfileDashboardPage() {
                           <div className="relative flex-1">
                             <Input
                               value={keys.ollamaEndpoint || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, ollamaEndpoint: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("ollamaEndpoint", e.target.value)}
                               placeholder="http://localhost:11434"
                               className="h-10 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500"
                             />
@@ -2628,6 +2680,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.ollama === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Ping OK
+                              </span>
+                            ) : keyStatus.ollama === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Ping Endpoint"
@@ -2680,10 +2736,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.tavily ? "text" : "password"}
                               value={keys.tavily || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, tavily: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("tavily", e.target.value)}
                               placeholder="tvly-..."
                               className="h-10 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500 pr-20"
                             />
@@ -2721,6 +2774,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.tavily === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.tavily === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Key"
@@ -2773,10 +2830,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.firecrawl ? "text" : "password"}
                               value={keys.firecrawl || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, firecrawl: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("firecrawl", e.target.value)}
                               placeholder="fc-..."
                               className="h-10 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500 pr-20"
                             />
@@ -2814,6 +2868,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.firecrawl === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.firecrawl === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Key"
@@ -2866,10 +2924,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.kernel ? "text" : "password"}
                               value={keys.kernel || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, kernel: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("kernel", e.target.value)}
                               placeholder="knl_..."
                               className="h-10 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500 pr-20"
                             />
@@ -2907,6 +2962,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.kernel === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.kernel === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Key"
@@ -2959,10 +3018,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.browserbase ? "text" : "password"}
                               value={keys.browserbase || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, browserbase: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("browserbase", e.target.value)}
                               placeholder="bb_..."
                               className="h-10 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500 pr-20"
                             />
@@ -3000,6 +3056,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.browserbase === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.browserbase === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Key"
@@ -3052,10 +3112,7 @@ export default function ProfileDashboardPage() {
                             <Input
                               type={showKey.steel ? "text" : "password"}
                               value={keys.steel || ""}
-                              onChange={(e) => {
-                                setKeys((k) => ({ ...k, steel: e.target.value }));
-                                markChanged();
-                              }}
+                              onChange={(e) => handleKeyChange("steel", e.target.value)}
                               placeholder="steel_..."
                               className="h-10 font-mono text-xs bg-[#1d1d23] border-white/10 rounded-xl text-neutral-200 placeholder:text-neutral-500 pr-20"
                             />
@@ -3093,6 +3150,10 @@ export default function ProfileDashboardPage() {
                             ) : keyStatus.steel === "success" ? (
                               <span className="flex items-center gap-1 text-emerald-400">
                                 <Check className="h-3.5 w-3.5" /> Verified
+                              </span>
+                            ) : keyStatus.steel === "error" ? (
+                              <span className="flex items-center gap-1 text-rose-400">
+                                <X className="h-3.5 w-3.5" /> Retry
                               </span>
                             ) : (
                               "Test Key"
@@ -3617,6 +3678,13 @@ export default function ProfileDashboardPage() {
           }}
           imageSrc={imageToCrop}
           onCropComplete={onCropDone}
+        />
+
+        {/* Load Tokens (Coming Soon...) Modal */}
+        <LoadTokensDialog
+          open={loadTokensOpen}
+          onOpenChange={setLoadTokensOpen}
+          userEmail={user?.email || profile.email || ""}
         />
       </main>
     </div>

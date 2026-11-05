@@ -1,5 +1,5 @@
-import { mkdir, readFile, appendFile, writeFile } from "node:fs/promises"
-import { join, resolve } from "node:path"
+import { mkdir, readFile, appendFile, writeFile } from "fs/promises"
+import { join, resolve } from "path"
 
 const MEMORY_DIR = ".memory"
 const MEMORY_ROOT = process.env.VERCEL

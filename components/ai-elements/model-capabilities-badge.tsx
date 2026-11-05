@@ -13,6 +13,7 @@ import {
   Check,
   Sparkles,
 } from "lucide-react";
+import { AiStarIcon } from "@/components/ui/ai-star";
 import {
   CAPABILITY_METADATA,
   ALL_CAPABILITY_KEYS,
@@ -60,7 +61,7 @@ export function getCapabilityIconComponent(
     case "urlContext":
       return <Link2 {...iconProps} />;
     default:
-      return <Sparkles {...iconProps} />;
+      return <AiStarIcon {...iconProps} />;
   }
 }
 

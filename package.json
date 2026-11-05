@@ -1,6 +1,6 @@
 {
   "name": "my-v0-project",
-  "version": "2.12.3",
+  "version": "2.13.0",
   "private": true,
   "packageManager": "pnpm@10.5.2",
   "overrides": {
@@ -11,7 +11,7 @@
     "dev": "NODE_OPTIONS=--max-old-space-size=8192 next dev --webpack",
     "dev:turbopack": "NODE_OPTIONS=--max-old-space-size=8192 next dev",
     "dev:webpack": "NODE_OPTIONS=--max-old-space-size=8192 next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint . --max-warnings=999",
     "generate-pdf": "tsx scripts/generate-pdf.ts",

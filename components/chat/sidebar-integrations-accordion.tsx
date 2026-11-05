@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   Briefcase,
   Plug,
@@ -46,17 +47,30 @@ export function SidebarIntegrationsAccordion({ settings, onSettingsChange }: Pro
           </AccordionTrigger>
           <AccordionContent className="space-y-2 pb-2.5 pt-0 text-[11px] leading-relaxed text-muted-foreground">
             <p className="text-xs">
-              Configure Model Context Protocol tools, PDF generators, and live integrations.
+              Configure Dynamic MCP tools, shared Memory Vault, and 100 req/day quota.
             </p>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => setMcpDialogOpen(true)}
-              className="h-7 w-full rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-medium"
-            >
-              <Settings className="mr-1.5 h-3.5 w-3.5" />
-              Manage Tools
-            </Button>
+            <div className="flex items-center gap-1.5 pt-1">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setMcpDialogOpen(true)}
+                className="h-7 flex-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-xs font-medium"
+              >
+                <Settings className="mr-1.5 h-3.5 w-3.5" />
+                Quick View
+              </Button>
+              <Button
+                asChild
+                size="sm"
+                variant="outline"
+                className="h-7 flex-1 rounded-lg border-white/10 text-neutral-300 hover:text-white text-xs font-medium"
+              >
+                <Link href="/profile?tab=mcp">
+                  <Server className="mr-1.5 h-3.5 w-3.5 text-purple-400" />
+                  Hub
+                </Link>
+              </Button>
+            </div>
           </AccordionContent>
         </AccordionItem>
       </Accordion>

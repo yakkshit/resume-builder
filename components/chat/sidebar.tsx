@@ -28,6 +28,8 @@ import {
   BookMarked,
   Settings,
 } from "lucide-react";
+import { Persona } from "@/components/ai-elements/persona";
+import { AiStarBadge } from "@/components/ui/ai-star";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ChatSession, ChatSettings } from "./chat-store";
@@ -147,6 +149,9 @@ export function ChatSidebar({
         <aside className="hidden md:flex flex-col items-center justify-between w-14 h-full bg-[#141416] border-r border-white/5 py-3 z-30 shrink-0 select-none">
           {/* Top Action Icons */}
           <div className="flex flex-col items-center gap-2.5 w-full">
+            <Link href="/" className="size-8 flex items-center justify-center shrink-0 mb-1 hover:scale-110 transition-transform">
+              <Persona state="idle" variant="theme" className="size-7" />
+            </Link>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
@@ -253,13 +258,16 @@ export function ChatSidebar({
                   <button
                     type="button"
                     onClick={onOpenMcp}
-                    className="size-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors"
-                    aria-label="MCP Tools & Servers"
+                    className="size-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/10 transition-colors relative"
+                    aria-label="Dynamic MCP Hub & Tools"
                   >
-                    <Plug className="size-4 text-indigo-400" />
+                    <Plug className="size-4 text-purple-400" />
+                    <span className="absolute top-1 right-1 size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="text-xs">MCP Tools</TooltipContent>
+                <TooltipContent side="right" className="text-xs">
+                  Dynamic MCP &amp; REST Hub (100 req/day)
+                </TooltipContent>
               </Tooltip>
             )}
           </div>
@@ -286,10 +294,10 @@ export function ChatSidebar({
         {/* Top Header & Navigation Section */}
         <div className="flex flex-col min-h-0 flex-1 overflow-hidden">
           {/* Brand & Collapse Header */}
-          <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/5 shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="size-6 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
-                <Sparkles className="size-3.5" />
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="size-7 flex items-center justify-center shrink-0">
+                <Persona state="idle" variant="theme" className="size-7" />
               </div>
               <span className="font-bold text-sm tracking-tight text-white">Career Studio</span>
             </div>
@@ -423,10 +431,15 @@ export function ChatSidebar({
                       onOpenMcp();
                       if (window.innerWidth < 768) onClose();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs transition-colors"
+                    className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs transition-colors group"
                   >
-                    <Plug className="size-3.5 text-neutral-400" />
-                    <span>MCP Tools & Agents</span>
+                    <div className="flex items-center gap-2.5">
+                      <Plug className="size-3.5 text-purple-400 group-hover:scale-110 transition-transform" />
+                      <span>Dynamic MCP &amp; Tools</span>
+                    </div>
+                    <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded font-mono font-medium">
+                      100/day
+                    </span>
                   </button>
                 )}
 

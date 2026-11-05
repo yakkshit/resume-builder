@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DatabaseService } from "@/lib/db/plsql-storage";
-import crypto from "node:crypto";
+import crypto from "crypto";
 
 export const runtime = "nodejs";
 

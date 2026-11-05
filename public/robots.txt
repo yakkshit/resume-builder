@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /chat/
+
+Sitemap: https://resume.cedzlabs.com/sitemap.xml
+

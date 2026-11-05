@@ -60,6 +60,27 @@ export default function PDFViewer({
     }
   }, [])
 
+  // Browser recommendation toast (recommending Google Chrome for optimal rendering)
+  useEffect(() => {
+    if (!isClient) return;
+    const toastSessionId = "has_shown_chrome_browser_toast";
+    if (typeof window !== "undefined" && !sessionStorage.getItem(toastSessionId)) {
+      sessionStorage.setItem(toastSessionId, "true");
+      const isChrome =
+        /Chrome/.test(navigator.userAgent) &&
+        /Google Inc/.test(navigator.vendor) &&
+        !/Edg\//.test(navigator.userAgent);
+      if (!isChrome) {
+        toast({
+          title: "Browser Recommendation",
+          description:
+            "For the best pixel-perfect vector PDF preview and printing, please use Google Chrome. Layout and font metrics might not render properly in other browsers.",
+          duration: 6000,
+        });
+      }
+    }
+  }, [isClient, toast]);
+
   // Generate PDF Blob whenever safeResumeData, template or activeLanguage changes
   useEffect(() => {
     if (!isClient) return
@@ -214,7 +235,7 @@ export default function PDFViewer({
   }
 
   return (
-    <Card className="flex flex-col h-full overflow-hidden border-0 shadow-lg">
+    <Card className="flex flex-col h-full flex-1 min-h-0 overflow-hidden border-0 shadow-lg">
       <div className="flex flex-wrap sm:flex-nowrap justify-between items-center px-3 sm:px-4 py-2 bg-muted/30 border-b gap-2 min-h-[48px]">
         <div className="flex items-center gap-2 shrink-0">
           <FileText className="h-4 w-4 text-primary" />
@@ -275,7 +296,7 @@ export default function PDFViewer({
         </div>
       </div>
 
-      <div className="relative flex-1 bg-muted/10 overflow-hidden min-h-[400px]">
+      <div className="relative flex-1 min-h-0 bg-muted/10 overflow-hidden flex flex-col">
         {renderError ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-background/95">
             <AlertCircle className="h-10 w-10 text-destructive mb-3" />
@@ -298,7 +319,7 @@ export default function PDFViewer({
         ) : (
           <iframe
             src={`${blobUrl}#toolbar=0&navpanes=0&scrollbar=1`}
-            className="w-full h-full border-0 min-h-[400px]"
+            className="w-full h-full border-0 flex-1 min-h-[500px]"
             title="PDF Resume Preview"
           />
         )}

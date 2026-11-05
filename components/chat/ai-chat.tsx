@@ -39,6 +39,7 @@ import {
     Plus,
     Square,
     ArrowDown,
+    Coins,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -132,6 +133,10 @@ const ChatOnboarding = dynamic(() => import("./chat-onboarding").then((m) => m.C
 const MCPDialog = dynamic(() => import("./mcp-dialog").then((m) => m.MCPDialog), {
     loading: panelLoading,
 });
+const LoadTokensDialog = dynamic(
+    () => import("@/components/tokens/load-tokens-dialog").then((m) => m.LoadTokensDialog),
+    { ssr: false }
+);
 const ChatFeedback = dynamic(() => import("./chat-feedback").then((m) => m.ChatFeedback), {
     loading: panelLoading,
 });
@@ -166,9 +171,12 @@ function WelcomeHero() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20, filter: "blur(8px)" }}
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-            className="flex flex-col items-center justify-center pt-8 pb-5 px-4 text-center select-none"
+            className="flex flex-col items-center justify-center pt-8 pb-5 px-2 sm:px-4 text-center select-none w-full max-w-full min-w-0"
         >
-            <h1 className="text-2xl sm:text-[32px] font-medium tracking-tight text-neutral-200">
+            <div className="mb-4 flex items-center justify-center">
+                <Persona state="idle" variant="theme" className="size-16 cursor-pointer hover:scale-105 transition-transform" />
+            </div>
+            <h1 className="text-xl sm:text-2xl md:text-[32px] font-medium tracking-tight text-neutral-200 break-words text-center max-w-full px-2">
                 What can I help with?
             </h1>
         </motion.div>
@@ -200,8 +208,8 @@ function ThinkingIndicator() {
             transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
             className="flex items-center gap-3 py-2"
         >
-            <div className="size-8 rounded-full bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center shrink-0">
-                <Sparkles className="size-4 text-indigo-400 animate-pulse" />
+            <div className="flex-shrink-0">
+                <Persona state="thinking" variant="theme" className="size-8" />
             </div>
             <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-[#1e1e22]/90 border border-white/10 shadow-xl backdrop-blur-md">
                 <AnimatePresence mode="wait">
@@ -1065,6 +1073,7 @@ function ChatInput({
     onToggleTool,
     onClearTools,
     onOpenProfileSettings,
+    onOpenLoadTokens,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -1092,6 +1101,7 @@ function ChatInput({
     onToggleTool?: (toolId: string) => void;
     onClearTools?: () => void;
     onOpenProfileSettings?: () => void;
+    onOpenLoadTokens?: () => void;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1416,7 +1426,7 @@ function ChatInput({
             </div>
 
             {/* Bottom Sub-bar directly underneath prompt input (Model Logo + Tools) */}
-            <div className="flex items-center justify-between gap-2 px-2 pt-2 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-1.5 px-2 pt-2 text-xs w-full min-w-0">
                 {/* Left side: Active tools chips */}
                 <div className="flex flex-wrap items-center gap-1.5 min-w-0">
                     {activeTools.map((tid) => {
@@ -1426,14 +1436,14 @@ function ChatInput({
                         return (
                             <span
                                 key={tid}
-                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] backdrop-blur-md shadow-xs transition-all bg-indigo-500/15 border border-indigo-500/30 text-indigo-200"
+                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] backdrop-blur-md shadow-xs transition-all bg-indigo-500/15 border border-indigo-500/30 text-indigo-200 max-w-full"
                             >
-                                <ToolIcon className={cn("size-3", tool.color)} />
-                                <span className="truncate max-w-[140px] font-medium">{tool.shortName || tool.name}</span>
+                                <ToolIcon className={cn("size-3 shrink-0", tool.color)} />
+                                <span className="truncate max-w-[120px] font-medium">{tool.shortName || tool.name}</span>
                                 <button
                                     type="button"
                                     onClick={() => onToggleTool?.(tid)}
-                                    className="hover:text-white text-indigo-300 ml-0.5"
+                                    className="hover:text-white text-indigo-300 ml-0.5 shrink-0"
                                     aria-label={`Remove ${tool.name}`}
                                 >
                                     <X className="size-2.5" />
@@ -1445,7 +1455,7 @@ function ChatInput({
                         <button
                             type="button"
                             onClick={onClearTools}
-                            className="text-[10px] text-neutral-400 hover:text-white underline underline-offset-2 ml-1"
+                            className="text-[10px] text-neutral-400 hover:text-white underline underline-offset-2 ml-1 shrink-0"
                         >
                             Clear all
                         </button>
@@ -1453,21 +1463,21 @@ function ChatInput({
                 </div>
 
                 {/* Right side: Model (with logo) and Tools selectors */}
-                <div className="flex items-center gap-2 shrink-0 ml-auto">
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0 ml-auto justify-end">
                     {/* Model selector with Logo and capability badges */}
                     <div className="flex items-center gap-1.5">
                         <ModelSelector open={modelMenuOpen} onOpenChange={setModelMenuOpen}>
                             <ModelSelectorTrigger asChild>
                                 <button
                                     type="button"
-                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-neutral-400 hover:text-neutral-200 hover:bg-white/5 transition-colors border border-white/5 hover:border-white/10"
+                                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium text-neutral-400 hover:text-neutral-200 hover:bg-white/5 transition-colors border border-white/5 hover:border-white/10 shrink-0"
                                     title={`Model: ${selectedModel?.label ?? model}`}
                                 >
                                     {selectedModel && (
-                                        <ModelSelectorLogo provider={selectedModel.provider} className="size-3.5" />
+                                        <ModelSelectorLogo provider={selectedModel.provider} className="size-3.5 shrink-0" />
                                     )}
-                                    <span className="truncate max-w-[110px]">{selectedModel?.label ? selectedModel.label.split(" ")[0] : "Model"}</span>
-                                    <ChevronDown className="size-3 text-neutral-500" />
+                                    <span className="truncate max-w-[100px]">{selectedModel?.label ? selectedModel.label.split(" ")[0] : "Model"}</span>
+                                    <ChevronDown className="size-3 text-neutral-500 shrink-0" />
                                 </button>
                             </ModelSelectorTrigger>
                             <ModelSelectorContent title="Select AI Model" className="max-w-xl">
@@ -1522,7 +1532,7 @@ function ChatInput({
                         </ModelSelector>
 
                         {/* Active Model Capabilities Icons right on the bar */}
-                        <div className="hidden lg:flex items-center gap-1 bg-black/30 border border-white/10 rounded-full px-2 py-0.5">
+                        <div className={cn("items-center gap-1 bg-black/30 border border-white/10 rounded-full px-2 py-0.5", inSplitPanel ? "hidden 2xl:flex" : "hidden lg:flex")}>
                             <ModelCapabilityIcons modelId={model} size="xs" maxIcons={7} />
                         </div>
                     </div>
@@ -1898,6 +1908,23 @@ function ChatInput({
                             </div>
                         </ToolSelectorContent>
                     </ToolSelector>
+
+                    {/* Load Tokens (Coming Soon...) Pill */}
+                    {onOpenLoadTokens && (
+                        <button
+                            type="button"
+                            onClick={onOpenLoadTokens}
+                            className={cn(
+                                "items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 transition-all shadow-xs shrink-0",
+                                inSplitPanel ? "hidden xl:inline-flex" : "hidden sm:inline-flex"
+                            )}
+                            title="Load AI & MCP Tokens (Coming Soon...)"
+                        >
+                            <Coins className="size-3 text-amber-400" />
+                            <span>Load Tokens</span>
+                            <span className="text-[9px] font-mono uppercase bg-amber-500/25 text-amber-300 px-1 py-0.2 rounded font-bold">Coming Soon...</span>
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
@@ -1915,6 +1942,7 @@ export default function AICareerAssistantChat() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
+    const [loadTokensOpen, setLoadTokensOpen] = useState(false);
     const [webviewOpen, setWebviewOpen] = useState(false);
     const [webviewSplitMode, setWebviewSplitMode] = useState<"horizontal" | "vertical" | "fullscreen">("horizontal");
     const [activeStageComponent, setActiveStageComponent] = useState<StageComponentInfo | null>(null);
@@ -2842,6 +2870,11 @@ export default function AICareerAssistantChat() {
                 open={mcpDialogOpen}
                 onOpenChange={setMcpDialogOpen}
             />
+            <LoadTokensDialog
+                open={loadTokensOpen}
+                onOpenChange={setLoadTokensOpen}
+                userEmail={user?.email || ""}
+            />
             <Toaster ref={toasterRef} />
 
             {/* Sidebar (Desktop Collapsible Rail / Expanded + Mobile Drawer) */}
@@ -3007,14 +3040,14 @@ export default function AICareerAssistantChat() {
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0, y: -20, filter: "blur(6px)" }}
                                     transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                                    className="flex-1 flex flex-col items-center justify-center px-4 py-8 relative z-10 min-h-0 overflow-y-auto"
+                                    className="flex-1 flex flex-col items-center justify-center px-2 sm:px-4 py-6 sm:py-8 relative z-10 min-h-0 overflow-y-auto w-full min-w-0 max-w-full overflow-x-hidden"
                                 >
-                                    <div className="w-full max-w-xl mx-auto flex flex-col items-center -mt-8 sm:-mt-12">
+                                    <div className="w-full max-w-xl mx-auto flex flex-col items-center min-w-0 max-w-full -mt-6 sm:-mt-12">
                                         <WelcomeHero />
                                         <motion.div
                                             layoutId="chat-composer-split"
                                             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                                            className="w-full"
+                                            className="w-full min-w-0 max-w-full"
                                         >
                                             <ChatInput
                                                 value={input}
@@ -3043,11 +3076,12 @@ export default function AICareerAssistantChat() {
                                                 onToggleTool={handleToggleTool}
                                                 onClearTools={handleClearTools}
                                                 onOpenProfileSettings={navigateToProfile}
+                                                onOpenLoadTokens={() => setLoadTokensOpen(true)}
                                             />
                                         </motion.div>
 
                                         {/* Centered prompt suggestions underneath composer (matching Image 1) */}
-                                        <div className="flex flex-wrap items-center justify-center gap-2 mt-5 max-w-xl mx-auto px-2">
+                                        <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mt-4 sm:mt-5 w-full max-w-full min-w-0 mx-auto px-2">
                                             {HERO_SUGGESTIONS.map((item) => {
                                                 const IconComp = item.icon;
                                                 return (
@@ -3057,10 +3091,10 @@ export default function AICareerAssistantChat() {
                                                         onClick={() => {
                                                             setInput(item.prompt);
                                                         }}
-                                                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-neutral-300 bg-[#1c1c20] hover:bg-[#28282e] hover:text-white border border-white/5 hover:border-white/10 transition-all duration-150 shadow-sm"
+                                                        className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1.5 rounded-full text-xs font-medium text-neutral-300 bg-[#1c1c20] hover:bg-[#28282e] hover:text-white border border-white/5 hover:border-white/10 transition-all duration-150 shadow-sm max-w-full"
                                                     >
-                                                        <IconComp className="size-3.5 text-neutral-400" />
-                                                        <span>{item.label}</span>
+                                                        <IconComp className="size-3.5 text-neutral-400 shrink-0" />
+                                                        <span className="truncate">{item.label}</span>
                                                     </button>
                                                 );
                                             })}
@@ -3196,6 +3230,7 @@ export default function AICareerAssistantChat() {
                                                 onToggleTool={handleToggleTool}
                                                 onClearTools={handleClearTools}
                                                 onOpenProfileSettings={navigateToProfile}
+                                                onOpenLoadTokens={() => setLoadTokensOpen(true)}
                                             />
                                         </div>
                                     </motion.div>
@@ -3323,11 +3358,12 @@ export default function AICareerAssistantChat() {
                                         onToggleTool={handleToggleTool}
                                         onClearTools={handleClearTools}
                                         onOpenProfileSettings={navigateToProfile}
+                                        onOpenLoadTokens={() => setLoadTokensOpen(true)}
                                     />
                                 </motion.div>
 
                                 {/* Centered prompt suggestions underneath composer (matching Image 1) */}
-                                <div className="flex flex-wrap items-center justify-center gap-2 mt-5 max-w-2xl mx-auto px-2">
+                                <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mt-5 max-w-2xl mx-auto px-2">
                                     {HERO_SUGGESTIONS.map((item) => {
                                         const IconComp = item.icon;
                                         return (
@@ -3337,10 +3373,10 @@ export default function AICareerAssistantChat() {
                                                 onClick={() => {
                                                     setInput(item.prompt);
                                                 }}
-                                                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-neutral-300 bg-[#1c1c20] hover:bg-[#28282e] hover:text-white border border-white/5 hover:border-white/10 transition-all duration-150 shadow-sm"
+                                                className="inline-flex items-center gap-1.5 sm:gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium text-neutral-300 bg-[#1c1c20] hover:bg-[#28282e] hover:text-white border border-white/5 hover:border-white/10 transition-all duration-150 shadow-sm max-w-full"
                                             >
-                                                <IconComp className="size-3.5 text-neutral-400" />
-                                                <span>{item.label}</span>
+                                                <IconComp className="size-3.5 text-neutral-400 shrink-0" />
+                                                <span className="truncate">{item.label}</span>
                                             </button>
                                         );
                                     })}

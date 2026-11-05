@@ -329,12 +329,13 @@ export function ComponentRenderer({
   switch (type) {
     case "resume":
       return (
-        <div>
+        <div className={isInSideStage ? "h-full flex-1 flex flex-col min-h-0" : undefined}>
           <ResumeViewer
             data={activeData}
             targetLanguage={targetLanguage}
             onLanguageChange={setTargetLanguage}
             isTranslating={isTranslating}
+            isInSideStage={isInSideStage}
             onPopOutToSide={
               onPopOutToSide && !isInSideStage
                 ? () =>
@@ -355,9 +356,13 @@ export function ComponentRenderer({
       );
     case "cover-letter":
       return (
-        <div>
-          {header}
-          <CoverLetterViewer data={activeData as any} persistToLocalStorage={targetLanguage === TRANSLATION_ORIGINAL} />
+        <div className={isInSideStage ? "h-full flex-1 flex flex-col min-h-0" : undefined}>
+          {!isInSideStage && header}
+          <CoverLetterViewer
+            data={activeData as any}
+            persistToLocalStorage={targetLanguage === TRANSLATION_ORIGINAL}
+            isInSideStage={isInSideStage}
+          />
         </div>
       );
     case "cover-letter-latex": {

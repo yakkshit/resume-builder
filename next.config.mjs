@@ -88,8 +88,37 @@ const nextConfig = {
   experimental: {},
   turbopack: {},
   webpack: (config, { isServer }) => {
-    config.resolve.alias.canvas = false
+    config.resolve.alias = {
+      ...(config.resolve.alias || {}),
+      canvas: false,
+      "node:crypto": isServer ? "crypto" : false,
+      "node:fs": isServer ? "fs" : false,
+      "node:fs/promises": isServer ? "fs/promises" : false,
+      "node:path": isServer ? "path" : false,
+      "node:child_process": isServer ? "child_process" : false,
+      "node:stream": isServer ? "stream" : false,
+      "node:util": isServer ? "util" : false,
+      "node:buffer": isServer ? "buffer" : false,
+      "node:url": isServer ? "url" : false,
+      "node:module": isServer ? "module" : false,
+      "node:os": isServer ? "os" : false,
+      "node:net": isServer ? "net" : false,
+      "node:http": isServer ? "http" : false,
+      "node:https": isServer ? "https" : false,
+      "node:zlib": isServer ? "zlib" : false,
+      "node:vm": isServer ? "vm" : false,
+      "node:worker_threads": isServer ? "worker_threads" : false,
+    }
     if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        crypto: false,
+        fs: false,
+        path: false,
+        child_process: false,
+        stream: false,
+        buffer: false,
+      }
       config.experiments = {
         ...(config.experiments || {}),
         asyncWebAssembly: true,

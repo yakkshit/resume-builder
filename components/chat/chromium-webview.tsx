@@ -54,6 +54,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { loadProviderKeys, saveProviderKeys } from "@/components/chat/profile-settings-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 export type BrowserEngine = "standard" | "kernel" | "kernel-stealth" | "browserbase" | "steel";
 
@@ -107,6 +108,7 @@ export function ChromiumWebview({
   splitLayout,
   onToggleSplitLayout,
 }: ChromiumWebviewProps) {
+  const { toast } = useToast();
   const [urlInput, setUrlInput] = useState(initialUrl);
   const [currentUrl, setCurrentUrl] = useState(initialUrl);
   const [history, setHistory] = useState<string[]>([initialUrl]);
@@ -201,8 +203,20 @@ export function ChromiumWebview({
     refreshKeys();
     const handleProfileUpdate = () => refreshKeys();
     window.addEventListener("ai-chat-profile-updated", handleProfileUpdate);
+
+    const toastSessionFlag = "has_shown_webview_chrome_recommendation";
+    if (typeof window !== "undefined" && !sessionStorage.getItem(toastSessionFlag)) {
+      sessionStorage.setItem(toastSessionFlag, "true");
+      toast({
+        title: "Browser Recommendation",
+        description:
+          "For the optimal interactive browser and web agent experience, Google Chrome is strongly recommended as some features may not function properly in other browsers.",
+        duration: 7000,
+      });
+    }
+
     return () => window.removeEventListener("ai-chat-profile-updated", handleProfileUpdate);
-  }, [refreshKeys]);
+  }, [refreshKeys, toast]);
 
   // Boot Kernel Cloud Browser session (<30ms boot)
   const bootKernelSession = useCallback(

@@ -166,9 +166,9 @@ export function ComponentStage({
         </div>
       </div>
 
-      {/* Main Canvas Scroll Area */}
-      <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 bg-radial-gradient/5">
-        <div className="mx-auto w-full max-w-4xl space-y-4">
+      {/* Main Canvas Workspace Area (Full Viewport Responsive Edge-to-Edge) */}
+      <div className="flex-1 min-h-0 flex flex-col p-1 sm:p-2 overflow-hidden bg-radial-gradient/5">
+        <div className="w-full h-full flex-1 min-h-0 flex flex-col">
           <ComponentRenderer
             type={component.type}
             data={component.data}

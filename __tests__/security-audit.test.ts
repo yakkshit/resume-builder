@@ -43,6 +43,9 @@ const FALSE_POSITIVE_VALUES = [
     "Content-Security-Policy",
     "X-Frame-Options",
     "cv_sync_record_v2",
+    "cedzlabs_cookie_consent_v2",
+    "career-agent-v2-migrated-v1",
+    "has_shown_chrome_browser_toast",
 ];
 
 const SECRET_PATTERNS = [
