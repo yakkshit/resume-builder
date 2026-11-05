@@ -23,13 +23,15 @@ export async function OPTIONS() {
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
+    const slug = searchParams.get("slug");
     const userId = searchParams.get("userId") || req.headers.get("x-user-id") || "default-user";
+    const lookupKey = slug || userId;
 
     const host = req.headers.get("host") || "localhost:3000";
     const proto = req.headers.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
     const baseUrl = `${proto}://${host}`;
 
-    const config = await getUserMcpConfig(userId);
+    const config = await getUserMcpConfig(lookupKey);
     const stats = await getMcpUsageStats(config.userId);
     const logs = await getRecentMcpLogs(config.userId, 25);
 

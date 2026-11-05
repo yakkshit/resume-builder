@@ -55,6 +55,7 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { InfiniteGridBackground } from "@/components/ui/the-infinite-grid";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { MarkdownRenderer } from "./markdown-renderer";
 import { ComponentRenderer } from "./component-renderer";
@@ -130,13 +131,6 @@ const ChatSidebar = dynamic(() => import("./sidebar").then((m) => m.ChatSidebar)
 const ChatOnboarding = dynamic(() => import("./chat-onboarding").then((m) => m.ChatOnboarding), {
     loading: panelLoading,
 });
-const MCPDialog = dynamic(() => import("./mcp-dialog").then((m) => m.MCPDialog), {
-    loading: panelLoading,
-});
-const LoadTokensDialog = dynamic(
-    () => import("@/components/tokens/load-tokens-dialog").then((m) => m.LoadTokensDialog),
-    { ssr: false }
-);
 const ChatFeedback = dynamic(() => import("./chat-feedback").then((m) => m.ChatFeedback), {
     loading: panelLoading,
 });
@@ -1073,7 +1067,6 @@ function ChatInput({
     onToggleTool,
     onClearTools,
     onOpenProfileSettings,
-    onOpenLoadTokens,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -1101,7 +1094,6 @@ function ChatInput({
     onToggleTool?: (toolId: string) => void;
     onClearTools?: () => void;
     onOpenProfileSettings?: () => void;
-    onOpenLoadTokens?: () => void;
 }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1909,22 +1901,18 @@ function ChatInput({
                         </ToolSelectorContent>
                     </ToolSelector>
 
-                    {/* Load Tokens (Coming Soon...) Pill */}
-                    {onOpenLoadTokens && (
-                        <button
-                            type="button"
-                            onClick={onOpenLoadTokens}
-                            className={cn(
-                                "items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-200 border border-amber-500/30 transition-all shadow-xs shrink-0",
-                                inSplitPanel ? "hidden xl:inline-flex" : "hidden sm:inline-flex"
-                            )}
-                            title="Load AI & MCP Tokens (Coming Soon...)"
-                        >
-                            <Coins className="size-3 text-amber-400" />
-                            <span>Load Tokens</span>
-                            <span className="text-[9px] font-mono uppercase bg-amber-500/25 text-amber-300 px-1 py-0.2 rounded font-bold">Coming Soon...</span>
-                        </button>
-                    )}
+                    {/* Token Wallet & Promo Code Link */}
+                    <Link
+                        href="/payandwallet"
+                        className={cn(
+                            "items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-all shadow-xs shrink-0 cursor-pointer",
+                            inSplitPanel ? "hidden xl:inline-flex" : "hidden sm:inline-flex"
+                        )}
+                        title="Token Wallet & Promo Code"
+                    >
+                        <Coins className="size-3 text-emerald-400" />
+                        <span>Token Wallet</span>
+                    </Link>
                 </div>
             </div>
         </div>
@@ -1941,8 +1929,6 @@ export default function AICareerAssistantChat() {
     const [composerShine, setComposerShine] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
-    const [loadTokensOpen, setLoadTokensOpen] = useState(false);
     const [webviewOpen, setWebviewOpen] = useState(false);
     const [webviewSplitMode, setWebviewSplitMode] = useState<"horizontal" | "vertical" | "fullscreen">("horizontal");
     const [activeStageComponent, setActiveStageComponent] = useState<StageComponentInfo | null>(null);
@@ -2866,15 +2852,6 @@ export default function AICareerAssistantChat() {
         <TooltipProvider delayDuration={7000}>
             <div className="relative z-[1] flex h-full min-h-0 w-full flex-row overflow-hidden">
             <ChatOnboarding open={onboardingOpen} onOpenChange={setOnboardingOpen} setSidebarOpen={setSidebarOpen} />
-            <MCPDialog
-                open={mcpDialogOpen}
-                onOpenChange={setMcpDialogOpen}
-            />
-            <LoadTokensDialog
-                open={loadTokensOpen}
-                onOpenChange={setLoadTokensOpen}
-                userEmail={user?.email || ""}
-            />
             <Toaster ref={toasterRef} />
 
             {/* Sidebar (Desktop Collapsible Rail / Expanded + Mobile Drawer) */}
@@ -2895,7 +2872,7 @@ export default function AICareerAssistantChat() {
                 onIntegrationsToast={showToast}
                 onOpenWebview={() => setWebviewOpen((v) => !v)}
                 webviewOpen={webviewOpen}
-                onOpenMcp={() => setMcpDialogOpen(true)}
+                onOpenMcp={() => router.push("/profile?tab=mcp")}
                 onOpenGuide={() => setOnboardingOpen(true)}
                 onOpenSettings={navigateToProfile}
                 onOpenCommandPalette={() => setCommandPaletteOpen(true)}
@@ -2916,7 +2893,7 @@ export default function AICareerAssistantChat() {
                     setSidebarOpen(false);
                 }}
                 onOpenWebview={() => setWebviewOpen((v) => !v)}
-                onOpenMcp={() => setMcpDialogOpen(true)}
+                onOpenMcp={() => router.push("/profile?tab=mcp")}
                 onOpenGuide={() => setOnboardingOpen(true)}
                 onOpenSettings={navigateToProfile}
             />
@@ -3069,14 +3046,13 @@ export default function AICareerAssistantChat() {
                                                 onSettingsChange={updateSettings}
                                                 raiseForOnboarding={onboardingOpen}
                                                 showToast={showToast}
-                                                onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                                                onOpenMcpDialog={() => router.push("/profile?tab=mcp")}
                                                 inSplitPanel={true}
                                                 isCenterWelcome={true}
                                                 activeTools={activeTools}
                                                 onToggleTool={handleToggleTool}
                                                 onClearTools={handleClearTools}
                                                 onOpenProfileSettings={navigateToProfile}
-                                                onOpenLoadTokens={() => setLoadTokensOpen(true)}
                                             />
                                         </motion.div>
 
@@ -3223,14 +3199,13 @@ export default function AICareerAssistantChat() {
                                                 onSettingsChange={updateSettings}
                                                 raiseForOnboarding={onboardingOpen}
                                                 showToast={showToast}
-                                                onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                                                onOpenMcpDialog={() => router.push("/profile?tab=mcp")}
                                                 inSplitPanel={true}
                                                 isCenterWelcome={false}
                                                 activeTools={activeTools}
                                                 onToggleTool={handleToggleTool}
                                                 onClearTools={handleClearTools}
                                                 onOpenProfileSettings={navigateToProfile}
-                                                onOpenLoadTokens={() => setLoadTokensOpen(true)}
                                             />
                                         </div>
                                     </motion.div>
@@ -3351,14 +3326,13 @@ export default function AICareerAssistantChat() {
                                         onSettingsChange={updateSettings}
                                         raiseForOnboarding={onboardingOpen}
                                         showToast={showToast}
-                                        onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                                        onOpenMcpDialog={() => router.push("/profile?tab=mcp")}
                                         inSplitPanel={false}
                                         isCenterWelcome={true}
                                         activeTools={activeTools}
                                         onToggleTool={handleToggleTool}
                                         onClearTools={handleClearTools}
                                         onOpenProfileSettings={navigateToProfile}
-                                        onOpenLoadTokens={() => setLoadTokensOpen(true)}
                                     />
                                 </motion.div>
 
@@ -3506,7 +3480,7 @@ export default function AICareerAssistantChat() {
                                         onSettingsChange={updateSettings}
                                         raiseForOnboarding={onboardingOpen}
                                         showToast={showToast}
-                                        onOpenMcpDialog={() => setMcpDialogOpen(true)}
+                                        onOpenMcpDialog={() => router.push("/profile?tab=mcp")}
                                         inSplitPanel={false}
                                         isCenterWelcome={false}
                                         activeTools={activeTools}

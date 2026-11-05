@@ -1,5 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer"
 import React, { createElement } from "react"
+import fs from "fs"
+import path from "path"
 import { getResumeTemplate, getCoverLetterTemplate } from "../components/pdf-templates"
 import { sanitizeResumeData } from "../lib/sanitize-resume-data"
 import type { ResumeData, CoverLetterData, Template, CoverLetterTemplate } from "../lib/types"
@@ -44,6 +46,21 @@ async function main(): Promise<void> {
       throw new Error("Missing resumeData for resume type")
     }
     const sanitized = sanitizeResumeData(parsed.resumeData)
+    if (!sanitized.basicInfo) {
+      sanitized.basicInfo = {} as any
+    }
+    if (
+      !sanitized.basicInfo.profilePicture ||
+      sanitized.basicInfo.profilePicture.trim() === "" ||
+      sanitized.basicInfo.profilePicture.includes("deepmind-picture-2.jpg")
+    ) {
+      try {
+        const p = path.join(process.cwd(), "public", "deepmind-picture-2.jpg")
+        if (fs.existsSync(p)) {
+          sanitized.basicInfo.profilePicture = `data:image/jpeg;base64,${fs.readFileSync(p).toString("base64")}`
+        }
+      } catch {}
+    }
     const templateName = (parsed.template as Template) || "modern"
     const PDFTemplate = getResumeTemplate(templateName)
     doc = createElement(PDFTemplate, { resumeData: sanitized })

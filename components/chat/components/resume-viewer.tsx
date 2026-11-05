@@ -48,7 +48,12 @@ function stripProfilePictureDeep(input: any): any {
   if (Array.isArray(input)) return input.map(stripProfilePictureDeep);
   const out: any = {};
   for (const [k, v] of Object.entries(input)) {
-    if (k === "profilePicture") continue;
+    if (k === "profilePicture") {
+      if (typeof v === "string" && (v.startsWith("data:image/") || v.startsWith("http://") || v.startsWith("https://") || v.startsWith("/"))) {
+        out[k] = v;
+      }
+      continue;
+    }
     out[k] = stripProfilePictureDeep(v);
   }
   return out;
@@ -126,9 +131,11 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
     const picRaw = typeof profile?.profilePicture === "string" ? profile.profilePicture.trim() : "";
     if (
       picRaw &&
-      (picRaw.startsWith("data:image/") || picRaw.startsWith("https://") || picRaw.startsWith("http://"))
+      (picRaw.startsWith("data:image/") || picRaw.startsWith("https://") || picRaw.startsWith("http://") || picRaw.startsWith("/"))
     ) {
       (out.basicInfo as any).profilePicture = picRaw;
+    } else if (!out.basicInfo.profilePicture) {
+      (out.basicInfo as any).profilePicture = "/deepmind-picture-2.jpg";
     }
     const gh = typeof profile?.github === "string" ? profile.github.trim() : "";
     setGithubOnBasicInfo(

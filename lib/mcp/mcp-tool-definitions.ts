@@ -147,6 +147,34 @@ export const ALL_MCP_TOOLS: MCPToolDefinition[] = [
     },
   },
   {
+    name: "create_resume",
+    category: "resume",
+    description: "Create or initialize a new resume for the user with profile details, selected template, and career sections.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string", description: "Title of the resume" },
+        template: { type: "string", description: "Template name (e.g. 'pokemon-trainer', 'modern', 'tech-modern', 'german-timeline-minimal')" },
+        resumeData: { type: "object", description: "Resume JSON object matching standard schema" },
+      },
+    },
+  },
+  {
+    name: "save_resume",
+    category: "resume",
+    description: "Save or update the user's active resume JSON in persistent storage.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        resumeId: { type: "string", description: "Optional resume ID" },
+        title: { type: "string", description: "Resume title" },
+        template: { type: "string", description: "Template name" },
+        resumeData: { type: "object", description: "Resume JSON data" },
+      },
+      required: ["resumeData"],
+    },
+  },
+  {
     name: "update_resume_section",
     category: "resume",
     description: "Update a specific section of the user's active resume JSON (experience, skills, education, projects, or basicInfo).",
@@ -215,14 +243,13 @@ export const ALL_MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: "generate_resume_pdf",
     category: "resume",
-    description: "Generate a production-quality PDF document for a resume given JSON data and template name.",
+    description: "Generate a production-quality PDF document for a resume given JSON data and template name. If resumeData is omitted, automatically compiles user's authentic active profile resume and picture.",
     inputSchema: {
       type: "object",
       properties: {
-        resumeData: { type: "object", description: "Resume JSON object matching standard schema" },
-        template: { type: "string", description: "Template key name (e.g. 'modern', 'german-cv', 'tech-modern')" },
+        template: { type: "string", description: "Template key name (e.g. 'pokemon-trainer', 'modern', 'tech-modern', 'german-timeline-minimal')" },
+        resumeData: { type: "object", description: "Optional Resume JSON object. Defaults to user's saved/active profile resume with photo embedded." },
       },
-      required: ["resumeData"],
     },
   },
 

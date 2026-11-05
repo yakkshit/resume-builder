@@ -19,10 +19,185 @@ import { DatabaseService } from "@/lib/db/plsql-storage";
 import { getFirebaseFirestore, isFirebaseConfigured, doc, getDoc, setDoc } from "@/lib/firebase";
 import { getMcpUsageStats } from "@/lib/firebase/mcp-storage";
 import { spawn } from "child_process";
+import fs from "fs";
 import path from "path";
 import React from "react";
 import { ALL_MCP_TOOLS, type MCPToolDefinition } from "@/lib/mcp/mcp-tool-definitions";
 export { ALL_MCP_TOOLS, type MCPToolDefinition };
+
+// Profile picture & canonical identity constants
+export const DEFAULT_PROFILE_PICTURE_URL = "https://resume.cedzlabs.com/deepmind-picture-2.jpg";
+
+export function getLocalProfilePictureDataUri(): string {
+  try {
+    const candidate = path.join(process.cwd(), "public", "deepmind-picture-2.jpg");
+    if (fs.existsSync(candidate)) {
+      const buf = fs.readFileSync(candidate);
+      return `data:image/jpeg;base64,${buf.toString("base64")}`;
+    }
+  } catch {}
+  return DEFAULT_PROFILE_PICTURE_URL;
+}
+
+export function getCanonicalUserProfile(userId: string) {
+  return {
+    id: userId,
+    clerkId: userId,
+    name: "Venkata Sai Yakkshit Reddy Asodi",
+    title: "Intern - Software Engineer, Spatial AI Agent Platform (m/f/d)",
+    email: "saiyakkshit2001@gmail.com",
+    phone: "+49 1713562972",
+    location: "Konstanz, Germany",
+    linkedin: "https://linkedin.com/in/yakkshit",
+    github: "https://github.com/yakkshit",
+    website: "https://github.com/yakkshit",
+    avatarUrl: DEFAULT_PROFILE_PICTURE_URL,
+    profilePicture: DEFAULT_PROFILE_PICTURE_URL,
+    bio: "Master's student with strong software engineering skills and a passion for advanced AI research, specializing in Spatial AI Agents and multi-modal perception. Proven experience in developing, evaluating, and deploying AI agents, LLMs, and VLMs for complex systems, including video tracking and analysis. Proficient in Python, Deep Learning (PyTorch), software architecture, and rigorous testing.",
+    targetRoles: [
+      "Intern - Software Engineer, Spatial AI Agent Platform",
+      "Autonomous Navigation & Robotics Engineer",
+      "Full-Stack & Distributed Systems Developer",
+      "MLOps & Spatial AI Specialist",
+    ],
+    isOnboarded: true,
+  };
+}
+
+export function getCanonicalUserResume(userId: string) {
+  const profilePicture = getLocalProfilePictureDataUri();
+  const data: ResumeData = {
+    basicInfo: {
+      name: "Venkata Sai Yakkshit Reddy Asodi",
+      title: "Intern - Software Engineer, Spatial AI Agent Platform (m/f/d)",
+      email: "saiyakkshit2001@gmail.com",
+      phone: "+49 1713562972",
+      location: "Konstanz, Germany",
+      linkedin: "https://linkedin.com/in/yakkshit",
+      website: "https://github.com/yakkshit",
+      summary: "Master's student with strong software engineering skills and a passion for advanced AI research, specializing in Spatial AI Agents and multi-modal perception. Proven experience in developing, evaluating, and deploying AI agents, LLMs, and VLMs for complex systems, including video tracking and analysis. Proficient in Python, Deep Learning (PyTorch), software architecture, and rigorous testing, eager to contribute to cutting-edge spatial information technology.",
+      profilePicture,
+      languages: ["English (Fluent / C1+)", "German (Basic / A2)"],
+      portfolioLinks: [
+        { platform: "GitHub", url: "https://github.com/yakkshit", username: "yakkshit" },
+        { platform: "NDE Open Source", url: "https://github.com/yakkshit/nde", username: "yakkshit" },
+      ],
+    },
+    experience: [
+      {
+        company: "Universität Konstanz",
+        position: "Research Assistant / AI Engineer",
+        startDate: "2025",
+        endDate: "Present",
+        description: "Conducting advanced research in the Neurobiology department, focusing on complex multi-agent systems for honeybee behavior.",
+        highlights: [
+          "Designed and implemented complex multi-agent systems in Python and C++ for analyzing honeybee behavior, utilizing Computer Vision and VLMs for video tracking and data acquisition.",
+          "Applied rigorous evaluation methods and formal verification to validate theoretical agentic concepts, ensuring system quality, performance, and reliability.",
+          "Managed and processed large-scale research data on cloud computing platforms, building robust pipelines for model training and evaluation.",
+        ],
+      },
+      {
+        company: "Bodensee Racing Team",
+        position: "Autonomous Navigation Engineer",
+        startDate: "2026",
+        endDate: "Present",
+        description: "Engineered autonomous navigation stacks for racing hardware, involving complex sensor data and real-time decision-making.",
+        highlights: [
+          "Developed real-time path planning and decision-making algorithms using ROS2, C++, and Python, integrating multi-sensor fusion for spatial perception.",
+          "Implemented sensor fusion across LiDAR, camera, and IMU data streams with low latency telemetry.",
+        ],
+      },
+      {
+        company: "Nutrish AI / Swift AI",
+        position: "Full-Stack Developer",
+        startDate: "2024",
+        endDate: "2025",
+        description: "Developed scalable backend systems, APIs, and modern frontend interfaces for multimodal AI applications.",
+        highlights: [
+          "Engineered scalable Python backend architectures and RESTful APIs for real-time AI inference and recommendation serving.",
+          "Constructed automated data preprocessing pipelines handling large multimodal datasets.",
+          "Implemented automated data validation checks and unit/integration test suites to safeguard pipeline reliability.",
+        ],
+      },
+      {
+        company: "CircleUp AG",
+        position: "Lead Full-Stack Developer",
+        startDate: "2023",
+        endDate: "2024",
+        description: "Architected microservices-based web applications with containerized Docker environments and Kubernetes orchestration.",
+        highlights: [
+          "Built automated CI/CD pipelines using GitHub Actions, standardizing release cycles and reducing deployment lead times.",
+          "Integrated production machine learning models and NLP pipelines with real-time monitoring and 99.8%+ uptime.",
+        ],
+      },
+    ],
+    education: [
+      {
+        institution: "Universität Konstanz, Germany",
+        degree: "M.Sc. , Computer and Information Science",
+        field: "Focus: Agentic AI, Collective Robotics, Formal Verification",
+        startDate: "2023",
+        endDate: "Present",
+        gpa: "",
+      },
+      {
+        institution: "JNTU Kakinada & Blekinge Institute of Technology (Sweden)",
+        degree: "B.Sc. , Computer Science",
+        field: "Computer Science and Engineering",
+        startDate: "2018",
+        endDate: "2022",
+        gpa: "",
+      },
+    ],
+    skills: [
+      "Python",
+      "C++",
+      "Software Architecture & Design",
+      "AI Agents & Orchestration",
+      "LLMs & VLMs (Vision-Language Models)",
+      "Deep Learning (PyTorch)",
+      "Multimodal & Fusion Perception",
+      "Spatial Computing",
+      "World Models & Embodied AI",
+      "Computer Vision",
+      "Machine Learning",
+      "Model Evaluation & Testing",
+      "Data Pipelines",
+      "APIs (FastAPI, REST)",
+      "Docker",
+      "ROS2 / Robotics",
+      "Gazebo / Webots Simulation",
+      "Formal Verification",
+      "Cloud Computing",
+      "Technical Communication",
+    ],
+    projects: [
+      {
+        name: "Spatial AI Agent Platform & World Models",
+        description: "Multi-modal agentic platform integrating video tracking, spatial perception, and real-time reasoning for embodied robotic systems.",
+        technologies: ["Python", "PyTorch", "ROS2", "Computer Vision", "VLMs"],
+        link: "https://github.com/yakkshit/nde",
+      },
+      {
+        name: "CareerAgent Model Context Protocol (MCP) Server",
+        description: "Open-source MCP server suite powering autonomous career assistants, multi-agent harnesses, and PDF resume compilation.",
+        technologies: ["TypeScript", "Next.js", "React-PDF", "MCP", "Docker"],
+        link: "https://github.com/yakkshit",
+      },
+    ],
+  };
+
+  return {
+    id: `resume-${userId || "active"}`,
+    userId,
+    title: "Venkata Sai Yakkshit Reddy Asodi - Resume",
+    template: "pokemon-trainer",
+    data: data as unknown as Record<string, unknown>,
+    pdfUrl: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}
 
 // Helper: Strip React elements for safe JSON serialization
 function stripReactElements(value: unknown): unknown {
@@ -46,6 +221,17 @@ async function generateResumeInProcess(resumeData: ResumeData, templateName: str
   const PDFTemplate = getResumeTemplate(templateName);
   const jsonClone = JSON.parse(JSON.stringify(resumeData));
   const cleanData = stripReactElements(sanitizeResumeData(jsonClone)) as ResumeData;
+  if (!cleanData.basicInfo) {
+    cleanData.basicInfo = {} as any;
+  }
+  const photoUri = getLocalProfilePictureDataUri();
+  if (
+    !cleanData.basicInfo.profilePicture ||
+    cleanData.basicInfo.profilePicture.trim() === "" ||
+    cleanData.basicInfo.profilePicture.includes("deepmind-picture-2.jpg")
+  ) {
+    cleanData.basicInfo.profilePicture = photoUri;
+  }
   const doc = PDFTemplate({ resumeData: cleanData });
   const raw = await renderToBuffer(doc as any);
   return Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
@@ -253,18 +439,18 @@ export async function executeMcpToolCall(
     // 5. GET USER PROFILE
     if (name === "get_user_profile") {
       const targetUser = args.userId || userId;
-      const user = await DatabaseService.getUserProfile(targetUser);
+      let user = await DatabaseService.getUserProfile(targetUser);
+      const canonical = getCanonicalUserProfile(targetUser);
+      if (!user || !user.name || user.name === "Career Professional" || user.name === "Candidate") {
+        user = canonical as any;
+      }
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify({
               userId: targetUser,
-              profile: user || {
-                name: "Career Professional",
-                targetRoles: ["Full Stack Engineer", "AI Developer"],
-                bio: "Experienced engineer passionate about scalable systems.",
-              },
+              profile: user,
             }, null, 2),
           },
         ],
@@ -290,24 +476,53 @@ export async function executeMcpToolCall(
     // 7. GET USER RESUME
     if (name === "get_user_resume") {
       const resumes = await DatabaseService.getUserResumes(userId);
-      const active = resumes.length > 0 ? resumes[0] : null;
+      let active = resumes.length > 0 ? resumes[0] : null;
+      if (!active || !active.data || (active.data as any).basicInfo?.name === "Candidate") {
+        active = getCanonicalUserResume(userId);
+      }
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify({
               userId,
-              count: resumes.length,
-              activeResume: active || {
-                title: "Primary Resume",
-                template: "modern",
-                data: {
-                  basicInfo: { name: "Candidate", email: "candidate@example.com", title: "Software Engineer" },
-                  experience: [],
-                  education: [],
-                  skills: ["TypeScript", "React", "Node.js", "Python"],
-                },
-              },
+              count: resumes.length || 1,
+              activeResume: active,
+            }, null, 2),
+          },
+        ],
+      };
+    }
+
+    // 7b. CREATE RESUME / SAVE RESUME
+    if (name === "create_resume" || name === "save_resume") {
+      const { title, template = "pokemon-trainer", resumeData } = args || {};
+      const canonical = getCanonicalUserResume(userId);
+      const mergedData: ResumeData = {
+        ...(canonical.data as unknown as ResumeData),
+        ...(resumeData || {}),
+        basicInfo: {
+          ...(canonical.data as unknown as ResumeData).basicInfo,
+          ...(resumeData?.basicInfo || {}),
+          profilePicture: resumeData?.basicInfo?.profilePicture || getLocalProfilePictureDataUri(),
+        },
+      };
+      const resumeTitle = title || (mergedData.basicInfo?.name ? `${mergedData.basicInfo.name} - Resume` : "My Resume");
+      const saved = await DatabaseService.saveResume({
+        id: args?.resumeId,
+        userId,
+        title: resumeTitle,
+        template,
+        data: mergedData as unknown as Record<string, unknown>,
+      });
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              message: "Resume successfully saved with user profile details and photo.",
+              resume: saved.resume,
             }, null, 2),
           },
         ],
@@ -317,6 +532,18 @@ export async function executeMcpToolCall(
     // 8. UPDATE RESUME SECTION
     if (name === "update_resume_section") {
       const { section, data } = args;
+      const canonical = getCanonicalUserResume(userId);
+      const currentResumes = await DatabaseService.getUserResumes(userId);
+      const current = currentResumes.length > 0 ? currentResumes[0] : canonical;
+      const currentData = { ...(canonical.data as unknown as Record<string, unknown>), ...(current.data || {}) };
+      (currentData as any)[section] = data;
+      const saved = await DatabaseService.saveResume({
+        id: current.id,
+        userId,
+        title: current.title,
+        template: current.template || undefined,
+        data: currentData,
+      });
       return {
         content: [
           {
@@ -326,6 +553,7 @@ export async function executeMcpToolCall(
               section,
               message: `Updated resume section '${section}' successfully.`,
               data,
+              resume: saved.resume,
             }, null, 2),
           },
         ],
@@ -413,8 +641,22 @@ export async function executeMcpToolCall(
 
     // 13. GENERATE RESUME PDF
     if (name === "generate_resume_pdf") {
-      const { resumeData, template = "modern" } = args || {};
-      if (!resumeData) throw new Error("Missing required argument: resumeData");
+      const { template = "pokemon-trainer" } = args || {};
+      let resumeData = args?.resumeData;
+      if (!resumeData) {
+        const resumes = await DatabaseService.getUserResumes(userId);
+        if (resumes.length > 0 && resumes[0].data) {
+          resumeData = resumes[0].data;
+        } else {
+          resumeData = getCanonicalUserResume(userId).data;
+        }
+      }
+      if (!resumeData.basicInfo) {
+        resumeData.basicInfo = {} as any;
+      }
+      if (!resumeData.basicInfo.profilePicture || resumeData.basicInfo.profilePicture === "") {
+        resumeData.basicInfo.profilePicture = getLocalProfilePictureDataUri();
+      }
       const pdfBuffer = await renderPdf({ type: "resume", data: resumeData, template });
       const base64 = pdfBuffer.toString("base64");
       return {
@@ -477,7 +719,18 @@ export async function executeMcpToolCall(
 
     // 16. PREPARE JOB APPLICATION PACKAGE
     if (name === "prepare_job_application_package") {
-      const { targetTitle, companyName, resumeData, coverLetterData, resumeTemplate = "modern", coverLetterTemplate = "standard" } = args || {};
+      const { targetTitle, companyName, coverLetterData, resumeTemplate = "pokemon-trainer", coverLetterTemplate = "standard" } = args || {};
+      let resumeData = args?.resumeData;
+      if (!resumeData) {
+        const resumes = await DatabaseService.getUserResumes(userId);
+        resumeData = resumes.length > 0 && resumes[0].data ? resumes[0].data : getCanonicalUserResume(userId).data;
+      }
+      if (!resumeData.basicInfo) {
+        resumeData.basicInfo = {} as any;
+      }
+      if (!resumeData.basicInfo.profilePicture || resumeData.basicInfo.profilePicture === "") {
+        resumeData.basicInfo.profilePicture = getLocalProfilePictureDataUri();
+      }
       const [resBuf, covBuf] = await Promise.all([
         renderPdf({ type: "resume", data: resumeData, template: resumeTemplate }),
         renderPdf({ type: "coverletter", data: coverLetterData, template: coverLetterTemplate }),

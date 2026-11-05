@@ -5,6 +5,7 @@ import React from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, Template } from "@/lib/types"
 import { requireApiKey } from "@/lib/api-auth"
+import { getLocalProfilePictureDataUri } from "@/lib/mcp/mcp-tools-catalog"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -142,6 +143,16 @@ export async function POST(request: NextRequest) {
 
     const normalized = normalizeResumeData(resumeData)
     const sanitized = sanitizeResumeData(normalized)
+    if (!sanitized.basicInfo) {
+      sanitized.basicInfo = {} as any
+    }
+    if (
+      !sanitized.basicInfo.profilePicture ||
+      sanitized.basicInfo.profilePicture.trim() === "" ||
+      sanitized.basicInfo.profilePicture.includes("deepmind-picture-2.jpg")
+    ) {
+      sanitized.basicInfo.profilePicture = getLocalProfilePictureDataUri()
+    }
     const templateName = (template as string) || "modern"
 
     console.log(`Generating PDF with template: ${templateName}`)

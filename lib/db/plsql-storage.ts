@@ -11,6 +11,7 @@ import {
   type DbMcpServer,
   type DbAgentHarness,
 } from "./schema";
+import { getFirebaseFirestore, isFirebaseConfigured, doc, getDoc, setDoc } from "@/lib/firebase";
 
 const inMemoryUsers = new Map<string, User>();
 const inMemoryResumes = new Map<string, Resume>();
@@ -25,14 +26,67 @@ export class DatabaseService {
   static async getUserProfile(clerkIdOrId: string): Promise<User | null> {
     if (!clerkIdOrId) return null;
 
-    // Check direct ID or clerkId lookup
+    // Check direct ID or clerkId lookup in memory
     for (const u of inMemoryUsers.values()) {
       if (u.id === clerkIdOrId || u.clerkId === clerkIdOrId || u.email === clerkIdOrId) {
         return u;
       }
     }
 
-    // User does not exist yet
+    // Try Firestore if configured
+    if (isFirebaseConfigured()) {
+      try {
+        const db = getFirebaseFirestore();
+        if (db) {
+          const snap = await getDoc(doc(db, "users", clerkIdOrId, "profile", "main"));
+          if (snap.exists()) {
+            const p = snap.data();
+            const u: User = {
+              id: clerkIdOrId,
+              clerkId: clerkIdOrId,
+              email: p.email || null,
+              name: p.name || null,
+              avatarUrl: p.profilePicture || null,
+              githubUsername: p.github || null,
+              githubRepo: null,
+              githubToken: null,
+              githubSyncEnabled: false,
+              isOnboarded: true,
+              isIncognito: false,
+              bio: p.careerNotes || null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            inMemoryUsers.set(clerkIdOrId, u);
+            return u;
+          }
+
+          const topSnap = await getDoc(doc(db, "users", clerkIdOrId));
+          if (topSnap.exists()) {
+            const p = topSnap.data();
+            const u: User = {
+              id: clerkIdOrId,
+              clerkId: clerkIdOrId,
+              email: p.email || null,
+              name: p.name || null,
+              avatarUrl: p.profilePicture || null,
+              githubUsername: p.github || null,
+              githubRepo: null,
+              githubToken: null,
+              githubSyncEnabled: false,
+              isOnboarded: true,
+              isIncognito: false,
+              bio: p.careerNotes || null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            inMemoryUsers.set(clerkIdOrId, u);
+            return u;
+          }
+        }
+      } catch {}
+    }
+
     return null;
   }
 
@@ -130,6 +184,25 @@ export class DatabaseService {
     };
 
     inMemoryResumes.set(resumeId, saved);
+
+    // Sync to Firestore if configured
+    if (isFirebaseConfigured() && saved.userId) {
+      try {
+        const db = getFirebaseFirestore();
+        if (db) {
+          setDoc(doc(db, "users", saved.userId, "resumes", "active"), {
+            id: saved.id,
+            userId: saved.userId,
+            title: saved.title,
+            template: saved.template,
+            data: saved.data,
+            pdfUrl: saved.pdfUrl,
+            updatedAt: new Date().toISOString(),
+          }, { merge: true }).catch(() => {});
+        }
+      } catch {}
+    }
+
     return { success: true, resume: saved };
   }
 
@@ -143,7 +216,36 @@ export class DatabaseService {
         list.push(r);
       }
     }
-    return list.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    if (list.length > 0) {
+      return list.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    }
+
+    // Try Firestore if configured
+    if (isFirebaseConfigured() && userId) {
+      try {
+        const db = getFirebaseFirestore();
+        if (db) {
+          const snap = await getDoc(doc(db, "users", userId, "resumes", "active"));
+          if (snap.exists()) {
+            const rData = snap.data();
+            const res: Resume = {
+              id: snap.id,
+              userId,
+              title: rData.title || "My Resume",
+              template: rData.template || "pokemon-trainer",
+              data: rData.data || {},
+              pdfUrl: rData.pdfUrl || null,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            };
+            inMemoryResumes.set(snap.id, res);
+            return [res];
+          }
+        }
+      } catch {}
+    }
+
+    return list;
   }
 
   /**

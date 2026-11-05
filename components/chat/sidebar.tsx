@@ -428,7 +428,11 @@ export function ChatSidebar({
                   <button
                     type="button"
                     onClick={() => {
-                      onOpenMcp();
+                      if (onOpenMcp) {
+                        onOpenMcp();
+                      } else {
+                        window.location.href = "/profile?tab=mcp";
+                      }
                       if (window.innerWidth < 768) onClose();
                     }}
                     className="w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs transition-colors group"
@@ -440,20 +444,6 @@ export function ChatSidebar({
                     <span className="text-[9px] bg-purple-500/20 text-purple-300 border border-purple-500/30 px-1.5 py-0.2 rounded font-mono font-medium">
                       100/day
                     </span>
-                  </button>
-                )}
-
-                {onOpenGuide && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenGuide();
-                      if (window.innerWidth < 768) onClose();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/5 text-xs transition-colors"
-                  >
-                    <BookMarked className="size-3.5 text-neutral-400" />
-                    <span>Interactive Guide</span>
                   </button>
                 )}
               </div>

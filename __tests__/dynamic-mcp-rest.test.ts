@@ -333,5 +333,85 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     // Verify security array includes empty object for optional/public capability auth
     expect(doc.security).toContainEqual({});
   });
+
+  it("returns authentic user identity (Venkata Sai Yakkshit Reddy Asodi) and photo via get_user_profile and get_user_resume", async () => {
+    await saveUserMcpConfig({
+      userId: testUserId,
+      slug: testSlug,
+      authType: "none",
+      isPublic: true,
+    });
+
+    const restProfileReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "get_user_profile",
+        args: {},
+      }),
+    });
+    const profileRes = await SlugRestPOST(restProfileReq, { params: Promise.resolve({ slug: testSlug }) });
+    expect(profileRes.status).toBe(200);
+    const profileData = await profileRes.json();
+    expect(profileData.success).toBe(true);
+    expect(profileData.result.profile.name).toBe("Venkata Sai Yakkshit Reddy Asodi");
+    expect(profileData.result.profile.email).toBe("saiyakkshit2001@gmail.com");
+    expect(profileData.result.profile.location).toContain("Konstanz");
+
+    const restResumeReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "get_user_resume",
+        args: {},
+      }),
+    });
+    const resumeRes = await SlugRestPOST(restResumeReq, { params: Promise.resolve({ slug: testSlug }) });
+    expect(resumeRes.status).toBe(200);
+    const resumeData = await resumeRes.json();
+    expect(resumeData.success).toBe(true);
+    expect(resumeData.result.activeResume.data.basicInfo.name).toBe("Venkata Sai Yakkshit Reddy Asodi");
+    expect(resumeData.result.activeResume.data.basicInfo.profilePicture).toBeDefined();
+    expect(resumeData.result.activeResume.data.basicInfo.profilePicture.length).toBeGreaterThan(50);
+    expect(resumeData.result.activeResume.data.experience.some((e: any) => e.company.includes("Universität Konstanz"))).toBe(true);
+    expect(resumeData.result.activeResume.data.experience.some((e: any) => e.company.includes("Bodensee Racing Team"))).toBe(true);
+  });
+
+  it("creates resume and generates PDF with embedded profile photo via MCP tools", async () => {
+    const createReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "create_resume",
+        args: {
+          title: "My Pokemon Trainer Resume",
+          template: "pokemon-trainer",
+        },
+      }),
+    });
+    const createRes = await SlugRestPOST(createReq, { params: Promise.resolve({ slug: testSlug }) });
+    expect(createRes.status).toBe(200);
+    const createData = await createRes.json();
+    expect(createData.success).toBe(true);
+    expect(createData.result.resume.data.basicInfo.name).toBe("Venkata Sai Yakkshit Reddy Asodi");
+    expect(createData.result.resume.data.basicInfo.profilePicture).toBeDefined();
+
+    const pdfReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "generate_resume_pdf",
+        args: {
+          template: "pokemon-trainer",
+        },
+      }),
+    });
+    const pdfRes = await SlugRestPOST(pdfReq, { params: Promise.resolve({ slug: testSlug }) });
+    expect(pdfRes.status).toBe(200);
+    const pdfData = await pdfRes.json();
+    expect(pdfData.success).toBe(true);
+    expect(pdfData.result.base64Data).toContain("data:application/pdf;base64,");
+    expect(pdfData.result.byteLength).toBeGreaterThan(1000);
+  }, 15000);
 });
 

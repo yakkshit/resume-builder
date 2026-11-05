@@ -6,11 +6,33 @@ import { cn } from "@/lib/utils";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export type PersonaState = "idle" | "listening" | "thinking" | "speaking" | "asleep";
-export type PersonaVariant = "theme" | "companion" | "obsidian" | "mana" | "opal" | "halo" | "glint" | "command";
+export type PersonaVariant =
+  | "theme"
+  | "companion"
+  | "obsidian"
+  | "mana"
+  | "opal"
+  | "halo"
+  | "glint"
+  | "command"
+  | "crimson"
+  | "sunset"
+  | "aurora";
+
+export type PersonaShape =
+  | "jelly"
+  | "squircle"
+  | "circle"
+  | "star"
+  | "hexagon"
+  | "diamond"
+  | "ghost"
+  | "ring";
 
 export interface PersonaProps {
   state?: PersonaState;
   variant?: PersonaVariant;
+  shape?: PersonaShape;
   className?: string;
   interactive?: boolean;
   onLoad?: () => void;
@@ -134,11 +156,80 @@ const THEMES: Record<PersonaVariant, VariantTheme> = {
     particleColor: "#bbf7d0",
     friendlyDescription: "Cybernetic High-Performance",
   },
+  crimson: {
+    id: "crimson",
+    name: "Crimson Flame",
+    glowColor: "rgba(239, 68, 68, 0.5)",
+    ringColor: "rgba(248, 113, 113, 0.8)",
+    bgGradient: ["#450a0a", "#7f1d1d", "#dc2626", "#f87171"],
+    eyeColor: "#fee2e2",
+    accentColor: "#ef4444",
+    blushColor: "rgba(254, 202, 202, 0.65)",
+    particleColor: "#fecaca",
+    friendlyDescription: "Passionate High-Energy Drive",
+  },
+  sunset: {
+    id: "sunset",
+    name: "Tangerine Sunset",
+    glowColor: "rgba(249, 115, 22, 0.5)",
+    ringColor: "rgba(251, 146, 60, 0.8)",
+    bgGradient: ["#431407", "#7c2d12", "#ea580c", "#fb923c"],
+    eyeColor: "#ffedd5",
+    accentColor: "#f97316",
+    blushColor: "rgba(254, 215, 170, 0.65)",
+    particleColor: "#fed7aa",
+    friendlyDescription: "Warm Evening Radiance",
+  },
+  aurora: {
+    id: "aurora",
+    name: "Neon Aurora",
+    glowColor: "rgba(168, 85, 247, 0.5)",
+    ringColor: "rgba(192, 132, 252, 0.8)",
+    bgGradient: ["#2e1065", "#581c87", "#9333ea", "#c084fc"],
+    eyeColor: "#f3e8ff",
+    accentColor: "#a855f7",
+    blushColor: "rgba(244, 114, 182, 0.65)",
+    particleColor: "#e9d5ff",
+    friendlyDescription: "Vibrant Ethereal Magic",
+  },
 };
+
+export const AVAILABLE_PERSONA_SHAPES: Array<{ id: PersonaShape; label: string; icon: string; description: string }> = [
+  { id: "jelly", label: "Organic Jelly", icon: "🫧", description: "Fluid, breathing jelly morphing blob" },
+  { id: "squircle", label: "Smooth Squircle", icon: "⏹️", description: "Modern iOS-grade superellipse" },
+  { id: "circle", label: "Orb Sphere", icon: "⚪", description: "Classic radiant circular glowing sphere" },
+  { id: "star", label: "Sparkle Star", icon: "✨", description: "4-point sparkling AI star" },
+  { id: "hexagon", label: "Cyber Hexagon", icon: "⬡", description: "Futuristic geometric tech hexagon" },
+  { id: "diamond", label: "Faceted Diamond", icon: "💎", description: "Crystalline rhomboid diamond" },
+  { id: "ghost", label: "Playful Ghost", icon: "👻", description: "Friendly floating companion ghost" },
+  { id: "ring", label: "Portal Ring", icon: "🪐", description: "Quantum energy portal ring" },
+];
+
+export const AVAILABLE_PERSONA_VARIANTS: Array<{ id: PersonaVariant; label: string; colorHex: string; description: string }> = [
+  { id: "theme", label: "Volt Lime", colorHex: "#aff33e", description: "Hyper-Adaptive Career Agent" },
+  { id: "companion", label: "Sky Pastel", colorHex: "#60a5fa", description: "Sweet Empathic Companion" },
+  { id: "obsidian", label: "Cosmic Violet", colorHex: "#8b5cf6", description: "Deep Cosmic Intelligence" },
+  { id: "mana", label: "Arcane Cyan", colorHex: "#06b6d4", description: "Arcane Flow & Inspiration" },
+  { id: "opal", label: "Iridescent Pink", colorHex: "#ec4899", description: "Warm Iridescent Empathy" },
+  { id: "halo", label: "Radiant Gold", colorHex: "#f59e0b", description: "Radiant Golden Energy" },
+  { id: "glint", label: "Emerald Focus", colorHex: "#10b981", description: "Sharp Emerald Focus" },
+  { id: "command", label: "Matrix Cyber", colorHex: "#22c55e", description: "Cybernetic High-Performance" },
+  { id: "crimson", label: "Ruby Flame", colorHex: "#ef4444", description: "Passionate High-Energy" },
+  { id: "sunset", label: "Tangerine Sunset", colorHex: "#f97316", description: "Warm Evening Radiance" },
+  { id: "aurora", label: "Neon Aurora", colorHex: "#a855f7", description: "Vibrant Ethereal Glow" },
+];
+
+export function setGlobalPersonaConfig(variant?: PersonaVariant, shape?: PersonaShape) {
+  if (typeof window === "undefined") return;
+  if (variant) localStorage.setItem("career_agent_persona_variant", variant);
+  if (shape) localStorage.setItem("career_agent_persona_shape", shape);
+  window.dispatchEvent(new CustomEvent("persona-style-change", { detail: { variant, shape } }));
+}
 
 export function Persona({
   state = "idle",
-  variant = "theme",
+  variant,
+  shape,
   className,
   interactive = true,
   onLoad,
@@ -157,8 +248,43 @@ export function Persona({
   const [hearts, setHearts] = useState<Array<{ id: number; x: number }>>([]);
   const [eyeOffset, setEyeOffset] = useState({ x: 0, y: 0, tiltX: 0, tiltY: 0 });
 
+  // Persistent / global style state
+  const [activeVariant, setActiveVariant] = useState<PersonaVariant>(variant || "theme");
+  const [activeShape, setActiveShape] = useState<PersonaShape>(shape || "jelly");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const storedVar = (localStorage.getItem("career_agent_persona_variant") as PersonaVariant) || null;
+      const storedShp = (localStorage.getItem("career_agent_persona_shape") as PersonaShape) || null;
+      if (!variant && storedVar && THEMES[storedVar]) {
+        setActiveVariant(storedVar);
+      } else if (variant) {
+        setActiveVariant(variant);
+      }
+      if (!shape && storedShp) {
+        setActiveShape(storedShp);
+      } else if (shape) {
+        setActiveShape(shape);
+      }
+    }
+  }, [variant, shape]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleStyleChange = (e: any) => {
+      if (!variant && e.detail?.variant && THEMES[e.detail.variant as PersonaVariant]) {
+        setActiveVariant(e.detail.variant);
+      }
+      if (!shape && e.detail?.shape) {
+        setActiveShape(e.detail.shape);
+      }
+    };
+    window.addEventListener("persona-style-change", handleStyleChange);
+    return () => window.removeEventListener("persona-style-change", handleStyleChange);
+  }, [variant, shape]);
+
   // Fallback to signature volt-lime theme
-  const theme = THEMES[variant] || THEMES.theme;
+  const theme = THEMES[activeVariant] || THEMES.theme;
 
   useEffect(() => {
     try {
@@ -434,7 +560,12 @@ export function Persona({
         )}
       </AnimatePresence>
 
-      {/* The Jelly Blob Body — Non-circular organic fluid morphing */}
+      {/* Shape-specific styling and dynamic animations */}
+      {(() => {
+        return null;
+      })()}
+
+      {/* The Persona Body with Adaptive Shape & Theme Styling */}
       <motion.div
         animate={
           isJoyful
@@ -443,13 +574,65 @@ export function Persona({
                 scaleY: [1, 0.74, 1.22, 0.88, 1.08, 0.97, 1],
                 rotate: [0, -6, 5, -3, 2, 0],
               }
+            : activeShape === "squircle"
+            ? {
+                scale: state === "listening" ? [1, 1.06, 1] : state === "thinking" ? [1, 1.03, 0.98, 1] : [1, 1.02, 1],
+                borderRadius: ["34%", "30%", "34%"],
+                transition: { repeat: Infinity, duration: state === "thinking" ? 1.8 : 3.5, ease: "easeInOut" },
+              }
+            : activeShape === "circle"
+            ? {
+                scale: state === "listening" ? [1, 1.08, 1] : state === "thinking" ? [1, 1.04, 0.97, 1] : [1, 1.02, 1],
+                borderRadius: ["50%", "50%"],
+                transition: { repeat: Infinity, duration: 3.2, ease: "easeInOut" },
+              }
+            : activeShape === "star"
+            ? {
+                scale: state === "listening" ? [1, 1.12, 1] : state === "thinking" ? [1, 1.06, 0.95, 1] : [1, 1.04, 0.98, 1],
+                rotate: state === "thinking" ? [0, 90, 180, 270, 360] : [0, 4, -4, 0],
+                transition: { repeat: Infinity, duration: state === "thinking" ? 6 : 4, ease: "easeInOut" },
+              }
+            : activeShape === "hexagon"
+            ? {
+                scale: state === "listening" ? [1, 1.07, 1] : state === "thinking" ? [1, 1.04, 1] : [1, 1.02, 1],
+                rotate: state === "thinking" ? [0, 60, 120, 180, 240, 300, 360] : [0, 2, -2, 0],
+                transition: { repeat: Infinity, duration: state === "thinking" ? 8 : 4.5, ease: "easeInOut" },
+              }
+            : activeShape === "diamond"
+            ? {
+                scale: state === "listening" ? [1, 1.09, 1] : state === "thinking" ? [1, 1.05, 0.96, 1] : [1, 1.03, 1],
+                rotate: [0, 3, -3, 0],
+                transition: { repeat: Infinity, duration: 3.8, ease: "easeInOut" },
+              }
+            : activeShape === "ghost"
+            ? {
+                borderRadius: ["50% 50% 28% 28%", "48% 52% 32% 26%", "52% 48% 26% 32%", "50% 50% 28% 28%"],
+                y: [0, -3, 0],
+                scale: [1, 1.03, 1],
+                transition: { repeat: Infinity, duration: 2.8, ease: "easeInOut" },
+              }
+            : activeShape === "ring"
+            ? {
+                scale: state === "listening" ? [1, 1.08, 1] : [1, 1.03, 0.98, 1],
+                rotate: state === "thinking" ? 360 : 0,
+                borderRadius: ["50%", "50%"],
+                transition: { repeat: Infinity, duration: state === "thinking" ? 3 : 4, ease: "easeInOut" },
+              }
             : jellyMorphVariants
         }
         className="relative size-full flex items-center justify-center overflow-hidden transition-all duration-150"
         style={{
           background: `radial-gradient(circle at 35% 26%, ${theme.bgGradient[3]} 0%, ${theme.bgGradient[2]} 52%, ${theme.bgGradient[1]} 85%, ${theme.bgGradient[0]} 100%)`,
-          border: `1.5px solid ${theme.ringColor}`,
+          border: ["star", "hexagon", "diamond"].includes(activeShape) ? "none" : `1.5px solid ${theme.ringColor}`,
           boxShadow: `0 4px 18px ${theme.glowColor}, inset 0 2px 5px rgba(255,255,255,0.65), inset 0 -3px 8px rgba(0,0,0,0.25)`,
+          clipPath:
+            activeShape === "star"
+              ? "polygon(50% 0%, 64% 36%, 100% 50%, 64% 64%, 50% 100%, 36% 64%, 0% 50%, 36% 36%)"
+              : activeShape === "hexagon"
+              ? "polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)"
+              : activeShape === "diamond"
+              ? "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)"
+              : undefined,
           transform: `rotateX(${eyeOffset.tiltX}deg) rotateY(${eyeOffset.tiltY}deg)`,
           transformStyle: "preserve-3d",
         }}

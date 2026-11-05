@@ -45,7 +45,6 @@ import { BentoGrid, BentoCard } from "@/components/ui/bento-grid";
 import { McpBentoCard } from "@/components/landing/mcp-bento-card";
 import { TemplatesBento } from "@/components/landing/templates-bento";
 import { InfiniteMovingCards } from "@/components/ui/infinite-moving-cards";
-import { LoadTokensDialog } from "@/components/tokens/load-tokens-dialog";
 
 const TRUSTED_COMPANIES = [
   { company: "Google" },
@@ -121,8 +120,6 @@ const FAQS = [
 ];
 
 export default function HomePage() {
-  const [loadTokensOpen, setLoadTokensOpen] = useState(false);
-
   return (
     <div className="relative min-h-screen w-full bg-black text-[#ededed] selection:bg-white/20 selection:text-white font-sans overflow-x-hidden scroll-smooth">
       {/* ── TOP CACHE MIGRATION ANNOUNCEMENT ─────────────────────────────────── */}
@@ -831,9 +828,6 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
-
-      {/* Load Tokens Dialog */}
-      <LoadTokensDialog open={loadTokensOpen} onOpenChange={setLoadTokensOpen} />
     </div>
   );
 }

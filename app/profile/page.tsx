@@ -59,7 +59,6 @@ import {
   Network,
   Coins,
 } from "lucide-react";
-import { LoadTokensDialog } from "@/components/tokens/load-tokens-dialog";
 
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -93,6 +92,15 @@ import { TRANSLATION_LANGUAGES } from "@/lib/translation";
 import { parseAndIngestFileToMemoryVault } from "@/lib/memory-vault";
 import { GraphRagViewer } from "@/components/chat/components/graph-rag-viewer";
 import { DynamicMcpSettings } from "@/components/profile/dynamic-mcp-settings";
+import { WalletAndPlansTab } from "@/components/profile/wallet-and-plans-tab";
+import {
+  Persona,
+  AVAILABLE_PERSONA_SHAPES,
+  AVAILABLE_PERSONA_VARIANTS,
+  setGlobalPersonaConfig,
+  type PersonaShape,
+  type PersonaVariant,
+} from "@/components/ai-elements/persona";
 import { Streamdown } from "streamdown";
 import { cjk } from "@streamdown/cjk";
 import { math } from "@streamdown/math";
@@ -146,7 +154,31 @@ export default function ProfileDashboardPage() {
   // Tab & search state
   const [activeTab, setActiveTab] = useState<string>("profile");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [loadTokensOpen, setLoadTokensOpen] = useState<boolean>(false);
+
+  // Personal AI Blob Companion Style State
+  const [blobShape, setBlobShape] = useState<PersonaShape>("jelly");
+  const [blobVariant, setBlobVariant] = useState<PersonaVariant>("theme");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const v = (localStorage.getItem("career_agent_persona_variant") as PersonaVariant) || "theme";
+      const s = (localStorage.getItem("career_agent_persona_shape") as PersonaShape) || "jelly";
+      setBlobVariant(v);
+      setBlobShape(s);
+    }
+  }, []);
+
+  const handleUpdateBlobConfig = (newVar?: PersonaVariant, newShp?: PersonaShape) => {
+    const v = newVar || blobVariant;
+    const s = newShp || blobShape;
+    if (newVar) setBlobVariant(newVar);
+    if (newShp) setBlobShape(newShp);
+    setGlobalPersonaConfig(v, s);
+    toast({
+      title: "AI Companion Style Saved 🎨",
+      description: "Custom blob color and shape updated across all views.",
+    });
+  };
 
   // Profile data
   const [profile, setProfile] = useState<UserProfile>({ ...EMPTY_PROFILE });
@@ -891,14 +923,14 @@ export default function ProfileDashboardPage() {
           <Button
             type="button"
             size="sm"
-            onClick={() => setLoadTokensOpen(true)}
-            className="w-full h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-primary/15 border border-amber-500/30 hover:border-amber-500/50 text-amber-200 hover:text-white rounded-lg shadow-xs flex items-center justify-between"
+            onClick={() => setActiveTab("usage")}
+            className="w-full h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-emerald-500/15 via-teal-500/15 to-primary/15 border border-emerald-500/30 hover:border-emerald-500/50 text-emerald-200 hover:text-white rounded-lg shadow-xs flex items-center justify-between"
           >
             <div className="flex items-center gap-1.5">
-              <Coins className="size-3 text-amber-400 shrink-0" />
-              <span className="font-medium text-[11px]">Load Tokens</span>
+              <Coins className="size-3 text-emerald-400 shrink-0" />
+              <span className="font-medium text-[11px]">Token Wallet</span>
             </div>
-            <span className="text-[9px] font-mono uppercase bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold border border-amber-500/25">Coming Soon</span>
+            <span className="text-[9px] font-mono uppercase bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/25">Wallet</span>
           </Button>
 
           {/* User Profile & Sign Out Card */}
@@ -967,16 +999,16 @@ export default function ProfileDashboardPage() {
                   </span>
                 )}
 
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => setLoadTokensOpen(true)}
-                  className="h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-primary/20 border border-amber-500/35 text-amber-200 hover:text-white rounded-full shadow-xs"
-                >
-                  <Coins className="size-3 text-amber-400" />
-                  <span>Load Tokens</span>
-                  <span className="text-[9px] font-mono uppercase bg-amber-500/25 text-amber-300 px-1 py-0.2 rounded font-bold">Coming Soon...</span>
-                </Button>
+                <Link href="/payandwallet">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-primary/20 border border-amber-500/35 text-amber-200 hover:text-white rounded-full shadow-xs"
+                  >
+                    <Coins className="size-3 text-amber-400" />
+                    <span>Token Wallet</span>
+                  </Button>
+                </Link>
               </div>
             </div>
 
@@ -3479,6 +3511,89 @@ export default function ProfileDashboardPage() {
                     <span className="text-xs font-medium">System Default</span>
                   </button>
                 </div>
+
+                {/* ── Personal AI Blob Companion Studio ── */}
+                <div className="pt-6 border-t border-white/[0.08] space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                        <Sparkles className="size-4 text-emerald-400" />
+                        Personal AI Blob Companion (Color, Shape &amp; SVGs)
+                      </h2>
+                      <p className="text-[11px] text-neutral-400 mt-0.5">
+                        Customize your personal companion orb. Choose from 8 geometric and organic SVG shapes and 11 chromatic themes.
+                      </p>
+                    </div>
+
+                    {/* Live Interactive Blob Preview */}
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-[#111114] border border-white/[0.06] shrink-0">
+                      <div className="size-14 flex items-center justify-center">
+                        <Persona
+                          state="idle"
+                          variant={blobVariant}
+                          shape={blobShape}
+                          className="size-12 cursor-pointer hover:scale-110 transition-transform"
+                        />
+                      </div>
+                      <div className="text-left text-xs">
+                        <div className="font-semibold text-white capitalize">{blobShape} • {blobVariant}</div>
+                        <div className="text-[10px] text-neutral-400">Click blob to interact! ✨</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 1. Shape Selection (8 Shapes) */}
+                  <div className="space-y-2">
+                    <Label className="text-xs text-neutral-300 font-medium">Companion Shape &amp; SVG Geometry</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {AVAILABLE_PERSONA_SHAPES.map((shp) => (
+                        <button
+                          key={shp.id}
+                          type="button"
+                          onClick={() => handleUpdateBlobConfig(undefined, shp.id)}
+                          className={`p-3 rounded-xl border text-left flex items-start gap-2.5 transition-all ${
+                            blobShape === shp.id
+                              ? "bg-white/10 border-white/30 text-white shadow-md ring-1 ring-white/20"
+                              : "bg-[#111114] border-white/[0.06] text-neutral-400 hover:text-white hover:bg-white/5"
+                          }`}
+                        >
+                          <span className="text-xl shrink-0">{shp.icon}</span>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold truncate">{shp.label}</div>
+                            <div className="text-[10px] text-neutral-500 line-clamp-1">{shp.description}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 2. Color Variant Selection (11 Themes) */}
+                  <div className="space-y-2 pt-2">
+                    <Label className="text-xs text-neutral-300 font-medium">Chromatic Glow &amp; Aura Theme</Label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                      {AVAILABLE_PERSONA_VARIANTS.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => handleUpdateBlobConfig(v.id, undefined)}
+                          className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-all ${
+                            blobVariant === v.id
+                              ? "bg-white/10 border-white/30 text-white shadow-md ring-1 ring-white/20"
+                              : "bg-[#111114] border-white/[0.06] text-neutral-400 hover:text-white hover:bg-white/5"
+                          }`}
+                        >
+                          <span
+                            className="size-4 rounded-full border border-white/20 shrink-0"
+                            style={{ backgroundColor: v.colorHex, boxShadow: `0 0 8px ${v.colorHex}` }}
+                          />
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold truncate">{v.label}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -3559,71 +3674,8 @@ export default function ProfileDashboardPage() {
             )}
 
             {/* ── TAB 6: PLAN & USAGE ───────────────────────────────────────────── */}
-            {activeTab === "usage" && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Current Free Plan */}
-                  <div className="p-6 rounded-2xl border border-white/10 bg-[#16161a] space-y-4 shadow-xl">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Current Plan</span>
-                      <Badge variant="outline" className="text-xs border-white/10 text-neutral-300">Active</Badge>
-                    </div>
-                    <div className="text-2xl font-bold text-white">Free Starter</div>
-                    <p className="text-xs text-neutral-400 leading-relaxed">
-                      Core AI chat, local resume editing, ATS scoring, and personal memory vault.
-                    </p>
-                    <div className="space-y-2 pt-2 border-t border-white/[0.06] text-xs text-neutral-300">
-                      <div className="flex items-center gap-2">
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Unlimited local resume builds</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Memory Vault RAG grounding</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="h-3.5 w-3.5 text-emerald-400" />
-                        <span>Bring your own custom API keys</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Pro Plan */}
-                  <div className="p-6 rounded-2xl border border-indigo-500/30 bg-gradient-to-b from-indigo-950/20 to-[#16161a] space-y-4 shadow-xl relative overflow-hidden">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Recommended</span>
-                      <Badge className="bg-indigo-600 text-white text-xs">Pro Member</Badge>
-                    </div>
-                    <div className="text-2xl font-bold text-white">
-                      $12 <span className="text-xs font-normal text-neutral-400">/ month</span>
-                    </div>
-                    <p className="text-xs text-neutral-300 leading-relaxed">
-                      Unlimited high-speed reasoning models, zero-quota throttling, and priority cloud sync.
-                    </p>
-                    <div className="space-y-2 pt-2 border-t border-white/[0.06] text-xs text-neutral-200">
-                      <div className="flex items-center gap-2">
-                        <Check className="h-3.5 w-3.5 text-indigo-400" />
-                        <span>DeepSeek R1 & o3-mini Reasoning</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="h-3.5 w-3.5 text-indigo-400" />
-                        <span>Automated GitHub sync & versioning</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Check className="h-3.5 w-3.5 text-indigo-400" />
-                        <span>PDF multi-page high-fidelity exports</span>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => toast({ title: "Pro Plan", description: "Payment gateway integration is ready." })}
-                      className="w-full mt-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs h-9 rounded-xl"
-                    >
-                      Upgrade to Pro
-                    </Button>
-                  </div>
-                </div>
-              </div>
+            {(activeTab === "usage" || activeTab === "payandwallet" || activeTab === "wallet") && (
+              <WalletAndPlansTab />
             )}
 
           </div>
@@ -3680,13 +3732,6 @@ export default function ProfileDashboardPage() {
           }}
           imageSrc={imageToCrop}
           onCropComplete={onCropDone}
-        />
-
-        {/* Load Tokens (Coming Soon...) Modal */}
-        <LoadTokensDialog
-          open={loadTokensOpen}
-          onOpenChange={setLoadTokensOpen}
-          userEmail={user?.email || profile.email || ""}
         />
       </main>
     </div>

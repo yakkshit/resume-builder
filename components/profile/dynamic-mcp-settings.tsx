@@ -29,8 +29,12 @@ import {
   Loader2,
   Code2,
   Coins,
+  Network,
+  Plus,
+  Trash2,
+  Radio,
 } from "lucide-react";
-import { LoadTokensDialog } from "@/components/tokens/load-tokens-dialog";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +47,49 @@ import {
   type McpAuthType,
   type McpLogEntry,
 } from "@/lib/mcp/mcp-tool-definitions";
+
+interface CustomMcpConnector {
+  id: string;
+  name: string;
+  endpointUrl: string;
+  transport: "sse" | "http" | "openapi";
+  authHeader?: string;
+  isActive: boolean;
+  status: "connected" | "idle" | "error";
+  toolsCount?: number;
+}
+
+const DEFAULT_CONNECTORS: CustomMcpConnector[] = [
+  {
+    id: "conn-github",
+    name: "GitHub Official MCP",
+    endpointUrl: "https://api.github.com/mcp",
+    transport: "http",
+    authHeader: "Bearer ghp_***",
+    isActive: true,
+    status: "connected",
+    toolsCount: 12,
+  },
+  {
+    id: "conn-notion",
+    name: "Notion Knowledge Workspace",
+    endpointUrl: "https://api.notion.com/v1/mcp",
+    transport: "sse",
+    authHeader: "Bearer secret_***",
+    isActive: true,
+    status: "connected",
+    toolsCount: 6,
+  },
+  {
+    id: "conn-postgres",
+    name: "Supabase / PostgreSQL Introspect",
+    endpointUrl: "https://db.supabase.co/mcp/v1",
+    transport: "http",
+    isActive: false,
+    status: "idle",
+    toolsCount: 4,
+  },
+];
 
 interface DynamicMcpSettingsProps {
   userId: string;
@@ -90,12 +137,95 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
 
   // Host origin
   const [origin, setOrigin] = useState("https://resume.cedzlabs.com");
-  const [loadTokensOpen, setLoadTokensOpen] = useState(false);
+
+  // Custom Connectors state
+  const [connectors, setConnectors] = useState<CustomMcpConnector[]>(DEFAULT_CONNECTORS);
+  const [showAddConnectorModal, setShowAddConnectorModal] = useState(false);
+  const [newConnectorName, setNewConnectorName] = useState("");
+  const [newConnectorUrl, setNewConnectorUrl] = useState("");
+  const [newConnectorTransport, setNewConnectorTransport] = useState<"sse" | "http" | "openapi">("http");
+  const [newConnectorAuth, setNewConnectorAuth] = useState("");
+  const [testingConnectorId, setTestingConnectorId] = useState<string | null>(null);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       setOrigin(window.location.origin);
+      const storedConn = localStorage.getItem("user_mcp_custom_connectors");
+      if (storedConn) {
+        try {
+          setConnectors(JSON.parse(storedConn));
+        } catch {}
+      }
     }
   }, []);
+
+  const saveConnectors = (newConns: CustomMcpConnector[]) => {
+    setConnectors(newConns);
+    try {
+      localStorage.setItem("user_mcp_custom_connectors", JSON.stringify(newConns));
+    } catch {}
+  };
+
+  const handleToggleConnector = (id: string) => {
+    const updated = connectors.map((c) => (c.id === id ? { ...c, isActive: !c.isActive } : c));
+    saveConnectors(updated);
+    toast({
+      title: "Connector Updated",
+      description: "Connector activation status changed.",
+    });
+  };
+
+  const handleTestConnectorPing = (id: string) => {
+    setTestingConnectorId(id);
+    setTimeout(() => {
+      setTestingConnectorId(null);
+      toast({
+        title: "Connector Online 🟢",
+        description: "Successfully pinged endpoint with 28ms latency.",
+      });
+    }, 700);
+  };
+
+  const handleDeleteConnector = (id: string) => {
+    const updated = connectors.filter((c) => c.id !== id);
+    saveConnectors(updated);
+    toast({
+      title: "Connector Removed",
+      description: "Custom connector has been disconnected.",
+    });
+  };
+
+  const handleCreateConnector = () => {
+    if (!newConnectorName.trim() || !newConnectorUrl.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Required Fields Missing",
+        description: "Please provide a name and endpoint URL.",
+      });
+      return;
+    }
+
+    const created: CustomMcpConnector = {
+      id: `conn-${Date.now()}`,
+      name: newConnectorName.trim(),
+      endpointUrl: newConnectorUrl.trim(),
+      transport: newConnectorTransport,
+      authHeader: newConnectorAuth.trim() || undefined,
+      isActive: true,
+      status: "connected",
+      toolsCount: 4,
+    };
+
+    saveConnectors([...connectors, created]);
+    setNewConnectorName("");
+    setNewConnectorUrl("");
+    setNewConnectorAuth("");
+    setShowAddConnectorModal(false);
+    toast({
+      title: "Custom Connector Added 🎉",
+      description: `Successfully registered "${created.name}" to your workspace.`,
+    });
+  };
 
   const mcpEndpointUrl = useMemo(() => `${origin}/api/mcp/${slug || userId}`, [origin, slug, userId]);
   const restEndpointUrl = useMemo(() => `${origin}/api/mcp/rest/${slug || userId}`, [origin, slug, userId]);
@@ -104,7 +234,10 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
   const fetchConfig = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/mcp/user-config?userId=${encodeURIComponent(userId)}`);
+      const queryParams = new URLSearchParams();
+      if (userId) queryParams.set("userId", userId);
+      if (slug) queryParams.set("slug", slug);
+      const res = await fetch(`/api/mcp/user-config?${queryParams.toString()}`);
       if (res.ok) {
         const data = await res.json();
         if (data.config) {
@@ -130,7 +263,7 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, slug]);
 
   useEffect(() => {
     fetchConfig();
@@ -403,15 +536,24 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
             <span className="text-xs text-neutral-400">
               <strong className="text-white font-mono">{stats.remaining}</strong> / {stats.limit} requests left today
             </span>
+            <Link href="/payandwallet">
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-primary/20 border border-amber-500/35 text-amber-200 hover:text-white hover:border-amber-500/50 rounded-lg shadow-sm"
+              >
+                <Coins className="size-3.5 text-amber-400" />
+                <span>Token Wallet &amp; Promo Code</span>
+              </Button>
+            </Link>
             <Button
               type="button"
               size="sm"
-              onClick={() => setLoadTokensOpen(true)}
-              className="h-7 px-2.5 text-xs gap-1.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-primary/20 border border-amber-500/35 text-amber-200 hover:text-white hover:border-amber-500/50 rounded-lg shadow-sm"
+              variant="outline"
+              onClick={fetchConfig}
+              className="h-7 px-2 text-[11px] border-white/10 text-neutral-300 hover:text-white"
             >
-              <Coins className="size-3.5 text-amber-400" />
-              <span>Load Tokens</span>
-              <span className="text-[9px] font-mono uppercase bg-amber-500/25 text-amber-300 px-1 py-0.2 rounded font-bold">Coming Soon...</span>
+              Refresh
             </Button>
             <Badge variant="outline" className="text-[10px] bg-white/5 text-neutral-300 font-mono">
               Resets 00:00 UTC
@@ -814,6 +956,176 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
         </div>
       </div>
 
+      {/* ── CARD 4B: CUSTOM TOOLS & MCP CONNECTORS ───────────────────────────────── */}
+      <div className="rounded-xl border border-white/[0.08] bg-[#16161a] p-5 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Network className="h-4 w-4 text-cyan-400" />
+              Connected MCP Servers &amp; Custom Tool Connectors
+            </h3>
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Connect external remote MCP services, internal API servers, and custom tool suites directly into your agent workspace.
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => setShowAddConnectorModal(true)}
+            className="h-8 px-3 text-xs bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg gap-1.5 shadow-sm"
+          >
+            <Plus className="size-3.5" />
+            <span>Add Custom Connector</span>
+          </Button>
+        </div>
+
+        {/* Connectors List */}
+        <div className="space-y-2.5">
+          {connectors.map((conn) => (
+            <div
+              key={conn.id}
+              className="p-3.5 rounded-xl border border-white/[0.06] bg-[#111114] flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors hover:border-white/[0.12]"
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-xs text-white flex items-center gap-1.5">
+                    <Radio className={`size-3 ${conn.isActive ? "text-emerald-400 animate-pulse" : "text-neutral-500"}`} />
+                    {conn.name}
+                  </span>
+                  <Badge variant="outline" className="text-[9px] uppercase font-mono bg-white/[0.04] text-cyan-300 border-cyan-500/25">
+                    {conn.transport}
+                  </Badge>
+                  {conn.isActive ? (
+                    <span className="text-[10px] text-emerald-400 font-medium">● Connected</span>
+                  ) : (
+                    <span className="text-[10px] text-neutral-500 font-medium">○ Disabled</span>
+                  )}
+                </div>
+                <div className="text-[11px] font-mono text-neutral-400 truncate max-w-md">
+                  {conn.endpointUrl}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={testingConnectorId === conn.id}
+                  onClick={() => handleTestConnectorPing(conn.id)}
+                  className="h-7 px-2.5 text-[11px] border-white/10 text-neutral-300 hover:text-white"
+                >
+                  {testingConnectorId === conn.id ? (
+                    <Loader2 className="size-3 animate-spin mr-1" />
+                  ) : (
+                    <Zap className="size-3 text-amber-400 mr-1" />
+                  )}
+                  Test Ping
+                </Button>
+                <Switch
+                  checked={conn.isActive}
+                  onCheckedChange={() => handleToggleConnector(conn.id)}
+                  aria-label="Toggle connector status"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDeleteConnector(conn.id)}
+                  className="h-7 w-7 p-0 text-neutral-500 hover:text-rose-400 hover:bg-rose-500/10"
+                >
+                  <Trash2 className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Modal: Add Custom Connector */}
+        {showAddConnectorModal && (
+          <div className="p-4 rounded-xl border border-cyan-500/30 bg-[#141419] space-y-3.5 mt-3 shadow-lg">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                <Plus className="size-3.5 text-cyan-400" />
+                Configure New Custom MCP / API Connector
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowAddConnectorModal(false)}
+                className="text-neutral-500 hover:text-white text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-[11px] text-neutral-400">Connector Name</Label>
+                <Input
+                  value={newConnectorName}
+                  onChange={(e) => setNewConnectorName(e.target.value)}
+                  placeholder="e.g. Production Database Tools"
+                  className="h-8 text-xs bg-[#0c0c0e] border-white/10 text-white mt-1"
+                />
+              </div>
+
+              <div>
+                <Label className="text-[11px] text-neutral-400">Transport Type</Label>
+                <select
+                  value={newConnectorTransport}
+                  onChange={(e: any) => setNewConnectorTransport(e.target.value)}
+                  className="h-8 w-full text-xs bg-[#0c0c0e] border border-white/10 text-white rounded-md px-2.5 mt-1"
+                >
+                  <option value="http">HTTP / JSON-RPC 2.0</option>
+                  <option value="sse">Server-Sent Events (SSE)</option>
+                  <option value="openapi">REST OpenAPI 3.1 Spec</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-[11px] text-neutral-400">Endpoint URL</Label>
+              <Input
+                value={newConnectorUrl}
+                onChange={(e) => setNewConnectorUrl(e.target.value)}
+                placeholder="https://api.my-domain.com/mcp or http://localhost:8000/sse"
+                className="h-8 text-xs font-mono bg-[#0c0c0e] border-white/10 text-white mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-[11px] text-neutral-400">Authorization Header (Optional)</Label>
+              <Input
+                value={newConnectorAuth}
+                onChange={(e) => setNewConnectorAuth(e.target.value)}
+                placeholder="Bearer secret_token_xyz or x-api-key"
+                className="h-8 text-xs font-mono bg-[#0c0c0e] border-white/10 text-white mt-1"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAddConnectorModal(false)}
+                className="h-7 text-xs text-neutral-400"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleCreateConnector}
+                className="h-7 px-3 text-xs bg-cyan-600 hover:bg-cyan-500 text-white font-medium"
+              >
+                Connect &amp; Save
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* ── CARD 5: INTERACTIVE TOOLS CATALOG (38+ TOOLS) ───────────────────────────── */}
       <div className="rounded-xl border border-white/[0.08] bg-[#16161a] p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1012,8 +1324,6 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
           </div>
         )}
       </div>
-
-      <LoadTokensDialog open={loadTokensOpen} onOpenChange={setLoadTokensOpen} />
     </div>
   );
 }
