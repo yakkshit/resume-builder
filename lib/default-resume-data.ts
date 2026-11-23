@@ -12,7 +12,7 @@ export const defaultResumeData: ResumeData = {
     website: "https://github.com/yakkshit",
     summary:
       "Master's student with strong software engineering skills and a passion for advanced AI research, specializing in Spatial AI Agents and multi-modal perception. Proven experience in developing, evaluating, and deploying AI agents, LLMs, and VLMs for complex systems, including video tracking and analysis. Proficient in Python, Deep Learning (PyTorch), software architecture, and rigorous testing, eager to contribute to cutting-edge spatial information technology.",
-    profilePicture: "/deepmind-picture-2.jpg",
+    profilePicture: "/api/avatar/default-user",
     languages: ["English (Fluent / C1+)", "German (Basic / A2)"],
     portfolioLinks: [
       {

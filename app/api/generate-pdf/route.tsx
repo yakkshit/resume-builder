@@ -5,7 +5,7 @@ import React from "react"
 import { sanitizeResumeData } from "@/lib/sanitize-resume-data"
 import type { ResumeData, Template } from "@/lib/types"
 import { requireApiKey } from "@/lib/api-auth"
-import { getLocalProfilePictureDataUri } from "@/lib/mcp/mcp-tools-catalog"
+import { resolveUserAvatarServerSide, userHasUploadedPhoto, PhotoResolutionError } from "@/lib/crypto/photo-resolver"
 
 export const runtime = "nodejs"
 export const maxDuration = 30
@@ -146,12 +146,21 @@ export async function POST(request: NextRequest) {
     if (!sanitized.basicInfo) {
       sanitized.basicInfo = {} as any
     }
-    if (
-      !sanitized.basicInfo.profilePicture ||
-      sanitized.basicInfo.profilePicture.trim() === "" ||
-      sanitized.basicInfo.profilePicture.includes("deepmind-picture-2.jpg")
-    ) {
-      sanitized.basicInfo.profilePicture = getLocalProfilePictureDataUri()
+
+    const userId = request.headers.get("x-user-id") || "default-user"
+    const photoResult = await resolveUserAvatarServerSide(userId)
+    const hasPhoto = await userHasUploadedPhoto(userId)
+
+    if (hasPhoto && photoResult.isPlaceholder) {
+      throw new PhotoResolutionError(
+        `PhotoResolutionError: User '${userId}' has an authentic uploaded profile photo, but photo resolution returned placeholder. Galaxy fallback is banned.`
+      )
+    }
+
+    if (photoResult.photoDataUri) {
+      sanitized.basicInfo.profilePicture = photoResult.photoDataUri
+    } else if (sanitized.basicInfo.profilePicture?.includes("deepmind-picture-2.jpg")) {
+      sanitized.basicInfo.profilePicture = ""
     }
     const templateName = (template as string) || "modern"
 

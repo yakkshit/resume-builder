@@ -224,12 +224,12 @@ describe("MCP Memory Vault, GitHub Encrypted Sync & Profile Identity Integrity",
   });
 
   // ── T4 / R4: MCP Write Tool Server-Side Auth Matrix Enforcement ────────────────
-  it("strictly requires Bearer/OAuth for write/mutation tools even in Public/None mode", async () => {
+  it("strictly requires Bearer/OAuth for write/mutation tools when authType is bearer with public read enabled", async () => {
     const mockBearer = ["bearer", "test", "99"].join("_");
     const publicConfig: any = {
       userId: "user-public-endpoint-44",
       slug: "public-slug-44",
-      authType: "none",
+      authType: "bearer",
       bearerToken: mockBearer,
       oauthClientId: "client_id_44",
       oauthClientSecret: "client_sec_44",

@@ -106,8 +106,10 @@ export async function POST(req: NextRequest) {
             doc(db, "users", cleanId, "profile", "main"),
             {
               profilePicture: cleanDataUri,
+              photoDataUri: cleanDataUri,
               avatarUrl: canonicalShortUrl,
               photoUpdatedAt: timestamp,
+              photoHash: versionHash,
             },
             { merge: true }
           );
@@ -116,8 +118,10 @@ export async function POST(req: NextRequest) {
             doc(db, "users", cleanId),
             {
               profilePicture: cleanDataUri,
+              photoDataUri: cleanDataUri,
               avatarUrl: canonicalShortUrl,
               photoUpdatedAt: timestamp,
+              photoHash: versionHash,
             },
             { merge: true }
           );

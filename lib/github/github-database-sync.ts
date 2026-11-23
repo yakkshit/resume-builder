@@ -25,6 +25,7 @@ export interface SanitizedCareerDatabase {
   updatedAt: string;
   timestampEpoch: number;
   syncSource?: string;
+  photoDataUri?: string;
   careerVault?: {
     masterSkills?: string;
     masterExperience?: string;
@@ -121,6 +122,16 @@ export function sanitizeDataForGitHub(fullData: Record<string, any>): SanitizedC
     graphNodesCount: fullData.graphNodesCount || 0,
     graphEdgesCount: fullData.graphEdgesCount || 0,
   };
+
+  const candidatePhoto = fullData.photoDataUri || fullData.profilePicture;
+  if (
+    typeof candidatePhoto === "string" &&
+    candidatePhoto.startsWith("data:image/") &&
+    !candidatePhoto.includes("deepmind-picture-2.jpg") &&
+    !candidatePhoto.includes("default-user")
+  ) {
+    sanitized.photoDataUri = candidatePhoto;
+  }
 
   return sanitized;
 }

@@ -134,8 +134,8 @@ function applyIdentitySourceRule(nextResume: any, currentResume: any): any {
       (picRaw.startsWith("data:image/") || picRaw.startsWith("https://") || picRaw.startsWith("http://") || picRaw.startsWith("/"))
     ) {
       (out.basicInfo as any).profilePicture = picRaw;
-    } else if (!out.basicInfo.profilePicture) {
-      (out.basicInfo as any).profilePicture = "/deepmind-picture-2.jpg";
+    } else if (out.basicInfo.profilePicture?.includes("deepmind-picture-2.jpg")) {
+      (out.basicInfo as any).profilePicture = "";
     }
     const gh = typeof profile?.github === "string" ? profile.github.trim() : "";
     setGithubOnBasicInfo(

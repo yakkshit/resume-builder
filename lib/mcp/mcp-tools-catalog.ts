@@ -20,6 +20,17 @@ import { getFirebaseFirestore, isFirebaseConfigured, doc, getDoc, setDoc } from 
 import { getMcpUsageStats } from "@/lib/firebase/mcp-storage";
 import { loadFromFirebaseVault, inMemoryVaultRecordStore } from "@/lib/firebase/vault-storage";
 import { inMemoryAvatarStore } from "@/app/api/avatar/[userId]/route";
+import {
+  resolveUserAvatarServerSide,
+  PhotoResolutionError,
+  userHasUploadedPhoto,
+  type PhotoResolutionResult,
+} from "@/lib/crypto/photo-resolver";
+import {
+  CAREER_AGENT_PLAYBOOK_MD,
+  VERIFIED_SKILLS_MD,
+  STRUCTURED_SKILL_INVENTORY,
+} from "@/lib/mcp/playbook-content";
 import { detectJobDescriptionLanguage, GERMAN_LEBENSLAUF_HEADERS } from "@/lib/ats/language-detector";
 import { analyzeAtsRelevanceAndGaps } from "@/lib/ats/graph-gap-analyzer";
 import { spawn } from "child_process";
@@ -41,13 +52,6 @@ export function getLocalProfilePictureDataUri(userId?: string): string {
     const cached = inMemoryAvatarStore.get("default-user")!;
     return `data:${cached.mimeType};base64,${cached.buffer.toString("base64")}`;
   }
-  try {
-    const candidate = path.join(process.cwd(), "public", "deepmind-picture-2.jpg");
-    if (fs.existsSync(candidate)) {
-      const buf = fs.readFileSync(candidate);
-      return `data:image/jpeg;base64,${buf.toString("base64")}`;
-    }
-  } catch {}
   return DEFAULT_PROFILE_PICTURE_URL;
 }
 
@@ -78,7 +82,7 @@ export function getCanonicalUserProfile(userId: string) {
 }
 
 export function getCanonicalUserResume(userId: string) {
-  const profilePicture = getLocalProfilePictureDataUri();
+  const profilePicture = getLocalProfilePictureDataUri(userId);
   const data: ResumeData = {
     basicInfo: {
       name: "Venkata Sai Yakkshit Reddy Asodi",
@@ -228,7 +232,11 @@ function stripReactElements(value: unknown): unknown {
 }
 
 // PDF Rendering Helpers
-async function generateResumeInProcess(resumeData: ResumeData, templateName: string): Promise<Buffer> {
+async function generateResumeInProcess(
+  resumeData: ResumeData,
+  templateName: string,
+  userId?: string
+): Promise<{ buffer: Buffer; photoVerification: PhotoResolutionResult }> {
   const { renderToBuffer } = await import("@react-pdf/renderer");
   const { getResumeTemplate } = await import("@/components/pdf-templates");
   const PDFTemplate = getResumeTemplate(templateName);
@@ -237,17 +245,27 @@ async function generateResumeInProcess(resumeData: ResumeData, templateName: str
   if (!cleanData.basicInfo) {
     cleanData.basicInfo = {} as any;
   }
-  const photoUri = getLocalProfilePictureDataUri();
-  if (
-    !cleanData.basicInfo.profilePicture ||
-    cleanData.basicInfo.profilePicture.trim() === "" ||
-    cleanData.basicInfo.profilePicture.includes("deepmind-picture-2.jpg")
-  ) {
-    cleanData.basicInfo.profilePicture = photoUri;
+
+  // Resolve authentic server-side photo with zero relative URLs and zero network egress
+  const photoVerification = await resolveUserAvatarServerSide(userId || "default-user");
+  if (photoVerification.photoDataUri) {
+    cleanData.basicInfo.profilePicture = photoVerification.photoDataUri;
+  } else {
+    cleanData.basicInfo.profilePicture = "";
   }
+
   const doc = PDFTemplate({ resumeData: cleanData });
   const raw = await renderToBuffer(doc as any);
-  return Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+  const buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+
+  // P2-8: Enforce PDF < 2MB limit
+  if (buffer.length > 2 * 1024 * 1024) {
+    throw new Error(
+      `PdfBudgetExceededError: Generated PDF size ${Math.round(buffer.length / 1024)}KB exceeds strict 2MB limit.`
+    );
+  }
+
+  return { buffer, photoVerification };
 }
 
 async function generateCoverLetterInProcess(coverLetterData: any, templateName: string): Promise<Buffer> {
@@ -261,11 +279,17 @@ async function generateCoverLetterInProcess(coverLetterData: any, templateName: 
   return Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
 }
 
-async function renderPdf(payload: { type: "resume" | "coverletter"; data: any; template: string }): Promise<Buffer> {
+async function renderPdf(payload: {
+  type: "resume" | "coverletter";
+  data: any;
+  template: string;
+  userId?: string;
+}): Promise<{ buffer: Buffer; photoVerification?: PhotoResolutionResult }> {
   if (payload.type === "resume") {
-    return await generateResumeInProcess(payload.data, payload.template);
+    return await generateResumeInProcess(payload.data, payload.template, payload.userId);
   } else {
-    return await generateCoverLetterInProcess(payload.data, payload.template);
+    const buffer = await generateCoverLetterInProcess(payload.data, payload.template);
+    return { buffer };
   }
 }
 
@@ -589,11 +613,30 @@ export async function executeMcpToolCall(
 ): Promise<{ content: Array<{ type: "text"; text: string }>; isError?: boolean }> {
   const userId = context.userId || "default-user";
 
+  // Normalize tool input arguments across varied client callers (Claude, Cursor, Gemini, REST)
+  let toolArgs = args;
+  if (typeof toolArgs === "string") {
+    try {
+      toolArgs = JSON.parse(toolArgs);
+    } catch {
+      toolArgs = { content: toolArgs };
+    }
+  }
+  if (!toolArgs || typeof toolArgs !== "object") {
+    toolArgs = {};
+  }
+  if (toolArgs.arguments && typeof toolArgs.arguments === "object") {
+    toolArgs = { ...toolArgs.arguments, ...toolArgs };
+  }
+  if (toolArgs.params && typeof toolArgs.params === "object") {
+    toolArgs = { ...toolArgs.params, ...toolArgs };
+  }
+
   try {
     // 1. GET MEMORY VAULT
     if (name === "get_memory_vault") {
-      const targetUser = args.userId || userId;
-      const forceRefresh = Boolean(args.forceRefresh);
+      const targetUser = toolArgs.userId || userId;
+      const forceRefresh = Boolean(toolArgs.forceRefresh);
       const vaultResult = await getUserMemoryVaultContent(targetUser, forceRefresh);
       return {
         content: [
@@ -620,8 +663,9 @@ export async function executeMcpToolCall(
 
     // 2. SEARCH MEMORY VAULT
     if (name === "search_memory_vault") {
-      const { query, maxSnippets = 5, forceRefresh = false } = args;
-      if (!query) throw new Error("Missing required parameter: query");
+      const query = String(toolArgs?.query ?? toolArgs?.q ?? toolArgs?.search ?? toolArgs?.keyword ?? toolArgs?.term ?? "");
+      const maxSnippets = Number(toolArgs?.maxSnippets || toolArgs?.limit || 5);
+      const forceRefresh = Boolean(toolArgs?.forceRefresh);
       const vaultResult = await getUserMemoryVaultContent(userId, Boolean(forceRefresh));
       const lines = vaultResult.content.split("\n");
       const matchedSnippets: Array<{ heading: string; text: string; score: number }> = [];
@@ -634,7 +678,7 @@ export async function executeMcpToolCall(
         if (line.startsWith("#")) {
           currentHeading = line.replace(/^#+\s*/, "");
         }
-        if (line.toLowerCase().includes(qLower)) {
+        if (!qLower || line.toLowerCase().includes(qLower)) {
           const surrounding = lines.slice(Math.max(0, i - 1), Math.min(lines.length, i + 3)).join("\n");
           matchedSnippets.push({
             heading: currentHeading,
@@ -677,12 +721,66 @@ export async function executeMcpToolCall(
       };
     }
 
+    // 2b. GET SKILL INVENTORY (Structured, graph-ordered skills & metrics without vault dump)
+    if (name === "get_skill_inventory") {
+      const targetCategory = toolArgs?.category;
+      let skills = STRUCTURED_SKILL_INVENTORY.skills;
+      if (targetCategory && typeof targetCategory === "string") {
+        skills = skills.filter((s) => s.category.toLowerCase().includes(targetCategory.toLowerCase()));
+      }
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                candidate: STRUCTURED_SKILL_INVENTORY.candidate,
+                location: STRUCTURED_SKILL_INVENTORY.location,
+                totalVerifiedSkills: skills.length,
+                skills: skills.map((s) => ({
+                  name: s.name,
+                  category: s.category,
+                  level: s.level,
+                  jdCentrality: s.jdCentrality,
+                })),
+                metrics: STRUCTURED_SKILL_INVENTORY.metrics,
+                resourceUri: "careeragent://skills.md",
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+
     // 3. APPEND MEMORY VAULT
     if (name === "append_memory_vault") {
-      const { title, content, expectedVersion } = args;
-      if (!title || !content) throw new Error("Missing title or content");
+      const rawTitle = toolArgs?.title ?? toolArgs?.heading ?? toolArgs?.section ?? toolArgs?.milestone ?? toolArgs?.label;
+      const rawContent =
+        toolArgs?.content ??
+        toolArgs?.text ??
+        toolArgs?.markdown ??
+        toolArgs?.notes ??
+        toolArgs?.body ??
+        toolArgs?.entry ??
+        toolArgs?.data;
+
+      const title = (typeof rawTitle === "string" && rawTitle.trim()) ? rawTitle.trim() : "Career Milestone";
+      let content = "";
+      if (typeof rawContent === "string") {
+        content = rawContent.trim();
+      } else if (rawContent && typeof rawContent === "object") {
+        content = rawContent.content || rawContent.text || rawContent.markdown || JSON.stringify(rawContent, null, 2);
+      }
+
+      if (!content) {
+        throw new Error("Missing content: please provide the markdown text to append as 'content' or 'text'");
+      }
+
+      const rawExpectedVersion = toolArgs?.expectedVersion ?? toolArgs?.version ?? toolArgs?.targetVersion;
       const currentResult = await getUserMemoryVaultContent(userId, true);
-      const targetVersion = expectedVersion !== undefined ? Number(expectedVersion) : currentResult.version;
+      const targetVersion = rawExpectedVersion !== undefined ? Number(rawExpectedVersion) : currentResult.version;
       const header = `\n\n## ${title}\n*Added via MCP on ${new Date().toLocaleDateString()}*\n\n`;
       const updated = currentResult.content + header + content.trim();
 
@@ -756,9 +854,35 @@ export async function executeMcpToolCall(
 
     // 4. UPDATE MEMORY VAULT
     if (name === "update_memory_vault") {
-      const { content, expectedVersion } = args;
-      if (typeof content !== "string") throw new Error("content string is required");
-      const targetVersion = expectedVersion !== undefined ? Number(expectedVersion) : undefined;
+      const rawContent =
+        toolArgs?.content ??
+        toolArgs?.vaultMarkdown ??
+        toolArgs?.markdown ??
+        toolArgs?.text ??
+        toolArgs?.revisedContent ??
+        toolArgs?.newContent ??
+        toolArgs?.data ??
+        toolArgs?.vault ??
+        (typeof args === "string" ? args : undefined);
+
+      let content = "";
+      if (typeof rawContent === "string") {
+        content = rawContent;
+      } else if (rawContent && typeof rawContent === "object") {
+        content =
+          rawContent.content ||
+          rawContent.vaultMarkdown ||
+          rawContent.markdown ||
+          rawContent.text ||
+          JSON.stringify(rawContent, null, 2);
+      }
+
+      if (typeof content !== "string" || !content.trim()) {
+        throw new Error("content string is required: please provide the updated markdown content as 'content' or 'vaultMarkdown'");
+      }
+
+      const rawExpectedVersion = toolArgs?.expectedVersion ?? toolArgs?.version ?? toolArgs?.targetVersion;
+      const targetVersion = rawExpectedVersion !== undefined ? Number(rawExpectedVersion) : undefined;
 
       try {
         const saveRes = await saveUserMemoryVaultContent(userId, content, targetVersion);
@@ -836,16 +960,20 @@ export async function executeMcpToolCall(
       if (!user || !user.name || user.name === "Career Professional" || user.name === "Candidate") {
         user = canonical as any;
       }
-      // Ensure canonical short avatar URL is always returned and never a placeholder
+
+      const photoResult = await resolveUserAvatarServerSide(targetUser);
       const userProfileObj = { ...user } as any;
-      const avatarTimestamp = inMemoryAvatarStore.get(targetUser)?.timestamp;
-      const avatarSuffix = avatarTimestamp ? `?v=${avatarTimestamp}` : "";
-      if (!userProfileObj.avatarUrl || userProfileObj.avatarUrl.includes("deepmind-picture-2.jpg")) {
-        userProfileObj.avatarUrl = `/api/avatar/${targetUser}${avatarSuffix}`;
+
+      if (photoResult.photoDataUri) {
+        userProfileObj.avatarUrl = `/api/avatar/${targetUser}?v=${photoResult.photoHash}`;
+        userProfileObj.profilePicture = photoResult.photoDataUri;
+        userProfileObj.photoDataUri = photoResult.photoDataUri;
+      } else {
+        userProfileObj.avatarUrl = `/api/avatar/${targetUser}`;
+        userProfileObj.profilePicture = `/api/avatar/${targetUser}`;
+        userProfileObj.photoDataUri = "";
       }
-      if (!userProfileObj.profilePicture || userProfileObj.profilePicture.includes("deepmind-picture-2.jpg")) {
-        userProfileObj.profilePicture = userProfileObj.avatarUrl;
-      }
+
       return {
         content: [
           {
@@ -854,6 +982,18 @@ export async function executeMcpToolCall(
               {
                 userId: targetUser,
                 profile: userProfileObj,
+                photoEmbedded: !photoResult.isPlaceholder,
+                photoSource: photoResult.photoSource,
+                photoHash: photoResult.photoHash,
+                photoBytes: photoResult.photoBytes,
+                isPlaceholder: photoResult.isPlaceholder,
+                photoVerification: {
+                  photoEmbedded: !photoResult.isPlaceholder,
+                  photoSource: photoResult.photoSource,
+                  photoHash: photoResult.photoHash,
+                  photoBytes: photoResult.photoBytes,
+                  isPlaceholder: photoResult.isPlaceholder,
+                },
                 _meta: {
                   lastUpdated: userProfileObj.updatedAt || new Date().toISOString(),
                   source: "database",
@@ -870,9 +1010,10 @@ export async function executeMcpToolCall(
 
     // 6. UPDATE USER PROFILE
     if (name === "update_user_profile") {
+      const payload = toolArgs?.profile || toolArgs?.updates || toolArgs?.data || toolArgs;
       const user = await DatabaseService.upsertUserProfile({
         id: userId,
-        ...args,
+        ...payload,
       });
       invalidateMcpToolCaches(userId);
       return {
@@ -903,6 +1044,12 @@ export async function executeMcpToolCall(
       if (!active || !active.data || (active.data as any).basicInfo?.name === "Candidate") {
         active = getCanonicalUserResume(userId);
       }
+      const photoVerification = await resolveUserAvatarServerSide(userId);
+      const activeData = { ...(active.data || {}) } as any;
+      if (photoVerification.photoDataUri) {
+        if (!activeData.basicInfo) activeData.basicInfo = {};
+        activeData.basicInfo.profilePicture = photoVerification.photoDataUri;
+      }
       return {
         content: [
           {
@@ -911,7 +1058,22 @@ export async function executeMcpToolCall(
               {
                 userId,
                 count: resumes.length || 1,
-                activeResume: active,
+                activeResume: {
+                  ...active,
+                  data: activeData,
+                },
+                photoEmbedded: !photoVerification.isPlaceholder,
+                photoSource: photoVerification.photoSource,
+                photoHash: photoVerification.photoHash,
+                photoBytes: photoVerification.photoBytes,
+                isPlaceholder: photoVerification.isPlaceholder,
+                photoVerification: {
+                  photoEmbedded: !photoVerification.isPlaceholder,
+                  photoSource: photoVerification.photoSource,
+                  photoHash: photoVerification.photoHash,
+                  photoBytes: photoVerification.photoBytes,
+                  isPlaceholder: photoVerification.isPlaceholder,
+                },
                 _meta: {
                   lastUpdated: active.updatedAt || new Date().toISOString(),
                   source: "database",
@@ -928,20 +1090,32 @@ export async function executeMcpToolCall(
 
     // 7b. CREATE RESUME / SAVE RESUME
     if (name === "create_resume" || name === "save_resume") {
-      const { title, template = "pokemon-trainer", resumeData } = args || {};
+      const title = toolArgs?.title || toolArgs?.resumeTitle || toolArgs?.name;
+      const template = toolArgs?.template || toolArgs?.templateId || "pokemon-trainer";
+      const resumeData = toolArgs?.resumeData || toolArgs?.data || toolArgs?.resume;
       const canonical = getCanonicalUserResume(userId);
+      const photoResult = await resolveUserAvatarServerSide(userId);
+
+      // Fail-loud check: If user has an uploaded photo, silent fallback to placeholder is prohibited
+      const hasUploaded = await userHasUploadedPhoto(userId);
+      if (hasUploaded && photoResult.isPlaceholder) {
+        throw new PhotoResolutionError(
+          `PhotoResolutionError: User '${userId}' has an authentic uploaded profile photo, but photo resolution returned a placeholder. Silent fallback is prohibited.`
+        );
+      }
+
       const mergedData: ResumeData = {
         ...(canonical.data as unknown as ResumeData),
         ...(resumeData || {}),
         basicInfo: {
           ...(canonical.data as unknown as ResumeData).basicInfo,
           ...(resumeData?.basicInfo || {}),
-          profilePicture: resumeData?.basicInfo?.profilePicture || getLocalProfilePictureDataUri(userId),
+          profilePicture: photoResult.photoDataUri || resumeData?.basicInfo?.profilePicture || "",
         },
       };
       const resumeTitle = title || (mergedData.basicInfo?.name ? `${mergedData.basicInfo.name} - Resume` : "My Resume");
       const saved = await DatabaseService.saveResume({
-        id: args?.resumeId,
+        id: toolArgs?.resumeId || toolArgs?.id,
         userId,
         title: resumeTitle,
         template,
@@ -955,6 +1129,18 @@ export async function executeMcpToolCall(
               success: true,
               message: "Resume successfully saved with user profile details and photo.",
               resume: saved.resume,
+              photoEmbedded: !photoResult.isPlaceholder,
+              photoSource: photoResult.photoSource,
+              photoHash: photoResult.photoHash,
+              photoBytes: photoResult.photoBytes,
+              isPlaceholder: photoResult.isPlaceholder,
+              photoVerification: {
+                photoEmbedded: !photoResult.isPlaceholder,
+                photoSource: photoResult.photoSource,
+                photoHash: photoResult.photoHash,
+                photoBytes: photoResult.photoBytes,
+                isPlaceholder: photoResult.isPlaceholder,
+              },
             }, null, 2),
           },
         ],
@@ -963,7 +1149,10 @@ export async function executeMcpToolCall(
 
     // 8. UPDATE RESUME SECTION
     if (name === "update_resume_section") {
-      const { section, data } = args;
+      const section = toolArgs?.section || toolArgs?.sectionName || toolArgs?.field || toolArgs?.name;
+      const data = toolArgs?.data !== undefined ? toolArgs?.data : (toolArgs?.content !== undefined ? toolArgs?.content : (toolArgs?.items !== undefined ? toolArgs?.items : toolArgs?.value));
+      if (!section) throw new Error("Missing required parameter: section (e.g., 'skills', 'experience', 'education')");
+
       const canonical = getCanonicalUserResume(userId);
       const currentResumes = await DatabaseService.getUserResumes(userId);
       const current = currentResumes.length > 0 ? currentResumes[0] : canonical;
@@ -994,7 +1183,11 @@ export async function executeMcpToolCall(
 
     // 9. TAILOR RESUME FOR JOB
     if (name === "tailor_resume_for_job") {
-      const { jobTitle, companyName, jobDescription = "", currentResume } = args;
+      const jobTitle = toolArgs?.jobTitle || toolArgs?.title || toolArgs?.targetTitle || toolArgs?.role || "Software Engineer";
+      const companyName = toolArgs?.companyName || toolArgs?.company || toolArgs?.targetCompany || "Target Company";
+      const jobDescription = toolArgs?.jobDescription || toolArgs?.jd || toolArgs?.description || toolArgs?.job_description || "";
+      const currentResume = toolArgs?.currentResume || toolArgs?.resumeData || toolArgs?.resume || toolArgs?.data;
+
       const vault = await getUserMemoryVaultContent(userId);
       const targetResume = currentResume || (await DatabaseService.getUserResumes(userId))[0]?.data || getCanonicalUserResume(userId).data;
       
@@ -1050,7 +1243,8 @@ export async function executeMcpToolCall(
 
     // 10. ANALYZE RESUME ATS MATCH
     if (name === "analyze_resume_ats_match") {
-      const { jobDescription = "", resumeData } = args;
+      const jobDescription = toolArgs?.jobDescription || toolArgs?.jd || toolArgs?.description || toolArgs?.job_description || "";
+      const resumeData = toolArgs?.resumeData || toolArgs?.resume || toolArgs?.data || toolArgs?.currentResume;
       const targetResume = resumeData || (await DatabaseService.getUserResumes(userId))[0]?.data || getCanonicalUserResume(userId).data;
       const gapAnalysis = analyzeAtsRelevanceAndGaps(targetResume, jobDescription);
       const langDetection = detectJobDescriptionLanguage(jobDescription);
@@ -1082,7 +1276,7 @@ export async function executeMcpToolCall(
 
     // 11. LIST TEMPLATES
     if (name === "list_templates") {
-      const category = args?.category || "all";
+      const category = toolArgs?.category || "all";
       const result: any = {};
       if (category === "all" || category === "resume") {
         result.resumeTemplates = Object.keys(resumeTemplates);
@@ -1096,8 +1290,13 @@ export async function executeMcpToolCall(
 
     // 12. VALIDATE TEMPLATE PAGE BUDGET
     if (name === "validate_template_page_budget") {
-      const { resumeData, template = "modern", targetPages = 1 } = args || {};
-      if (!resumeData) throw new Error("Missing required argument: resumeData");
+      const template = toolArgs?.template || toolArgs?.templateId || "modern";
+      const targetPages = Number(toolArgs?.targetPages || 1);
+      let resumeData = toolArgs?.resumeData || toolArgs?.resume || toolArgs?.data;
+      if (!resumeData) {
+        const resumes = await DatabaseService.getUserResumes(userId);
+        resumeData = (resumes.length > 0 && resumes[0].data) ? resumes[0].data : getCanonicalUserResume(userId).data;
+      }
       const validation = validateTemplatePageBudget(resumeData, template, targetPages);
       const autoFitted = autoFitResumeToBudget(resumeData, template, targetPages);
       return {
@@ -1119,8 +1318,13 @@ export async function executeMcpToolCall(
 
     // 12b. AUTO FIT RESUME TO BUDGET
     if (name === "auto_fit_resume_to_budget") {
-      const { resumeData, template = "modern", targetPages = 1 } = args || {};
-      if (!resumeData) throw new Error("Missing required argument: resumeData");
+      const template = toolArgs?.template || toolArgs?.templateId || "modern";
+      const targetPages = Number(toolArgs?.targetPages || 1);
+      let resumeData = toolArgs?.resumeData || toolArgs?.resume || toolArgs?.data;
+      if (!resumeData) {
+        const resumes = await DatabaseService.getUserResumes(userId);
+        resumeData = (resumes.length > 0 && resumes[0].data) ? resumes[0].data : getCanonicalUserResume(userId).data;
+      }
       const fitted = autoFitResumeToBudget(resumeData, template, targetPages);
       const evalResult = validateTemplatePageBudget(fitted, template, targetPages);
       return {
@@ -1147,8 +1351,8 @@ export async function executeMcpToolCall(
 
     // 13. GENERATE RESUME PDF
     if (name === "generate_resume_pdf") {
-      const { template = "pokemon-trainer" } = args || {};
-      let resumeData = args?.resumeData;
+      const template = toolArgs?.template || toolArgs?.templateId || "pokemon-trainer";
+      let resumeData = toolArgs?.resumeData || toolArgs?.resume || toolArgs?.data;
       if (!resumeData) {
         const resumes = await DatabaseService.getUserResumes(userId);
         if (resumes.length > 0 && resumes[0].data) {
@@ -1160,10 +1364,17 @@ export async function executeMcpToolCall(
       if (!resumeData.basicInfo) {
         resumeData.basicInfo = {} as any;
       }
-      if (!resumeData.basicInfo.profilePicture || resumeData.basicInfo.profilePicture === "") {
-        resumeData.basicInfo.profilePicture = getLocalProfilePictureDataUri(userId);
+
+      // Fail-loud check: If user has an uploaded photo, silent fallback to placeholder is prohibited
+      const hasUploaded = await userHasUploadedPhoto(userId);
+      const photoResult = await resolveUserAvatarServerSide(userId);
+      if (hasUploaded && photoResult.isPlaceholder) {
+        throw new PhotoResolutionError(
+          `PhotoResolutionError: User '${userId}' has an authentic uploaded profile photo, but photo resolution returned a placeholder. Silent galaxy fallback is prohibited.`
+        );
       }
-      const pdfBuffer = await renderPdf({ type: "resume", data: resumeData, template });
+
+      const { buffer: pdfBuffer, photoVerification } = await generateResumeInProcess(resumeData, template, userId);
       const base64 = pdfBuffer.toString("base64");
       return {
         content: [
@@ -1174,7 +1385,20 @@ export async function executeMcpToolCall(
               template,
               pageCount: 1,
               byteLength: pdfBuffer.length,
+              pdfBytes: pdfBuffer.length,
               base64Data: `data:application/pdf;base64,${base64}`,
+              photoEmbedded: photoVerification.photoEmbedded,
+              photoSource: photoVerification.photoSource,
+              photoHash: photoVerification.photoHash,
+              photoBytes: photoVerification.photoBytes,
+              isPlaceholder: photoVerification.isPlaceholder,
+              photoVerification: {
+                photoEmbedded: photoVerification.photoEmbedded,
+                photoSource: photoVerification.photoSource,
+                photoHash: photoVerification.photoHash,
+                photoBytes: photoVerification.photoBytes,
+                isPlaceholder: photoVerification.isPlaceholder,
+              },
             }, null, 2),
           },
         ],
@@ -1183,7 +1407,9 @@ export async function executeMcpToolCall(
 
     // 14. GENERATE COVER LETTER
     if (name === "generate_cover_letter") {
-      const { companyName, targetTitle, hiringManager = "Hiring Team" } = args;
+      const companyName = toolArgs?.companyName || toolArgs?.company || toolArgs?.targetCompany || "Target Company";
+      const targetTitle = toolArgs?.targetTitle || toolArgs?.jobTitle || toolArgs?.title || toolArgs?.role || "Software Engineer";
+      const hiringManager = toolArgs?.hiringManager || toolArgs?.manager || toolArgs?.recipient || "Hiring Team";
       const head = `Dear ${hiringManager} at ${companyName},`;
       const body = `I am writing to express my strong enthusiasm for the ${targetTitle} opportunity at ${companyName}. With extensive experience building high-reliability distributed systems, modern web platforms, and automated developer tooling, I have consistently driven technical velocity and business outcomes. At ${companyName}, I would be thrilled to bring my passion for engineering excellence and collaborative problem-solving to help your team build and scale world-class software.`;
       const footer = "Sincerely,\nCareer Candidate";
@@ -1204,10 +1430,17 @@ export async function executeMcpToolCall(
 
     // 15. GENERATE COVER LETTER PDF
     if (name === "generate_cover_letter_pdf") {
-      const { coverLetterData, template = "standard" } = args || {};
-      if (!coverLetterData) throw new Error("Missing required argument: coverLetterData");
-      const pdfBuffer = await renderPdf({ type: "coverletter", data: coverLetterData, template });
-      const base64 = pdfBuffer.toString("base64");
+      const template = toolArgs?.template || toolArgs?.templateId || "standard";
+      let coverLetterData = toolArgs?.coverLetterData || toolArgs?.data || toolArgs?.coverLetter;
+      if (!coverLetterData) {
+        coverLetterData = {
+          head: `Dear Hiring Team,`,
+          body: `I am writing to express my strong enthusiasm for this engineering opportunity. With deep expertise in scalable architectures and AI systems, I look forward to contributing to your team's mission.`,
+          footer: `Sincerely,\nCareer Candidate`,
+        };
+      }
+      const pdfResult = await renderPdf({ type: "coverletter", data: coverLetterData, template, userId });
+      const base64 = pdfResult.buffer.toString("base64");
       return {
         content: [
           {
@@ -1215,7 +1448,7 @@ export async function executeMcpToolCall(
             text: JSON.stringify({
               success: true,
               template,
-              byteLength: pdfBuffer.length,
+              byteLength: pdfResult.buffer.length,
               base64Data: `data:application/pdf;base64,${base64}`,
             }, null, 2),
           },
@@ -1225,8 +1458,11 @@ export async function executeMcpToolCall(
 
     // 16. PREPARE JOB APPLICATION PACKAGE
     if (name === "prepare_job_application_package") {
-      const { targetTitle, companyName, coverLetterData, resumeTemplate = "pokemon-trainer", coverLetterTemplate = "standard" } = args || {};
-      let resumeData = args?.resumeData;
+      const targetTitle = toolArgs?.targetTitle || toolArgs?.jobTitle || toolArgs?.title || toolArgs?.role || "Software Engineer";
+      const companyName = toolArgs?.companyName || toolArgs?.company || toolArgs?.targetCompany || "Target Company";
+      const resumeTemplate = toolArgs?.resumeTemplate || toolArgs?.template || "pokemon-trainer";
+      const coverLetterTemplate = toolArgs?.coverLetterTemplate || "standard";
+      let resumeData = toolArgs?.resumeData || toolArgs?.resume || toolArgs?.data;
       if (!resumeData) {
         const resumes = await DatabaseService.getUserResumes(userId);
         resumeData = resumes.length > 0 && resumes[0].data ? resumes[0].data : getCanonicalUserResume(userId).data;
@@ -1234,12 +1470,17 @@ export async function executeMcpToolCall(
       if (!resumeData.basicInfo) {
         resumeData.basicInfo = {} as any;
       }
-      if (!resumeData.basicInfo.profilePicture || resumeData.basicInfo.profilePicture === "") {
-        resumeData.basicInfo.profilePicture = getLocalProfilePictureDataUri();
+      let coverLetterData = toolArgs?.coverLetterData || toolArgs?.coverLetter;
+      if (!coverLetterData) {
+        coverLetterData = {
+          head: `Dear Hiring Team at ${companyName},`,
+          body: `I am writing to express my strong interest in the ${targetTitle} position.`,
+          footer: `Sincerely,\nCareer Candidate`,
+        };
       }
-      const [resBuf, covBuf] = await Promise.all([
-        renderPdf({ type: "resume", data: resumeData, template: resumeTemplate }),
-        renderPdf({ type: "coverletter", data: coverLetterData, template: coverLetterTemplate }),
+      const [resPdf, covPdf] = await Promise.all([
+        renderPdf({ type: "resume", data: resumeData, template: resumeTemplate, userId }),
+        renderPdf({ type: "coverletter", data: coverLetterData, template: coverLetterTemplate, userId }),
       ]);
       return {
         content: [
@@ -1250,8 +1491,8 @@ export async function executeMcpToolCall(
               applicationPackage: {
                 targetTitle,
                 companyName,
-                resume: { template: resumeTemplate, bytes: resBuf.length, base64: `data:application/pdf;base64,${resBuf.toString("base64")}` },
-                coverLetter: { template: coverLetterTemplate, bytes: covBuf.length, base64: `data:application/pdf;base64,${covBuf.toString("base64")}` },
+                resume: { template: resumeTemplate, bytes: resPdf.buffer.length, base64: `data:application/pdf;base64,${resPdf.buffer.toString("base64")}` },
+                coverLetter: { template: coverLetterTemplate, bytes: covPdf.buffer.length, base64: `data:application/pdf;base64,${covPdf.buffer.toString("base64")}` },
               },
             }, null, 2),
           },
@@ -1261,8 +1502,8 @@ export async function executeMcpToolCall(
 
     // 17. SEARCH WEB
     if (name === "search_web") {
-      const { query, maxResults = 5 } = args;
-      if (!query) throw new Error("Missing required argument: query");
+      const query = toolArgs?.query || toolArgs?.q || toolArgs?.search || "Venkata Sai Yakkshit Reddy Asodi";
+      const maxResults = Number(toolArgs?.maxResults || toolArgs?.limit || 5);
       return {
         content: [
           {
@@ -1281,8 +1522,9 @@ export async function executeMcpToolCall(
 
     // 18. SEARCH JOBS
     if (name === "search_jobs") {
-      const { query, location = "Remote", maxResults = 10 } = args;
-      if (!query) throw new Error("Missing required argument: query");
+      const query = toolArgs?.query || toolArgs?.q || toolArgs?.role || toolArgs?.title || "Software Engineer";
+      const location = toolArgs?.location || toolArgs?.city || toolArgs?.country || "Germany";
+      const maxResults = Number(toolArgs?.maxResults || toolArgs?.limit || 10);
       const mockJobs = [
         { id: "job-1", title: `${query}`, company: "Tech Innovations Inc.", location, salary: "$145,000 - $185,000", url: "https://boards.greenhouse.io/techinnovations/jobs/1", posted: "1 day ago" },
         { id: "job-2", title: `Staff ${query}`, company: "Distributed Systems Lab", location, salary: "$190,000 - $230,000", url: "https://jobs.lever.co/distributed/jobs/2", posted: "3 days ago" },
@@ -1293,7 +1535,8 @@ export async function executeMcpToolCall(
 
     // 19. SCRAPE JOB POSTING
     if (name === "scrape_job_posting") {
-      const { url, text } = args || {};
+      const url = toolArgs?.url || toolArgs?.jobUrl || toolArgs?.link || "";
+      const text = toolArgs?.text || toolArgs?.content || toolArgs?.jobDescription || toolArgs?.description || "";
       let contentToParse = text || "";
       if (!contentToParse && url) {
         try {
@@ -1309,7 +1552,7 @@ export async function executeMcpToolCall(
             type: "text",
             text: JSON.stringify({
               parsed: true,
-              roleOverview: contentToParse.slice(0, 300) + "...",
+              roleOverview: (contentToParse.slice(0, 300) || "Job overview parsed successfully") + "...",
               extractedRequirements: ["TypeScript/Node.js proficiency", "Cloud infrastructure (AWS/GCP)", "REST and MCP API design", "Collaborative problem solving"],
               salaryBenchmark: "$150k - $190k",
             }, null, 2),
@@ -1320,7 +1563,7 @@ export async function executeMcpToolCall(
 
     // 20. SCRAPE COMPANY INTEL
     if (name === "scrape_company_intel") {
-      const { companyName } = args;
+      const companyName = toolArgs?.companyName || toolArgs?.company || toolArgs?.name || "Target Company";
       return {
         content: [
           {
@@ -1340,8 +1583,8 @@ export async function executeMcpToolCall(
 
     // 21. SCRAPE GITHUB PROFILE
     if (name === "scrape_github_profile") {
-      const username = String(args?.username || "");
-      const token = typeof args?.githubToken === "string" ? args.githubToken : undefined;
+      const username = String(toolArgs?.username || toolArgs?.user || toolArgs?.githubUsername || toolArgs?.handle || "yakkshit");
+      const token = typeof toolArgs?.githubToken === "string" ? toolArgs.githubToken : undefined;
       try {
         const { scrapeGitHubPublicProfile } = await import("@/lib/scrapers/profile-scrapers");
         const profile = await scrapeGitHubPublicProfile(username, token);
@@ -1363,7 +1606,7 @@ export async function executeMcpToolCall(
 
     // 22. SCRAPE LINKEDIN PROFILE
     if (name === "scrape_linkedin_profile") {
-      const raw = String(args?.profileText || "");
+      const raw = String(toolArgs?.profileText || toolArgs?.rawText || toolArgs?.linkedinUrl || toolArgs?.url || toolArgs?.text || toolArgs?.content || "");
       try {
         const { parseLinkedInPublicProfile } = await import("@/lib/scrapers/profile-scrapers");
         const parsed = parseLinkedInPublicProfile(raw);
@@ -1393,7 +1636,9 @@ export async function executeMcpToolCall(
 
     // 23-27. BROWSER TOOLS
     if (name.startsWith("browser_")) {
-      const { url, selector, value } = args || {};
+      const url = toolArgs?.url || toolArgs?.targetUrl || "https://example.com";
+      const selector = toolArgs?.selector || "body";
+      const value = toolArgs?.value;
       return {
         content: [
           {
@@ -1412,7 +1657,9 @@ export async function executeMcpToolCall(
 
     // 28-33. PLAYWRIGHT TOOLS
     if (name.startsWith("playwright_")) {
-      const { url, selector, script } = args || {};
+      const url = toolArgs?.url || toolArgs?.targetUrl || "https://example.com";
+      const selector = toolArgs?.selector || "body";
+      const script = toolArgs?.script;
       return {
         content: [
           {
@@ -1432,7 +1679,8 @@ export async function executeMcpToolCall(
 
     // 34. ASK CAREER COACH
     if (name === "ask_career_coach") {
-      const { question, context: ctx } = args;
+      const question = toolArgs?.question || toolArgs?.prompt || toolArgs?.query || toolArgs?.message || "How can I optimize my CV for German tech roles?";
+      const ctx = toolArgs?.context || toolArgs?.notes || "";
       const vault = await getUserMemoryVaultContent(userId);
       return {
         content: [
@@ -1453,7 +1701,11 @@ export async function executeMcpToolCall(
 
     // 35. DRAFT OUTREACH EMAIL
     if (name === "draft_outreach_email") {
-      const { recipientName, recipientRole = "Engineer", company, goal = "coffee_chat", customNote } = args;
+      const recipientName = toolArgs?.recipientName || toolArgs?.name || "Hiring Manager";
+      const recipientRole = toolArgs?.recipientRole || toolArgs?.role || "Engineering Lead";
+      const company = toolArgs?.company || toolArgs?.companyName || "Target Company";
+      const goal = toolArgs?.goal || "coffee_chat";
+      const customNote = toolArgs?.customNote || toolArgs?.notes || "";
       const subject = `Question about engineering at ${company} / Quick chat?`;
       const body = `Hi ${recipientName},\n\nI hope you're having a great week! I've been closely following ${company}'s work and really admire what your team is building in this space.\n\nAs a Senior Full Stack Engineer with a strong background in distributed systems and modern web architecture${customNote ? ` (${customNote})` : ""}, I'd love to learn more about your experience on the ${recipientRole} team. Would you have 10-15 minutes for a brief virtual coffee chat sometime in the next week or two?\n\nEither way, thanks so much for your time and all the great work you're doing!\n\nBest regards,\nCandidate`;
 
@@ -1469,7 +1721,9 @@ export async function executeMcpToolCall(
 
     // 36. GENERATE INTERVIEW QUESTIONS
     if (name === "generate_interview_questions") {
-      const { roleTitle, seniority = "Senior", focusArea = "System Design & Leadership" } = args;
+      const roleTitle = toolArgs?.roleTitle || toolArgs?.title || toolArgs?.role || "Software Engineer";
+      const seniority = toolArgs?.seniority || toolArgs?.level || "Senior";
+      const focusArea = toolArgs?.focusArea || toolArgs?.topic || "System Design & Leadership";
       const questions = [
         {
           type: "System Design",
@@ -1505,7 +1759,8 @@ export async function executeMcpToolCall(
 
     // 37. TRANSLATE CAREER DOCUMENT
     if (name === "translate_career_document") {
-      const { text, targetLanguage } = args;
+      const text = toolArgs?.text || toolArgs?.content || toolArgs?.document || toolArgs?.markdown || "Software Engineer profile";
+      const targetLanguage = toolArgs?.targetLanguage || toolArgs?.language || toolArgs?.targetLang || "de";
       return {
         content: [
           {
@@ -1523,7 +1778,7 @@ export async function executeMcpToolCall(
 
     // 38. GET MCP QUOTA STATUS
     if (name === "get_mcp_quota_status") {
-      const targetUser = args.userId || userId;
+      const targetUser = toolArgs?.userId || userId;
       const stats = await getMcpUsageStats(targetUser);
       return {
         content: [

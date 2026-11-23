@@ -106,6 +106,17 @@ export const ALL_MCP_TOOLS: MCPToolDefinition[] = [
       required: ["content"],
     },
   },
+  {
+    name: "get_skill_inventory",
+    category: "vault",
+    description: "Retrieve structured, graph-centrality-ordered skills and verified metrics grounded in user memory vault (≤2 KB, prevents full vault dump).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        category: { type: "string", description: "Optional filter category (e.g. 'AI & Robotics', 'Machine Learning', 'Full Stack')" },
+      },
+    },
+  },
 
   // --- USER PROFILE & RESUME TOOLS ---
   {

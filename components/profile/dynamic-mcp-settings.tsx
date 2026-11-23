@@ -523,6 +523,51 @@ export function DynamicMcpSettings({ userId, userName }: DynamicMcpSettingsProps
           </div>
           <span className="text-[11px] text-neutral-500 hidden sm:inline">Unique identifier for personal endpoints.</span>
         </div>
+
+        {/* Playbook & Skills Distribution (Well-Known & Claude Code) */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 pt-3 border-t border-white/[0.06]">
+          <span className="text-xs text-neutral-400 font-medium">Agent Playbook &amp; Skills:</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleCopy(`curl -fsSL ${origin}/.well-known/agents.md >> ~/.claude/AGENTS.md`, "copy-agents-md")}
+            className="h-7 text-xs border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:text-white gap-1.5"
+          >
+            {copiedKey === "copy-agents-md" ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+            Copy AGENTS.md for Claude Code
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleCopy(`curl -fsSL ${origin}/.well-known/skills.md -o skills.md`, "copy-skills-md")}
+            className="h-7 text-xs border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:text-white gap-1.5"
+          >
+            {copiedKey === "copy-skills-md" ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+            Copy skills.md
+          </Button>
+          <div className="ml-auto flex items-center gap-3">
+            <a
+              href="/.well-known/agents.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-primary hover:underline flex items-center gap-1"
+            >
+              <span>View AGENTS.md</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+            <a
+              href="/.well-known/skills.md"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] text-sky-400 hover:underline flex items-center gap-1"
+            >
+              <span>View skills.md</span>
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* ── CARD 2: DAILY QUOTA & TELEMETRY METER (100 REQUESTS/DAY) ──────────────────── */}

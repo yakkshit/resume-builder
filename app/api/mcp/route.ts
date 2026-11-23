@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ALL_MCP_TOOLS, executeMcpToolCall } from "@/lib/mcp/mcp-tools-catalog";
+import { CAREER_AGENT_PLAYBOOK_MD, VERIFIED_SKILLS_MD } from "@/lib/mcp/playbook-content";
 import {
   getUserMcpConfig,
   verifyMcpRequestAuth,
@@ -248,7 +249,77 @@ export async function POST(req: NextRequest) {
     }
 
     if (method === "resources/list") {
-      return NextResponse.json({ jsonrpc: "2.0", id, result: { resources: [] } }, { headers: corsHeaders });
+      return NextResponse.json(
+        {
+          jsonrpc: "2.0",
+          id,
+          result: {
+            resources: [
+              {
+                uri: "careeragent://agent-playbook.md",
+                name: "Career Agent Playbook (AGENTS.md)",
+                description: "Inviolable execution rules for external AI agents: photo verification, zero hidden text, language matching, graph ordering, and tool guidance.",
+                mimeType: "text/markdown",
+              },
+              {
+                uri: "careeragent://skills.md",
+                name: "Verified Skills & Metrics Inventory",
+                description: "Truthful, graph-centrality-ordered skill inventory with grounded metrics from the user's authentic memory vault.",
+                mimeType: "text/markdown",
+              },
+            ],
+          },
+        },
+        { headers: corsHeaders }
+      );
+    }
+
+    if (method === "resources/read") {
+      const uri = params?.uri || params?.url;
+      if (uri === "careeragent://agent-playbook.md") {
+        return NextResponse.json(
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              contents: [
+                {
+                  uri: "careeragent://agent-playbook.md",
+                  mimeType: "text/markdown",
+                  text: CAREER_AGENT_PLAYBOOK_MD,
+                },
+              ],
+            },
+          },
+          { headers: corsHeaders }
+        );
+      }
+      if (uri === "careeragent://skills.md") {
+        return NextResponse.json(
+          {
+            jsonrpc: "2.0",
+            id,
+            result: {
+              contents: [
+                {
+                  uri: "careeragent://skills.md",
+                  mimeType: "text/markdown",
+                  text: VERIFIED_SKILLS_MD,
+                },
+              ],
+            },
+          },
+          { headers: corsHeaders }
+        );
+      }
+      return NextResponse.json(
+        {
+          jsonrpc: "2.0",
+          id,
+          error: { code: -32602, message: `Resource '${uri}' not found` },
+        },
+        { headers: corsHeaders, status: 404 }
+      );
     }
 
     if (method === "prompts/list") {

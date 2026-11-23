@@ -336,8 +336,18 @@ export function verifyMcpRequestAuth(
     } catch {}
   }
 
-  // 5. If this is a mutating write tool, REJECT if unauthenticated (even in Public/None mode)
-  if (isMutating) {
+  // 5. REST Endpoint Tamper Protection:
+  // Mutating tools on REST endpoints (/api/mcp/rest/) require Bearer/OAuth credentials when configured
+  const isRestEndpoint = (() => {
+    try {
+      const url = new URL(req.url);
+      return url.pathname.includes("/api/mcp/rest/");
+    } catch {
+      return false;
+    }
+  })();
+
+  if (isMutating && isRestEndpoint && (config.bearerToken || config.oauthClientSecret) && !token) {
     return {
       authorized: false,
       authTypeUsed: "rejected_write",
@@ -345,18 +355,33 @@ export function verifyMcpRequestAuth(
     };
   }
 
-  // 6. If user configured "none" or public mode, allow READ-ONLY tools immediately
-  if (config.authType === "none" || config.isPublic) {
+  // 6. Explicit "none" mode authorization:
+  // When authType is "none", MCP protocol endpoints (/api/mcp/{slug}) are open for both read and write tools
+  if (config.authType === "none") {
     return { authorized: true, authTypeUsed: "none (public)" };
   }
 
+  // 7. If endpoint is public for read tools (when authType is bearer/oauth but isPublic is enabled)
+  if (config.isPublic && !isMutating) {
+    return { authorized: true, authTypeUsed: "public-read" };
+  }
+
+  // Mutating write tools require credentials under all non-none auth modes
+  if (isMutating && !token) {
+    return {
+      authorized: false,
+      authTypeUsed: "rejected_write",
+      error: `Unauthorized: Mutation tool '${toolName}' requires Bearer or OAuth credentials.`,
+    };
+  }
+
   // 7. Secret Personal Capability Slug URL verification for MCP protocol (/api/mcp/<slug>) read tools
-  if (config.slug && config.slug.length >= 12 && config.slug !== "default-user") {
+  if (config.slug && config.slug !== "default-user") {
     try {
       const url = new URL(req.url);
       const pathname = url.pathname.toLowerCase();
       const targetSlug = config.slug.toLowerCase();
-      if (pathname.includes(`/api/mcp/${targetSlug}`) && !pathname.includes(`/api/mcp/rest/`)) {
+      if (pathname.includes(`/api/mcp/${targetSlug}`) && !pathname.includes(`/api/mcp/rest/`) && !isMutating) {
         return { authorized: true, authTypeUsed: "slug-url" };
       }
     } catch {}

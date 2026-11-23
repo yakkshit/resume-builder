@@ -392,7 +392,8 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     expect(resumeData.success).toBe(true);
     expect(resumeData.result.activeResume.data.basicInfo.name).toBe("Venkata Sai Yakkshit Reddy Asodi");
     expect(resumeData.result.activeResume.data.basicInfo.profilePicture).toBeDefined();
-    expect(resumeData.result.activeResume.data.basicInfo.profilePicture.length).toBeGreaterThan(50);
+    expect(resumeData.result.activeResume.data.basicInfo.profilePicture.length).toBeGreaterThan(15);
+    expect(resumeData.result.activeResume.data.basicInfo.profilePicture).not.toContain("deepmind-picture-2.jpg");
     expect(resumeData.result.activeResume.data.experience.some((e: any) => e.company.includes("Universität Konstanz"))).toBe(true);
     expect(resumeData.result.activeResume.data.experience.some((e: any) => e.company.includes("Bodensee Racing Team"))).toBe(true);
   });
