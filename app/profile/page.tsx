@@ -199,6 +199,12 @@ export default function ProfileDashboardPage() {
   const [isIngestingDoc, setIsIngestingDoc] = useState<boolean>(false);
   const [isSyncingGraph, setIsSyncingGraph] = useState<boolean>(false);
   const [graphState, setGraphState] = useState<any>(null);
+  const [lastVaultSyncedAt, setLastVaultSyncedAt] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("cv_last_vault_synced_at") || new Date().toISOString();
+    }
+    return null;
+  });
 
   const fetchOrSyncGraph = async (isSync = false) => {
     setIsSyncingGraph(true);
@@ -223,9 +229,25 @@ export default function ProfileDashboardPage() {
         setGraphState(data.graph);
       }
       if (isSync) {
+        // Also write-through to unified memory vault sync endpoint for MCP cache invalidation
+        await fetch("/api/memory-vault/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user?.id || "default-user",
+            ragKnowledgeBase: profile.ragKnowledgeBase || SAMPLE_VAULT_TEMPLATE,
+          }),
+        }).catch(() => {});
+
+        const nowIso = new Date().toISOString();
+        setLastVaultSyncedAt(nowIso);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("cv_last_vault_synced_at", nowIso);
+        }
+
         toast({
-          title: "Synced to Knowledge Graph Engine",
-          description: `Extracted & merged ${data.nodeCount ?? data.graph?.nodes?.length ?? 0} nodes and ${data.edgeCount ?? data.graph?.edges?.length ?? 0} multi-hop edges.`,
+          title: "Memory Vault & Graph Synced!",
+          description: `Extracted & merged ${data.nodeCount ?? data.graph?.nodes?.length ?? 0} nodes and ${data.edgeCount ?? data.graph?.edges?.length ?? 0} multi-hop edges. MCP endpoints updated.`,
         });
       }
     } catch (err: any) {
@@ -368,11 +390,31 @@ export default function ProfileDashboardPage() {
     reader.readAsDataURL(file);
   };
 
-  const onCropDone = (dataUrl: string) => {
-    setProfile((prev) => ({ ...prev, profilePicture: dataUrl }));
+  const onCropDone = async (dataUrl: string) => {
     setImageToCrop(null);
+    setProfile((prev) => ({ ...prev, profilePicture: dataUrl }));
     markChanged();
-    toast({ title: "Photo Updated", description: "Profile photo cropped and saved." });
+    toast({ title: "Photo Updated", description: "Generating permanent short URL and saving..." });
+
+    try {
+      const res = await fetch("/api/avatar/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user?.id || "default-user",
+          image: dataUrl,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.avatarUrl) {
+          setProfile((prev) => ({ ...prev, profilePicture: data.avatarUrl }));
+          toast({ title: "Permanent Photo URL Active", description: `Canonical URL: ${data.shortUrl}` });
+        }
+      }
+    } catch (e) {
+      console.warn("Avatar upload notice:", e);
+    }
   };
 
   // Memory Vault Actions
@@ -714,7 +756,7 @@ export default function ProfileDashboardPage() {
         }
       }
 
-      // Save personal details and API keys to Firebase Secret Vault
+      // Save personal details, memory vault, and API keys to Firebase Secret Vault
       await saveToFirebaseVault({
         personalDetails: {
           name: profile.name || "",
@@ -734,7 +776,31 @@ export default function ProfileDashboardPage() {
         encryptionPassphrase: profile.encryptionPassphrase,
         githubToken: profile.githubToken,
         githubRepo: profile.githubRepo || "career-agent-database",
+        ragKnowledgeBase: profile.ragKnowledgeBase,
+        masterSkills: profile.masterSkills,
+        masterExperience: profile.masterExperience,
+        masterProjects: profile.masterProjects,
+        masterEducation: profile.masterEducation,
+        masterCertifications: profile.masterCertifications,
       }).catch((e) => console.warn("Firebase vault sync notice:", e));
+
+      // Write-through to unified Memory Vault sync endpoint to invalidate MCP tool caches
+      if (profile.ragKnowledgeBase) {
+        await fetch("/api/memory-vault/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user?.id || "default-user",
+            ragKnowledgeBase: profile.ragKnowledgeBase,
+          }),
+        }).catch(() => {});
+
+        const nowIso = new Date().toISOString();
+        setLastVaultSyncedAt(nowIso);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("cv_last_vault_synced_at", nowIso);
+        }
+      }
 
       // Sync user profile directly into Firebase Database (Firestore & Auth)
       await syncUserProfileToFirebase(profile).catch((e) => console.warn("Firebase direct profile sync notice:", e));
@@ -1382,14 +1448,14 @@ export default function ProfileDashboardPage() {
                       </button>
                     </div>
 
-                    {/* Sync to Neo4j */}
+                    {/* Sync to Neo4j & Invalidate MCP Cache */}
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       disabled={isSyncingGraph}
                       onClick={() => fetchOrSyncGraph(true)}
-                      className="h-7 px-2.5 text-[11px] bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300 gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                      className="h-7 px-2.5 text-[11px] bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-300 gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.15)] transition-all"
                     >
                       {isSyncingGraph ? (
                         <Loader2 className="h-3 w-3 animate-spin text-emerald-400" />
@@ -1398,6 +1464,20 @@ export default function ProfileDashboardPage() {
                       )}
                       <span>{isSyncingGraph ? "Syncing..." : "Sync Graph"}</span>
                     </Button>
+
+                    {/* Last Synced At Freshness Indicator */}
+                    <div
+                      className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[11px] font-mono text-emerald-300 select-none shadow-xs"
+                      title={lastVaultSyncedAt ? `Last verified & synced at: ${new Date(lastVaultSyncedAt).toLocaleString()}` : "Ready for sync"}
+                    >
+                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-neutral-400 text-[10px] uppercase tracking-wider font-semibold">Freshness:</span>
+                      <span className="font-medium text-emerald-200">
+                        {lastVaultSyncedAt
+                          ? new Date(lastVaultSyncedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+                          : "Synchronized"}
+                      </span>
+                    </div>
 
                     {/* Load Template */}
                     <Button

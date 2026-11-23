@@ -10,7 +10,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import type { SetStateAction } from "react";
 import dynamic from "next/dynamic";
-import { FileText, Eye, Edit, Undo2, Redo2, PanelRightOpen, PanelRightClose, Gauge, Scissors, CheckCircle2, AlertTriangle, Copy, Check } from "lucide-react";
+import { FileText, Eye, Edit, Undo2, Redo2, PanelRightOpen, PanelRightClose, Gauge, Scissors, CheckCircle2, AlertTriangle, Copy, Check, Wand2 } from "lucide-react";
 import { ArtifactTrafficLights, type ArtifactPanelMode } from "@/components/chat/chat-artifact-chrome";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import { tryLocalStorageGet, tryLocalStorageSet } from "@/lib/safe-local-storage
 import { deepMerge, cn } from "@/lib/utils";
 import { normalizeResumePayloadToFlat } from "@/lib/normalize-sections-resume";
 import { TRANSLATION_ORIGINAL } from "@/lib/translation";
-import { validateTemplatePageBudget, type PageBudgetEvaluation } from "@/lib/resume-template-limits";
+import { validateTemplatePageBudget, autoFitResumeToBudget, type PageBudgetEvaluation } from "@/lib/resume-template-limits";
 
 // PDF viewer loaded dynamically (client-only, heavy)
 const PdfPreviewClient = dynamic(
@@ -292,6 +292,15 @@ export function ResumeViewer({
       return safe;
     });
   }, [pushResumeHistory]);
+
+  const handleAutoFit = useCallback(() => {
+    const fitted = autoFitResumeToBudget(resumeData, template, 1);
+    setResumeData(fitted);
+    if (syncWithGlobalResume) {
+      tryLocalStorageSet("ai-chat-resume-data", JSON.stringify(fitted));
+    }
+    showToast("success", `Resume auto-fitted to 1-page budget (${template} template)`);
+  }, [resumeData, template, syncWithGlobalResume, setResumeData]);
 
   void undoRedoTick;
   const canUndo = resumeHistRef.current.i > 0;
@@ -581,6 +590,19 @@ export function ResumeViewer({
                 </ul>
               </div>
 
+              {/* 1-Click Auto-Fit Button */}
+              {!pageBudget.isOnePageCompliant && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAutoFit}
+                  className="w-full h-7 text-[11px] gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-sm transition-all"
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  <span>1-Click Auto-Fit to 1 Page</span>
+                </Button>
+              )}
+
               {/* Copy prompt button */}
               <Button
                 type="button"
@@ -603,6 +625,19 @@ export function ResumeViewer({
               </Button>
             </PopoverContent>
           </Popover>
+
+          {/* Quick Auto-Fit Pill Button if overflowing */}
+          {!pageBudget.isOnePageCompliant && (
+            <button
+              type="button"
+              onClick={handleAutoFit}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all cursor-pointer shrink-0"
+              title="1-Click Auto-Fit to 1-Page Budget"
+            >
+              <Wand2 className="w-2.5 h-2.5" />
+              <span>Auto-Fit</span>
+            </button>
+          )}
         </div>
         
         {panelMode !== "hidden" ? (

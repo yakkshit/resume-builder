@@ -72,11 +72,20 @@ export async function syncUserProfileToFirebase(
           location: merged.location || "",
           linkedin: merged.linkedin || "",
           github: merged.github || "",
+          website: merged.website || "",
           targetRoles: merged.targetRoles || "",
           careerNotes: merged.careerNotes || "",
           profilePicture: merged.profilePicture || "",
+          ragKnowledgeBase: merged.ragKnowledgeBase || "",
+          masterSkills: merged.masterSkills || "",
+          masterExperience: merged.masterExperience || "",
+          masterProjects: merged.masterProjects || "",
+          masterEducation: merged.masterEducation || "",
+          masterCertifications: merged.masterCertifications || "",
           defaultEmailProvider: merged.defaultEmailProvider || "gmail",
           updatedAt: timestamp,
+          vaultUpdatedAt: timestamp,
+          vaultVersion: Date.now(),
           syncedToFirebase: true,
         };
 
@@ -101,6 +110,13 @@ export async function syncUserProfileToFirebase(
           encryptionPassphrase: merged.encryptionPassphrase,
           githubToken: merged.githubToken,
           githubRepo: merged.githubRepo,
+          ragKnowledgeBase: merged.ragKnowledgeBase,
+          masterSkills: merged.masterSkills,
+          masterExperience: merged.masterExperience,
+          masterProjects: merged.masterProjects,
+          masterEducation: merged.masterEducation,
+          masterCertifications: merged.masterCertifications,
+          uid,
         });
 
         // Trigger reactive update across all open components

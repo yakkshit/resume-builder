@@ -64,6 +64,7 @@ export const ALL_MCP_TOOLS: MCPToolDefinition[] = [
       type: "object",
       properties: {
         userId: { type: "string", description: "Optional user ID or slug. Defaults to active authenticated session." },
+        forceRefresh: { type: "boolean", description: "Bypass in-memory cache and fetch directly from canonical storage" },
       },
     },
   },
@@ -115,6 +116,7 @@ export const ALL_MCP_TOOLS: MCPToolDefinition[] = [
       type: "object",
       properties: {
         userId: { type: "string", description: "User ID or slug" },
+        forceRefresh: { type: "boolean", description: "Bypass in-memory cache and fetch directly from canonical storage" },
       },
     },
   },
@@ -143,6 +145,7 @@ export const ALL_MCP_TOOLS: MCPToolDefinition[] = [
       type: "object",
       properties: {
         resumeId: { type: "string", description: "Optional specific resume ID" },
+        forceRefresh: { type: "boolean", description: "Bypass cache and force fresh read" },
       },
     },
   },
@@ -230,6 +233,20 @@ export const ALL_MCP_TOOLS: MCPToolDefinition[] = [
     name: "validate_template_page_budget",
     category: "resume",
     description: "Validate whether a resume JSON fits cleanly on a single page for a template. Returns character count and trim feedback.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        resumeData: { type: "object", description: "Resume JSON data" },
+        template: { type: "string", description: "Template ID (e.g. 'modern', 'ivy-league', 'two-column', 'german-cv')" },
+        targetPages: { type: "number", description: "Target pages (default: 1)" },
+      },
+      required: ["resumeData"],
+    },
+  },
+  {
+    name: "auto_fit_resume_to_budget",
+    category: "resume",
+    description: "Programmatically auto-fit and curate a resume JSON to fit strictly within a template's 1-page (or 2-page) budget without orphan whitespace or overflow.",
     inputSchema: {
       type: "object",
       properties: {

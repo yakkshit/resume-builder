@@ -4,6 +4,7 @@ import {
   RESUME_TEMPLATE_LIMITS,
   calculateResumeMetrics,
   validateTemplatePageBudget,
+  autoFitResumeToBudget,
   getTemplateCapacityCheatSheetMarkdown,
 } from "@/lib/resume-template-limits"
 import { defaultResumeData } from "@/lib/default-resume-data"
@@ -185,6 +186,13 @@ describe("Resume Template 1-Page Limits & Capacity System", () => {
     expect(evalResult.modelSelfTrainingFeedback).toContain("[1-PAGE TEMPLATE FIT: OVERFLOW DETECTED - SELF-TRAINING FEEDBACK]")
     expect(evalResult.modelSelfTrainingFeedback).toContain("ACTIONABLE TRIMMING INSTRUCTIONS FOR 1-PAGE RE-GENERATION:")
     expect(evalResult.modelSelfTrainingFeedback).toContain("MODEL SELF-CORRECTION DIRECTIVE:")
+
+    // Auto-fit execution: Curates bloated resume so it fits strictly within 1-page budget
+    const fittedResume = autoFitResumeToBudget(bloatedResume, "modern", 1)
+    const fittedEval = validateTemplatePageBudget(fittedResume, "modern", 1)
+    expect(fittedEval.isOnePageCompliant).toBe(true)
+    expect(fittedEval.characterUsagePercent).toBeLessThanOrEqual(100)
+    expect(fittedEval.overflowCharacters).toBe(0)
   })
 
   it("should generate a valid markdown cheat sheet covering all 21 templates", () => {

@@ -9,7 +9,7 @@
  * 4. User can download the security token and encryption key directly to a local file.
  */
 
-import { encryptPayload } from "@/lib/crypto/encryption";
+import { encryptPayload, decryptPayload } from "@/lib/crypto/encryption";
 import { saveToFirebaseVault, type FirebasePersonalDetails, type FirebaseApiKeys } from "@/lib/firebase/vault-storage";
 
 export interface GitHubSyncConfig {
@@ -68,7 +68,34 @@ export interface GitHubTimestampStatus {
   message: string;
 }
 
+/**
+ * Derives a non-reversible cryptographic key fingerprint for zero-knowledge validation (T3 / R3).
+ * Never stores or logs the actual raw encryption passphrase.
+ */
+export function deriveKeyFingerprint(passphrase: string): string {
+  let hash = 0;
+  for (let i = 0; i < passphrase.length; i++) {
+    hash = (hash << 5) - hash + passphrase.charCodeAt(i);
+    hash |= 0;
+  }
+  return `fp_${Math.abs(hash).toString(16).padStart(8, "0")}`;
+}
+
 export const GITHUB_SYNC_STORAGE_RECORD = "cv_sync_record_v2";
+
+/**
+ * Derives a deterministic user-scoped repository name to prevent cross-tenant collision (T3 / R3).
+ */
+export function deriveUserScopedRepoName(userId: string): string {
+  const cleanId = (userId || "default-user").trim().toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < cleanId.length; i++) {
+    hash = (hash << 5) - hash + cleanId.charCodeAt(i);
+    hash |= 0;
+  }
+  const hex = Math.abs(hash).toString(16).padStart(8, "0").slice(0, 8);
+  return `career-vault-${hex}`;
+}
 
 /**
  * Strips personal details and raw API keys to guarantee zero-leakage to Git.
@@ -289,25 +316,31 @@ export async function syncCareerDatabaseToGitHub(params: {
     throw new Error("Missing GitHub token. Generate a Personal Access Token with repo scope.");
   }
 
-  // 1. Save Personal Details & API Keys to Firebase Secret Vault
+  // 1. Sanitize and Exclude all Personal Details and API Keys (stamps updatedAt & timestampEpoch)
+  const cleanData = sanitizeDataForGitHub(fullData);
+  const clientIso = cleanData.updatedAt;
+  const clientEpoch = cleanData.timestampEpoch;
+
+  // 2. Save Personal Details, API Keys & Memory Vault to Firebase Secret Vault
   let firebaseOk = false;
   try {
     const fbRes = await saveToFirebaseVault({
       personalDetails,
       apiKeys,
-      encryptionPassphrase: config.encryptionPassphrase,
+      keyFingerprint: config.encryptionPassphrase ? deriveKeyFingerprint(config.encryptionPassphrase) : undefined,
       githubToken: config.githubToken,
       githubRepo: config.githubRepo,
+      ragKnowledgeBase: cleanData.careerVault?.ragKnowledgeBase,
+      masterSkills: cleanData.careerVault?.masterSkills,
+      masterExperience: cleanData.careerVault?.masterExperience,
+      masterProjects: cleanData.careerVault?.masterProjects,
+      masterEducation: cleanData.careerVault?.masterEducation,
+      masterCertifications: cleanData.careerVault?.masterCertifications,
     });
     firebaseOk = fbRes.ok;
   } catch (err) {
     console.warn("Firebase secret vault sync notice:", err);
   }
-
-  // 2. Sanitize and Exclude all Personal Details and API Keys (stamps updatedAt & timestampEpoch)
-  const cleanData = sanitizeDataForGitHub(fullData);
-  const clientIso = cleanData.updatedAt;
-  const clientEpoch = cleanData.timestampEpoch;
 
   // 3. Zero-Knowledge Encrypt the payload
   const passphrase = config.encryptionPassphrase || "default_career_master_salt_2026";
@@ -328,14 +361,17 @@ export async function syncCareerDatabaseToGitHub(params: {
     "User-Agent": "CareerAssistant-SyncEngine/2.0",
   };
 
-  if (!owner) {
-    const userRes = await fetch("https://api.github.com/user", { headers });
-    if (!userRes.ok) {
-      throw new Error(`GitHub token authentication failed (${userRes.status}). Verify token validity.`);
-    }
-    const userData = await userRes.json();
-    owner = userData.login;
+  const userRes = await fetch("https://api.github.com/user", { headers });
+  if (!userRes.ok) {
+    throw new Error(`GitHub token authentication failed (${userRes.status}). Verify token validity.`);
   }
+  const userData = await userRes.json();
+  const authenticatedLogin = userData.login;
+
+  if (owner && owner.toLowerCase() !== authenticatedLogin.toLowerCase()) {
+    throw new Error(`CrossTenantSecurityViolation: Cannot push to a repository owned by a different GitHub account (${owner}).`);
+  }
+  owner = authenticatedLogin;
 
   const branch = config.branch || "main";
   const filePath = config.filePath || "database/career_vault_encrypted.json";
@@ -459,4 +495,100 @@ export async function syncCareerDatabaseToGitHub(params: {
     apiKeysStripped: true,
     firebaseVaultUpdated: firebaseOk,
   };
+}
+
+export interface GitHubPullResult {
+  ok: boolean;
+  data?: SanitizedCareerDatabase;
+  commitSha?: string;
+  commitUrl?: string;
+  timestamp?: string;
+  timestampEpoch?: number;
+  error?: string;
+}
+
+/**
+ * Pull and decrypt the encrypted database from user's private GitHub repository
+ */
+export async function pullCareerDatabaseFromGitHub(
+  config: GitHubSyncConfig
+): Promise<GitHubPullResult> {
+  if (!config.githubToken?.trim()) {
+    return { ok: false, error: "Missing GitHub token" };
+  }
+
+  try {
+    let owner = "";
+    let repoName = config.githubRepo.trim();
+    if (repoName.includes("/")) {
+      const parts = repoName.split("/");
+      owner = parts[0];
+      repoName = parts[1];
+    }
+
+    const headers = {
+      Accept: "application/vnd.github.v3+json",
+      Authorization: `Bearer ${config.githubToken.trim()}`,
+      "User-Agent": "CareerAssistant-SyncEngine/2.0",
+    };
+
+    const userRes = await fetch("https://api.github.com/user", { headers });
+    if (!userRes.ok) {
+      return { ok: false, error: `GitHub authentication failed (${userRes.status})` };
+    }
+    const userData = await userRes.json();
+    const authenticatedLogin = userData.login;
+
+    if (owner && owner.toLowerCase() !== authenticatedLogin.toLowerCase()) {
+      return {
+        ok: false,
+        error: `CrossTenantSecurityViolation: Cannot pull from a repository owned by a different GitHub account (${owner}).`,
+      };
+    }
+    owner = authenticatedLogin;
+
+    const branch = config.branch || "main";
+    const filePath = config.filePath || "database/career_vault_encrypted.json";
+
+    const fileRes = await fetch(
+      `https://api.github.com/repos/${owner}/${repoName}/contents/${filePath}?ref=${branch}`,
+      { headers }
+    );
+
+    if (!fileRes.ok) {
+      return { ok: false, error: `Remote database file '${filePath}' not found on branch '${branch}'` };
+    }
+
+    const fileJson = await fileRes.json();
+    const base64Content = (fileJson.content || "").replace(/\s+/g, "");
+    const commitSha = fileJson.sha || "remote-sha";
+    const commitUrl = `https://github.com/${owner}/${repoName}/blob/${branch}/${filePath}`;
+
+    // Decode Base64 content
+    let encryptedEnvelopeStr = "";
+    if (typeof window === "undefined") {
+      encryptedEnvelopeStr = Buffer.from(base64Content, "base64").toString("utf-8");
+    } else {
+      encryptedEnvelopeStr = decodeURIComponent(escape(atob(base64Content)));
+    }
+
+    // Zero-Knowledge Decrypt
+    const passphrase = config.encryptionPassphrase || "default_career_master_salt_2026";
+    const decryptedJsonStr = await decryptPayload(encryptedEnvelopeStr, passphrase);
+    const parsedData = JSON.parse(decryptedJsonStr) as SanitizedCareerDatabase;
+
+    return {
+      ok: true,
+      data: parsedData,
+      commitSha,
+      commitUrl,
+      timestamp: parsedData.updatedAt,
+      timestampEpoch: parsedData.timestampEpoch,
+    };
+  } catch (err: any) {
+    return {
+      ok: false,
+      error: err?.message || "Failed to pull and decrypt database from GitHub",
+    };
+  }
 }

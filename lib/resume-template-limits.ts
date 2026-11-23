@@ -1038,6 +1038,155 @@ function effectiveMaxWords(b: TemplatePageBudget, multiplier: number): number {
 }
 
 /**
+ * Programmatically auto-fits a resume to a template's single-page (or N-page) budget.
+ * Curates positions, trims bullet lengths, and caps skills/projects to guarantee usage <= 100%.
+ */
+export function autoFitResumeToBudget(
+  resume: Partial<ResumeData> | null | undefined,
+  templateId: string = "modern",
+  targetPages: number = 1
+): ResumeData {
+  if (!resume) {
+    return {} as ResumeData
+  }
+
+  // Deep clone to avoid mutating input
+  const cloned: ResumeData = JSON.parse(JSON.stringify(resume))
+  const safeTemplate = (templateId in RESUME_TEMPLATE_LIMITS ? templateId : "modern") as Template
+  const budget = RESUME_TEMPLATE_LIMITS[safeTemplate]
+  const sLimits = budget.sectionLimits
+  const multiplier = targetPages === 1 ? 1 : targetPages * 0.95
+  const maxAllowedChars = Math.round(budget.maxCharacters * multiplier)
+
+  // 1. Trim summary if present and overflowing
+  if (cloned.basicInfo?.summary) {
+    const maxSummaryChars = Math.round(sLimits.summary.recommendedCharacters * multiplier)
+    if (cloned.basicInfo.summary.length > maxSummaryChars) {
+      const sentences = cloned.basicInfo.summary
+        .split(/(?<=[.!?])\s+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+      let newSummary = ""
+      for (const sentence of sentences) {
+        if ((newSummary + (newSummary ? " " : "") + sentence).length <= maxSummaryChars) {
+          newSummary += (newSummary ? " " : "") + sentence
+        } else {
+          break
+        }
+      }
+      if (!newSummary && sentences.length > 0) {
+        const words = sentences[0].split(/\s+/)
+        let curr = ""
+        for (const w of words) {
+          if ((curr + (curr ? " " : "") + w).length <= maxSummaryChars - 3) {
+            curr += (curr ? " " : "") + w
+          } else {
+            break
+          }
+        }
+        newSummary = curr ? `${curr}...` : sentences[0].slice(0, maxSummaryChars)
+      }
+      cloned.basicInfo.summary = newSummary
+    }
+  }
+
+  // 2. Curate Experience positions
+  if (Array.isArray(cloned.experience)) {
+    const maxPositions = Math.max(1, Math.round(sLimits.experience.maxPositions * multiplier))
+    if (cloned.experience.length > maxPositions) {
+      cloned.experience = cloned.experience.slice(0, maxPositions)
+    }
+
+    const maxBulletsPerRole = Math.max(1, Math.round(sLimits.experience.maxBulletsPerPosition))
+    const maxCharsPerBullet = sLimits.experience.maxCharactersPerBullet || 160
+
+    for (const exp of cloned.experience) {
+      if (Array.isArray(exp.highlights)) {
+        if (exp.highlights.length > maxBulletsPerRole) {
+          exp.highlights = exp.highlights.slice(0, maxBulletsPerRole)
+        }
+        exp.highlights = exp.highlights.map((bullet) => {
+          if (bullet.length > maxCharsPerBullet) {
+            const words = bullet.split(/\s+/)
+            let b = ""
+            for (const w of words) {
+              if ((b + (b ? " " : "") + w).length <= maxCharsPerBullet - 1) {
+                b += (b ? " " : "") + w
+              } else {
+                break
+              }
+            }
+            return b ? `${b}.` : bullet.slice(0, maxCharsPerBullet)
+          }
+          return bullet
+        })
+      }
+    }
+  }
+
+  // 3. Curate Projects
+  if (Array.isArray(cloned.projects)) {
+    const maxProjects = Math.max(1, Math.round(sLimits.projects.maxCount * multiplier))
+    if (cloned.projects.length > maxProjects) {
+      cloned.projects = cloned.projects.slice(0, maxProjects)
+    }
+    for (const proj of cloned.projects) {
+      if (proj.description && proj.description.length > 130) {
+        proj.description = proj.description.slice(0, 127) + "..."
+      }
+    }
+  }
+
+  // 4. Curate Skills
+  if (Array.isArray(cloned.skills)) {
+    const maxSkills = Math.max(4, Math.round(sLimits.skills.maxCount * multiplier))
+    if (cloned.skills.length > maxSkills) {
+      cloned.skills = cloned.skills.slice(0, maxSkills)
+    }
+  }
+
+  // 5. Curate Education
+  if (Array.isArray(cloned.education)) {
+    const maxEd = Math.max(1, Math.round(sLimits.education.maxEntries * multiplier))
+    if (cloned.education.length > maxEd) {
+      cloned.education = cloned.education.slice(0, maxEd)
+    }
+  }
+
+  // 6. Progressive fine trimming if still exceeding budget
+  let currentMetrics = calculateResumeMetrics(cloned)
+  let iterations = 0
+  while (currentMetrics.totalCharacters > maxAllowedChars && iterations < 12) {
+    iterations++
+    let trimmedABullet = false
+    if (Array.isArray(cloned.experience)) {
+      for (let i = cloned.experience.length - 1; i >= 0; i--) {
+        const exp = cloned.experience[i]
+        if (Array.isArray(exp.highlights) && exp.highlights.length > 2) {
+          exp.highlights.pop()
+          trimmedABullet = true
+          break
+        }
+      }
+    }
+    if (!trimmedABullet && Array.isArray(cloned.skills) && cloned.skills.length > 8) {
+      cloned.skills = cloned.skills.slice(0, cloned.skills.length - 2)
+    } else if (!trimmedABullet && Array.isArray(cloned.projects) && cloned.projects.length > 1) {
+      cloned.projects.pop()
+    } else if (!trimmedABullet) {
+      if (cloned.basicInfo?.summary && cloned.basicInfo.summary.length > 80) {
+        cloned.basicInfo.summary = cloned.basicInfo.summary.slice(0, Math.floor(cloned.basicInfo.summary.length * 0.8)) + "..."
+      } else {
+        break
+      }
+    }
+    currentMetrics = calculateResumeMetrics(cloned)
+  }
+
+  return cloned
+}
+
+/**
  * Returns a markdown reference table of all template 1-page limits for AI prompt injection.
  */
 export function getTemplateCapacityCheatSheetMarkdown(): string {

@@ -259,36 +259,42 @@ export function extractAuthTokenFromRequest(req: Request | NextRequest): string 
   }
 }
 
+export const WRITE_MUTATING_TOOLS = new Set([
+  "append_memory_vault",
+  "update_memory_vault",
+  "update_user_profile",
+  "save_resume_draft",
+  "create_resume",
+  "create_new_resume",
+  "delete_resume",
+  "sync_memory_vault",
+]);
+
+export function isWriteTool(toolName?: string): boolean {
+  if (!toolName) return false;
+  if (WRITE_MUTATING_TOOLS.has(toolName)) return true;
+  return /^(append|update|save|create|delete|set|sync)_/i.test(toolName);
+}
+
 /**
  * Flexible Authorization Verifier
  * Supports:
- * - "none" (Public access)
+ * - "none" (Public access for READ-ONLY tools)
  * - Safe discovery tools (list_templates, etc.)
- * - Secret Capability URL (direct access via unguessable personal slug endpoint)
+ * - Secret Capability URL (direct access via unguessable personal slug endpoint for read tools)
  * - "bearer" (Bearer token / x-api-key / query param)
  * - "oauth" (Basic auth, client_id + client_secret, or Bearer matching client_secret)
  * - "custom_header" (User-defined header name and value)
+ * 
+ * SECURITY ENFORCEMENT: All write/mutating tools strictly require valid Bearer or OAuth
+ * credentials regardless of whether the endpoint is set to Public mode.
  */
 export function verifyMcpRequestAuth(
   req: Request | NextRequest,
   config: UserMcpConfig,
   toolName?: string
 ): { authorized: boolean; authTypeUsed: string; error?: string } {
-  // If user configured "none" or public mode, allow immediately
-  if (config.authType === "none" || config.isPublic) {
-    return { authorized: true, authTypeUsed: "none (public)" };
-  }
-
-  // Safe read-only discovery & template inspection tools can always execute without blocking AI clients
-  const SAFE_PUBLIC_TOOLS = new Set([
-    "list_templates",
-    "validate_template_page_budget",
-    "get_template_limits",
-    "search_jobs",
-  ]);
-  if (toolName && SAFE_PUBLIC_TOOLS.has(toolName)) {
-    return { authorized: true, authTypeUsed: `public-safe-tool (${toolName})` };
-  }
+  const isMutating = isWriteTool(toolName);
 
   // 1. Owner dashboard session check (live test executions from resume.cedzlabs.com/profile)
   const reqUserId = req.headers.get("x-user-id");
@@ -300,11 +306,51 @@ export function verifyMcpRequestAuth(
     return { authorized: true, authTypeUsed: "session-owner" };
   }
 
-  // 2. Secret Personal Capability Slug URL verification for MCP protocol (/api/mcp/<slug>):
-  // When an AI agent (Google Gemini, Claude Desktop, Cursor) calls the user's dedicated personal MCP endpoint,
-  // the unguessable 28-character slug in the URL itself acts as a capability token.
-  // This allows Google Gemini to execute tools (get_user_resume, tailor_resume_for_job, generate_resume_pdf)
-  // without failing on missing HTTP header inputs.
+  // 2. Safe read-only discovery & template inspection tools can always execute
+  const SAFE_PUBLIC_TOOLS = new Set([
+    "list_templates",
+    "validate_template_page_budget",
+    "get_template_limits",
+    "search_jobs",
+  ]);
+  if (toolName && SAFE_PUBLIC_TOOLS.has(toolName)) {
+    return { authorized: true, authTypeUsed: `public-safe-tool (${toolName})` };
+  }
+
+  const token = extractAuthTokenFromRequest(req);
+
+  // 3. Token match (Bearer token or client secret)
+  if (token && (token === config.bearerToken || token === config.oauthClientSecret)) {
+    return { authorized: true, authTypeUsed: "token-match" };
+  }
+
+  // 4. Basic Auth Check
+  const authHeader = req.headers.get("authorization");
+  if (authHeader && authHeader.startsWith("Basic ")) {
+    try {
+      const decoded = Buffer.from(authHeader.slice(6), "base64").toString("utf-8");
+      const [cId, cSec] = decoded.split(":");
+      if (cId === config.oauthClientId && cSec === config.oauthClientSecret) {
+        return { authorized: true, authTypeUsed: "oauth-basic" };
+      }
+    } catch {}
+  }
+
+  // 5. If this is a mutating write tool, REJECT if unauthenticated (even in Public/None mode)
+  if (isMutating) {
+    return {
+      authorized: false,
+      authTypeUsed: "rejected_write",
+      error: `Unauthorized: Mutation tool '${toolName}' requires Bearer or OAuth credentials even on public endpoints.`,
+    };
+  }
+
+  // 6. If user configured "none" or public mode, allow READ-ONLY tools immediately
+  if (config.authType === "none" || config.isPublic) {
+    return { authorized: true, authTypeUsed: "none (public)" };
+  }
+
+  // 7. Secret Personal Capability Slug URL verification for MCP protocol (/api/mcp/<slug>) read tools
   if (config.slug && config.slug.length >= 12 && config.slug !== "default-user") {
     try {
       const url = new URL(req.url);
@@ -315,8 +361,6 @@ export function verifyMcpRequestAuth(
       }
     } catch {}
   }
-
-  const token = extractAuthTokenFromRequest(req);
 
   // Universal token match (if query param or header matches bearerToken, client secret, or slug)
   if (token && (token === config.bearerToken || token === config.oauthClientSecret)) {

@@ -32,6 +32,7 @@ interface GitHubSyncCardProps {
   encryptionPassphrase?: string;
   lastSyncResult?: GitHubSyncResult | null;
   onTriggerSync?: () => Promise<void>;
+  onTriggerPull?: () => Promise<void>;
   className?: string;
 }
 
@@ -42,9 +43,11 @@ export function GitHubSyncCard({
   encryptionPassphrase = "",
   lastSyncResult,
   onTriggerSync,
+  onTriggerPull,
   className,
 }: GitHubSyncCardProps) {
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isPulling, setIsPulling] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [storedSync, setStoredSync] = useState<{
     timestamp: string;
@@ -80,6 +83,16 @@ export function GitHubSyncCard({
       await onTriggerSync();
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handlePullClick = async () => {
+    if (!onTriggerPull) return;
+    setIsPulling(true);
+    try {
+      await onTriggerPull();
+    } finally {
+      setIsPulling(false);
     }
   };
 
@@ -132,11 +145,26 @@ export function GitHubSyncCard({
             <span>{downloaded ? "Downloaded!" : "Download Token File"}</span>
           </Button>
 
+          {onTriggerPull && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isPulling || isSyncing}
+              onClick={handlePullClick}
+              className="h-8 px-2.5 text-xs bg-white/5 hover:bg-white/10 border-white/10 text-sky-300 rounded-xl gap-1.5"
+              title="Pull and restore latest career database from GitHub"
+            >
+              <RefreshCw className={cn("size-3", isPulling && "animate-spin")} />
+              <span>{isPulling ? "Restoring..." : "Pull & Restore"}</span>
+            </Button>
+          )}
+
           {onTriggerSync && (
             <Button
               type="button"
               size="sm"
-              disabled={isSyncing}
+              disabled={isSyncing || isPulling}
               onClick={handleSyncClick}
               className="h-8 px-3 text-xs bg-sky-500 hover:bg-sky-600 text-white rounded-xl gap-1.5 font-medium shadow-md shadow-sky-500/20"
             >

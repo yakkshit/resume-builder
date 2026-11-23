@@ -114,11 +114,31 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     expect(data.tool).toBe("search_memory_vault");
   });
 
-  it("appends and reads shared Memory Vault via tools", async () => {
-    // Append to vault
-    const appendReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
+  it("appends and reads shared Memory Vault via tools, rejecting unauthenticated writes in public mode", async () => {
+    // 1. Unauthenticated write in public mode MUST be rejected (401)
+    const unauthAppendReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tool: "append_memory_vault",
+        args: {
+          title: "Malicious Injection Attempt",
+          content: "Attacker attempting to overwrite vault.",
+        },
+      }),
+    });
+    const unauthRes = await SlugRestPOST(unauthAppendReq, { params: Promise.resolve({ slug: testSlug }) });
+    expect(unauthRes.status).toBe(401);
+    const unauthData = await unauthRes.json();
+    expect(unauthData.message).toContain("requires Bearer or OAuth credentials");
+
+    // 2. Authenticated write with Bearer token succeeds
+    const appendReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test_bearer_123",
+      },
       body: JSON.stringify({
         tool: "append_memory_vault",
         args: {
@@ -131,7 +151,7 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     const appendRes = await SlugRestPOST(appendReq, { params: Promise.resolve({ slug: testSlug }) });
     expect(appendRes.status).toBe(200);
 
-    // Search for newly appended milestone
+    // Search for newly appended milestone (read tool works in public mode)
     const searchReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -380,7 +400,10 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
   it("creates resume and generates PDF with embedded profile photo via MCP tools", async () => {
     const createReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer test_bearer_123",
+      },
       body: JSON.stringify({
         tool: "create_resume",
         args: {

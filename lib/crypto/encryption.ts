@@ -49,10 +49,16 @@ function getSubtleCrypto(): SubtleCrypto {
   throw new Error("Web Crypto API (subtle) is not available in this environment.")
 }
 
+export const OWASP_PBKDF2_ITERATIONS = 310000;
+
 /**
- * Derive an AES-GCM 256-bit key from a user passphrase and salt using PBKDF2 (100,000 iterations).
+ * Derive an AES-GCM 256-bit key from a user passphrase and salt using PBKDF2 (>=310,000 iterations per OWASP).
  */
-export async function deriveKeyFromPassphrase(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+export async function deriveKeyFromPassphrase(
+  passphrase: string,
+  salt: Uint8Array,
+  iterations: number = OWASP_PBKDF2_ITERATIONS
+): Promise<CryptoKey> {
   const subtle = getSubtleCrypto()
   const enc = new TextEncoder()
   const keyMaterial = await subtle.importKey(
@@ -67,7 +73,7 @@ export async function deriveKeyFromPassphrase(passphrase: string, salt: Uint8Arr
     {
       name: "PBKDF2",
       salt: salt as any,
-      iterations: 100000,
+      iterations,
       hash: "SHA-256",
     },
     keyMaterial,
@@ -82,6 +88,7 @@ export interface EncryptedPayload {
   iv: string // Base64
   salt: string // Base64
   ciphertext: string // Base64
+  iterations?: number
 }
 
 /**
@@ -108,7 +115,7 @@ export async function encryptPayload(data: unknown, passphrase: string): Promise
     nodeCrypto.randomFillSync(iv)
   }
 
-  const key = await deriveKeyFromPassphrase(passphrase, salt)
+  const key = await deriveKeyFromPassphrase(passphrase, salt, OWASP_PBKDF2_ITERATIONS)
   const encryptedBuffer = await subtle.encrypt(
     {
       name: "AES-GCM",
@@ -123,6 +130,7 @@ export async function encryptPayload(data: unknown, passphrase: string): Promise
     iv: arrayBufferToBase64(iv),
     salt: arrayBufferToBase64(salt),
     ciphertext: arrayBufferToBase64(encryptedBuffer),
+    iterations: OWASP_PBKDF2_ITERATIONS,
   }
 
   return JSON.stringify(payload)
@@ -147,8 +155,9 @@ export async function decryptPayload(encryptedEnvelope: string, passphrase: stri
   const salt = base64ToUint8Array(payload.salt)
   const iv = base64ToUint8Array(payload.iv)
   const ciphertext = base64ToUint8Array(payload.ciphertext)
+  const iterations = payload.iterations || 310000
 
-  const key = await deriveKeyFromPassphrase(passphrase, salt)
+  const key = await deriveKeyFromPassphrase(passphrase, salt, iterations)
   const decryptedBuffer = await subtle.decrypt(
     {
       name: "AES-GCM",
