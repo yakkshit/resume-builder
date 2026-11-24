@@ -354,7 +354,7 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     expect(doc.security).toContainEqual({});
   });
 
-  it("returns authentic user identity (Venkata Sai Yakkshit Reddy Asodi) and photo via get_user_profile and get_user_resume", async () => {
+  it("returns base user identity (Alex Morgan) and photo via get_user_profile and get_user_resume", async () => {
     await saveUserMcpConfig({
       userId: testUserId,
       slug: testSlug,
@@ -374,9 +374,9 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     expect(profileRes.status).toBe(200);
     const profileData = await profileRes.json();
     expect(profileData.success).toBe(true);
-    expect(profileData.result.profile.name).toBe("Venkata Sai Yakkshit Reddy Asodi");
-    expect(profileData.result.profile.email).toBe("saiyakkshit2001@gmail.com");
-    expect(profileData.result.profile.location).toContain("Konstanz");
+    expect(profileData.result.profile.name).toBe("Alex Morgan");
+    expect(profileData.result.profile.email).toBe("alex.morgan@example.com");
+    expect(profileData.result.profile.location).toContain("Berlin");
 
     const restResumeReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {
       method: "POST",
@@ -390,12 +390,11 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     expect(resumeRes.status).toBe(200);
     const resumeData = await resumeRes.json();
     expect(resumeData.success).toBe(true);
-    expect(resumeData.result.activeResume.data.basicInfo.name).toBe("Venkata Sai Yakkshit Reddy Asodi");
+    expect(resumeData.result.activeResume.data.basicInfo.name).toBe("Alex Morgan");
     expect(resumeData.result.activeResume.data.basicInfo.profilePicture).toBeDefined();
     expect(resumeData.result.activeResume.data.basicInfo.profilePicture.length).toBeGreaterThan(15);
     expect(resumeData.result.activeResume.data.basicInfo.profilePicture).not.toContain("deepmind-picture-2.jpg");
-    expect(resumeData.result.activeResume.data.experience.some((e: any) => e.company.includes("Universität Konstanz"))).toBe(true);
-    expect(resumeData.result.activeResume.data.experience.some((e: any) => e.company.includes("Bodensee Racing Team"))).toBe(true);
+    expect(resumeData.result.activeResume.data.experience.some((e: any) => e.company.includes("CloudScale"))).toBe(true);
   });
 
   it("creates resume and generates PDF with embedded profile photo via MCP tools", async () => {
@@ -417,7 +416,7 @@ describe("Dynamic Custom MCP & REST Platform with Multi-Auth, Shared Memory Vaul
     expect(createRes.status).toBe(200);
     const createData = await createRes.json();
     expect(createData.success).toBe(true);
-    expect(createData.result.resume.data.basicInfo.name).toBe("Venkata Sai Yakkshit Reddy Asodi");
+    expect(createData.result.resume.data.basicInfo.name).toBe("Alex Morgan");
     expect(createData.result.resume.data.basicInfo.profilePicture).toBeDefined();
 
     const pdfReq = new NextRequest(`http://localhost:3000/api/mcp/rest/${testSlug}`, {

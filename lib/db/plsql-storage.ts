@@ -232,7 +232,7 @@ export class DatabaseService {
               id: snap.id,
               userId,
               title: rData.title || "My Resume",
-              template: rData.template || "pokemon-trainer",
+              template: rData.template || "german-modern",
               data: rData.data || {},
               pdfUrl: rData.pdfUrl || null,
               createdAt: new Date(),

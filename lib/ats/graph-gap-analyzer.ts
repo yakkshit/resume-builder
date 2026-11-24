@@ -25,26 +25,48 @@ export interface AtsGapReport {
 
 const COMMON_TECH_TERMS = [
   "Python", "PyTorch", "C++", "ROS2", "Computer Vision", "VLMs", "LLMs", "SLAM",
-  "Spatial AI", "Multi-Agent Systems", "Docker", "Kubernetes", "TypeScript",
-  "React", "Next.js", "CI/CD", "Linux", "eBPF", "TensorRT", "CUDA", "OpenCV",
-  "Point Cloud", "PCL", "REST-APIs", "Microservices", "PostgreSQL", "Kafka",
-  "Sensor Fusion", "Distributed Systems", "Deep Learning", "GCP", "AWS"
+  "Spatial AI", "Multi-Agent Systems", "Docker", "Docker Compose", "Kubernetes", "TypeScript",
+  "JavaScript", "React", "Next.js", "CI/CD", "GitHub Actions", "Linux", "Bash",
+  "AWS", "GCP", "Azure", "Terraform", "Ansible", "Prometheus", "Grafana", "DevOps",
+  "MySQL", "PostgreSQL", "MSSQL", "Redis", "MongoDB", "REST", "REST-APIs", "FastAPI",
+  "Microservices", "Sensor Fusion", "LiDAR", "IMU", "Camera", "Gazebo", "Webots",
+  "C#", ".NET", "Unity", "WebAssembly", "SolidWorks", "3D Printing", "Mechanical Design",
+  "Formal Verification", "Distributed Systems", "Deep Learning", "TensorRT", "CUDA", "OpenCV",
+  "Point Cloud", "PCL", "Kafka", "Claude Code", "Cursor", "Git"
 ]
 
 /**
  * Extracts salient technical terms present in the JD.
  */
 export function extractJdKeywords(jdText: string): string[] {
+  if (!jdText || typeof jdText !== "string") return []
   const clean = jdText.toLowerCase()
   const found: string[] = []
+  
+  // 1. Match against comprehensive tech term dictionary
   for (const term of COMMON_TECH_TERMS) {
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-    const regex = new RegExp(`(^|[^a-zA-Z0-9])${escaped}([^a-zA-Z0-9]|$)`, "i")
+    const regex = new RegExp(`(^|[^a-zA-Z0-9#+])${escaped}([^a-zA-Z0-9#+]|$)`, "i")
     if (regex.test(clean)) {
       found.push(term)
     }
   }
-  return found
+
+  // 2. Dynamic regex extraction for tech acronyms, tooling, and versioned terms (e.g. ROS2, C++, C#, .NET, CI/CD, AWS)
+  const dynamicMatches = jdText.match(/\b([A-Z][a-zA-Z0-9+/#.-]{1,15})\b/g) || []
+  const ignoredWords = new Set(["The", "We", "You", "Our", "And", "For", "With", "In", "On", "At", "To", "A", "An", "Is", "Are", "Will", "Role", "Job", "Team", "Company", "Must", "Have", "Key", "Work", "Good", "Experience", "Skills", "Requirements", "About", "Please", "Apply", "Status", "Years", "Degree", "Germany", "Konstanz", "Berlin", "Munich"])
+  
+  for (const word of dynamicMatches) {
+    const trimmed = word.trim()
+    if (trimmed.length >= 2 && !ignoredWords.has(trimmed) && !found.some(f => f.toLowerCase() === trimmed.toLowerCase())) {
+      // Check if it looks like a technical keyword (has punctuation like C++, .NET, CI/CD, or mixed case/numbers like ROS2, Next.js, FastAPI)
+      if (/[+#./0-9]/.test(trimmed) || /^[A-Z]{2,6}$/.test(trimmed)) {
+        found.push(trimmed)
+      }
+    }
+  }
+
+  return Array.from(new Set(found))
 }
 
 /**
@@ -104,9 +126,17 @@ export function analyzeAtsRelevanceAndGaps(
   })
 
   // 2. Compute ATS Match Score
-  const totalKeyCount = Math.max(1, jdKeywords.length)
-  const matchRatio = matchedKeywords.length / totalKeyCount
-  const overallMatchScore = Math.min(100, Math.round(matchRatio * 75 + (matchedKeywords.length > 0 ? 25 : 0)))
+  let overallMatchScore = 0
+  if (jdKeywords.length > 0) {
+    const matchRatio = matchedKeywords.length / jdKeywords.length
+    overallMatchScore = Math.min(100, Math.round(matchRatio * 75 + (matchedKeywords.length > 0 ? 25 : 0)))
+  } else if (jdText && jdText.trim().length > 10) {
+    // Fallback: check general technical word overlap between JD tokens and resume
+    const jdTokens = jdText.toLowerCase().split(/\s+/).filter(w => w.length > 3)
+    const tokenMatches = jdTokens.filter(t => fullResumeText.includes(t))
+    const ratio = tokenMatches.length / Math.max(1, jdTokens.length)
+    overallMatchScore = Math.min(85, Math.max(40, Math.round(ratio * 100)))
+  }
   const atsPassLikelihood = overallMatchScore >= 80 ? "HIGH" : overallMatchScore >= 55 ? "MEDIUM" : "LOW"
 
   // 3. Top Gap Recommendations with [X]% placeholders (Strictly NO hallucinated fake metrics)

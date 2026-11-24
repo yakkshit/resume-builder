@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
 
     if (photoResult.photoDataUri) {
       sanitized.basicInfo.profilePicture = photoResult.photoDataUri
-    } else if (sanitized.basicInfo.profilePicture?.includes("deepmind-picture-2.jpg")) {
+    } else {
       sanitized.basicInfo.profilePicture = ""
     }
     const templateName = (template as string) || "modern"

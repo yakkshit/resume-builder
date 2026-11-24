@@ -38,10 +38,9 @@ export const metadata: Metadata = {
     'dynamic mcp',
   ],
   authors: [
-    { name: 'Venkata Sai Yakkshit Reddy Asodi', url: 'https://resume.cedzlabs.com' },
     { name: 'CedzLabs', url: 'https://cedzlabs.com' },
   ],
-  creator: 'Venkata Sai Yakkshit Reddy Asodi',
+  creator: 'CedzLabs',
   publisher: 'CedzLabs',
   formatDetection: {
     email: false,

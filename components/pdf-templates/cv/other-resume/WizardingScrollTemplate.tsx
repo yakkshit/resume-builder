@@ -386,7 +386,7 @@ export function WizardingScrollTemplate({
           <View style={styles.subHeaderRow}>
             <View style={styles.subHeaderLeft}>
               <Text style={styles.candidateFullName}>
-                {basicInfo.name || "Venkata Sai Yakkshit Reddy Asodi"}
+                {basicInfo.name || "Alex Morgan"}
               </Text>
               <Text style={styles.candidateTitle}>
                 {basicInfo.title || "FULL-STACK ENGINEER (WEB & DATA APPLICATIONS)"}

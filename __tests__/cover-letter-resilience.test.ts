@@ -6,14 +6,14 @@ import { getCoverLetterTemplate, coverLetterTemplates } from "@/components/pdf-t
 describe("Cover Letter Sanitization & Parser Resilience", () => {
   it("sanitizes the exact Zalion AI Engineer cover letter output from the model", () => {
     const modelOutput = {
-      head: "Venkata Sai Yakkshit Reddy Asodi\nKonstanz, Germany | saiyakkshit2001@gmail.com | +49 1713562972 | yakkshit.github.io\n\n[Date]\n\nHiring Team\nZalion\n[Zalion's Address, if known, otherwise omit]",
-      body: "Dear Zalion Hiring Team,\n\nI am writing to express my profound interest in the AI Engineer position at Zalion, as advertised. Your mission to revolutionize industrial procurement with cutting-edge AI agents deeply resonates with my expertise in architecting and deploying robust, agent-powered solutions and scalable full-stack applications. With a strong background in multi-agent systems, LLM fine-tuning, RAG pipelines, and end-to-end feature ownership, I am confident I can make an immediate and significant impact on your team.\n\nSincerely,\nVenkata Sai Yakkshit Reddy Asodi",
+      head: "Alex Morgan\nBerlin, Germany | alex.morgan@example.com | +49 151 23456789 | alexmorgan.dev\n\n[Date]\n\nHiring Team\nZalion\n[Zalion's Address, if known, otherwise omit]",
+      body: "Dear Zalion Hiring Team,\n\nI am writing to express my profound interest in the AI Engineer position at Zalion, as advertised. Your mission to revolutionize industrial procurement with cutting-edge AI agents deeply resonates with my expertise in architecting and deploying robust, agent-powered solutions and scalable full-stack applications. With a strong background in multi-agent systems, LLM fine-tuning, RAG pipelines, and end-to-end feature ownership, I am confident I can make an immediate and significant impact on your team.\n\nSincerely,\nAlex Morgan",
       footer: "",
       template: "modern",
     };
 
     const sanitized = sanitizeCoverLetterData(modelOutput);
-    expect(sanitized.head).toContain("Venkata Sai Yakkshit Reddy Asodi");
+    expect(sanitized.head).toContain("Alex Morgan");
     expect(sanitized.body).toContain("Dear Zalion Hiring Team");
     expect(typeof sanitized.footer).toBe("string");
   });

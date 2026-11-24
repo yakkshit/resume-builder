@@ -32,109 +32,95 @@ If user has an uploaded photo and resolution yields a placeholder, tool throws \
 - Documents: \`get_user_profile\`, \`get_user_resume\`, \`generate_resume_pdf\`, \`auto_fit_resume_to_budget\`
 `;
 
-export const VERIFIED_SKILLS_MD = `# 🛠️ Verified Career Skills & Grounded Metrics
+export const VERIFIED_SKILLS_MD = `# 🛠️ Verified Career Skills & Grounded Capabilities
 
-*Candidate: Venkata Sai Yakkshit Reddy Asodi (Konstanz, Germany)*
-*Source: CareerAgent Memory Vault & Academic Research Dossier*
+*Candidate: Alex Morgan (Berlin, Germany)*
+*Source: CareerAgent Sample Dossier*
 
-### Core Competencies & Graph Centrality
-1. **Spatial AI & Multi-Modal Perception** (0.98 centrality) - Video tracking and VLM analysis agents.
-2. **Autonomous Systems & Robotics** (0.95 centrality) - ROS2 real-time path planning, LiDAR/IMU sensor fusion (<30ms).
-3. **Deep Learning & Agent Engineering** (0.94 centrality) - PyTorch, Computer Vision, SLAM, Formal Verification.
-4. **Cloud Microservices & MLOps** (0.91 centrality) - Docker, Kubernetes, CI/CD Actions (99.8%+ uptime).
-5. **Full-Stack Systems** (0.89 centrality) - TypeScript, React, Next.js, PostgreSQL.
+### Confirmed Core Competencies
+1. **Full-Stack & Cloud Systems** - React, Next.js, TypeScript, Python, AWS, Docker, Kubernetes, MySQL, and GitHub Actions CI/CD.
+2. **Backend & Microservices** - Scalable REST & GraphQL APIs, distributed database architectures, automated unit & integration testing.
+3. **DevOps & Infrastructure** - Linux/Bash, Docker Compose, networking, Terraform, Ansible, Prometheus, Grafana.
+4. **Autonomous Agent Tooling** - Model Context Protocol (MCP) server development, workflow automation, Claude Code, Cursor.
 
-### Grounded Empirical Metrics
-- **<30ms sensor telemetry**: real-time LiDAR + IMU fusion latency in ROS2.
-- **100+ fps throughput**: real-time multi-agent video tracking with GPU acceleration.
-- **99.8% uptime**: maintained across microservices at CircleUp AG.
-- **42% latency reduction**: distributed pipeline caching optimization.
+### Languages & Verification Standards
+- **Languages**: English (Fluent / C1+), German (Professional / B2).
+- **Integrity**: Grounded strictly in candidate records. Zero unverified metrics or hidden text.
 `;
 
 export const STRUCTURED_SKILL_INVENTORY = {
-  candidate: "Venkata Sai Yakkshit Reddy Asodi",
-  location: "Konstanz, Germany",
+  candidate: "Alex Morgan",
+  location: "Berlin, Germany",
+  languages: ["English (Fluent / C1+)", "German (Professional / B2)"],
   skills: [
     {
-      name: "Spatial AI & Perception",
+      name: "React, Next.js & TypeScript",
       level: "Expert",
-      category: "AI & Robotics",
-      evidence: ["Universität Konstanz Neurobiology multi-agent honeybee tracking with VLMs"],
+      category: "Full Stack",
+      evidence: ["Production web microservices, scalable dashboards, and SaaS applications"],
       jdCentrality: 0.98,
     },
     {
-      name: "Python & PyTorch",
+      name: "Python & Backend Systems",
       level: "Expert",
-      category: "Machine Learning",
-      evidence: ["Deep learning pipelines, video tracking algorithms, VLM benchmarks"],
+      category: "Backend & Systems",
+      evidence: ["Scalable REST APIs, automated data pipelines, and distributed services"],
       jdCentrality: 0.96,
     },
     {
-      name: "ROS2 & Autonomous Navigation",
+      name: "DevOps, Cloud & Infrastructure",
       level: "Advanced",
-      category: "Robotics",
-      evidence: ["Path planning, LiDAR/IMU sensor fusion for racing hardware (<30ms telemetry)"],
-      jdCentrality: 0.94,
+      category: "DevOps & Cloud",
+      evidence: ["AWS, Docker, Docker Compose, Kubernetes, CI/CD GitHub Actions, Linux/Bash, Terraform, Ansible, Prometheus, Grafana"],
+      jdCentrality: 0.95,
     },
     {
-      name: "C++ & Real-Time Systems",
+      name: "Relational Databases (MySQL & PostgreSQL)",
       level: "Advanced",
-      category: "Systems Engineering",
-      evidence: ["Low-latency multi-threading and autonomous telemetry pipelines"],
+      category: "Backend & Systems",
+      evidence: ["Relational schema design, query optimization, and high-availability replication"],
       jdCentrality: 0.93,
     },
     {
-      name: "Computer Vision & SLAM",
+      name: "Model Context Protocol & Agent Tooling",
       level: "Advanced",
-      category: "AI & Robotics",
-      evidence: ["Multi-camera calibration, feature matching, spatial depth mapping"],
+      category: "AI & Tooling",
+      evidence: ["Autonomous agent harnesses, MCP server suites, and developer workflows"],
       jdCentrality: 0.92,
     },
     {
-      name: "CI/CD & MLOps Infrastructure",
+      name: "Software Architecture & System Design",
       level: "Advanced",
-      category: "Backend & Systems",
-      evidence: ["Docker, Kubernetes, zero-downtime CI/CD deployment at CircleUp AG (99.8%+ uptime)"],
-      jdCentrality: 0.91,
-    },
-    {
-      name: "TypeScript & React / Next.js",
-      level: "Expert",
-      category: "Full Stack",
-      evidence: ["High-performance interactive web dashboards and production SaaS apps"],
+      category: "Architecture",
+      evidence: ["Decoupled microservice architectures and event-driven architectures"],
       jdCentrality: 0.90,
     },
     {
-      name: "Agentic AI & Formal Verification",
+      name: "Linux & Bash Scripting",
       level: "Advanced",
-      category: "AI Research",
-      evidence: ["Rigorous verification and benchmark evaluation for autonomous LLM/VLM agents"],
-      jdCentrality: 0.89,
+      category: "Systems",
+      evidence: ["Production server administration, shell automation, and container orchestration"],
+      jdCentrality: 0.88,
+    },
+    {
+      name: "Automated Testing & CI/CD",
+      level: "Expert",
+      category: "Quality Engineering",
+      evidence: ["Comprehensive test automation across unit, integration, and end-to-end suites"],
+      jdCentrality: 0.87,
     },
   ],
   metrics: [
     {
-      claim: "Sensor telemetry latency in ROS2",
-      value: "<30ms latency across LiDAR, camera, and IMU streams",
-      source: "Bodensee Racing Team",
-      verified: true,
-    },
-    {
-      claim: "Multi-agent video tracking agent throughput",
-      value: "100+ fps real-time processing",
-      source: "Universität Konstanz Neurobiology Lab",
-      verified: true,
-    },
-    {
       claim: "Production microservices availability",
-      value: "99.8%+ uptime",
-      source: "CircleUp AG",
+      value: "99.9%+ uptime across deployed cloud platforms",
+      source: "CloudScale Technologies",
       verified: true,
     },
     {
-      claim: "Data pipeline latency optimization",
-      value: "42% latency reduction",
-      source: "Career AI Studio / NDE Project",
+      claim: "Automated CI/CD deployment frequency",
+      value: "Zero-downtime automated deployments via GitHub Actions",
+      source: "CloudScale Technologies",
       verified: true,
     },
   ],

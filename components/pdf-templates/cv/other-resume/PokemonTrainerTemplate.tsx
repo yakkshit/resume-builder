@@ -506,7 +506,7 @@ export function PokemonTrainerTemplate({
             </View>
             <View style={styles.profileDetails}>
               <Text style={styles.candidateName}>
-                {basicInfo.name || "Venkata Sai Yakkshit Reddy Asodi"}
+                {basicInfo.name || "Alex Morgan"}
               </Text>
               <Text style={styles.candidateTitle}>
                 {basicInfo.title || "FULL-STACK ENGINEER (WEB & DATA APPLICATIONS)"}

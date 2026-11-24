@@ -5,6 +5,8 @@ import path from "path"
 import { getResumeTemplate, getCoverLetterTemplate } from "../components/pdf-templates"
 import { sanitizeResumeData } from "../lib/sanitize-resume-data"
 import type { ResumeData, CoverLetterData, Template, CoverLetterTemplate } from "../lib/types"
+import { isPlaceholderUri, resolveUserAvatarServerSide } from "../lib/crypto/photo-resolver"
+import { autoFitResumeToBudget } from "../lib/resume-template-limits"
 
 const MIN_PDF_SIZE = 200
 
@@ -45,23 +47,36 @@ async function main(): Promise<void> {
     if (!parsed.resumeData) {
       throw new Error("Missing resumeData for resume type")
     }
-    const sanitized = sanitizeResumeData(parsed.resumeData)
+    let sanitized = sanitizeResumeData(parsed.resumeData)
     if (!sanitized.basicInfo) {
       sanitized.basicInfo = {} as any
     }
-    if (
-      !sanitized.basicInfo.profilePicture ||
-      sanitized.basicInfo.profilePicture.trim() === "" ||
-      sanitized.basicInfo.profilePicture.includes("deepmind-picture-2.jpg")
-    ) {
+    const templateName = (parsed.template as Template) || "german-modern"
+
+    // Auto-fit to 1-page budget
+    try {
+      sanitized = autoFitResumeToBudget(sanitized, templateName, 1)
+    } catch {}
+
+    // Enforce photo resolution & zero-galaxy contract
+    const currentPic = sanitized.basicInfo.profilePicture || ""
+    if (isPlaceholderUri(currentPic)) {
+      sanitized.basicInfo.profilePicture = ""
+    } else if (currentPic.startsWith("/api/avatar/")) {
+      const urlUserId = currentPic.split("?")[0].replace("/api/avatar/", "").trim()
+      const targetUser = urlUserId && urlUserId !== "default-user" ? urlUserId : "default-user"
       try {
-        const p = path.join(process.cwd(), "public", "deepmind-picture-2.jpg")
-        if (fs.existsSync(p)) {
-          sanitized.basicInfo.profilePicture = `data:image/jpeg;base64,${fs.readFileSync(p).toString("base64")}`
+        const photoResult = await resolveUserAvatarServerSide(targetUser)
+        if (photoResult.photoDataUri) {
+          sanitized.basicInfo.profilePicture = photoResult.photoDataUri
+        } else {
+          sanitized.basicInfo.profilePicture = ""
         }
-      } catch {}
+      } catch {
+        sanitized.basicInfo.profilePicture = ""
+      }
     }
-    const templateName = (parsed.template as Template) || "modern"
+
     const PDFTemplate = getResumeTemplate(templateName)
     doc = createElement(PDFTemplate, { resumeData: sanitized })
   }

@@ -9,7 +9,7 @@ export function StructuredData() {
     logo: "https://resume.cedzlabs.com/og-image.png",
     founder: {
       "@type": "Person",
-      name: "Venkata Sai Yakkshit Reddy Asodi",
+      name: "CedzLabs Team",
     },
     sameAs: [
       "https://github.com/cedzlabs",

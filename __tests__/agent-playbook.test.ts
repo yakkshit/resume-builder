@@ -39,14 +39,11 @@ describe("Agent Playbook (AGENTS.md), Skills Grounding & MCP Resources Contract"
 
   it("contains graph-ordered verified skills with authentic metrics in STRUCTURED_SKILL_INVENTORY", () => {
     expect(STRUCTURED_SKILL_INVENTORY.skills.length).toBeGreaterThanOrEqual(8);
-    const ros2Skill = STRUCTURED_SKILL_INVENTORY.skills.find((s) => s.name.includes("ROS2"));
-    expect(ros2Skill).toBeDefined();
+    const tsSkill = STRUCTURED_SKILL_INVENTORY.skills.find((s) => s.name.includes("TypeScript") || s.name.includes("React"));
+    expect(tsSkill).toBeDefined();
 
-    const metricItem = STRUCTURED_SKILL_INVENTORY.metrics.find((m) => m.claim.includes("ROS2") || m.value.includes("<30ms"));
+    const metricItem = STRUCTURED_SKILL_INVENTORY.metrics.find((m) => m.value.includes("uptime") || m.value.includes("99"));
     expect(metricItem).toBeDefined();
-
-    const ciCdMetric = STRUCTURED_SKILL_INVENTORY.metrics.find((m) => m.value.includes("99.8%"));
-    expect(ciCdMetric).toBeDefined();
   });
 
   it("registers get_skill_inventory tool in ALL_MCP_TOOLS catalog", () => {

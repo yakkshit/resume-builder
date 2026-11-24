@@ -307,7 +307,7 @@ export function RetroPokedexTemplate({
               )}
             </View>
             <View style={styles.trainerInfo}>
-              <Text style={styles.trainerName}>{basicInfo.name || "Venkata Sai Yakkshit Reddy Asodi"}</Text>
+              <Text style={styles.trainerName}>{basicInfo.name || "Alex Morgan"}</Text>
               <Text style={styles.trainerRole}>
                 {basicInfo.title || "FULL-STACK ENGINEER (WEB & DATA APPLICATIONS)"}
               </Text>
